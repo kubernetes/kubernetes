@@ -18,7 +18,6 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
@@ -53,6 +52,13 @@ const (
 	// caching with ETags containing all APIResources known to the apiserver.
 	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
 
+	// owner: @vinayakankugoyal
+	// kep: https://kep.k8s.io/4633
+	// alpha: v1.31
+	//
+	// Allows us to enable anonymous auth for only certain apiserver endpoints.
+	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
+
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
@@ -61,16 +67,6 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking featuregate.Feature = "APIListChunking"
-
-	// owner: @MikeSpreitzer @yue9944882
-	// alpha: v1.18
-	// beta: v1.20
-	// stable: 1.29
-	//
-	// Enables managing request concurrency with prioritization and fairness at each server.
-	// The FeatureGate was introduced in release 1.15 but the feature
-	// was not really implemented before 1.18.
-	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
 
 	// owner: @ilackams
 	// alpha: v1.7
@@ -98,6 +94,13 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
+	// owner: @deads2k
+	// kep: https://kep.k8s.io/4601
+	// alpha: v1.31
+	//
+	// Allows authorization to use field and label selectors.
+	AuthorizeWithSelectors featuregate.Feature = "AuthorizeWithSelectors"
+
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
@@ -108,14 +111,12 @@ const (
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
-	// owner: @cici37
-	// kep: https://kep.k8s.io/2876
-	// alpha: v1.23
-	// beta: v1.25
-	// stable: v1.29
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/4355
+	// alpha: v1.31
 	//
-	// Enables expression validation for Custom Resource
-	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
+	// Enables coordinated leader election in the API server
+	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
 	// alpha: v1.20
 	// beta: v1.21
@@ -283,6 +284,12 @@ const (
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
+	// owner: @wojtek-t
+	// beta: v1.31
+	//
+	// Enables post-start-hook for storage readiness
+	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
+
 	// owner: @serathius
 	// beta: 1.30
 	// Enables watches without resourceVersion to be served from storage.
@@ -321,6 +328,17 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+}
+
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	// Example:
+	// EmulationVersion: {
+	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	// },
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -328,13 +346,13 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
+	AnonymousAuthConfigurableEndpoints: {Default: false, PreRelease: featuregate.Alpha},
+
 	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
@@ -344,9 +362,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
+	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
+
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
+	CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
@@ -385,6 +405,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	WatchCacheInitializationPostStartHook: {Default: false, PreRelease: featuregate.Beta},
 
 	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 

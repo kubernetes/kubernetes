@@ -23,37 +23,40 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 )
 
 type ExamplePlugin struct {
-	stopCh  <-chan struct{}
-	logger  klog.Logger
-	d       kubeletplugin.DRAPlugin
-	fileOps FileOperations
+	stopCh     <-chan struct{}
+	logger     klog.Logger
+	kubeClient kubernetes.Interface
+	d          kubeletplugin.DRAPlugin
+	fileOps    FileOperations
 
-	cdiDir     string
-	driverName string
-	nodeName   string
-	instances  sets.Set[string]
+	cdiDir      string
+	driverName  string
+	nodeName    string
+	deviceNames sets.Set[string]
 
-	mutex          sync.Mutex
-	instancesInUse sets.Set[string]
-	prepared       map[ClaimID]any
-	gRPCCalls      []GRPCCall
+	mutex     sync.Mutex
+	prepared  map[ClaimID][]Device // prepared claims -> result of nodePrepareResource
+	gRPCCalls []GRPCCall
 
 	blockPrepareResourcesMutex   sync.Mutex
 	blockUnprepareResourcesMutex sync.Mutex
@@ -87,11 +90,18 @@ type ClaimID struct {
 	UID  string
 }
 
-var _ drapbv1alpha3.NodeServer = &ExamplePlugin{}
+type Device struct {
+	PoolName    string
+	DeviceName  string
+	RequestName string
+	CDIDeviceID string
+}
+
+var _ drapb.NodeServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
-func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
-	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
+func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s-%s.json", ex.driverName, claimUID, requestName))
 }
 
 // FileOperations defines optional callbacks for handling CDI files
@@ -104,15 +114,19 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// NumResourceInstances determines whether the plugin reports resources
-	// instances and how many. A negative value causes it to report "not implemented"
-	// in the NodeListAndWatchResources gRPC call.
-	NumResourceInstances int
+	// NumDevices determines whether the plugin reports devices
+	// and how many. It reports nothing if negative.
+	NumDevices int
+
+	// Pre-defined devices, with each device name mapped to
+	// the device attributes. Not used if NumDevices >= 0.
+	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
+
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -127,32 +141,61 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string
 		}
 	}
 	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		instances:      sets.New[string](),
-		instancesInUse: sets.New[string](),
-		prepared:       make(map[ClaimID]any),
+		stopCh:      ctx.Done(),
+		logger:      logger,
+		kubeClient:  kubeClient,
+		fileOps:     fileOps,
+		cdiDir:      cdiDir,
+		driverName:  driverName,
+		nodeName:    nodeName,
+		prepared:    make(map[ClaimID][]Device),
+		deviceNames: sets.New[string](),
 	}
 
-	for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
-		ex.instances.Insert(fmt.Sprintf("instance-%02d", i))
+	for i := 0; i < ex.fileOps.NumDevices; i++ {
+		ex.deviceNames.Insert(fmt.Sprintf("device-%02d", i))
 	}
-
+	for deviceName := range ex.fileOps.Devices {
+		ex.deviceNames.Insert(deviceName)
+	}
 	opts = append(opts,
-		kubeletplugin.Logger(logger),
 		kubeletplugin.DriverName(driverName),
+		kubeletplugin.NodeName(nodeName),
+		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
 	ex.d = d
+
+	if fileOps.NumDevices >= 0 {
+		devices := make([]resourceapi.Device, ex.fileOps.NumDevices)
+		for i := 0; i < ex.fileOps.NumDevices; i++ {
+			devices[i] = resourceapi.Device{
+				Name:  fmt.Sprintf("device-%02d", i),
+				Basic: &resourceapi.BasicDevice{},
+			}
+		}
+		resources := kubeletplugin.Resources{
+			Devices: devices,
+		}
+		ex.d.PublishResources(ctx, resources)
+	} else if len(ex.fileOps.Devices) > 0 {
+		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
+		for i, deviceName := range sets.List(ex.deviceNames) {
+			devices[i] = resourceapi.Device{
+				Name:  deviceName,
+				Basic: &resourceapi.BasicDevice{Attributes: ex.fileOps.Devices[deviceName]},
+			}
+		}
+		resources := kubeletplugin.Resources{
+			Devices: devices,
+		}
+		ex.d.PublishResources(ctx, resources)
+	}
 
 	return ex, nil
 }
@@ -226,128 +269,129 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 	return ex.unprepareResourcesFailure
 }
 
-// NodePrepareResource ensures that the CDI file for the claim exists. It uses
+// NodePrepareResource ensures that the CDI file(s) (one per request) for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) ([]string, error) {
+func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drapb.Claim) ([]Device, error) {
 	logger := klog.FromContext(ctx)
+
+	// The plugin must retrieve the claim itself to get it in the version
+	// that it understands.
+	claim, err := ex.kubeClient.ResourceV1alpha3().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
+	}
+	if claim.Status.Allocation == nil {
+		return nil, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
+	}
+	if claim.UID != types.UID(claimReq.UID) {
+		return nil, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
+	}
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
 	ex.blockPrepareResourcesMutex.Lock()
 	defer ex.blockPrepareResourcesMutex.Unlock()
 
-	deviceName := "claim-" + claimUID
-	vendor := ex.driverName
-	class := "test"
-	dev := vendor + "/" + class + "=" + deviceName
-	claimID := ClaimID{Name: claimName, UID: claimUID}
-	if _, ok := ex.prepared[claimID]; ok {
+	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	if result, ok := ex.prepared[claimID]; ok {
 		// Idempotent call, nothing to do.
-		return []string{dev}, nil
+		return result, nil
 	}
 
-	// Determine environment variables.
-	var p parameters
-	var actualResourceHandle any
-	var instanceNames []string
-	switch len(structuredResourceHandle) {
-	case 0:
-		// Control plane controller did the allocation.
-		if err := json.Unmarshal([]byte(resourceHandle), &p); err != nil {
-			return nil, fmt.Errorf("unmarshal resource handle: %w", err)
-		}
-		actualResourceHandle = resourceHandle
-	case 1:
-		// Scheduler did the allocation with structured parameters.
-		handle := structuredResourceHandle[0]
-		if handle == nil {
-			return nil, errors.New("unexpected nil StructuredResourceHandle")
-		}
-		p.NodeName = handle.NodeName
-		if err := extractParameters(handle.VendorClassParameters, &p.EnvVars, "admin"); err != nil {
-			return nil, err
-		}
-		if err := extractParameters(handle.VendorClaimParameters, &p.EnvVars, "user"); err != nil {
-			return nil, err
-		}
-		for _, result := range handle.Results {
-			if err := extractParameters(result.VendorRequestParameters, &p.EnvVars, "user"); err != nil {
-				return nil, err
-			}
-			namedResources := result.NamedResources
-			if namedResources == nil {
-				return nil, errors.New("missing named resources allocation result")
-			}
-			instanceName := namedResources.Name
-			if instanceName == "" {
-				return nil, errors.New("empty named resources instance name")
-			}
-			if !ex.instances.Has(instanceName) {
-				return nil, fmt.Errorf("unknown allocated instance %q", instanceName)
-			}
-			if ex.instancesInUse.Has(instanceName) {
-				return nil, fmt.Errorf("resource instance %q used more than once", instanceName)
-			}
-			instanceNames = append(instanceNames, instanceName)
-		}
-		actualResourceHandle = handle
-	default:
-		// Huh?
-		return nil, fmt.Errorf("invalid length of NodePrepareResourceRequest.StructuredResourceHandle: %d", len(structuredResourceHandle))
-	}
+	var devices []Device
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		requestName := result.Request
 
-	// Sanity check scheduling.
-	if p.NodeName != "" && ex.nodeName != "" && p.NodeName != ex.nodeName {
-		return nil, fmt.Errorf("claim was allocated for %q, cannot be prepared on %q", p.NodeName, ex.nodeName)
-	}
+		// The driver joins all env variables in the order in which
+		// they appear in results (last one wins).
+		env := make(map[string]string)
+		for i, config := range claim.Status.Allocation.Devices.Config {
+			if config.Opaque == nil ||
+				config.Opaque.Driver != ex.driverName ||
+				len(config.Requests) > 0 && !slices.Contains(config.Requests, requestName) {
+				continue
+			}
+			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {
+				return nil, fmt.Errorf("parameters in config #%d: %w", i, err)
+			}
+		}
 
-	// CDI wants env variables as set of strings.
-	envs := []string{}
-	for key, val := range p.EnvVars {
-		envs = append(envs, key+"="+val)
-	}
+		// It also sets a claim_<claim name>_<request name>=true env variable.
+		// This can be used to identify which devices where mapped into a container.
+		claimReqName := "claim_" + claim.Name + "_" + requestName
+		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
+		env[claimReqName] = "true"
 
-	spec := &spec{
-		Version: "0.3.0", // This has to be a version accepted by the runtimes.
-		Kind:    vendor + "/" + class,
-		// At least one device is required and its entry must have more
-		// than just the name.
-		Devices: []device{
-			{
-				Name: deviceName,
-				ContainerEdits: containerEdits{
-					Env: envs,
+		deviceName := "claim-" + claimReq.UID + "-" + requestName
+		vendor := ex.driverName
+		class := "test"
+		cdiDeviceID := vendor + "/" + class + "=" + deviceName
+
+		// CDI wants env variables as set of strings.
+		envs := []string{}
+		for key, val := range env {
+			envs = append(envs, key+"="+val)
+		}
+		sort.Strings(envs)
+
+		if len(envs) == 0 {
+			// CDI does not support empty ContainerEdits. For example,
+			// kubelet+crio then fail with:
+			//    CDI device injection failed: unresolvable CDI devices ...
+			//
+			// Inject nothing instead, which is supported by DRA.
+			continue
+		}
+
+		spec := &spec{
+			Version: "0.3.0", // This has to be a version accepted by the runtimes.
+			Kind:    vendor + "/" + class,
+			// At least one device is required and its entry must have more
+			// than just the name.
+			Devices: []device{
+				{
+					Name: deviceName,
+					ContainerEdits: containerEdits{
+						Env: envs,
+					},
 				},
 			},
-		},
-	}
-	filePath := ex.getJSONFilePath(claimUID)
-	buffer, err := json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("marshal spec: %w", err)
-	}
-	if err := ex.fileOps.Create(filePath, buffer); err != nil {
-		return nil, fmt.Errorf("failed to write CDI file %v", err)
+		}
+		filePath := ex.getJSONFilePath(claimReq.UID, requestName)
+		buffer, err := json.Marshal(spec)
+		if err != nil {
+			return nil, fmt.Errorf("marshal spec: %w", err)
+		}
+		if err := ex.fileOps.Create(filePath, buffer); err != nil {
+			return nil, fmt.Errorf("failed to write CDI file: %w", err)
+		}
+		device := Device{
+			PoolName:    result.Pool,
+			DeviceName:  result.Device,
+			RequestName: requestName,
+			CDIDeviceID: cdiDeviceID,
+		}
+		devices = append(devices, device)
 	}
 
-	ex.prepared[claimID] = actualResourceHandle
-	for _, instanceName := range instanceNames {
-		ex.instancesInUse.Insert(instanceName)
-	}
-
-	logger.V(3).Info("CDI file created", "path", filePath, "device", dev)
-	return []string{dev}, nil
+	logger.V(3).Info("CDI file(s) created", "devices", devices)
+	ex.prepared[claimID] = devices
+	return devices, nil
 }
 
-func extractParameters(parameters runtime.RawExtension, env *map[string]string, kind string) error {
+func extractParameters(parameters runtime.RawExtension, env *map[string]string, admin bool) error {
 	if len(parameters.Raw) == 0 {
 		return nil
 	}
+	kind := "user"
+	if admin {
+		kind = "admin"
+	}
 	var data map[string]string
 	if err := json.Unmarshal(parameters.Raw, &data); err != nil {
-		return fmt.Errorf("decoding %s parameters: %v", kind, err)
+		return fmt.Errorf("decoding %s parameters: %w", kind, err)
 	}
 	if len(data) > 0 && *env == nil {
 		*env = make(map[string]string)
@@ -358,9 +402,9 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
-	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
-		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+	resp := &drapb.NodePrepareResourcesResponse{
+		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
 	}
 
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
@@ -368,15 +412,23 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 	}
 
 	for _, claimReq := range req.Claims {
-		cdiDevices, err := ex.nodePrepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
+		devices, err := ex.nodePrepareResource(ctx, claimReq)
 		if err != nil {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
+			resp.Claims[claimReq.UID] = &drapb.NodePrepareResourceResponse{
 				Error: err.Error(),
 			}
 		} else {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
-				CDIDevices: cdiDevices,
+			r := &drapb.NodePrepareResourceResponse{}
+			for _, device := range devices {
+				pbDevice := &drapb.Device{
+					PoolName:     device.PoolName,
+					DeviceName:   device.DeviceName,
+					RequestNames: []string{device.RequestName},
+					CDIDeviceIDs: []string{device.CDIDeviceID},
+				}
+				r.Devices = append(r.Devices, pbDevice)
 			}
+			resp.Claims[claimReq.UID] = r
 		}
 	}
 	return resp, nil
@@ -385,55 +437,35 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) error {
+func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *drapb.Claim) error {
 	ex.blockUnprepareResourcesMutex.Lock()
 	defer ex.blockUnprepareResourcesMutex.Unlock()
 
 	logger := klog.FromContext(ctx)
 
-	filePath := ex.getJSONFilePath(claimUID)
-	if err := ex.fileOps.Remove(filePath); err != nil {
-		return fmt.Errorf("error removing CDI file: %w", err)
-	}
-	logger.V(3).Info("CDI file removed", "path", filePath)
-
-	ex.mutex.Lock()
-	defer ex.mutex.Unlock()
-
-	claimID := ClaimID{Name: claimName, UID: claimUID}
-	expectedResourceHandle, ok := ex.prepared[claimID]
+	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	devices, ok := ex.prepared[claimID]
 	if !ok {
 		// Idempotent call, nothing to do.
 		return nil
 	}
 
-	var actualResourceHandle any = resourceHandle
-	if structuredResourceHandle != nil {
-		if len(structuredResourceHandle) != 1 {
-			return fmt.Errorf("unexpected number of entries in StructuredResourceHandle: %d", len(structuredResourceHandle))
+	for _, device := range devices {
+		filePath := ex.getJSONFilePath(claimReq.UID, device.RequestName)
+		if err := ex.fileOps.Remove(filePath); err != nil {
+			return fmt.Errorf("error removing CDI file: %w", err)
 		}
-		actualResourceHandle = structuredResourceHandle[0]
+		logger.V(3).Info("CDI file removed", "path", filePath)
 	}
-	if diff := cmp.Diff(expectedResourceHandle, actualResourceHandle); diff != "" {
-		return fmt.Errorf("difference between expected (-) and actual resource handle (+):\n%s", diff)
-	}
+
 	delete(ex.prepared, claimID)
-	if structuredResourceHandle := structuredResourceHandle; structuredResourceHandle != nil {
-		for _, handle := range structuredResourceHandle {
-			for _, result := range handle.Results {
-				instanceName := result.NamedResources.Name
-				ex.instancesInUse.Delete(instanceName)
-			}
-		}
-	}
-	delete(ex.prepared, ClaimID{Name: claimName, UID: claimUID})
 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
-	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
-		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+	resp := &drapb.NodeUnprepareResourcesResponse{
+		Claims: make(map[string]*drapb.NodeUnprepareResourceResponse),
 	}
 
 	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
@@ -441,49 +473,16 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 	}
 
 	for _, claimReq := range req.Claims {
-		err := ex.nodeUnprepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
+		err := ex.nodeUnprepareResource(ctx, claimReq)
 		if err != nil {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{
+			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{
 				Error: err.Error(),
 			}
 		} else {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{}
+			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{}
 		}
 	}
 	return resp, nil
-}
-
-func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, stream drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
-	if ex.fileOps.NumResourceInstances < 0 {
-		ex.logger.Info("Sending no NodeResourcesResponse")
-		return status.New(codes.Unimplemented, "node resource support disabled").Err()
-	}
-
-	instances := make([]resourceapi.NamedResourcesInstance, len(ex.instances))
-	for i, name := range sets.List(ex.instances) {
-		instances[i].Name = name
-	}
-	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
-		Resources: []*resourceapi.ResourceModel{
-			{
-				NamedResources: &resourceapi.NamedResourcesResources{
-					Instances: instances,
-				},
-			},
-		},
-	}
-
-	ex.logger.Info("Sending NodeListAndWatchResourcesResponse", "response", resp)
-	if err := stream.Send(resp); err != nil {
-		return err
-	}
-
-	// Keep the stream open until the test is done.
-	// TODO: test sending more updates later
-	<-ex.stopCh
-	ex.logger.Info("Done sending NodeListAndWatchResourcesResponse, closing stream")
-
-	return nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {

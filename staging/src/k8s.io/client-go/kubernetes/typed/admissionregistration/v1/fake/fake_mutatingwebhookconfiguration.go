@@ -45,7 +45,7 @@ var mutatingwebhookconfigurationsKind = v1.SchemeGroupVersion.WithKind("Mutating
 func (c *FakeMutatingWebhookConfigurations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.MutatingWebhookConfiguration, err error) {
 	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(mutatingwebhookconfigurationsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(mutatingwebhookconfigurationsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeMutatingWebhookConfigurations) Get(ctx context.Context, name string
 func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.MutatingWebhookConfigurationList, err error) {
 	emptyResult := &v1.MutatingWebhookConfigurationList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(mutatingwebhookconfigurationsResource, mutatingwebhookconfigurationsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(mutatingwebhookconfigurationsResource, mutatingwebhookconfigurationsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts metav
 // Watch returns a watch.Interface that watches the requested mutatingWebhookConfigurations.
 func (c *FakeMutatingWebhookConfigurations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(mutatingwebhookconfigurationsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(mutatingwebhookconfigurationsResource, opts))
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
 func (c *FakeMutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1.MutatingWebhookConfiguration, opts metav1.CreateOptions) (result *v1.MutatingWebhookConfiguration, err error) {
 	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeMutatingWebhookConfigurations) Create(ctx context.Context, mutating
 func (c *FakeMutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1.MutatingWebhookConfiguration, opts metav1.UpdateOptions) (result *v1.MutatingWebhookConfiguration, err error) {
 	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeMutatingWebhookConfigurations) Delete(ctx context.Context, name str
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeMutatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(mutatingwebhookconfigurationsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(mutatingwebhookconfigurationsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.MutatingWebhookConfigurationList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeMutatingWebhookConfigurations) DeleteCollection(ctx context.Context
 func (c *FakeMutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MutatingWebhookConfiguration, err error) {
 	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingwebhookconfigurationsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeMutatingWebhookConfigurations) Apply(ctx context.Context, mutatingW
 	}
 	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

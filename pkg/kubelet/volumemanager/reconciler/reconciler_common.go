@@ -248,9 +248,10 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 		// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher,
 		// so attach it
 		volumeToAttach := operationexecutor.VolumeToAttach{
-			VolumeName: volumeToMount.VolumeName,
-			VolumeSpec: volumeToMount.VolumeSpec,
-			NodeName:   rc.nodeName,
+			VolumeName:    volumeToMount.VolumeName,
+			VolumeSpec:    volumeToMount.VolumeSpec,
+			NodeName:      rc.nodeName,
+			ScheduledPods: []*v1.Pod{volumeToMount.Pod},
 		}
 		klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
 		err := rc.operationExecutor.AttachVolume(logger, volumeToAttach, rc.actualStateOfWorld)

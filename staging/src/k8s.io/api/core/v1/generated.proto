@@ -126,20 +126,24 @@ message AzureDiskVolumeSource {
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
   // +optional
+  // +default=ref(AzureDataDiskCachingReadWrite)
   optional string cachingMode = 3;
 
   // fsType is Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
+  // +default="ext4"
   optional string fsType = 4;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
+  // +default=false
   optional bool readOnly = 5;
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+  // +default=ref(AzureSharedBlobDisk)
   optional string kind = 6;
 }
 
@@ -420,30 +424,6 @@ message CinderVolumeSource {
   // to OpenStack.
   // +optional
   optional LocalObjectReference secretRef = 4;
-}
-
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-message ClaimSource {
-  // ResourceClaimName is the name of a ResourceClaim object in the same
-  // namespace as this pod.
-  optional string resourceClaimName = 1;
-
-  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
-  // object in the same namespace as this pod.
-  //
-  // The template will be used to create a new ResourceClaim, which will
-  // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The pod name and resource name, along with a
-  // generated component, will be used to form a unique name for the
-  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-  //
-  // This field is immutable and no changes will be made to the
-  // corresponding ResourceClaim by the control plane after creating the
-  // ResourceClaim.
-  optional string resourceClaimTemplateName = 2;
 }
 
 // ClientIPConfig represents the configurations of Client IP based session affinity.
@@ -1114,6 +1094,16 @@ message ContainerStatus {
   // +featureGate=SupplementalGroupsPolicy
   // +optional
   optional ContainerUser user = 13;
+
+  // AllocatedResourcesStatus represents the status of various resources
+  // allocated for this Pod.
+  // +featureGate=ResourceHealthStatus
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  repeated ResourceStatus allocatedResourcesStatus = 14;
 }
 
 // ContainerUser represents user identity information
@@ -2010,6 +2000,7 @@ message HostAlias {
 // HostIP represents a single IP address allocated to the host.
 message HostIP {
   // IP is the IP address assigned to the host
+  // +required
   optional string ip = 1;
 }
 
@@ -2045,6 +2036,7 @@ message ISCSIPersistentVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2102,6 +2094,7 @@ message ISCSIVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2140,6 +2133,26 @@ message ISCSIVolumeSource {
   // <target portal>:<volume name> will be created for the connection.
   // +optional
   optional string initiatorName = 12;
+}
+
+// ImageVolumeSource represents a image volume resource.
+message ImageVolumeSource {
+  // Required: Image or artifact reference to be used.
+  // Behaves in the same way as pod.spec.containers[*].image.
+  // Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+  // More info: https://kubernetes.io/docs/concepts/containers/images
+  // This field is optional to allow higher level config management to default or override
+  // container images in workload controllers like Deployments and StatefulSets.
+  // +optional
+  optional string reference = 1;
+
+  // Policy for pulling OCI objects. Possible values are:
+  // Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  // Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+  // +optional
+  optional string pullPolicy = 2;
 }
 
 // Maps a string key to a path within a volume.
@@ -2615,6 +2628,15 @@ message NodeDaemonEndpoints {
   optional DaemonEndpoint kubeletEndpoint = 1;
 }
 
+// NodeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the NodeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message NodeFeatures {
+  // SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+  // +optional
+  optional bool supplementalGroupsPolicy = 1;
+}
+
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
@@ -2645,12 +2667,17 @@ message NodeRuntimeHandler {
   optional NodeRuntimeHandlerFeatures features = 2;
 }
 
-// NodeRuntimeHandlerFeatures is a set of runtime features.
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message NodeRuntimeHandlerFeatures {
   // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
+
+  // UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+  // +featureGate=UserNamespacesSupport
+  // +optional
+  optional bool userNamespaces = 2;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2740,7 +2767,7 @@ message NodeSpec {
 // NodeStatus is information about the current status of a node.
 message NodeStatus {
   // Capacity represents the total resources of a node.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#capacity
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
@@ -2811,9 +2838,15 @@ message NodeStatus {
 
   // The available runtime handlers.
   // +featureGate=RecursiveReadOnlyMounts
+  // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
+
+  // Features describes the set of features implemented by the CRI implementation.
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional NodeFeatures features = 13;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -3086,7 +3119,7 @@ message PersistentVolumeClaimSpec {
   // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
   // exists.
   // More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+  // (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string volumeAttributesClassName = 9;
@@ -3185,14 +3218,14 @@ message PersistentVolumeClaimStatus {
 
   // currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
   // When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string currentVolumeAttributesClassName = 8;
 
   // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
   // When this is unset, there is no ModifyVolume operation being attempted.
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
   // +featureGate=VolumeAttributesClass
   // +optional
   optional ModifyVolumeStatus modifyVolumeStatus = 9;
@@ -3409,7 +3442,7 @@ message PersistentVolumeSpec {
   // after a volume has been updated successfully to a new class.
   // For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
   // PersistentVolumeClaims during the binding process.
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string volumeAttributesClassName = 10;
@@ -3433,8 +3466,6 @@ message PersistentVolumeStatus {
 
   // lastPhaseTransitionTime is the time the phase transitioned from one to another
   // and automatically resets to current time everytime a volume phase transitions.
-  // This is a beta field and requires the PersistentVolumeLastPhaseTransitionTime feature to be enabled (enabled by default).
-  // +featureGate=PersistentVolumeLastPhaseTransitionTime
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastPhaseTransitionTime = 4;
 }
@@ -3722,6 +3753,7 @@ message PodExecOptions {
 // PodIP represents a single IP address allocated to the pod.
 message PodIP {
   // IP is the IP address assigned to the pod
+  // +required
   optional string ip = 1;
 }
 
@@ -3827,7 +3859,10 @@ message PodReadinessGate {
   optional string conditionType = 1;
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// PodResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the pod.
+//
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
 message PodResourceClaim {
@@ -3835,8 +3870,29 @@ message PodResourceClaim {
   // This must be a DNS_LABEL.
   optional string name = 1;
 
-  // Source describes where to find the ResourceClaim.
-  optional ClaimSource source = 2;
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace as this pod.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimName = 3;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace as this pod.
+  //
+  // The template will be used to create a new ResourceClaim, which will
+  // be bound to this pod. When this pod is deleted, the ResourceClaim
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
+  //
+  // This field is immutable and no changes will be made to the
+  // corresponding ResourceClaim by the control plane after creating the
+  // ResourceClaim.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimTemplateName = 4;
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
@@ -4658,7 +4714,8 @@ message ProbeHandler {
 
 // Represents a projected volume source
 message ProjectedVolumeSource {
-  // sources is the list of volume projections
+  // sources is the list of volume projections. Each entry in this list
+  // handles one source.
   // +optional
   // +listType=atomic
   repeated VolumeProjection sources = 1;
@@ -4729,18 +4786,21 @@ message RBDPersistentVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4781,18 +4841,21 @@ message RBDVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4948,6 +5011,13 @@ message ResourceClaim {
   // the Pod where this field is used. It makes that resource available
   // inside a container.
   optional string name = 1;
+
+  // Request is the name chosen for a request in the referenced claim.
+  // If empty, everything from the claim is made available, otherwise
+  // only the result of this request.
+  //
+  // +optional
+  optional string request = 2;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
@@ -4963,6 +5033,25 @@ message ResourceFieldSelector {
   // Specifies the output format of the exposed resources, defaults to "1"
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
+}
+
+// ResourceHealth represents the health of a resource. It has the latest device health information.
+// This is a part of KEP https://kep.k8s.io/4680 and historical health changes are planned to be added in future iterations of a KEP.
+message ResourceHealth {
+  // ResourceID is the unique identifier of the resource. See the ResourceID type for more information.
+  optional string resourceID = 1;
+
+  // Health of the resource.
+  // can be one of:
+  //  - Healthy: operates as normal
+  //  - Unhealthy: reported unhealthy. We consider this a temporary health issue
+  //               since we do not have a mechanism today to distinguish
+  //               temporary and permanent issues.
+  //  - Unknown: The status cannot be determined.
+  //             For example, Device Plugin got unregistered and hasn't been re-registered since.
+  //
+  // In future we may want to introduce the PermanentlyUnhealthy Status.
+  optional string health = 2;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -5056,6 +5145,20 @@ message ResourceRequirements {
   repeated ResourceClaim claims = 3;
 }
 
+message ResourceStatus {
+  // Name of the resource. Must be unique within the pod and match one of the resources from the pod spec.
+  // +required
+  optional string name = 1;
+
+  // List of unique Resources health. Each element in the list contains an unique resource ID and resource health.
+  // At a minimum, ResourceID must uniquely identify the Resource
+  // allocated to the Pod on the Node for the lifetime of a Pod.
+  // See ResourceID type for it's definition.
+  // +listType=map
+  // +listMapKey=resourceID
+  repeated ResourceHealth resources = 2;
+}
+
 // SELinuxOptions are the labels to be applied to the container
 message SELinuxOptions {
   // User is a SELinux user label that applies to the container.
@@ -5102,6 +5205,7 @@ message ScaleIOPersistentVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5113,6 +5217,7 @@ message ScaleIOPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5148,6 +5253,7 @@ message ScaleIOVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5159,6 +5265,7 @@ message ScaleIOVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
@@ -5442,7 +5549,7 @@ message SecurityContext {
   optional bool allowPrivilegeEscalation = 7;
 
   // procMount denotes the type of proc mount to use for the containers.
-  // The default is DefaultProcMount which uses the container runtime defaults for
+  // The default value is Default which uses the container runtime defaults for
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
   // Note that this field cannot be set when spec.os.name is windows.
@@ -6357,7 +6464,8 @@ message VolumeNodeAffinity {
   optional NodeSelector required = 1;
 }
 
-// Projection that may be projected along with other supported volume types
+// Projection that may be projected along with other supported volume types.
+// Exactly one of these fields must be set.
 message VolumeProjection {
   // secret information about the secret data to project
   // +optional
@@ -6574,6 +6682,24 @@ message VolumeSource {
   //
   // +optional
   optional EphemeralVolumeSource ephemeral = 29;
+
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // The volume is resolved at pod startup depending on which PullPolicy value is provided:
+  //
+  // - Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // - Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // - IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  //
+  // The volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.
+  // A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.
+  // The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
+  // The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
+  // The volume will be mounted read-only (ro) and non-executable files (noexec).
+  // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath).
+  // The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
+  // +featureGate=ImageVolume
+  // +optional
+  optional ImageVolumeSource image = 30;
 }
 
 // Represents a vSphere volume resource.

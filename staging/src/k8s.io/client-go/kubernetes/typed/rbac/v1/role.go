@@ -20,20 +20,14 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
-	consistencydetector "k8s.io/client-go/util/consistencydetector"
-	watchlist "k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -58,190 +52,18 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration]
 }
 
 // newRoles returns a Roles
 func newRoles(c *RbacV1Client, namespace string) *roles {
 	return &roles{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration](
+			"roles",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.Role { return &v1.Role{} },
+			func() *v1.RoleList { return &v1.RoleList{} }),
 	}
-}
-
-// Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *roles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Role, err error) {
-	result = &v1.Role{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("roles").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *roles) List(ctx context.Context, opts metav1.ListOptions) (*v1.RoleList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for roles, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for roles", c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for roles ended with an error, falling back to the standard LIST semantics, err = %v", err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for roles", c.list, opts, result)
-	}
-	return result, err
-}
-
-// list takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *roles) list(ctx context.Context, opts metav1.ListOptions) (result *v1.RoleList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.RoleList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// watchList establishes a watch stream with the server and returns the list of Roles
-func (c *roles) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.RoleList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.RoleList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested roles.
-func (c *roles) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Create(ctx context.Context, role *v1.Role, opts metav1.CreateOptions) (result *v1.Role, err error) {
-	result = &v1.Role{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(role).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Update(ctx context.Context, role *v1.Role, opts metav1.UpdateOptions) (result *v1.Role, err error) {
-	result = &v1.Role{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("roles").
-		Name(role.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(role).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *roles) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("roles").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *roles) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("roles").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched role.
-func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Role, err error) {
-	result = &v1.Role{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("roles").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied role.
-func (c *roles) Apply(ctx context.Context, role *rbacv1.RoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Role, err error) {
-	if role == nil {
-		return nil, fmt.Errorf("role provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(role)
-	if err != nil {
-		return nil, err
-	}
-	name := role.Name
-	if name == nil {
-		return nil, fmt.Errorf("role.Name must be provided to Apply")
-	}
-	result = &v1.Role{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("roles").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

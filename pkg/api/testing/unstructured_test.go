@@ -17,30 +17,24 @@ limitations under the License.
 package testing
 
 import (
-	"bytes"
-	"fmt"
 	"math/rand"
-	"os"
 	"reflect"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	cborserializer "k8s.io/apimachinery/pkg/runtime/serializer/cbor"
-	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -142,206 +136,15 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRoundtripToUnstructured verifies the roundtrip faithfulness of all external types from native
-// to unstructured and back using both the JSON and CBOR serializers. The intermediate unstructured
-// objects produced by both encodings must be identical and be themselves roundtrippable to JSON and
-// CBOR.
 func TestRoundtripToUnstructured(t *testing.T) {
-	// These are GVKs that whose CBOR roundtrippability is blocked by a known issue that must be
-	// resolved as a prerequisite for alpha.
-	knownFailureReasons := map[string][]schema.GroupVersionKind{
-		// Since JSON cannot directly represent arbitrary byte sequences, a byte slice
-		// encodes to a JSON string containing the base64 encoding of the slice
-		// contents. Decoding a JSON string into a byte slice assumes (and requires) that
-		// the JSON string contain base64-encoded data. The CBOR serializer must be
-		// compatible with this behavior.
-		"byte slices should be represented in unstructured as base64-encoded strings": {
-			{Version: "v1", Kind: "Secret"},
-			{Version: "v1", Kind: "SecretList"},
-			{Version: "v1", Kind: "RangeAllocation"},
-			{Version: "v1", Kind: "ConfigMap"},
-			{Version: "v1", Kind: "ConfigMapList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfigurationList"},
-			{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"},
-			{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"},
-			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequest"},
-			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequestList"},
-		},
-		// If a RawExtension's bytes are invalid JSON, its containing object can't be encoded to JSON.
-		"rawextension needs to work in programs that assume json": {
-			{Version: "v1", Kind: "List"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevisionList"},
-			{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
-			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaim"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParametersList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParametersList"},
-		},
-	}
-
-	seed := int64(time.Now().Nanosecond())
-	if override := os.Getenv("TEST_RAND_SEED"); len(override) > 0 {
-		overrideSeed, err := strconv.ParseInt(override, 10, 64)
-		if err != nil {
-			t.Fatal(err)
-		}
-		seed = overrideSeed
-		t.Logf("using overridden seed: %d", seed)
-	} else {
-		t.Logf("seed (override with TEST_RAND_SEED if desired): %d", seed)
-	}
-
-	var buf bytes.Buffer
+	skipped := sets.New[schema.GroupVersionKind]()
 	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
 		if nonRoundTrippableTypes.Has(gvk.Kind) {
-			continue
+			skipped.Insert(gvk)
 		}
-		if gvk.Version == runtime.APIVersionInternal {
-			continue
-		}
-
-		subtestName := fmt.Sprintf("%s.%s/%s", gvk.Version, gvk.Group, gvk.Kind)
-		if gvk.Group == "" {
-			subtestName = fmt.Sprintf("%s/%s", gvk.Version, gvk.Kind)
-		}
-
-		t.Run(subtestName, func(t *testing.T) {
-			for reason, gvks := range knownFailureReasons {
-				for _, each := range gvks {
-					if gvk == each {
-						t.Skip(reason)
-					}
-				}
-			}
-
-			fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
-
-			for i := 0; i < 50; i++ {
-				// We do fuzzing on the internal version of the object, and only then
-				// convert to the external version. This is because custom fuzzing
-				// function are only supported for internal objects.
-				internalObj, err := legacyscheme.Scheme.New(schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}.WithKind(gvk.Kind))
-				if err != nil {
-					t.Fatalf("couldn't create internal object %v: %v", gvk.Kind, err)
-				}
-				fuzzer.Fuzz(internalObj)
-
-				item, err := legacyscheme.Scheme.New(gvk)
-				if err != nil {
-					t.Fatalf("couldn't create external object %v: %v", gvk.Kind, err)
-				}
-				if err := legacyscheme.Scheme.Convert(internalObj, item, nil); err != nil {
-					t.Fatalf("conversion for %v failed: %v", gvk.Kind, err)
-				}
-
-				// Decoding into Unstructured requires that apiVersion and kind be
-				// serialized, so populate TypeMeta.
-				item.GetObjectKind().SetGroupVersionKind(gvk)
-
-				jsonSerializer := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, jsonserializer.SerializerOptions{})
-				cborSerializer := cborserializer.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme)
-
-				// original->JSON->Unstructured
-				buf.Reset()
-				if err := jsonSerializer.Encode(item, &buf); err != nil {
-					t.Fatalf("error encoding native to json: %v", err)
-				}
-				var uJSON runtime.Object = &metaunstruct.Unstructured{}
-				uJSON, _, err = jsonSerializer.Decode(buf.Bytes(), &gvk, uJSON)
-				if err != nil {
-					t.Fatalf("error decoding json to unstructured: %v", err)
-				}
-
-				// original->CBOR->Unstructured
-				buf.Reset()
-				if err := cborSerializer.Encode(item, &buf); err != nil {
-					t.Fatalf("error encoding native to cbor: %v", err)
-				}
-				var uCBOR runtime.Object = &metaunstruct.Unstructured{}
-				uCBOR, _, err = cborSerializer.Decode(buf.Bytes(), &gvk, uCBOR)
-				if err != nil {
-					diag, _ := cbor.Diagnose(buf.Bytes())
-					t.Fatalf("error decoding cbor to unstructured: %v, diag: %s", err, diag)
-				}
-
-				// original->JSON->Unstructured == original->CBOR->Unstructured
-				if !apiequality.Semantic.DeepEqual(uJSON, uCBOR) {
-					t.Fatalf("unstructured via json differed from unstructured via cbor: %v", cmp.Diff(uJSON, uCBOR))
-				}
-
-				// original->JSON/CBOR->Unstructured == original->JSON/CBOR->Unstructured->JSON->Unstructured
-				buf.Reset()
-				if err := jsonSerializer.Encode(uJSON, &buf); err != nil {
-					t.Fatalf("error encoding unstructured to json: %v", err)
-				}
-				var uJSON2 runtime.Object = &metaunstruct.Unstructured{}
-				uJSON2, _, err = jsonSerializer.Decode(buf.Bytes(), &gvk, uJSON2)
-				if err != nil {
-					t.Fatalf("error decoding json to unstructured: %v", err)
-				}
-				if !apiequality.Semantic.DeepEqual(uJSON, uJSON2) {
-					t.Errorf("object changed during native-json-unstructured-json-unstructured roundtrip, diff: %s", cmp.Diff(uJSON, uJSON2))
-				}
-
-				// original->JSON/CBOR->Unstructured == original->JSON/CBOR->Unstructured->CBOR->Unstructured
-				buf.Reset()
-				if err := cborSerializer.Encode(uCBOR, &buf); err != nil {
-					t.Fatalf("error encoding unstructured to cbor: %v", err)
-				}
-				var uCBOR2 runtime.Object = &metaunstruct.Unstructured{}
-				uCBOR2, _, err = cborSerializer.Decode(buf.Bytes(), &gvk, uCBOR2)
-				if err != nil {
-					diag, _ := cbor.Diagnose(buf.Bytes())
-					t.Fatalf("error decoding cbor to unstructured: %v, diag: %s", err, diag)
-				}
-				if !apiequality.Semantic.DeepEqual(uCBOR, uCBOR2) {
-					t.Errorf("object changed during native-cbor-unstructured-cbor-unstructured roundtrip, diff: %s", cmp.Diff(uCBOR, uCBOR2))
-				}
-
-				// original->JSON/CBOR->Unstructured->JSON->final == original
-				buf.Reset()
-				if err := jsonSerializer.Encode(uJSON, &buf); err != nil {
-					t.Fatalf("error encoding unstructured to json: %v", err)
-				}
-				finalJSON, _, err := jsonSerializer.Decode(buf.Bytes(), &gvk, nil)
-				if err != nil {
-					t.Fatalf("error decoding json to native: %v", err)
-				}
-				if !apiequality.Semantic.DeepEqual(item, finalJSON) {
-					t.Errorf("object changed during native-json-unstructured-json-native roundtrip, diff: %s", cmp.Diff(item, finalJSON))
-				}
-
-				// original->JSON/CBOR->Unstructured->CBOR->final == original
-				buf.Reset()
-				if err := cborSerializer.Encode(uCBOR, &buf); err != nil {
-					t.Fatalf("error encoding unstructured to cbor: %v", err)
-				}
-				finalCBOR, _, err := cborSerializer.Decode(buf.Bytes(), &gvk, nil)
-				if err != nil {
-					diag, _ := cbor.Diagnose(buf.Bytes())
-					t.Fatalf("error decoding cbor to native: %v, diag: %s", err, diag)
-				}
-				if !apiequality.Semantic.DeepEqual(item, finalCBOR) {
-					t.Errorf("object changed during native-cbor-unstructured-cbor-native roundtrip, diff: %s", cmp.Diff(item, finalCBOR))
-				}
-			}
-		})
 	}
+
+	roundtrip.RoundtripToUnstructured(t, legacyscheme.Scheme, FuzzerFuncs, skipped)
 }
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {

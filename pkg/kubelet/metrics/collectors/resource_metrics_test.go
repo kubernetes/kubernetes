@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -48,8 +47,6 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"pod_memory_working_set_bytes",
 		"pod_swap_usage_bytes",
 	}
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 
 	tests := []struct {
 		name            string
@@ -408,8 +405,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			provider := summaryprovidertest.NewMockSummaryProvider(mockCtrl)
-			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).AnyTimes()
+			provider := summaryprovidertest.NewMockSummaryProvider(t)
+			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)
 
 			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {

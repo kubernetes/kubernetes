@@ -31,8 +31,8 @@ import (
 	_ "github.com/cespare/prettybench"
 	_ "gotest.tools/gotestsum"
 
-	// mockgen
-	_ "go.uber.org/mock/mockgen"
+	// mockery
+	_ "github.com/vektra/mockery/v2"
 
 	// tools like cpu
 	_ "go.uber.org/automaxprocs"

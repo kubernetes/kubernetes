@@ -280,7 +280,7 @@ func NewProxier(ctx context.Context,
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 	nfacctRunner, err := nfacct.New()
 	if err != nil {
-		logger.Error(err, "Failed to create nfacct runner")
+		logger.Error(err, "Failed to create nfacct runner, nfacct based metrics won't be available")
 	}
 
 	proxier := &Proxier{

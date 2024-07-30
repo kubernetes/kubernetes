@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// VolumeApplyConfiguration represents an declarative configuration of the Volume type for use
+// VolumeApplyConfiguration represents a declarative configuration of the Volume type for use
 // with apply.
 type VolumeApplyConfiguration struct {
 	Name                           *string `json:"name,omitempty"`
 	VolumeSourceApplyConfiguration `json:",inline"`
 }
 
-// VolumeApplyConfiguration constructs an declarative configuration of the Volume type for use with
+// VolumeApplyConfiguration constructs a declarative configuration of the Volume type for use with
 // apply.
 func Volume() *VolumeApplyConfiguration {
 	return &VolumeApplyConfiguration{}
@@ -268,5 +268,13 @@ func (b *VolumeApplyConfiguration) WithCSI(value *CSIVolumeSourceApplyConfigurat
 // If called multiple times, the Ephemeral field is set to the value of the last call.
 func (b *VolumeApplyConfiguration) WithEphemeral(value *EphemeralVolumeSourceApplyConfiguration) *VolumeApplyConfiguration {
 	b.Ephemeral = value
+	return b
+}
+
+// WithImage sets the Image field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Image field is set to the value of the last call.
+func (b *VolumeApplyConfiguration) WithImage(value *ImageVolumeSourceApplyConfiguration) *VolumeApplyConfiguration {
+	b.Image = value
 	return b
 }

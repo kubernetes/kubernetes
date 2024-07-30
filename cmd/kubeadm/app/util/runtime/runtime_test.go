@@ -319,7 +319,12 @@ func TestImageExists(t *testing.T) {
 		prepare  func(*fakeImpl)
 	}{
 		{
-			name:     "valid",
+			name: "valid",
+			prepare: func(mock *fakeImpl) {
+				mock.ImageStatusReturns(&v1.ImageStatusResponse{
+					Image: &v1.Image{},
+				}, nil)
+			},
 			expected: true,
 		},
 		{

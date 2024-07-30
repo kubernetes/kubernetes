@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// DeploymentSpecApplyConfiguration represents an declarative configuration of the DeploymentSpec type for use
+// DeploymentSpecApplyConfiguration represents a declarative configuration of the DeploymentSpec type for use
 // with apply.
 type DeploymentSpecApplyConfiguration struct {
 	Replicas                *int32                                    `json:"replicas,omitempty"`
@@ -37,7 +37,7 @@ type DeploymentSpecApplyConfiguration struct {
 	ProgressDeadlineSeconds *int32                                    `json:"progressDeadlineSeconds,omitempty"`
 }
 
-// DeploymentSpecApplyConfiguration constructs an declarative configuration of the DeploymentSpec type for use with
+// DeploymentSpecApplyConfiguration constructs a declarative configuration of the DeploymentSpec type for use with
 // apply.
 func DeploymentSpec() *DeploymentSpecApplyConfiguration {
 	return &DeploymentSpecApplyConfiguration{}

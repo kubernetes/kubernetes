@@ -54,11 +54,13 @@ message LeaseList {
 // LeaseSpec is a specification of a Lease.
 message LeaseSpec {
   // holderIdentity contains the identity of the holder of a current lease.
+  // If Coordinated Leader Election is used, the holder identity must be
+  // equal to the elected LeaseCandidate.metadata.name field.
   // +optional
   optional string holderIdentity = 1;
 
   // leaseDurationSeconds is a duration that candidates for a lease need
-  // to wait to force acquire it. This is measure against time of last
+  // to wait to force acquire it. This is measured against the time of last
   // observed renewTime.
   // +optional
   optional int32 leaseDurationSeconds = 2;
@@ -76,5 +78,19 @@ message LeaseSpec {
   // holders.
   // +optional
   optional int32 leaseTransitions = 5;
+
+  // Strategy indicates the strategy for picking the leader for coordinated leader election.
+  // If the field is not specified, there is no active coordination for this lease.
+  // (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
+  // +featureGate=CoordinatedLeaderElection
+  // +optional
+  optional string strategy = 6;
+
+  // PreferredHolder signals to a lease holder that the lease has a
+  // more optimal holder and should be given up.
+  // This field can only be set if Strategy is also set.
+  // +featureGate=CoordinatedLeaderElection
+  // +optional
+  optional string preferredHolder = 7;
 }
 

@@ -37,14 +37,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/component-base/featuregate"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -53,6 +56,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	"k8s.io/sample-apiserver/pkg/apiserver"
 	sampleserver "k8s.io/sample-apiserver/pkg/cmd/server"
 	wardlev1alpha1client "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 	netutils "k8s.io/utils/net"
@@ -226,81 +230,40 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 }
 
 func TestAggregatedAPIServer(t *testing.T) {
+	// Testing default, BanFlunder default=true in 1.2
+	t.Run("WithoutWardleFeatureGateAtV1.2", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, true, "1.2", "1.2")
+	})
+	// Testing emulation version N, BanFlunder default=true in 1.1
+	t.Run("WithoutWardleFeatureGateAtV1.1", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, true, "1.1", "1.1")
+	})
+	// Testing emulation version N-1, BanFlunder default=false in 1.0
+	t.Run("WithoutWardleFeatureGateAtV1.0", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, false, "1.1", "1.0")
+	})
+	// Testing emulation version N-1, Explicitly set BanFlunder=true in 1.0
+	t.Run("WithWardleFeatureGateAtV1.0", func(t *testing.T) {
+		testAggregatedAPIServer(t, true, true, "1.1", "1.0")
+	})
+}
+
+func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, wardleBinaryVersion, wardleEmulationVersion string) {
+	const testNamespace = "kube-wardle"
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	// makes the kube-apiserver very responsive.  it's normally a minute
-	dynamiccertificates.FileRefreshDuration = 1 * time.Second
+	// each wardle binary is bundled with a specific kube binary.
+	kubeBinaryVersion := sampleserver.WardleVersionToKubeVersion(version.MustParse(wardleBinaryVersion)).String()
 
-	// we need the wardle port information first to set up the service resolver
-	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// endpoints cannot have loopback IPs so we need to override the resolver itself
-	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion)
+	kubeClientConfig := getKubeConfig(testKAS)
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
-	defer testServer.TearDownFn()
-	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
-	// force json because everything speaks it
-	kubeClientConfig.ContentType = ""
-	kubeClientConfig.AcceptContentTypes = ""
-	kubeClient := client.NewForConfigOrDie(kubeClientConfig)
-	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
-	wardleClient := wardlev1alpha1client.NewForConfigOrDie(kubeClientConfig)
-
-	// create the bare minimum resources required to be able to get the API service into an available state
-	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-wardle",
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = kubeClient.CoreV1().Services("kube-wardle").Create(ctx, &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "api",
-		},
-		Spec: corev1.ServiceSpec{
-			ExternalName: "needs-to-be-non-empty",
-			Type:         corev1.ServiceTypeExternalName,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// start the wardle server to prove we can aggregate it
-	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeClientConfig))
-	defer os.Remove(wardleToKASKubeConfigFile)
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
-	go func() {
-		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
-		// ensure this is a SAN on the generated cert for service FQDN
-		o.AlternateDNS = []string{
-			"api.kube-wardle.svc",
-		}
-		o.RecommendedOptions.SecureServing.Listener = listener
-		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, o)
-		wardleCmd.SetArgs([]string{
-			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
-			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
-			"--etcd-servers", framework.GetEtcdURL(),
-			"--cert-dir", wardleCertDir,
-			"--kubeconfig", wardleToKASKubeConfigFile,
-		})
-		if err := wardleCmd.Execute(); err != nil {
-			t.Error(err)
-		}
-	}()
-	directWardleClientConfig, err := waitForWardleRunning(ctx, t, kubeClientConfig, wardleCertDir, wardlePort)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, wardleEmulationVersion, kubeClientConfig)
 
 	// now we're finally ready to test. These are what's run by default now
 	wardleDirectClient := client.NewForConfigOrDie(directWardleClientConfig)
@@ -308,88 +271,22 @@ func TestAggregatedAPIServer(t *testing.T) {
 	testAPIGroup(ctx, t, wardleDirectClient.Discovery().RESTClient())
 	testAPIResourceList(ctx, t, wardleDirectClient.Discovery().RESTClient())
 
-	wardleCA, err := os.ReadFile(directWardleClientConfig.CAFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
-		Spec: apiregistrationv1.APIServiceSpec{
-			Service: &apiregistrationv1.ServiceReference{
-				Namespace: "kube-wardle",
-				Name:      "api",
-			},
-			Group:                "wardle.example.com",
-			Version:              "v1alpha1",
-			CABundle:             wardleCA,
-			GroupPriorityMinimum: 200,
-			VersionPriority:      200,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	wardleClient := wardlev1alpha1client.NewForConfigOrDie(kubeClientConfig)
 
-	// wait for the API service to be available
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
-		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.wardle.example.com", metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		var available bool
-		for _, condition := range apiService.Status.Conditions {
-			if condition.Type == apiregistrationv1.Available && condition.Status == apiregistrationv1.ConditionTrue {
-				available = true
-				break
-			}
-		}
-		if !available {
-			t.Log("api service is not available", apiService.Status.Conditions)
-			return false, nil
-		}
-
-		// make sure discovery is healthy overall
-		_, _, err = kubeClient.Discovery().ServerGroupsAndResources()
-		if err != nil {
-			t.Log("discovery failed", err)
-			return false, nil
-		}
-
-		// make sure we have the wardle resources in discovery
-		apiResources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("wardle.example.com/v1alpha1")
-		if err != nil {
-			t.Log("wardle discovery failed", err)
-			return false, nil
-		}
-		if len(apiResources.APIResources) != 2 {
-			t.Log("wardle discovery has wrong resources", apiResources.APIResources)
-			return false, nil
-		}
-		resources := make([]string, 0, 2)
-		for _, resource := range apiResources.APIResources {
-			resource := resource
-			resources = append(resources, resource.Name)
-		}
-		sort.Strings(resources)
-		if !reflect.DeepEqual([]string{"fischers", "flunders"}, resources) {
-			return false, fmt.Errorf("unexpected resources: %v", resources)
-		}
-
-		return true, nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	waitForWardleAPIServiceReady(ctx, t, kubeClientConfig, wardleCertDir, testNamespace)
 
 	// perform simple CRUD operations against the wardle resources
-	_, err = wardleClient.Fischers().Create(ctx, &wardlev1alpha1.Fischer{
+	_, err := wardleClient.Fischers().Create(ctx, &wardlev1alpha1.Fischer{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
+		DisallowedFlunders: []string{"badname"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// clean up data after test is done
+	defer wardleClient.Fischers().Delete(ctx, "panda", metav1.DeleteOptions{})
 	fischersList, err := wardleClient.Fischers().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -403,15 +300,38 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
 		ObjectMeta: metav1.ObjectMeta{
+			Name: "badname",
+		},
+	}, metav1.CreateOptions{})
+	if banFlunder && err == nil {
+		t.Fatal("expect flunder:badname not admitted when wardle feature gates are specified")
+	}
+	if !banFlunder {
+		if err != nil {
+			t.Fatal("expect flunder:badname admitted when wardle feature gates are not specified")
+		} else {
+			defer wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "badname", metav1.DeleteOptions{})
+		}
+	}
+	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
 	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "panda", metav1.DeleteOptions{})
 	flunderList, err := wardleClient.Flunders(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(flunderList.Items) != 1 {
-		t.Errorf("expected one flunder: %#v", flunderList.Items)
+	expectedFlunderCount := 2
+	if banFlunder {
+		expectedFlunderCount = 1
+	}
+	if len(flunderList.Items) != expectedFlunderCount {
+		t.Errorf("expected %d flunder: %#v", expectedFlunderCount, flunderList.Items)
 	}
 	if len(flunderList.ResourceVersion) == 0 {
 		t.Error("expected non-empty resource version for flunder list")
@@ -454,10 +374,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
 	// and then the wardle server will detect and update too.
-	if err := os.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testKAS.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testKAS.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
 		t.Fatal(err)
 	}
 	// wait for it to be picked up.  there's a test in certreload_test.go that ensure this works
@@ -501,44 +421,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if numMatches != 4 {
 		t.Fatal("names don't match")
 	}
-}
-
-func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConfig *rest.Config, wardleCertDir string, wardlePort int) (*rest.Config, error) {
-	directWardleClientConfig := rest.AnonymousClientConfig(rest.CopyConfig(wardleToKASKubeConfig))
-	directWardleClientConfig.CAFile = path.Join(wardleCertDir, "apiserver.crt")
-	directWardleClientConfig.CAData = nil
-	directWardleClientConfig.ServerName = ""
-	directWardleClientConfig.BearerToken = wardleToKASKubeConfig.BearerToken
-	var wardleClient client.Interface
-	lastHealthContent := []byte{}
-	var lastHealthErr error
-	err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if _, err := os.Stat(directWardleClientConfig.CAFile); os.IsNotExist(err) { // wait until the file trust is created
-			lastHealthErr = err
-			return false, nil
-		}
-		directWardleClientConfig.Host = fmt.Sprintf("https://127.0.0.1:%d", wardlePort)
-		wardleClient, err = client.NewForConfig(directWardleClientConfig)
-		if err != nil {
-			// this happens because we race the API server start
-			t.Log(err)
-			return false, nil
-		}
-		healthStatus := 0
-		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
-		lastHealthContent, lastHealthErr = result.Raw()
-		if healthStatus != http.StatusOK {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Log(string(lastHealthContent))
-		t.Log(lastHealthErr)
-		return nil, err
-	}
-
-	return directWardleClientConfig, nil
 }
 
 func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
@@ -655,6 +537,230 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	}
 }
 
+func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace, kubebinaryVersion, wardleBinaryVersion string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
+	// makes the kube-apiserver very responsive.  it's normally a minute
+	dynamiccertificates.FileRefreshDuration = 1 * time.Second
+
+	// we need the wardle port information first to set up the service resolver
+	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// endpoints cannot have loopback IPs so we need to override the resolver itself
+	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
+
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: kubebinaryVersion}, nil, framework.SharedEtcd())
+	t.Cleanup(func() { testServer.TearDownFn() })
+
+	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		apiserver.WardleComponentName, utilversion.NewEffectiveVersion(wardleBinaryVersion),
+		featuregate.NewVersionedFeatureGate(version.MustParse(wardleBinaryVersion)))
+
+	kubeClient := client.NewForConfigOrDie(getKubeConfig(testServer))
+
+	// create the bare minimum resources required to be able to get the API service into an available state
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = kubeClient.CoreV1().Services(namespace).Create(ctx, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "api",
+		},
+		Spec: corev1.ServiceSpec{
+			ExternalName: "needs-to-be-non-empty",
+			Type:         corev1.ServiceTypeExternalName,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wardleOptions := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
+	// ensure this is a SAN on the generated cert for service FQDN
+	wardleOptions.AlternateDNS = []string{
+		fmt.Sprintf("api.%s.svc", namespace),
+	}
+	wardleOptions.RecommendedOptions.SecureServing.Listener = listener
+	wardleOptions.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
+
+	return testServer, wardleOptions, wardlePort
+}
+
+func runPreparedWardleServer(
+	ctx context.Context,
+	t *testing.T,
+	wardleOptions *sampleserver.WardleServerOptions,
+	certDir string,
+	wardlePort int,
+	flunderBanningFeatureGate bool,
+	banFlunder bool,
+	emulationVersion string,
+	kubeConfig *rest.Config,
+) *rest.Config {
+
+	// start the wardle server to prove we can aggregate it
+	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeConfig))
+	t.Cleanup(func() { os.Remove(wardleToKASKubeConfigFile) })
+
+	go func() {
+		args := []string{
+			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
+			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
+			"--etcd-servers", framework.GetEtcdURL(),
+			"--cert-dir", certDir,
+			"--kubeconfig", wardleToKASKubeConfigFile,
+			"--emulated-version", fmt.Sprintf("wardle=%s", emulationVersion),
+		}
+		if flunderBanningFeatureGate {
+			args = append(args, "--feature-gates", fmt.Sprintf("wardle:BanFlunder=%v", banFlunder))
+		}
+		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, wardleOptions)
+		wardleCmd.SetArgs(args)
+		if err := wardleCmd.Execute(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	directWardleClientConfig, err := waitForWardleRunning(ctx, t, kubeConfig, certDir, wardlePort)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return directWardleClientConfig
+}
+
+func waitForWardleAPIServiceReady(ctx context.Context, t *testing.T, kubeConfig *rest.Config, wardleCertDir string, namespace string) {
+	kubeClient := client.NewForConfigOrDie(kubeConfig)
+	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeConfig)
+
+	wardleCA, err := os.ReadFile(wardleCAFilePath(wardleCertDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
+				Namespace: namespace,
+				Name:      "api",
+			},
+			Group:                "wardle.example.com",
+			Version:              "v1alpha1",
+			CABundle:             wardleCA,
+			GroupPriorityMinimum: 200,
+			VersionPriority:      200,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the API service to be available
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.wardle.example.com", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		var available bool
+		for _, condition := range apiService.Status.Conditions {
+			if condition.Type == apiregistrationv1.Available && condition.Status == apiregistrationv1.ConditionTrue {
+				available = true
+				break
+			}
+		}
+		if !available {
+			t.Log("api service is not available", apiService.Status.Conditions)
+			return false, nil
+		}
+
+		// make sure discovery is healthy overall
+		_, _, err = kubeClient.Discovery().ServerGroupsAndResources()
+		if err != nil {
+			t.Log("discovery failed", err)
+			return false, nil
+		}
+
+		// make sure we have the wardle resources in discovery
+		apiResources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("wardle.example.com/v1alpha1")
+		if err != nil {
+			t.Log("wardle discovery failed", err)
+			return false, nil
+		}
+		if len(apiResources.APIResources) != 2 {
+			t.Log("wardle discovery has wrong resources", apiResources.APIResources)
+			return false, nil
+		}
+		resources := make([]string, 0, 2)
+		for _, resource := range apiResources.APIResources {
+			resource := resource
+			resources = append(resources, resource.Name)
+		}
+		sort.Strings(resources)
+		if !reflect.DeepEqual([]string{"fischers", "flunders"}, resources) {
+			return false, fmt.Errorf("unexpected resources: %v", resources)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func getKubeConfig(testServer *kastesting.TestServer) *rest.Config {
+	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
+	// force json because everything speaks it
+	kubeClientConfig.ContentType = ""
+	kubeClientConfig.AcceptContentTypes = ""
+
+	return kubeClientConfig
+}
+
+func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConfig *rest.Config, wardleCertDir string, wardlePort int) (*rest.Config, error) {
+	directWardleClientConfig := rest.AnonymousClientConfig(rest.CopyConfig(wardleToKASKubeConfig))
+	directWardleClientConfig.CAFile = wardleCAFilePath(wardleCertDir)
+	directWardleClientConfig.CAData = nil
+	directWardleClientConfig.ServerName = ""
+	directWardleClientConfig.BearerToken = wardleToKASKubeConfig.BearerToken
+	var wardleClient client.Interface
+	lastHealthContent := []byte{}
+	var lastHealthErr error
+	err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if _, err := os.Stat(directWardleClientConfig.CAFile); os.IsNotExist(err) { // wait until the file trust is created
+			lastHealthErr = err
+			return false, nil
+		}
+		directWardleClientConfig.Host = fmt.Sprintf("https://127.0.0.1:%d", wardlePort)
+		wardleClient, err = client.NewForConfig(directWardleClientConfig)
+		if err != nil {
+			// this happens because we race the API server start
+			t.Log(err)
+			return false, nil
+		}
+		healthStatus := 0
+		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
+		lastHealthContent, lastHealthErr = result.Raw()
+		if healthStatus != http.StatusOK {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Log(string(lastHealthContent))
+		t.Log(lastHealthErr)
+		return nil, err
+	}
+
+	return directWardleClientConfig, nil
+}
+
+func wardleCAFilePath(wardleCertDir string) string { return path.Join(wardleCertDir, "apiserver.crt") }
+
 func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfig *rest.Config) string {
 	// write a kubeconfig out for starting other API servers with delegated auth.  remember, no in-cluster config
 	// the loopback client config uses a loopback cert with different SNI.  We need to use the "real"
@@ -744,9 +850,9 @@ func testAPIGroupList(ctx context.Context, t *testing.T, client rest.Interface) 
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis", err)
 	}
-	assert.Equal(t, 1, len(apiGroupList.Groups))
+	assert.Len(t, apiGroupList.Groups, 1)
 	assert.Equal(t, wardlev1alpha1.GroupName, apiGroupList.Groups[0].Name)
-	assert.Equal(t, 2, len(apiGroupList.Groups[0].Versions))
+	assert.Len(t, apiGroupList.Groups[0].Versions, 2)
 
 	v1alpha1 := metav1.GroupVersionForDiscovery{
 		GroupVersion: wardlev1alpha1.SchemeGroupVersion.String(),
@@ -774,7 +880,7 @@ func testAPIGroup(ctx context.Context, t *testing.T, client rest.Interface) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.example.com", err)
 	}
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Group, apiGroup.Name)
-	assert.Equal(t, 2, len(apiGroup.Versions))
+	assert.Len(t, apiGroup.Versions, 2)
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiGroup.Versions[1].GroupVersion)
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Version, apiGroup.Versions[1].Version)
 	assert.Equal(t, apiGroup.PreferredVersion, apiGroup.Versions[0])
@@ -792,7 +898,7 @@ func testAPIResourceList(ctx context.Context, t *testing.T, client rest.Interfac
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.example.com/v1alpha1", err)
 	}
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 2, len(apiResourceList.APIResources))
+	assert.Len(t, apiResourceList.APIResources, 2)
 	assert.Equal(t, "fischers", apiResourceList.APIResources[0].Name)
 	assert.False(t, apiResourceList.APIResources[0].Namespaced)
 	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)

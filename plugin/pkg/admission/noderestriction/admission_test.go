@@ -18,6 +18,11 @@ package noderestriction
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"reflect"
 	"strings"
 	"testing"
@@ -41,6 +46,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -213,11 +219,15 @@ type admitTestCase struct {
 	nodesGetter corev1lister.NodeLister
 	attributes  admission.Attributes
 	features    featuregate.FeatureGate
+	setupFunc   func(t *testing.T)
 	err         string
 }
 
 func (a *admitTestCase) run(t *testing.T) {
 	t.Run(a.name, func(t *testing.T) {
+		if a.setupFunc != nil {
+			a.setupFunc(t)
+		}
 		c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 		if a.features != nil {
 			c.InspectFeatureGates(a.features)
@@ -375,6 +385,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		}
 		aLabeledPod  = withLabels(coremypod, labelsA)
 		abLabeledPod = withLabels(coremypod, labelsAB)
+
+		privKey, _ = rsa.GenerateKey(rand.Reader, 2048)
 	)
 
 	existingPodsIndex.Add(v1mymirrorpod)
@@ -1238,6 +1250,42 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: admission.NewAttributesRecord(nil, nil, csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "", admission.Delete, &metav1.UpdateOptions{}, false, mynode),
 			err:        "",
 		},
+		// CSR
+		{
+			name:       "allowed CSR create correct node serving",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "allowed CSR create correct node client",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeAPIServerClientKubeletSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "allowed CSR create non-node CSR",
+			attributes: createCSRAttributes("some-other-identity", certificatesapi.KubeAPIServerClientSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "deny CSR create incorrect node",
+			attributes: createCSRAttributes("system:node:othernode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "forbidden: can only create a node CSR with CN=system:node:mynode",
+		},
+		{
+			name:       "allow CSR create incorrect node with feature gate disabled",
+			attributes: createCSRAttributes("system:node:othernode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "",
+			features:   feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.AllowInsecureKubeletCertificateSigningRequests, true)
+			},
+		},
+		{
+			name:       "deny CSR create invalid",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, false, privKey, mynode),
+			err:        "unable to parse csr: asn1: syntax error: sequence truncated",
+		},
 	}
 	for _, tt := range tests {
 		tt.nodesGetter = existingNodes
@@ -1448,7 +1496,7 @@ func TestAdmitPVCStatus(t *testing.T) {
 	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
 	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 
-	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeFailed
+	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeInfeasible
 
 	tests := []struct {
 		name                    string
@@ -1603,74 +1651,182 @@ func createPodAttributes(pod *api.Pod, user user.Info) admission.Attributes {
 	return admission.NewAttributesRecord(pod, nil, podKind, pod.Namespace, pod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
 }
 
+func createCSRAttributes(cn, signer string, validCsr bool, key any, user user.Info) admission.Attributes {
+	csrResource := certificatesapi.Resource("certificatesigningrequests").WithVersion("v1")
+	csrKind := certificatesapi.Kind("CertificateSigningRequest").WithVersion("v1")
+
+	csrPem := []byte("-----BEGIN CERTIFICATE REQUEST-----\n-----END CERTIFICATE REQUEST-----")
+	if validCsr {
+		structuredCsr := x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName: cn,
+			},
+		}
+		csrDer, _ := x509.CreateCertificateRequest(rand.Reader, &structuredCsr, key)
+		csrPem = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDer})
+	}
+
+	csreq := &certificatesapi.CertificateSigningRequest{
+		Spec: certificatesapi.CertificateSigningRequestSpec{
+			Request:    csrPem,
+			SignerName: signer,
+		},
+	}
+	return admission.NewAttributesRecord(csreq, nil, csrKind, "", "", csrResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
+
+}
+
 func TestAdmitResourceSlice(t *testing.T) {
 	apiResource := resourceapi.SchemeGroupVersion.WithResource("resourceslices")
 	nodename := "mynode"
 	mynode := &user.DefaultInfo{Name: "system:node:" + nodename, Groups: []string{"system:nodes"}}
-	err := "can only create ResourceSlice with the same NodeName as the requesting node"
+	createErr := "can only create ResourceSlice with the same NodeName as the requesting node"
+	deleteErr := "can only delete ResourceSlice with the same NodeName as the requesting node"
 
 	sliceNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename,
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodename,
+		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename + "-other",
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodename + "-other",
+		},
+	}
+	sliceNoNode := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "something",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: "",
+		},
 	}
 
 	tests := map[string]struct {
 		operation      admission.Operation
-		obj            runtime.Object
+		options        runtime.Object
+		obj, oldObj    runtime.Object
 		featureEnabled bool
 		expectError    string
 	}{
 		"create allowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"create disallowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
-			expectError:    err,
+			expectError:    createErr,
+		},
+		"create disallowed, no node name, enabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    createErr,
 		},
 		"create allowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: false,
 			expectError:    "",
 		},
 		"create disallowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: false,
-			expectError:    err,
+			expectError:    createErr,
+		},
+		"create disallowed, no node name, disabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: false,
+			expectError:    createErr,
 		},
 		"update allowed, same node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"update allowed, other node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
 			expectError:    "",
+		},
+		"update allowed, no node": {
+			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
+		"delete allowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
+		"delete disallowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
+		"delete disallowed, no node name, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
+		"delete allowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: false,
+			expectError:    "",
+		},
+		"delete disallowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
+		},
+		"delete disallowed, no node name, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
-				test.obj, nil, schema.GroupVersionKind{},
-				"", "foo", apiResource, "", test.operation, &metav1.CreateOptions{}, false, mynode)
+				test.obj, test.oldObj, schema.GroupVersionKind{},
+				"", "foo", apiResource, "", test.operation, test.options, false, mynode)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, test.featureEnabled)
 			a := &admitTestCase{
 				name:       name,

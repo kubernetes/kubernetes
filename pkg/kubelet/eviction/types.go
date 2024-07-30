@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -source=types.go -destination=mock_threshold_notifier_test.go -package=eviction NotifierFactory,ThresholdNotifier
+//go:generate mockery
 package eviction
 
 import (
@@ -38,7 +38,7 @@ const (
 	fsStatsLogs fsStatsType = "logs"
 	// fsStatsRoot identifies stats for pod container writable layers.
 	fsStatsRoot fsStatsType = "root"
-	// fsStatsContainer identifies stats for pod container read-only layers
+	// fsStatsImages identifies stats for pod container read-only layers
 	fsStatsImages fsStatsType = "images"
 )
 

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1beta1
 
-// ExternalDocumentationApplyConfiguration represents an declarative configuration of the ExternalDocumentation type for use
+// ExternalDocumentationApplyConfiguration represents a declarative configuration of the ExternalDocumentation type for use
 // with apply.
 type ExternalDocumentationApplyConfiguration struct {
 	Description *string `json:"description,omitempty"`
 	URL         *string `json:"url,omitempty"`
 }
 
-// ExternalDocumentationApplyConfiguration constructs an declarative configuration of the ExternalDocumentation type for use with
+// ExternalDocumentationApplyConfiguration constructs a declarative configuration of the ExternalDocumentation type for use with
 // apply.
 func ExternalDocumentation() *ExternalDocumentationApplyConfiguration {
 	return &ExternalDocumentationApplyConfiguration{}

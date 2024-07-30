@@ -104,7 +104,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 0, len(gc.dependencyGraphBuilder.monitors))
+	assert.Empty(t, gc.dependencyGraphBuilder.monitors)
 
 	// Make sure resource monitor syncing creates and stops resource monitors.
 	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
@@ -112,13 +112,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
-	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+	assert.Len(t, gc.dependencyGraphBuilder.monitors, 2)
 
 	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
-	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+	assert.Len(t, gc.dependencyGraphBuilder.monitors, 1)
 
 	go gc.Run(tCtx, 1)
 
@@ -126,13 +126,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
-	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+	assert.Len(t, gc.dependencyGraphBuilder.monitors, 2)
 
 	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
-	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+	assert.Len(t, gc.dependencyGraphBuilder.monitors, 1)
 }
 
 // fakeAction records information about requests to aid in testing.
@@ -223,7 +223,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	go sharedInformers.Start(stop)
+	sharedInformers.Start(stop)
 	return garbageCollector{gc, stop}
 }
 

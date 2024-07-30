@@ -128,7 +128,7 @@ func GenMarkdownTree(cmd *cobra.Command, dir string) error {
 	return GenMarkdownTreeCustom(cmd, dir, emptyStr, identity)
 }
 
-// GenMarkdownTreeCustom is the the same as GenMarkdownTree, but
+// GenMarkdownTreeCustom is the same as GenMarkdownTree, but
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {

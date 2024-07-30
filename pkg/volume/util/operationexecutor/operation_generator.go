@@ -483,8 +483,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		volumeMounter, newMounterErr := volumePlugin.NewMounter(
 			volumeToMount.VolumeSpec,
-			volumeToMount.Pod,
-			volume.VolumeOptions{})
+			volumeToMount.Pod)
 		if newMounterErr != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -970,8 +969,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	}
 	blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 		volumeToMount.VolumeSpec,
-		volumeToMount.Pod,
-		volume.VolumeOptions{})
+		volumeToMount.Pod)
 	if newMapperErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, eventErr.Error())
@@ -1679,6 +1677,8 @@ func (og *operationGenerator) GenerateExpandAndRecoverVolumeFunc(
 	}, nil
 }
 
+// Deprecated: This function should not called by any controller code in future and should be removed
+// from kubernetes code
 func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOpts) inTreeResizeResponse {
 	pvc := resizeOpts.pvc
 	pv := resizeOpts.pv
@@ -1718,7 +1718,7 @@ func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOp
 		case v1.PersistentVolumeClaimControllerResizeInProgress,
 			v1.PersistentVolumeClaimNodeResizePending,
 			v1.PersistentVolumeClaimNodeResizeInProgress,
-			v1.PersistentVolumeClaimNodeResizeFailed:
+			v1.PersistentVolumeClaimNodeResizeInfeasible:
 			if allocatedSize != nil {
 				newSize = *allocatedSize
 			}
@@ -1742,14 +1742,14 @@ func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOp
 			// we don't need to do any work. We could be here because of a spurious update event.
 			// This is case #1
 			return resizeResponse
-		case v1.PersistentVolumeClaimNodeResizeFailed:
+		case v1.PersistentVolumeClaimNodeResizeInfeasible:
 			// This is case#3
 			pvc, err = og.markForPendingNodeExpansion(pvc, pv)
 			resizeResponse.pvc = pvc
 			resizeResponse.err = err
 			return resizeResponse
 		case v1.PersistentVolumeClaimControllerResizeInProgress,
-			v1.PersistentVolumeClaimControllerResizeFailed:
+			v1.PersistentVolumeClaimControllerResizeInfeasible:
 			// This is case#2 or it could also be case#4 when user manually shrunk the PVC
 			// after expanding it.
 			if allocatedSize != nil {
@@ -1875,8 +1875,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		if fsVolume {
 			volumeMounter, newMounterErr := volumePlugin.NewMounter(
 				volumeToMount.VolumeSpec,
-				volumeToMount.Pod,
-				volume.VolumeOptions{})
+				volumeToMount.Pod)
 			if newMounterErr != nil {
 				eventErr, detailedErr = volumeToMount.GenerateError("NodeExpandVolume.NewMounter initialization failed", newMounterErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -1914,8 +1913,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 			blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 				volumeToMount.VolumeSpec,
-				volumeToMount.Pod,
-				volume.VolumeOptions{})
+				volumeToMount.Pod)
 			if newMapperErr != nil {
 				eventErr, detailedErr = volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -2001,6 +1999,7 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 
 			rsOpts.NewSize = pvSpecCap
 			rsOpts.OldSize = pvcStatusCap
+			rsOpts.VolumeSpec = volumeToMount.VolumeSpec
 			resizeOp := nodeResizeOperationOpts{
 				vmt:                volumeToMount,
 				pvc:                pvc,

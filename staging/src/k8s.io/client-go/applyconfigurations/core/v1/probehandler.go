@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ProbeHandlerApplyConfiguration represents an declarative configuration of the ProbeHandler type for use
+// ProbeHandlerApplyConfiguration represents a declarative configuration of the ProbeHandler type for use
 // with apply.
 type ProbeHandlerApplyConfiguration struct {
 	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
@@ -27,7 +27,7 @@ type ProbeHandlerApplyConfiguration struct {
 	GRPC      *GRPCActionApplyConfiguration      `json:"grpc,omitempty"`
 }
 
-// ProbeHandlerApplyConfiguration constructs an declarative configuration of the ProbeHandler type for use with
+// ProbeHandlerApplyConfiguration constructs a declarative configuration of the ProbeHandler type for use with
 // apply.
 func ProbeHandler() *ProbeHandlerApplyConfiguration {
 	return &ProbeHandlerApplyConfiguration{}

@@ -46,7 +46,7 @@ var jobsKind = v1.SchemeGroupVersion.WithKind("Job")
 func (c *FakeJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Job, err error) {
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(jobsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(jobsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeJobs) Get(ctx context.Context, name string, options metav1.GetOptio
 func (c *FakeJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.JobList, err error) {
 	emptyResult := &v1.JobList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(jobsResource, jobsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(jobsResource, jobsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *FakeJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(jobsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(jobsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 func (c *FakeJobs) Create(ctx context.Context, job *v1.Job, opts metav1.CreateOptions) (result *v1.Job, err error) {
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(jobsResource, c.ns, job, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeJobs) Create(ctx context.Context, job *v1.Job, opts metav1.CreateOp
 func (c *FakeJobs) Update(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (result *v1.Job, err error) {
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(jobsResource, c.ns, job), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(jobsResource, c.ns, job, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeJobs) Update(ctx context.Context, job *v1.Job, opts metav1.UpdateOp
 func (c *FakeJobs) UpdateStatus(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (result *v1.Job, err error) {
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(jobsResource, "status", c.ns, job, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOp
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(jobsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.JobList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 func (c *FakeJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Job, err error) {
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(jobsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeJobs) Apply(ctx context.Context, job *batchv1.JobApplyConfiguration
 	}
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(jobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeJobs) ApplyStatus(ctx context.Context, job *batchv1.JobApplyConfigu
 	}
 	emptyResult := &v1.Job{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(jobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

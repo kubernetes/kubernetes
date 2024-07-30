@@ -25,10 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
@@ -316,18 +318,87 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
+		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+			QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimAdded},
+	}, nil
+}
+
+// isSchedulableAfterPersistentVolumeClaimAdded is invoked whenever a PersistentVolumeClaim added or changed, It checks whether
+// that change made a previously unschedulable pod schedulable.
+func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, newPersistentVolumeClaim, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
+
+	if newPersistentVolumeClaim.Namespace != pod.Namespace {
+		return framework.QueueSkip, nil
+	}
+
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		if volume.PersistentVolumeClaim.ClaimName == newPersistentVolumeClaim.Name {
+			logger.V(5).Info("PVC that is referred from the pod was created, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
+			return framework.Queue, nil
+		}
+	}
+	logger.V(5).Info("PVC irrelevant to the Pod was created, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
+	return framework.QueueSkip, nil
+}
+
+// isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
+// It checks whether the deleted pod will conflict with volumes of other pods on the same node
+func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+	}
+
+	if deletedPod.Namespace != pod.Namespace {
+		return framework.QueueSkip, nil
+	}
+
+	nodeInfo := framework.NewNodeInfo(deletedPod)
+	if !satisfyVolumeConflicts(pod, nodeInfo) {
+		logger.V(5).Info("Pod with the volume that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return framework.Queue, nil
+	}
+
+	// Return Queue if a deleted pod uses the same PVC since the pod may be unschedulable due to the ReadWriteOncePod access mode of the PVC.
+	//
+	// For now, we don't actually fetch PVC and check the access mode because that operation could be expensive.
+	// Once the observability around QHint is established,
+	// we may want to do that depending on how much the operation would impact the QHint latency negatively.
+	// https://github.com/kubernetes/kubernetes/issues/124566
+	claims := sets.New[string]()
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			claims.Insert(volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	for _, volume := range deletedPod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && claims.Has(volume.PersistentVolumeClaim.ClaimName) {
+			logger.V(5).Info("Pod with the same PVC that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("An irrelevant Pod was deleted, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return framework.QueueSkip, nil
 }
 
 // New initializes a new plugin and returns it.

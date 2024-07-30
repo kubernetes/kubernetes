@@ -111,7 +111,7 @@ func TestTimingHistogram(t *testing.T) {
 			}
 
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
@@ -242,7 +242,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			}
 
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				if metric.GetHelp() != test.expectedHelp {
@@ -264,7 +264,7 @@ func TestTimingHistogramVec(t *testing.T) {
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.String())
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count for family %#+v", len(mf.GetMetric()), mf)
+				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count for family %#+v", len(mf.GetMetric()), mf)
 				for _, m := range mf.GetMetric() {
 					expectedCount := uint64(dt1)
 					expectedSum := float64(dt1) * v0

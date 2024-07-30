@@ -73,6 +73,13 @@ func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attri
 		return true
 	})
 
+	// See: https://kep.k8s.io/4639
+	for _, v := range pod.Spec.Volumes {
+		if v.Image != nil {
+			v.Image.PullPolicy = api.PullAlways
+		}
+	}
+
 	return nil
 }
 
@@ -96,6 +103,20 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 		}
 		return true
 	})
+
+	// See: https://kep.k8s.io/4639
+	for i, v := range pod.Spec.Volumes {
+		if v.Image != nil && v.Image.PullPolicy != api.PullAlways {
+			allErrs = append(allErrs, admission.NewForbidden(attributes,
+				field.NotSupported(
+					field.NewPath("spec").Child("volumes").Index(i).Child("image").Child("pullPolicy"),
+					v.Image.PullPolicy,
+					[]string{string(api.PullAlways)},
+				),
+			))
+		}
+	}
+
 	if len(allErrs) > 0 {
 		return utilerrors.NewAggregate(allErrs)
 	}

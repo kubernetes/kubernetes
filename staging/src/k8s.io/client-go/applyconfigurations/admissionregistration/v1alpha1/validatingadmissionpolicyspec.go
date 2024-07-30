@@ -22,7 +22,7 @@ import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 )
 
-// ValidatingAdmissionPolicySpecApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicySpec type for use
+// ValidatingAdmissionPolicySpecApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicySpec type for use
 // with apply.
 type ValidatingAdmissionPolicySpecApplyConfiguration struct {
 	ParamKind        *ParamKindApplyConfiguration                     `json:"paramKind,omitempty"`
@@ -34,7 +34,7 @@ type ValidatingAdmissionPolicySpecApplyConfiguration struct {
 	Variables        []VariableApplyConfiguration                     `json:"variables,omitempty"`
 }
 
-// ValidatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicySpec type for use with
+// ValidatingAdmissionPolicySpecApplyConfiguration constructs a declarative configuration of the ValidatingAdmissionPolicySpec type for use with
 // apply.
 func ValidatingAdmissionPolicySpec() *ValidatingAdmissionPolicySpecApplyConfiguration {
 	return &ValidatingAdmissionPolicySpecApplyConfiguration{}

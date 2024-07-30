@@ -111,7 +111,7 @@ func (fs FS) AllProcs() (Procs, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return Procs{}, fmt.Errorf("%s: Cannot read file: %v: %w", ErrFileRead, names, err)
+		return Procs{}, fmt.Errorf("%w: Cannot read file: %v: %w", ErrFileRead, names, err)
 	}
 
 	p := Procs{}
@@ -137,7 +137,7 @@ func (p Proc) CmdLine() ([]string, error) {
 		return []string{}, nil
 	}
 
-	return strings.Split(string(bytes.TrimRight(data, string("\x00"))), string(byte(0))), nil
+	return strings.Split(string(bytes.TrimRight(data, "\x00")), "\x00"), nil
 }
 
 // Wchan returns the wchan (wait channel) of a process.
@@ -212,7 +212,7 @@ func (p Proc) FileDescriptors() ([]uintptr, error) {
 	for i, n := range names {
 		fd, err := strconv.ParseInt(n, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("%s: Cannot parse line: %v: %w", ErrFileParse, i, err)
+			return nil, fmt.Errorf("%w: Cannot parse line: %v: %w", ErrFileParse, i, err)
 		}
 		fds[i] = uintptr(fd)
 	}
@@ -297,7 +297,7 @@ func (p Proc) fileDescriptors() ([]string, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return nil, fmt.Errorf("%s: Cannot read file: %v: %w", ErrFileRead, names, err)
+		return nil, fmt.Errorf("%w: Cannot read file: %v: %w", ErrFileRead, names, err)
 	}
 
 	return names, nil

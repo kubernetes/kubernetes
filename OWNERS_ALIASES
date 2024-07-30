@@ -165,7 +165,6 @@ aliases:
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
-    - chendave
     - damemi
     - denkensk
     - sanposhiho
@@ -177,6 +176,7 @@ aliases:
   # - hex108
   # - resouer
   # - wgliang
+  # - chendave
 
   sig-cli-maintainers:
     - ardaguclu

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1beta2
 
-// ExemptPriorityLevelConfigurationApplyConfiguration represents an declarative configuration of the ExemptPriorityLevelConfiguration type for use
+// ExemptPriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the ExemptPriorityLevelConfiguration type for use
 // with apply.
 type ExemptPriorityLevelConfigurationApplyConfiguration struct {
 	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty"`
 	LendablePercent          *int32 `json:"lendablePercent,omitempty"`
 }
 
-// ExemptPriorityLevelConfigurationApplyConfiguration constructs an declarative configuration of the ExemptPriorityLevelConfiguration type for use with
+// ExemptPriorityLevelConfigurationApplyConfiguration constructs a declarative configuration of the ExemptPriorityLevelConfiguration type for use with
 // apply.
 func ExemptPriorityLevelConfiguration() *ExemptPriorityLevelConfigurationApplyConfiguration {
 	return &ExemptPriorityLevelConfigurationApplyConfiguration{}

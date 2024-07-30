@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EndpointSliceApplyConfiguration represents an declarative configuration of the EndpointSlice type for use
+// EndpointSliceApplyConfiguration represents a declarative configuration of the EndpointSlice type for use
 // with apply.
 type EndpointSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type EndpointSliceApplyConfiguration struct {
 	Ports                            []EndpointPortApplyConfiguration `json:"ports,omitempty"`
 }
 
-// EndpointSlice constructs an declarative configuration of the EndpointSlice type for use with
+// EndpointSlice constructs a declarative configuration of the EndpointSlice type for use with
 // apply.
 func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 	b := &EndpointSliceApplyConfiguration{}
@@ -274,4 +274,10 @@ func (b *EndpointSliceApplyConfiguration) WithPorts(values ...*EndpointPortApply
 		b.Ports = append(b.Ports, *values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EndpointSliceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

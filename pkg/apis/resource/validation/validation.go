@@ -17,172 +17,260 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
+	dracel "k8s.io/dynamic-resource-allocation/cel"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	namedresourcesvalidation "k8s.io/kubernetes/pkg/apis/resource/structured/namedresources/validation"
 )
 
-// validateResourceDriverName reuses the validation of a CSI driver because
-// the allowed values are exactly the same.
-var validateResourceDriverName = corevalidation.ValidateCSIDriverName
+var (
+	// validateResourceDriverName reuses the validation of a CSI driver because
+	// the allowed values are exactly the same.
+	validateDriverName      = corevalidation.ValidateCSIDriverName
+	validateDeviceName      = corevalidation.ValidateDNS1123Label
+	validateDeviceClassName = corevalidation.ValidateDNS1123Subdomain
+	validateRequestName     = corevalidation.ValidateDNS1123Label
+)
 
-// ValidateClaim validates a ResourceClaim.
-func ValidateClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
+func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if name == "" {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		if len(name) > resource.PoolNameMaxLength {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath, name, resource.PoolNameMaxLength))
+		}
+		parts := strings.Split(name, "/")
+		for _, part := range parts {
+			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath)...)
+		}
+	}
+	return allErrs
+}
+
+// ValidateResourceClaim validates a ResourceClaim.
+func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"), false)...)
 	return allErrs
 }
 
-func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range corevalidation.ValidateClassName(spec.ResourceClassName, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClassName"), spec.ResourceClassName, msg))
-	}
-	allErrs = append(allErrs, validateResourceClaimParametersRef(spec.ParametersRef, fldPath.Child("parametersRef"))...)
-	if !supportedAllocationModes.Has(string(spec.AllocationMode)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("allocationMode"), spec.AllocationMode, supportedAllocationModes.List()))
-	}
-	return allErrs
-}
-
-var supportedAllocationModes = sets.NewString(string(resource.AllocationModeImmediate), string(resource.AllocationModeWaitForFirstConsumer))
-
-// It would have been nice to use Go generics to reuse the same validation
-// function for Kind and Name in both types, but generics cannot be used to
-// access common fields in structs.
-
-func validateResourceClaimParametersRef(ref *resource.ResourceClaimParametersReference, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	if ref == nil {
-		return allErrs
-	}
-
-	// group is required but the Core group is the empty value, so it can not be enforced.
-	if ref.APIGroup != "" {
-		for _, msg := range utilvalidation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
-		}
-	}
-
-	if ref.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
-		}
-	}
-
-	if ref.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
-		}
-	}
-	return allErrs
-}
-
-func validateClassParameters(ref *resource.ResourceClassParametersReference, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	if ref == nil {
-		return allErrs
-	}
-
-	// group is required but the Core group is the empty value, so it can not be enforced.
-	if ref.APIGroup != "" {
-		for _, msg := range utilvalidation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
-		}
-	}
-
-	if ref.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
-		}
-	}
-
-	if ref.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
-		}
-	}
-
-	// namespace is optional.
-	if ref.Namespace != "" {
-		for _, msg := range apimachineryvalidation.ValidateNamespaceName(ref.Namespace, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), ref.Namespace, msg))
-		}
-	}
-	return allErrs
-}
-
-// ValidateClass validates a ResourceClass.
-func ValidateClass(resourceClass *resource.ResourceClass) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClass.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceDriverName(resourceClass.DriverName, field.NewPath("driverName"))...)
-	allErrs = append(allErrs, validateClassParameters(resourceClass.ParametersRef, field.NewPath("parametersRef"))...)
-	if resourceClass.SuitableNodes != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(resourceClass.SuitableNodes, field.NewPath("suitableNodes"))...)
-	}
-
-	return allErrs
-}
-
-// ValidateClassUpdate tests if an update to ResourceClass is valid.
-func ValidateClassUpdate(resourceClass, oldClass *resource.ResourceClass) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClass.ObjectMeta, &oldClass.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateClass(resourceClass)...)
-	return allErrs
-}
-
-// ValidateClaimUpdate tests if an update to ResourceClaim is valid.
-func ValidateClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
+// ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
+func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateClaim(resourceClaim)...)
+	// Because the spec is immutable, all CEL expressions in it must have been stored.
+	// If the user tries an update, this is not true and checking is less strict, but
+	// as there are errors, it doesn't matter.
+	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
-// ValidateClaimStatusUpdate tests if an update to the status of a ResourceClaim is valid.
-func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
+// ValidateResourceClaimStatusUpdate tests if an update to the status of a ResourceClaim is valid.
+func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
-	fldPath := field.NewPath("status")
-	// The name might not be set yet.
-	if resourceClaim.Status.DriverName != "" {
-		allErrs = append(allErrs, validateResourceDriverName(resourceClaim.Status.DriverName, fldPath.Child("driverName"))...)
-	} else if resourceClaim.Status.Allocation != nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driverName"), "must be specified when `allocation` is set"))
+	requestNames := gatherRequestNames(&resourceClaim.Spec.Devices)
+	allErrs = append(allErrs, validateResourceClaimStatusUpdate(&resourceClaim.Status, &oldClaim.Status, resourceClaim.DeletionTimestamp != nil, requestNames, field.NewPath("status"))...)
+	return allErrs
+}
+
+func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateDeviceClaim(&spec.Devices, fldPath.Child("devices"), stored)...)
+	if spec.Controller != "" {
+		allErrs = append(allErrs, validateDriverName(spec.Controller, fldPath.Child("controller"))...)
+	}
+	return allErrs
+}
+
+func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
+	allErrs := field.ErrorList{}
+	requestNames := gatherRequestNames(deviceClaim)
+	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
+		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
+			return validateDeviceRequest(request, fldPath, stored)
+		},
+		func(request resource.DeviceRequest) (string, string) {
+			return request.Name, "name"
+		},
+		fldPath.Child("requests"))...)
+	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
+		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
+			return validateDeviceConstraint(constraint, fldPath, requestNames)
+		}, fldPath.Child("constraints"))...)
+	allErrs = append(allErrs, validateSlice(deviceClaim.Config, resource.DeviceConfigMaxSize,
+		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
+			return validateDeviceClaimConfiguration(config, fldPath, requestNames)
+		}, fldPath.Child("config"))...)
+	return allErrs
+}
+
+func gatherRequestNames(deviceClaim *resource.DeviceClaim) sets.Set[string] {
+	requestNames := sets.New[string]()
+	for _, request := range deviceClaim.Requests {
+		requestNames.Insert(request.Name)
+	}
+	return requestNames
+}
+
+func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
+	if request.DeviceClassName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("deviceClassName"), ""))
+	} else {
+		allErrs = append(allErrs, validateDeviceClassName(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	}
+	allErrs = append(allErrs, validateSlice(request.Selectors, resource.DeviceSelectorsMaxSize,
+		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
+			return validateSelector(selector, fldPath, stored)
+		},
+		fldPath.Child("selectors"))...)
+	switch request.AllocationMode {
+	case resource.DeviceAllocationModeAll:
+		if request.Count != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("count"), request.Count, fmt.Sprintf("must not be specified when allocationMode is '%s'", request.AllocationMode)))
+		}
+	case resource.DeviceAllocationModeExactCount:
+		if request.Count <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("count"), request.Count, "must be greater than zero"))
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("allocationMode"), request.AllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}))
+	}
+	return allErrs
+}
+
+func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	if selector.CEL == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("cel"), ""))
+	} else {
+		allErrs = append(allErrs, validateCELSelector(*selector.CEL, fldPath.Child("cel"), stored)...)
+	}
+	return allErrs
+}
+
+func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	envType := environment.NewExpressions
+	if stored {
+		envType = environment.StoredExpressions
+	}
+	result := dracel.GetCompiler().CompileCELExpression(celSelector.Expression, envType)
+	if result.Error != nil {
+		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
+	}
+	return allErrs
+}
+
+func convertCELErrorToValidationError(fldPath *field.Path, expression string, err error) *field.Error {
+	var celErr *cel.Error
+	if errors.As(err, &celErr) {
+		switch celErr.Type {
+		case cel.ErrorTypeRequired:
+			return field.Required(fldPath, celErr.Detail)
+		case cel.ErrorTypeInvalid:
+			return field.Invalid(fldPath, expression, celErr.Detail)
+		case cel.ErrorTypeInternal:
+			return field.InternalError(fldPath, celErr)
+		}
+	}
+	return field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", err))
+}
+
+func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateSet(constraint.Requests, resource.DeviceRequestsMaxSize,
+		func(name string, fldPath *field.Path) field.ErrorList {
+			return validateRequestNameRef(name, fldPath, requestNames)
+		},
+		stringKey, fldPath.Child("requests"))...)
+	if constraint.MatchAttribute == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("matchAttribute"), ""))
+	} else {
+		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
+	}
+	return allErrs
+}
+
+func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
+		func(name string, fldPath *field.Path) field.ErrorList {
+			return validateRequestNameRef(name, fldPath, requestNames)
+		}, stringKey, fldPath.Child("requests"))...)
+	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath)...)
+	return allErrs
+}
+
+func validateRequestNameRef(name string, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	allErrs := validateRequestName(name, fldPath)
+	if !requestNames.Has(name) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, "must be the name of a request in the claim"))
+	}
+	return allErrs
+}
+
+func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if config.Opaque == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("opaque"), ""))
+	} else {
+		allErrs = append(allErrs, validateOpaqueConfiguration(*config.Opaque, fldPath.Child("opaque"))...)
+	}
+	return allErrs
+}
+
+func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
+	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
+	var v any
+	if len(config.Parameters.Raw) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
+	} else if err := json.Unmarshal(config.Parameters.Raw, &v); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+	} else if v == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
+	} else if _, isObject := v.(map[string]any); !isObject {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", "parameters must be a valid JSON object"))
 	}
 
-	allErrs = append(allErrs, validateAllocationResult(resourceClaim.Status.Allocation, fldPath.Child("allocation"))...)
-	allErrs = append(allErrs, validateResourceClaimConsumers(resourceClaim.Status.ReservedFor, resource.ResourceClaimReservedForMaxSize, fldPath.Child("reservedFor"))...)
+	return allErrs
+}
+
+func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaimStatus, claimDeleted bool, requestNames sets.Set[string], fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames)...)
+	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
+		validateResourceClaimUserReference,
+		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
+		fldPath.Child("reservedFor"))...)
 
 	// Now check for invariants that must be valid for a ResourceClaim.
-	if len(resourceClaim.Status.ReservedFor) > 0 {
-		if resourceClaim.Status.Allocation == nil {
+	if len(status.ReservedFor) > 0 {
+		if status.Allocation == nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be specified when `allocated` is not set"))
 		} else {
-			if !resourceClaim.Status.Allocation.Shareable && len(resourceClaim.Status.ReservedFor) > 1 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be reserved more than once"))
-			}
 			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
 			// but not added.
-			if resourceClaim.DeletionTimestamp != nil || resourceClaim.Status.DeallocationRequested {
-				oldSet := sets.New(oldClaim.Status.ReservedFor...)
-				newSet := sets.New(resourceClaim.Status.ReservedFor...)
+			if claimDeleted || status.DeallocationRequested {
+				oldSet := sets.New(oldStatus.ReservedFor...)
+				newSet := sets.New(status.ReservedFor...)
 				newItems := newSet.Difference(oldSet)
 				if len(newItems) > 0 {
 					allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set"))
@@ -191,19 +279,19 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 		}
 	}
 
-	// Updates to a populated resourceClaim.Status.Allocation are not allowed
-	if oldClaim.Status.Allocation != nil && resourceClaim.Status.Allocation != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Status.Allocation, oldClaim.Status.Allocation, fldPath.Child("allocation"))...)
+	// Updates to a populated status.Allocation are not allowed
+	if oldStatus.Allocation != nil && status.Allocation != nil {
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
 	}
 
-	if !oldClaim.Status.DeallocationRequested &&
-		resourceClaim.Status.DeallocationRequested &&
-		len(resourceClaim.Status.ReservedFor) > 0 {
+	if !oldStatus.DeallocationRequested &&
+		status.DeallocationRequested &&
+		len(status.ReservedFor) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set"))
 	}
 
-	if resourceClaim.Status.Allocation == nil &&
-		resourceClaim.Status.DeallocationRequested {
+	if status.Allocation == nil &&
+		status.DeallocationRequested {
 		// Either one or the other field was modified incorrectly.
 		// For the sake of simplicity this only reports the invalid
 		// end result.
@@ -214,85 +302,12 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	// anymore because the deallocation may already have started. The field
 	// can only get reset by the driver together with removing the
 	// allocation.
-	if oldClaim.Status.DeallocationRequested &&
-		!resourceClaim.Status.DeallocationRequested &&
-		resourceClaim.Status.Allocation != nil {
+	if oldStatus.DeallocationRequested &&
+		!status.DeallocationRequested &&
+		status.Allocation != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may not be cleared when `allocation` is set"))
 	}
 
-	return allErrs
-}
-
-func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if allocation != nil {
-		if len(allocation.ResourceHandles) > 0 {
-			allErrs = append(allErrs, validateResourceHandles(allocation.ResourceHandles, resource.AllocationResultResourceHandlesMaxSize, fldPath.Child("resourceHandles"))...)
-		}
-		if allocation.AvailableOnNodes != nil {
-			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.AvailableOnNodes, fldPath.Child("availableOnNodes"))...)
-		}
-	}
-	return allErrs
-}
-
-func validateResourceHandles(resourceHandles []resource.ResourceHandle, maxSize int, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, resourceHandle := range resourceHandles {
-		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateResourceDriverName(resourceHandle.DriverName, idxPath.Child("driverName"))...)
-		if len(resourceHandle.Data) > resource.ResourceHandleDataMaxSize {
-			allErrs = append(allErrs, field.TooLongMaxLength(idxPath.Child("data"), len(resourceHandle.Data), resource.ResourceHandleDataMaxSize))
-		}
-		if resourceHandle.StructuredData != nil {
-			allErrs = append(allErrs, validateStructuredResourceHandle(resourceHandle.StructuredData, idxPath.Child("structuredData"))...)
-		}
-		if len(resourceHandle.Data) > 0 && resourceHandle.StructuredData != nil {
-			allErrs = append(allErrs, field.Invalid(idxPath, nil, "data and structuredData are mutually exclusive"))
-		}
-	}
-	if len(resourceHandles) > maxSize {
-		// Dumping the entire field into the error message is likely to be too long,
-		// in particular when it is already beyond the maximum size. Instead this
-		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(resourceHandles), maxSize))
-	}
-	return allErrs
-}
-
-func validateStructuredResourceHandle(handle *resource.StructuredResourceHandle, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if handle.NodeName != "" {
-		allErrs = append(allErrs, validateNodeName(handle.NodeName, fldPath.Child("nodeName"))...)
-	}
-	allErrs = append(allErrs, validateDriverAllocationResults(handle.Results, fldPath.Child("results"))...)
-	return allErrs
-}
-
-func validateDriverAllocationResults(results []resource.DriverAllocationResult, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for index, result := range results {
-		idxPath := fldPath.Index(index)
-		allErrs = append(allErrs, validateAllocationResultModel(&result.AllocationResultModel, idxPath)...)
-	}
-	return allErrs
-}
-
-func validateAllocationResultModel(model *resource.AllocationResultModel, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	entries := sets.New[string]()
-	if model.NamedResources != nil {
-		entries.Insert("namedResources")
-		allErrs = append(allErrs, namedresourcesvalidation.ValidateAllocationResult(model.NamedResources, fldPath.Child("namedResources"))...)
-	}
-	switch len(entries) {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
-	case 1:
-		// Okay.
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, sets.List(entries), "exactly one field must be set, not several"))
-	}
 	return allErrs
 }
 
@@ -310,48 +325,105 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	return allErrs
 }
 
-// validateSliceIsASet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
-func validateSliceIsASet[T comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	allItems := sets.New[T]()
-	for i, item := range slice {
-		idxPath := fldPath.Index(i)
-		if allItems.Has(item) {
-			allErrs = append(allErrs, field.Duplicate(idxPath, item))
-		} else {
-			allErrs = append(allErrs, validateItem(item, idxPath)...)
-			allItems.Insert(item)
-		}
+func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	if allocation == nil {
+		return nil
 	}
-	if len(slice) > maxSize {
-		// Dumping the entire field into the error message is likely to be too long,
-		// in particular when it is already beyond the maximum size. Instead this
-		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(slice), maxSize))
+
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames)...)
+	if allocation.NodeSelector != nil {
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
+	if allocation.Controller != "" {
+		allErrs = append(allErrs, validateDriverName(allocation.Controller, fldPath.Child("controller"))...)
 	}
 	return allErrs
 }
 
-// validateResourceClaimConsumers ensures that the slice contains no duplicate UIDs and does not exceed a certain maximum size.
-func validateResourceClaimConsumers(consumers []resource.ResourceClaimConsumerReference, maxSize int, fldPath *field.Path) field.ErrorList {
+func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
-	allUIDs := sets.New[types.UID]()
-	for i, consumer := range consumers {
-		idxPath := fldPath.Index(i)
-		if allUIDs.Has(consumer.UID) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("uid"), consumer.UID))
-		} else {
-			allErrs = append(allErrs, validateResourceClaimUserReference(consumer, idxPath)...)
-			allUIDs.Insert(consumer.UID)
-		}
-	}
-	if len(consumers) > maxSize {
-		// Dumping the entire field into the error message is likely to be too long,
-		// in particular when it is already beyond the maximum size. Instead this
-		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(consumers), maxSize))
+	allErrs = append(allErrs, validateSlice(allocation.Results, resource.AllocationResultsMaxSize,
+		func(result resource.DeviceRequestAllocationResult, fldPath *field.Path) field.ErrorList {
+			return validateDeviceRequestAllocationResult(result, fldPath, requestNames)
+		}, fldPath.Child("results"))...)
+	allErrs = append(allErrs, validateSlice(allocation.Config, 2*resource.DeviceConfigMaxSize, /* class + claim */
+		func(config resource.DeviceAllocationConfiguration, fldPath *field.Path) field.ErrorList {
+			return validateDeviceAllocationConfiguration(config, fldPath, requestNames)
+		}, fldPath.Child("config"))...)
+
+	return allErrs
+}
+
+func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
+	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
+	return allErrs
+}
+
+func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfiguration, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateAllocationConfigSource(config.Source, fldPath.Child("source"))...)
+	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
+		func(name string, fldPath *field.Path) field.ErrorList {
+			return validateRequestNameRef(name, fldPath, requestNames)
+		}, stringKey, fldPath.Child("requests"))...)
+	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath)...)
+	return allErrs
+}
+
+func validateAllocationConfigSource(source resource.AllocationConfigSource, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	switch source {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	case resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass:
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath, source, []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}))
 	}
 	return allErrs
+}
+
+// ValidateClass validates a DeviceClass.
+func ValidateDeviceClass(class *resource.DeviceClass) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&class.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, nil, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateClassUpdate tests if an update to DeviceClass is valid.
+func ValidateDeviceClassUpdate(class, oldClass *resource.DeviceClass) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&class.ObjectMeta, &oldClass.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, &oldClass.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// If the selectors are exactly as before, we treat the CEL expressions as "stored".
+	// Any change, including merely reordering selectors, triggers validation as new
+	// expressions.
+	stored := false
+	if oldSpec != nil {
+		stored = apiequality.Semantic.DeepEqual(spec.Selectors, oldSpec.Selectors)
+	}
+	allErrs = append(allErrs, validateSlice(spec.Selectors, resource.DeviceSelectorsMaxSize,
+		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
+			return validateSelector(selector, fldPath, stored)
+		},
+		fldPath.Child("selectors"))...)
+	allErrs = append(allErrs, validateSlice(spec.Config, resource.DeviceConfigMaxSize, validateDeviceClassConfiguration, fldPath.Child("config"))...)
+	if spec.SuitableNodes != nil {
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.SuitableNodes, field.NewPath("suitableNodes"))...)
+	}
+	return allErrs
+}
+
+func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
+	return validateDeviceConfiguration(config.DeviceConfiguration, fldPath)
 }
 
 // ValidatePodSchedulingContext validates a PodSchedulingContext.
@@ -362,7 +434,7 @@ func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext)
 }
 
 func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
+	allErrs := validateSet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, stringKey, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
@@ -399,28 +471,31 @@ func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulin
 }
 
 func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSliceIsASet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("unsuitableNodes"))
+	allErrs := validateSet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, stringKey, fldPath.Child("unsuitableNodes"))
 	return allErrs
 }
 
-// ValidateClaimTemplace validates a ResourceClaimTemplate.
-func ValidateClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
+// ValidateResourceClaimTemplate validates a ResourceClaimTemplate.
+func ValidateResourceClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, corevalidation.ValidateResourceClaimTemplateName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"), false)...)
 	return allErrs
 }
 
-func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := corevalidation.ValidateTemplateObjectMeta(&spec.ObjectMeta, fldPath.Child("metadata"))
-	allErrs = append(allErrs, validateResourceClaimSpec(&spec.Spec, fldPath.Child("spec"))...)
+	allErrs = append(allErrs, validateResourceClaimSpec(&spec.Spec, fldPath.Child("spec"), stored)...)
 	return allErrs
 }
 
-// ValidateClaimTemplateUpdate tests if an update to template is valid.
-func ValidateClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTemplate) field.ErrorList {
+// ValidateResourceClaimTemplateUpdate tests if an update to template is valid.
+func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTemplate) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateClaimTemplate(template)...)
+	// Because the spec is immutable, all CEL expressions in it must have been stored.
+	// If the user tries an update, this is not true and checking is less strict, but
+	// as there are errors, it doesn't matter.
+	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -433,179 +508,258 @@ func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateResourceSlice tests if a ResourceSlice object is valid.
-func ValidateResourceSlice(resourceSlice *resource.ResourceSlice) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceSlice.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	if resourceSlice.NodeName != "" {
-		allErrs = append(allErrs, validateNodeName(resourceSlice.NodeName, field.NewPath("nodeName"))...)
-	}
-	allErrs = append(allErrs, validateResourceDriverName(resourceSlice.DriverName, field.NewPath("driverName"))...)
-	allErrs = append(allErrs, validateResourceModel(&resourceSlice.ResourceModel, nil)...)
-	return allErrs
-}
-
-func validateResourceModel(model *resource.ResourceModel, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	entries := sets.New[string]()
-	if model.NamedResources != nil {
-		entries.Insert("namedResources")
-		allErrs = append(allErrs, namedresourcesvalidation.ValidateResources(model.NamedResources, fldPath.Child("namedResources"))...)
-	}
-	switch len(entries) {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
-	case 1:
-		// Okay.
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, sets.List(entries), "exactly one field must be set, not several"))
-	}
+func ValidateResourceSlice(slice *resource.ResourceSlice) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&slice.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceSliceSpec(&slice.Spec, nil, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateResourceSlice tests if a ResourceSlice update is valid.
 func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.ResourceSlice) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlice.ObjectMeta, &oldResourceSlice.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceSlice(resourceSlice)...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceSlice.NodeName, oldResourceSlice.NodeName, field.NewPath("nodeName"))...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceSlice.DriverName, oldResourceSlice.DriverName, field.NewPath("driverName"))...)
+	allErrs = append(allErrs, validateResourceSliceSpec(&resourceSlice.Spec, &oldResourceSlice.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-// ValidateResourceClaimParameters tests if a ResourceClaimParameters object is valid for creation.
-func ValidateResourceClaimParameters(parameters *resource.ResourceClaimParameters) field.ErrorList {
-	return validateResourceClaimParameters(parameters, false)
-}
-
-func validateResourceClaimParameters(parameters *resource.ResourceClaimParameters, requestStored bool) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&parameters.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceClaimParametersRef(parameters.GeneratedFrom, field.NewPath("generatedFrom"))...)
-	allErrs = append(allErrs, validateDriverRequests(parameters.DriverRequests, field.NewPath("driverRequests"), requestStored)...)
-	return allErrs
-}
-
-func validateDriverRequests(requests []resource.DriverRequests, fldPath *field.Path, requestStored bool) field.ErrorList {
+func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	driverNames := sets.New[string]()
-	for i, request := range requests {
-		idxPath := fldPath.Index(i)
-		driverName := request.DriverName
-		allErrs = append(allErrs, validateResourceDriverName(driverName, idxPath.Child("driverName"))...)
-		if driverNames.Has(driverName) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("driverName"), driverName))
-		} else {
-			driverNames.Insert(driverName)
+	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
+	if oldSpec != nil {
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
+	}
+
+	numNodeSelectionFields := 0
+	if spec.NodeName != "" {
+		numNodeSelectionFields++
+		allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
+	}
+	if spec.NodeSelector != nil {
+		numNodeSelectionFields++
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+		if len(spec.NodeSelector.NodeSelectorTerms) != 1 {
+			// This additional constraint simplifies merging of different selectors
+			// when devices are allocated from different slices.
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), spec.NodeSelector.NodeSelectorTerms, "must have exactly one selector term"))
 		}
-		allErrs = append(allErrs, validateResourceRequests(request.Requests, idxPath.Child("requests"), requestStored)...)
 	}
-	return allErrs
-}
-
-func validateResourceRequests(requests []resource.ResourceRequest, fldPath *field.Path, requestStored bool) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, request := range requests {
-		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateResourceRequestModel(&request.ResourceRequestModel, idxPath, requestStored)...)
+	if spec.AllNodes {
+		numNodeSelectionFields++
 	}
-	if len(requests) == 0 {
-		// We could allow this, it just doesn't make sense: the entire entry would get ignored and thus
-		// should have been left out entirely.
-		allErrs = append(allErrs, field.Required(fldPath, "empty entries with no requests are not allowed"))
-	}
-	return allErrs
-}
-
-func validateResourceRequestModel(model *resource.ResourceRequestModel, fldPath *field.Path, requestStored bool) field.ErrorList {
-	var allErrs field.ErrorList
-	entries := sets.New[string]()
-	if model.NamedResources != nil {
-		entries.Insert("namedResources")
-		allErrs = append(allErrs, namedresourcesvalidation.ValidateRequest(namedresourcesvalidation.Options{StoredExpressions: requestStored}, model.NamedResources, fldPath.Child("namedResources"))...)
-	}
-	switch len(entries) {
+	switch numNodeSelectionFields {
 	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
+	case 1:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, spec, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
+	}
+
+	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices, validateDevice,
+		func(device resource.Device) (string, string) {
+			return device.Name, "name"
+		}, fldPath.Child("devices"))...)
+
+	return allErrs
+}
+
+func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validatePoolName(pool.Name, fldPath.Child("name"))...)
+	if pool.ResourceSliceCount <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceSliceCount"), pool.ResourceSliceCount, "must be greater than zero"))
+	}
+	if pool.Generation < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), pool.Generation, "must be greater than or equal to zero"))
+	}
+	return allErrs
+}
+
+func validateDevice(device resource.Device, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
+	if device.Basic == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("basic"), ""))
+	} else {
+		allErrs = append(allErrs, validateBasicDevice(*device.Basic, fldPath.Child("basic"))...)
+	}
+	return allErrs
+}
+
+func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// Warn about exceeding the maximum length only once. If any individual
+	// field is too large, then so is the combination.
+	allErrs = append(allErrs, validateMap(device.Attributes, -1, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
+	allErrs = append(allErrs, validateMap(device.Capacity, -1, validateQualifiedName, validateQuantity, fldPath.Child("capacity"))...)
+	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
+		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
+	}
+	return allErrs
+}
+
+var (
+	numericIdentifier = `(0|[1-9]\d*)`
+
+	preReleaseIdentifier = `(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)`
+
+	buildIdentifier = `[0-9a-zA-Z-]+`
+
+	semverRe = regexp.MustCompile(`^` +
+
+		// dot-separated version segments (e.g. 1.2.3)
+		numericIdentifier + `\.` + numericIdentifier + `\.` + numericIdentifier +
+
+		// optional dot-separated prerelease segments (e.g. -alpha.PRERELEASE.1)
+		`(-` + preReleaseIdentifier + `(\.` + preReleaseIdentifier + `)*)?` +
+
+		// optional dot-separated build identifier segments (e.g. +build.id.20240305)
+		`(\+` + buildIdentifier + `(\.` + buildIdentifier + `)*)?` +
+
+		`$`)
+)
+
+func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	numFields := 0
+	if attribute.BoolValue != nil {
+		numFields++
+	}
+	if attribute.IntValue != nil {
+		numFields++
+	}
+	if attribute.StringValue != nil {
+		if len(*attribute.StringValue) > resource.DeviceAttributeMaxValueLength {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("string"), *attribute.StringValue, resource.DeviceAttributeMaxValueLength))
+		}
+		numFields++
+	}
+	if attribute.VersionValue != nil {
+		numFields++
+		if !semverRe.MatchString(*attribute.VersionValue) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
+		}
+		if len(*attribute.VersionValue) > resource.DeviceAttributeMaxValueLength {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("version"), *attribute.VersionValue, resource.DeviceAttributeMaxValueLength))
+		}
+	}
+
+	switch numFields {
+	case 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one value must be specified"))
 	case 1:
 		// Okay.
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, sets.List(entries), "exactly one field must be set, not several"))
+		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one field must be specified"))
 	}
 	return allErrs
 }
 
-// ValidateResourceClaimParameters tests if a ResourceClaimParameters update is valid.
-func ValidateResourceClaimParametersUpdate(resourceClaimParameters, oldResourceClaimParameters *resource.ResourceClaimParameters) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaimParameters.ObjectMeta, &oldResourceClaimParameters.ObjectMeta, field.NewPath("metadata"))
-	requestStored := apiequality.Semantic.DeepEqual(oldResourceClaimParameters.DriverRequests, resourceClaimParameters.DriverRequests)
-	allErrs = append(allErrs, validateResourceClaimParameters(resourceClaimParameters, requestStored)...)
-	return allErrs
+func validateQuantity(quantity apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	// Any parsed quantity is valid.
+	return nil
 }
 
-// ValidateResourceClassParameters tests if a ResourceClassParameters object is valid for creation.
-func ValidateResourceClassParameters(parameters *resource.ResourceClassParameters) field.ErrorList {
-	return validateResourceClassParameters(parameters, false)
-}
-
-func validateResourceClassParameters(parameters *resource.ResourceClassParameters, filtersStored bool) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&parameters.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateClassParameters(parameters.GeneratedFrom, field.NewPath("generatedFrom"))...)
-	allErrs = append(allErrs, validateResourceFilters(parameters.Filters, field.NewPath("filters"), filtersStored)...)
-	allErrs = append(allErrs, validateVendorParameters(parameters.VendorParameters, field.NewPath("vendorParameters"))...)
-	return allErrs
-}
-
-func validateResourceFilters(filters []resource.ResourceFilter, fldPath *field.Path, filtersStored bool) field.ErrorList {
+func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	driverNames := sets.New[string]()
-	for i, filter := range filters {
-		idxPath := fldPath.Index(i)
-		driverName := filter.DriverName
-		allErrs = append(allErrs, validateResourceDriverName(driverName, idxPath.Child("driverName"))...)
-		if driverNames.Has(driverName) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("driverName"), driverName))
-		} else {
-			driverNames.Insert(driverName)
-		}
-		allErrs = append(allErrs, validateResourceFilterModel(&filter.ResourceFilterModel, idxPath, filtersStored)...)
+	if name == "" {
+		allErrs = append(allErrs, field.Required(fldPath, "name required"))
+		return allErrs
 	}
-	return allErrs
-}
 
-func validateResourceFilterModel(model *resource.ResourceFilterModel, fldPath *field.Path, filtersStored bool) field.ErrorList {
-	var allErrs field.ErrorList
-	entries := sets.New[string]()
-	if model.NamedResources != nil {
-		entries.Insert("namedResources")
-		allErrs = append(allErrs, namedresourcesvalidation.ValidateFilter(namedresourcesvalidation.Options{StoredExpressions: filtersStored}, model.NamedResources, fldPath.Child("namedResources"))...)
-	}
-	switch len(entries) {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+	parts := strings.Split(string(name), "/")
+	switch len(parts) {
 	case 1:
-		// Okay.
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, sets.List(entries), "exactly one field must be set, not several"))
-	}
-	return allErrs
-}
-
-func validateVendorParameters(parameters []resource.VendorParameters, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	driverNames := sets.New[string]()
-	for i, parameters := range parameters {
-		idxPath := fldPath.Index(i)
-		driverName := parameters.DriverName
-		allErrs = append(allErrs, validateResourceDriverName(driverName, idxPath.Child("driverName"))...)
-		if driverNames.Has(driverName) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("driverName"), driverName))
+		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)
+	case 2:
+		if len(parts[0]) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, "the prefix must not be empty"))
 		} else {
-			driverNames.Insert(driverName)
+			allErrs = append(allErrs, validateDriverName(parts[0], fldPath)...)
+		}
+		if len(parts[1]) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, "the name must not be empty"))
+		} else {
+			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
 	}
 	return allErrs
 }
 
-// ValidateResourceClassParameters tests if a ResourceClassParameters update is valid.
-func ValidateResourceClassParametersUpdate(resourceClassParameters, oldResourceClassParameters *resource.ResourceClassParameters) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClassParameters.ObjectMeta, &oldResourceClassParameters.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceClassParameters(resourceClassParameters)...)
+func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
+	allErrs := validateQualifiedName(resource.QualifiedName(name), fldPath)
+	if !strings.Contains(string(name), "/") {
+		allErrs = append(allErrs, field.Required(fldPath.Child("domain"), "must include a prefix"))
+	}
+	return allErrs
+}
+
+func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(id) > resource.DeviceMaxIDLength {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, id, resource.DeviceMaxIDLength))
+	}
+	for _, msg := range validation.IsCIdentifier(id) {
+		allErrs = append(allErrs, field.TypeInvalid(fldPath, id, msg))
+	}
+	return allErrs
+}
+
+// validateSlice ensures that a slice does not exceed a certain maximum size
+// and that all entries are valid.
+// A negative maxSize disables the length check.
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, item := range slice {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validateItem(item, idxPath)...)
+	}
+	if maxSize >= 0 && len(slice) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(slice), maxSize))
+	}
+	return allErrs
+}
+
+// validateSet ensures that a slice contains no duplicates, does not
+// exceed a certain maximum size and that all entries are valid.
+func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
+	allErrs := validateSlice(slice, maxSize, validateItem, fldPath)
+	allItems := sets.New[K]()
+	for i, item := range slice {
+		idxPath := fldPath.Index(i)
+		key, fieldName := itemKey(item)
+		childPath := idxPath
+		if fieldName != "" {
+			childPath = childPath.Child(fieldName)
+		}
+		if allItems.Has(key) {
+			allErrs = append(allErrs, field.Duplicate(childPath, key))
+		} else {
+			allItems.Insert(key)
+		}
+	}
+	return allErrs
+}
+
+// stringKey uses the item itself as a key for validateSet.
+func stringKey(item string) (string, string) {
+	return item, ""
+}
+
+// validateMap validates keys, items and the maximum length of a map.
+// A negative maxSize disables the length check.
+func validateMap[K ~string, T any](m map[K]T, maxSize int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if maxSize >= 0 && len(m) > maxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(m), maxSize))
+	}
+	for key, item := range m {
+		allErrs = append(allErrs, validateKey(key, fldPath)...)
+		allErrs = append(allErrs, validateItem(item, fldPath.Key(string(key)))...)
+	}
 	return allErrs
 }

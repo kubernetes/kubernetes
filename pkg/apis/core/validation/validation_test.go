@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -54,7 +55,6 @@ const (
 	dnsSubdomainLabelErrMsg           = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg                  = "a valid environment variable name must consist of"
 	relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
-	defaultGracePeriod                = int64(30)
 	noUserNamespace                   = false
 )
 
@@ -64,6 +64,7 @@ var (
 	containerRestartPolicyNever     = core.ContainerRestartPolicy("Never")
 	containerRestartPolicyInvalid   = core.ContainerRestartPolicy("invalid")
 	containerRestartPolicyEmpty     = core.ContainerRestartPolicy("")
+	defaultGracePeriod              = ptr.To[int64](30)
 )
 
 type topologyPair struct {
@@ -3006,6 +3007,20 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableVolumeAttributesClass: true,
 			isExpectedFailure:           true,
 		},
+		"invalid-update-volume-attributes-class-when-claim-not-bound": {
+			oldClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass1.DeepCopy()
+				clone.Status.Phase = core.ClaimPending
+				return clone
+			}(),
+			newClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass2.DeepCopy()
+				clone.Status.Phase = core.ClaimPending
+				return clone
+			}(),
+			enableVolumeAttributesClass: true,
+			isExpectedFailure:           true,
+		},
 		"invalid-update-volume-attributes-class-to-nil-without-featuregate-enabled": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
 			newClaim:                    validClaimNilVolumeAttributesClass,
@@ -5351,6 +5366,97 @@ func TestValidateVolumes(t *testing.T) {
 				field: "projected.sources[1]",
 			}},
 		},
+		// ImageVolumeSource
+		{
+			name: "valid image volume on pod",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+		}, {
+			name: "feature disabled",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: false},
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "field[0]",
+				detail: "must specify a volume type",
+			}},
+		}, {
+			name: "image volume with empty name",
+			vol: core.Volume{
+				Name: "",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "name",
+			}},
+		}, {
+			name: "image volume with empty reference on pod",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: true},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "image.reference",
+			}},
+		}, {
+			name: "image volume with empty reference on other object",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: false},
+		}, {
+			name: "image volume with wrong pullPolicy",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "wrong",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "image.pullPolicy",
+			}},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -5367,7 +5473,7 @@ func TestValidateVolumes(t *testing.T) {
 				if err.Type != expErr.etype {
 					t.Errorf("unexpected error type:\n\twant: %q\n\t got: %q", expErr.etype, err.Type)
 				}
-				if !strings.HasSuffix(err.Field, "."+expErr.field) {
+				if err.Field != expErr.field && !strings.HasSuffix(err.Field, "."+expErr.field) {
 					t.Errorf("unexpected error field:\n\twant: %q\n\t got: %q", expErr.field, err.Field)
 				}
 				if !strings.Contains(err.Detail, expErr.detail) {
@@ -5406,126 +5512,82 @@ func TestHugePagesIsolation(t *testing.T) {
 		expectError bool
 	}{
 		"Valid: request hugepages-2Mi": {
-			pod: &core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-							},
+			pod: podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
+						}))))),
 		},
 		"Valid: request more than one hugepages size": {
-			pod: &core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
+			pod: podtest.MakePod("hugepages-shared",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
+							"hugepages-1Gi":             "2Gi",
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
+							"hugepages-1Gi":             "2Gi",
+						}))))),
 			expectError: false,
 		},
 		"Valid: request hugepages-1Gi, limit hugepages-2Mi and hugepages-1Gi": {
-			pod: &core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
+			pod: podtest.MakePod("hugepages-multiple",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
+							"hugepages-1Gi":             "2Gi",
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						map[string]string{
+							string(core.ResourceCPU):    "10",
+							string(core.ResourceMemory): "10G",
+							"hugepages-2Mi":             "1Gi",
+							"hugepages-1Gi":             "2Gi",
+						}))))),
 		},
 		"Invalid: not requesting cpu and memory": {
-			pod: &core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-requireCpuOrMemory", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
+			pod: podtest.MakePod("hugepages-requireCpuOrMemory",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							"hugepages-2Mi": "1Gi",
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						map[string]string{
+							"hugepages-2Mi": "1Gi",
+						}))))),
 			expectError: true,
 		},
 		"Invalid: request 1Gi hugepages-2Mi but limit 2Gi": {
-			pod: &core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+			pod: podtest.MakePod("hugepages-shared",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								string(core.ResourceCPU):    "10",
+								string(core.ResourceMemory): "10G",
+								"hugepages-2Mi":             "1Gi",
 							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("2Gi"),
-							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+							map[string]string{
+								string(core.ResourceCPU):    "10",
+								string(core.ResourceMemory): "10G",
+								"hugepages-2Mi":             "2Gi",
+							}))))),
 			expectError: true,
 		},
 	}
@@ -7002,8 +7064,10 @@ func TestValidateVolumeMounts(t *testing.T) {
 				},
 			},
 		}}}},
+		{Name: "image-volume", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	opts := PodValidationOptions{AllowImageVolumeSource: true}
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), opts)
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -7031,38 +7095,41 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/rro-ifpossible", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)},
 		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
 		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
+		{Name: "image-volume", MountPath: "/image-volume"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
-	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), opts); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]core.VolumeMount{
-		"empty name":                             {{Name: "", MountPath: "/foo"}},
-		"name not found":                         {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
-		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
-		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
-		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
-		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
-		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
-		"rro but not ro":                         {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
-		"rro with incompatible propagation":      {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
-		"rro-if-possible but not ro":             {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"empty name":                                       {{Name: "", MountPath: "/foo"}},
+		"name not found":                                   {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                                  {{Name: "abc", MountPath: ""}},
+		"mountpath collision":                              {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                                 {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                                    {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                              {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                               {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate":           {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"name exists in volumeDevice":                      {{Name: "xyz", MountPath: "/bar"}},
+		"mountpath exists in volumeDevice":                 {{Name: "uvw", MountPath: "/mnt/exists"}},
+		"both exist in volumeDevice":                       {{Name: "xyz", MountPath: "/mnt/exists"}},
+		"rro but not ro":                                   {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
+		"rro with incompatible propagation":                {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
+		"rro-if-possible but not ro":                       {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"subPath not allowed for image volume sources":     {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
+		"subPathExpr not allowed for image volume sources": {{Name: "image-volume", MountPath: "/image-volume-err-2", SubPathExpr: "$(POD_NAME)"}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -7128,7 +7195,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -7184,7 +7251,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -7292,7 +7359,7 @@ func TestValidateMountPropagation(t *testing.T) {
 		return
 	}
 	for i, test := range tests {
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"), PodValidationOptions{})
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
@@ -9940,7 +10007,6 @@ func TestValidatePodConditions(t *testing.T) {
 }
 
 func TestValidatePodSpec(t *testing.T) {
-	activeDeadlineSeconds := int64(30)
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
 	minUserID := int64(0)
@@ -9951,173 +10017,126 @@ func TestValidatePodSpec(t *testing.T) {
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
-	successCases := map[string]core.PodSpec{
-		"populate basic fields, leave defaults for most": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate all fields": {
-			Volumes: []core.Volume{
-				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
-			},
-			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:  core.RestartPolicyAlways,
-			NodeSelector: map[string]string{
+	successCases := map[string]*core.Pod{
+		"populate basic fields, leave defaults for most": podtest.MakePod(""),
+		"populate all fields": podtest.MakePod("",
+			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+			podtest.SetNodeSelector(map[string]string{
 				"key": "value",
-			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSeconds,
-			ServiceAccountName:    "acct",
-		},
-		"populate all fields with larger active deadline": {
-			Volumes: []core.Volume{
-				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
-			},
-			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:  core.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSecondsMax,
-			ServiceAccountName:    "acct",
-		},
-		"populate HostNetwork": {
-			Containers: []core.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
-				},
-			},
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate RunAsUser SupplementalGroups FSGroup with minID 0": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+			podtest.SetNodeName("foobar"),
+			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsMax),
+			podtest.SetServiceAccountName("acct"),
+		),
+		"populate HostNetwork": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
+			podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+		),
+		"populate RunAsUser SupplementalGroups FSGroup with minID 0": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID},
 				RunAsUser:          &minUserID,
 				FSGroup:            &minGroupID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate HostIPC": {
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate HostIPC": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostIPC: true,
-			},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate HostPID": {
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate HostPID": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostPID: true,
-			},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate Affinity": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate HostAliases": {
-			HostAliases:   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate HostAliases with `foo.bar` hostnames": {
-			HostAliases:   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate HostAliases with HostNetwork": {
-			HostAliases: []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
-			Containers:  []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate Affinity": podtest.MakePod("",
+			podtest.SetAffinity(&core.Affinity{
+				NodeAffinity: &core.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{{
+							MatchExpressions: []core.NodeSelectorRequirement{{
+								Key:      "key2",
+								Operator: core.NodeSelectorOpIn,
+								Values:   []string{"value1", "value2"},
+							}},
+							MatchFields: []core.NodeSelectorRequirement{{
+								Key:      "metadata.name",
+								Operator: core.NodeSelectorOpIn,
+								Values:   []string{"host1"},
+							}},
+						}},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+						Weight: 10,
+						Preference: core.NodeSelectorTerm{
+							MatchExpressions: []core.NodeSelectorRequirement{{
+								Key:      "foo",
+								Operator: core.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							}},
+						},
+					}},
+				},
+			}),
+		),
+		"populate HostAliases": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}),
+		),
+		"populate HostAliases with `foo.bar` hostnames": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
+		),
+		"populate HostAliases with HostNetwork": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"populate PriorityClassName": {
-			Volumes:           []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:        []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:     core.RestartPolicyAlways,
-			DNSPolicy:         core.DNSClusterFirst,
-			PriorityClassName: "valid-name",
-		},
-		"populate ShareProcessNamespace": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate PriorityClassName": podtest.MakePod("",
+			podtest.SetPriorityClassName("valid-name"),
+		),
+		"populate ShareProcessNamespace": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				ShareProcessNamespace: &[]bool{true}[0],
-			},
-		},
-		"populate RuntimeClassName": {
-			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:    core.RestartPolicyAlways,
-			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: utilpointer.String("valid-sandbox"),
-		},
-		"populate Overhead": {
-			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:    core.RestartPolicyAlways,
-			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: utilpointer.String("valid-sandbox"),
-			Overhead:         core.ResourceList{},
-		},
-		"populate DNSPolicy": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"populate RuntimeClassName": podtest.MakePod("",
+			podtest.SetRuntimeClassName("valid-sandbox"),
+		),
+		"populate Overhead": podtest.MakePod("",
+			podtest.SetOverhead(core.ResourceList{}),
+		),
+		"populate FSGroupChangePolicy": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &goodfsGroupChangePolicy,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
+			}),
+		),
+		"resources resize policy for containers": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResizePolicy(
+				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
+			)),
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
 	}
 
-	activeDeadlineSeconds = int64(0)
+	activeDeadlineSecondsZero := int64(0)
 	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = int64(-1)
@@ -10125,254 +10144,118 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID = int64(-1)
 	maxGroupID = int64(2147483648)
 
-	failureCases := map[string]core.PodSpec{
-		"bad volume": {
-			Volumes:       []core.Volume{{}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		},
-		"no containers": {
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad container": {
-			Containers:    []core.Container{{}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad init container": {
-			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{}},
-			RestartPolicy:  core.RestartPolicyAlways,
-			DNSPolicy:      core.DNSClusterFirst,
-		},
-		"bad DNS policy": {
-			DNSPolicy:     core.DNSPolicy("invalid"),
-			RestartPolicy: core.RestartPolicyAlways,
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		},
-		"bad service account name": {
-			Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:      core.RestartPolicyAlways,
-			DNSPolicy:          core.DNSClusterFirst,
-			ServiceAccountName: "invalidName",
-		},
-		"bad restart policy": {
-			RestartPolicy: "UnknowPolicy",
-			DNSPolicy:     core.DNSClusterFirst,
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		},
-		"with hostNetwork hostPort unspecified": {
-			Containers: []core.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []core.ContainerPort{
-					{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}},
-				},
-			},
-			SecurityContext: &core.PodSecurityContext{
+	failureCases := map[string]core.Pod{
+		"bad volume":               *podtest.MakePod("", podtest.SetVolumes(core.Volume{})),
+		"no containers":            *podtest.MakePod("", podtest.SetContainers()),
+		"bad container":            *podtest.MakePod("", podtest.SetContainers(core.Container{})),
+		"bad init container":       *podtest.MakePod("", podtest.SetInitContainers(core.Container{})),
+		"bad DNS policy":           *podtest.MakePod("", podtest.SetDNSPolicy(core.DNSPolicy("invalid"))),
+		"bad service account name": *podtest.MakePod("", podtest.SetServiceAccountName("invalidName")),
+		"bad restart policy":       *podtest.MakePod("", podtest.SetRestartPolicy("UnknowPolicy")),
+		"with hostNetwork hostPort unspecified": *podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"with hostNetwork hostPort not equal to containerPort": {
-			Containers: []core.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []core.ContainerPort{
-					{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
-				},
-			},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"with hostNetwork hostPort not equal to containerPort": *podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"with hostAliases with invalid IP": {
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"with hostAliases with invalid IP": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: false,
-			},
-			HostAliases: []core.HostAlias{{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}},
-		},
-		"with hostAliases with invalid hostname": {
-			SecurityContext: &core.PodSecurityContext{
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
+		),
+		"with hostAliases with invalid hostname": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: false,
-			},
-			HostAliases: []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}},
-		},
-		"bad supplementalGroups large than math.MaxInt32": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
+		),
+		"bad supplementalGroups large than math.MaxInt32": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID, 1234},
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad supplementalGroups less than 0": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad supplementalGroups less than 0": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID, 1234},
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad runAsUser large than math.MaxInt32": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad runAsUser large than math.MaxInt32": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &maxUserID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad runAsUser less than 0": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad runAsUser less than 0": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &minUserID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad fsGroup large than math.MaxInt32": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad fsGroup large than math.MaxInt32": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroup: &maxGroupID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad fsGroup less than 0": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad fsGroup less than 0": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroup: &minGroupID,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad-active-deadline-seconds": {
-			Volumes: []core.Volume{
-				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
-			},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSeconds,
-		},
-		"active-deadline-seconds-too-large": {
-			Volumes: []core.Volume{
-				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
-			},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSecondsTooLarge,
-		},
-		"bad nodeName": {
-			NodeName:      "node name",
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad PriorityClassName": {
-			Volumes:           []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:        []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:     core.RestartPolicyAlways,
-			DNSPolicy:         core.DNSClusterFirst,
-			PriorityClassName: "InvalidName",
-		},
-		"ShareProcessNamespace and HostPID both set": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad-active-deadline-seconds": *podtest.MakePod("",
+			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero),
+		),
+		"active-deadline-seconds-too-large": *podtest.MakePod("",
+			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsTooLarge),
+		),
+		"bad nodeName": *podtest.MakePod("",
+			podtest.SetNodeName("node name"),
+		),
+		"bad PriorityClassName": *podtest.MakePod("",
+			podtest.SetPriorityClassName("InvalidName"),
+		),
+		"ShareProcessNamespace and HostPID both set": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostPID:               true,
 				ShareProcessNamespace: &[]bool{true}[0],
-			},
-		},
-		"bad RuntimeClassName": {
-			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:    core.RestartPolicyAlways,
-			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: utilpointer.String("invalid/sandbox"),
-		},
-		"bad empty fsGroupchangepolicy": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad RuntimeClassName": *podtest.MakePod("",
+			podtest.SetRuntimeClassName("invalid/sandbox"),
+		),
+		"bad empty fsGroupchangepolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy2,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"bad invalid fsgroupchangepolicy": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"bad invalid fsgroupchangepolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"disallowed resources resize policy for init containers": {
-			InitContainers: []core.Container{{
-				Name:  "initctr",
-				Image: "initimage",
-				ResizePolicy: []core.ContainerResizePolicy{
-					{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			}},
-			Containers: []core.Container{{
-				Name:  "ctr",
-				Image: "image",
-				ResizePolicy: []core.ContainerResizePolicy{
-					{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
+			}),
+		),
+		"disallowed resources resize policy for init containers": *podtest.MakePod("",
+			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerResizePolicy(
+				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+			))),
+		),
 	}
 	for k, v := range failureCases {
 		opts := PodValidationOptions{
 			ResourceIsPod: true,
 		}
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
 }
 
-func extendPodSpecwithTolerations(in core.PodSpec, tolerations []core.Toleration) core.PodSpec {
-	var out core.PodSpec
-	out.Containers = in.Containers
-	out.RestartPolicy = in.RestartPolicy
-	out.DNSPolicy = in.DNSPolicy
-	out.Tolerations = tolerations
-	return out
-}
-
 func TestValidatePod(t *testing.T) {
-	validPodSpec := func(affinity *core.Affinity) core.PodSpec {
-		spec := core.PodSpec{
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		}
-		if affinity != nil {
-			spec.Affinity = affinity
-		}
-		return spec
-	}
 	validPVCSpec := core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -10390,36 +10273,18 @@ func TestValidatePod(t *testing.T) {
 	longVolName := strings.Repeat("b", 60)
 
 	successCases := map[string]core.Pod{
-		"basic fields": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"just about everything": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Volumes: []core.Volume{
-					{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
-				},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				NodeSelector: map[string]string{
-					"key": "value",
-				},
-				NodeName: "foobar",
-			},
-		},
-		"serialized node affinity requirements": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(
+		"basic fields": *podtest.MakePod("123"),
+		"just about everything": *podtest.MakePod("abc.123.do-re-mi",
+			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+			podtest.SetNodeSelector(map[string]string{
+				"key": "value",
+			}),
+			podtest.SetNodeName("foobar"),
+			podtest.SetServiceAccountName("acct"),
+		),
+		"serialized node affinity requirements": *podtest.MakePod("123",
+			podtest.SetAffinity(
 				// TODO: Uncomment and move this block and move inside NodeAffinity once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
 				//		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
@@ -10461,15 +10326,10 @@ func TestValidatePod(t *testing.T) {
 							},
 						}},
 					},
-				},
-			),
-		},
-		"serialized node affinity requirements, II": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(
+				}),
+		),
+		"serialized node affinity requirements, II": *podtest.MakePod("123",
+			podtest.SetAffinity(
 				// TODO: Uncomment and move this block and move inside NodeAffinity once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
 				//		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
@@ -10500,11 +10360,9 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 			),
-		},
-		"serialized pod affinity in affinity requirements in annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+		),
+		"serialized pod affinity in affinity requirements in annotations": *podtest.MakePod("123",
+			podtest.SetAffinity(
 				// TODO: Uncomment and move this block into Annotations map once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
 				//		"requiredDuringSchedulingRequiredDuringExecution": [{
@@ -10518,48 +10376,45 @@ func TestValidatePod(t *testing.T) {
 				//			"namespaces":["ns"],
 				//			"topologyKey": "zone"
 				//		}]
-			},
-			Spec: validPodSpec(&core.Affinity{
-				PodAffinity: &core.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{{
-								Key:      "key2",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"value1", "value2"},
-							}},
-						},
-						TopologyKey: "zone",
-						Namespaces:  []string{"ns"},
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{{
-								Key:      "key",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"value1", "value2"},
-							}},
-						},
-					}},
-					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
-						Weight: 10,
-						PodAffinityTerm: core.PodAffinityTerm{
+				&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{{
 									Key:      "key2",
-									Operator: metav1.LabelSelectorOpNotIn,
+									Operator: metav1.LabelSelectorOpIn,
 									Values:   []string{"value1", "value2"},
 								}},
 							},
+							TopologyKey: "zone",
 							Namespaces:  []string{"ns"},
-							TopologyKey: "region",
-						},
-					}},
-				},
-			}),
-		},
-		"serialized pod anti affinity with different Label Operators in affinity requirements in annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{{
+									Key:      "key",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"value1", "value2"},
+								}},
+							},
+						}},
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1", "value2"},
+									}},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						}},
+					},
+				}),
+		),
+		"serialized pod anti affinity with different Label Operators in affinity requirements in annotations": *podtest.MakePod("123",
+			podtest.SetAffinity(
 				// TODO: Uncomment and move this block into Annotations map once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
 				//		"requiredDuringSchedulingRequiredDuringExecution": [{
@@ -10573,604 +10428,371 @@ func TestValidatePod(t *testing.T) {
 				//			"namespaces":["ns"],
 				//			"topologyKey": "zone"
 				//		}]
-			},
-			Spec: validPodSpec(&core.Affinity{
-				PodAntiAffinity: &core.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{{
-								Key:      "key2",
-								Operator: metav1.LabelSelectorOpExists,
-							}},
-						},
-						TopologyKey: "zone",
-						Namespaces:  []string{"ns"},
-					}},
-					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
-						Weight: 10,
-						PodAffinityTerm: core.PodAffinityTerm{
+				&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{{
 									Key:      "key2",
-									Operator: metav1.LabelSelectorOpDoesNotExist,
+									Operator: metav1.LabelSelectorOpExists,
 								}},
 							},
+							TopologyKey: "zone",
 							Namespaces:  []string{"ns"},
-							TopologyKey: "region",
-						},
-					}},
-				},
-			}),
-		},
-		"populate forgiveness tolerations with exists operator in annotations.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
-		},
-		"populate forgiveness tolerations with equal operator in annotations.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
-		},
-		"populate tolerations equal operator in annotations.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
-		},
-		"populate tolerations exists operator in annotations.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(nil),
-		},
-		"empty key with Exists operator is OK for toleration, empty toleration key means match all taint keys.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Operator: "Exists", Effect: "NoSchedule"}}),
-		},
-		"empty operator is OK for toleration, defaults to Equal.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
-		},
-		"empty effect is OK for toleration, empty toleration effect means match all taint effects.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}}),
-		},
-		"negative tolerationSeconds is OK for toleration.": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-forgiveness-invalid",
-				Namespace: "ns",
-			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
-		},
-		"runtime default seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"docker default seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileDockerDefault,
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"unconfined seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "unconfined",
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"localhost seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "localhost/foo",
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"localhost seccomp profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"runtime default seccomp profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
-					SeccompProfile: &core.SeccompProfile{
-						Type: core.SeccompProfileTypeRuntimeDefault,
+						}},
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpDoesNotExist,
+									}},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						}},
 					},
+				}),
+		),
+		"populate forgiveness tolerations with exists operator in annotations.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
+		),
+		"populate forgiveness tolerations with equal operator in annotations.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
+		),
+		"populate tolerations equal operator in annotations.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}),
+		),
+		"populate tolerations exists operator in annotations.": *podtest.MakePod("123",
+			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
+		),
+		"empty key with Exists operator is OK for toleration, empty toleration key means match all taint keys.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Operator: "Exists", Effect: "NoSchedule"}),
+		),
+		"empty operator is OK for toleration, defaults to Equal.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Key: "foo", Value: "bar", Effect: "NoSchedule"}),
+		),
+		"empty effect is OK for toleration, empty toleration effect means match all taint effects.": *podtest.MakePod("123",
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar"}),
+		),
+		"negative tolerationSeconds is OK for toleration.": *podtest.MakePod("123",
+			podtest.SetTolerations(
+				core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}),
+		),
+		"runtime default seccomp profile": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
+			},
+			),
+		),
+		"docker default seccomp profile": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.SeccompPodAnnotationKey: "unconfined",
+			},
+			),
+		),
+		"localhost seccomp profile": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.SeccompPodAnnotationKey: "localhost/foo",
+			},
+			),
+		),
+		"localhost seccomp profile for a container": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
+			},
+			),
+		),
+		"runtime default seccomp profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SeccompProfile: &core.SeccompProfile{
+					Type: core.SeccompProfileTypeRuntimeDefault,
 				},
 			},
-		},
-		"runtime default seccomp profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"unconfined seccomp profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
+			),
+		),
+		"runtime default seccomp profile for a container": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type: core.SeccompProfileTypeUnconfined,
 					},
+				}),
+			)),
+		),
+		"unconfined seccomp profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SeccompProfile: &core.SeccompProfile{
+					Type: core.SeccompProfileTypeRuntimeDefault,
 				},
-			},
-		},
-		"unconfined seccomp profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeUnconfined,
-						},
+			}),
+		),
+		"unconfined seccomp profile for a container": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
+					SeccompProfile: &core.SeccompProfile{
+						Type: core.SeccompProfileTypeUnconfined,
 					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"localhost seccomp profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
+				}),
+			)),
+		),
+		"localhost seccomp profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SeccompProfile: &core.SeccompProfile{
+					Type:             core.SeccompProfileTypeLocalhost,
+					LocalhostProfile: utilpointer.String("filename.json"),
+				},
+			}),
+		),
+		"localhost seccomp profile for a container, II": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type:             core.SeccompProfileTypeLocalhost,
 						LocalhostProfile: utilpointer.String("filename.json"),
 					},
+				}),
+			)),
+		),
+		"default AppArmor annotation for a container": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+			}),
+		),
+		"default AppArmor annotation for an init container": *podtest.MakePod("123",
+			podtest.SetInitContainers(podtest.MakeContainer("init-ctr")),
+			podtest.SetAnnotations(map[string]string{
+				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+			}),
+		),
+		"localhost AppArmor annotation for a container": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo",
+			}),
+		),
+		"runtime default AppArmor profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type: core.AppArmorProfileTypeRuntimeDefault,
 				},
-			},
-		},
-		"localhost seccomp profile for a container, II": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type:             core.SeccompProfileTypeLocalhost,
-							LocalhostProfile: utilpointer.String("filename.json"),
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"default AppArmor annotation for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"default AppArmor annotation for an init container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-				},
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy:  core.RestartPolicyAlways,
-				DNSPolicy:      core.DNSClusterFirst,
-			},
-		},
-		"localhost AppArmor annotation for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo",
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"runtime default AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"runtime default AppArmor profile for a container": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: core.AppArmorProfileTypeRuntimeDefault,
 					},
+				}),
+			)),
+		),
+		"unconfined AppArmor profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type: core.AppArmorProfileTypeUnconfined,
 				},
-			},
-		},
-		"runtime default AppArmor profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"unconfined AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"unconfined AppArmor profile for a container": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: core.AppArmorProfileTypeUnconfined,
 					},
+				}),
+			)),
+		),
+		"localhost AppArmor profile for a pod": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type:             core.AppArmorProfileTypeLocalhost,
+					LocalhostProfile: ptr.To("example-org/application-foo"),
 				},
-			},
-		},
-		"unconfined AppArmor profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeUnconfined,
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"localhost AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
+			}),
+		),
+		"localhost AppArmor profile for a container field": *podtest.MakePod("123",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To("example-org/application-foo"),
 					},
-				},
-			},
-		},
-		"localhost AppArmor profile for a container field": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("example-org/application-foo"),
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"matching AppArmor fields and annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-				},
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("foo"),
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"matching AppArmor pod field and annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-				},
-			},
-			Spec: core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
+				}),
+			)),
+		),
+		"matching AppArmor fields and annotations": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
+			}),
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To("foo"),
 					},
+				}),
+			)),
+		),
+		"matching AppArmor pod field and annotations": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{
+				core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
+			}),
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type:             core.AppArmorProfileTypeLocalhost,
+					LocalhostProfile: ptr.To("foo"),
 				},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"syntactically valid sysctls": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				SecurityContext: &core.PodSecurityContext{
-					Sysctls: []core.Sysctl{{
-						Name:  "kernel.shmmni",
-						Value: "32768",
-					}, {
-						Name:  "kernel.shmmax",
-						Value: "1000000000",
-					}, {
-						Name:  "knet.ipv4.route.min_pmtu",
-						Value: "1000",
-					}},
-				},
-			},
-		},
-		"valid extended resources for init container": {
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{{
-					Name:            "valid-extended",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Resources: core.ResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceName("example.com/a"): resource.MustParse("10"),
-						},
-						Limits: core.ResourceList{
-							core.ResourceName("example.com/a"): resource.MustParse("10"),
-						},
-					},
-					TerminationMessagePolicy: "File",
+			}),
+		),
+		"syntactically valid sysctls": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				Sysctls: []core.Sysctl{{
+					Name:  "kernel.shmmni",
+					Value: "32768",
+				}, {
+					Name:  "kernel.shmmax",
+					Value: "1000000000",
+				}, {
+					Name:  "knet.ipv4.route.min_pmtu",
+					Value: "1000",
 				}},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"valid extended resources for regular container": {
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				Containers: []core.Container{{
-					Name:            "valid-extended",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Resources: core.ResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceName("example.com/a"): resource.MustParse("10"),
+			}),
+		),
+		"valid extended resources for init container": *podtest.MakePod("valid-extended",
+			podtest.SetInitContainers(podtest.MakeContainer("valid-extended",
+				podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							"example.com/a": "10",
 						},
-						Limits: core.ResourceList{
-							core.ResourceName("example.com/a"): resource.MustParse("10"),
+						map[string]string{
+							"example.com/a": "10",
 						},
-					},
-					TerminationMessagePolicy: "File",
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"valid serviceaccount token projected volume with serviceaccount name specified": {
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-			Spec: core.PodSpec{
-				ServiceAccountName: "some-service-account",
-				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy:      core.RestartPolicyAlways,
-				DNSPolicy:          core.DNSClusterFirst,
-				Volumes: []core.Volume{{
-					Name: "projected-volume",
-					VolumeSource: core.VolumeSource{
-						Projected: &core.ProjectedVolumeSource{
-							Sources: []core.VolumeProjection{{
-								ServiceAccountToken: &core.ServiceAccountTokenProjection{
-									Audience:          "foo-audience",
-									ExpirationSeconds: 6000,
-									Path:              "foo-path",
-								},
-							}},
+					))),
+			),
+		),
+		"valid extended resources for regular container": *podtest.MakePod("valid-extended",
+			podtest.SetContainers(podtest.MakeContainer("valid-extended",
+				podtest.SetContainerResources(
+					podtest.MakeResourceRequirements(
+						map[string]string{
+							"example.com/a": "10",
 						},
-					},
-				}},
-			},
-		},
-		"valid ClusterTrustBundlePEM projected volume referring to a CTB by name": {
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-			Spec: core.PodSpec{
-				ServiceAccountName: "some-service-account",
-				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy:      core.RestartPolicyAlways,
-				DNSPolicy:          core.DNSClusterFirst,
-				Volumes: []core.Volume{
-					{
-						Name: "projected-volume",
-						VolumeSource: core.VolumeSource{
-							Projected: &core.ProjectedVolumeSource{
-								Sources: []core.VolumeProjection{
-									{
-										ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-											Path: "foo-path",
-											Name: utilpointer.String("foo"),
-										},
-									},
-								},
+						map[string]string{
+							"example.com/a": "10",
+						},
+					))),
+			),
+		),
+		"valid serviceaccount token projected volume with serviceaccount name specified": *podtest.MakePod("valid-extended",
+			podtest.SetServiceAccountName("some-service-account"),
+			podtest.SetVolumes(core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ServiceAccountToken: &core.ServiceAccountTokenProjection{
+								Audience:          "foo-audience",
+								ExpirationSeconds: 6000,
+								Path:              "foo-path",
 							},
-						},
+						}},
 					},
 				},
-			},
-		},
-		"valid ClusterTrustBundlePEM projected volume referring to a CTB by signer name": {
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-			Spec: core.PodSpec{
-				ServiceAccountName: "some-service-account",
-				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy:      core.RestartPolicyAlways,
-				DNSPolicy:          core.DNSClusterFirst,
-				Volumes: []core.Volume{
-					{
-						Name: "projected-volume",
-						VolumeSource: core.VolumeSource{
-							Projected: &core.ProjectedVolumeSource{
-								Sources: []core.VolumeProjection{
-									{
-										ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-											Path:       "foo-path",
-											SignerName: utilpointer.String("example.com/foo"),
-											LabelSelector: &metav1.LabelSelector{
-												MatchLabels: map[string]string{
-													"version": "live",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		"ephemeral volume + PVC, no conflict between them": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Volumes: []core.Volume{
-					{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
-					{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
-				},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"negative pod-deletion-cost": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.PodDeletionCost: "-100"}},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"positive pod-deletion-cost": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.PodDeletionCost: "100"}},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		"MatchLabelKeys/MismatchLabelKeys in required PodAffinity": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Affinity: &core.Affinity{
-					PodAffinity: &core.PodAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+			}),
+		),
+		"valid ClusterTrustBundlePEM projected volume referring to a CTB by name": *podtest.MakePod("valid-extended",
+			podtest.SetVolumes(core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
 							{
+								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+									Path: "foo-path",
+									Name: utilpointer.String("foo"),
+								},
+							},
+						},
+					},
+				},
+			}),
+		),
+		"valid ClusterTrustBundlePEM projected volume referring to a CTB by signer name": *podtest.MakePod("valid-extended",
+			podtest.SetVolumes(core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+									Path:       "foo-path",
+									SignerName: utilpointer.String("example.com/foo"),
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"version": "live",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		),
+		"ephemeral volume + PVC, no conflict between them": *podtest.MakePod("valid-extended",
+			podtest.SetVolumes(
+				core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
+				core.Volume{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
+			),
+		),
+		"negative pod-deletion-cost": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "-100"}),
+		),
+		"positive pod-deletion-cost": *podtest.MakePod("123",
+			podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "100"}),
+		),
+		"MatchLabelKeys/MismatchLabelKeys in required PodAffinity": *podtest.MakePod("123",
+			podtest.SetAffinity(&core.Affinity{
+				PodAffinity: &core.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1", "value2"},
+									},
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1"},
+									},
+									{
+										Key:      "key3",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1"},
+									},
+								},
+							},
+							TopologyKey:       "k8s.io/zone",
+							MatchLabelKeys:    []string{"key2"},
+							MismatchLabelKeys: []string{"key3"},
+						},
+					},
+				},
+			}),
+		),
+		"MatchLabelKeys/MismatchLabelKeys in preferred PodAffinity": *podtest.MakePod("123",
+			podtest.SetAffinity(&core.Affinity{
+				PodAffinity: &core.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
 										{
@@ -11197,59 +10819,47 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				},
-			},
-		},
-		"MatchLabelKeys/MismatchLabelKeys in preferred PodAffinity": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Affinity: &core.Affinity{
-					PodAffinity: &core.PodAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
-							{
-								Weight: 10,
-								PodAffinityTerm: core.PodAffinityTerm{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "key",
-												Operator: metav1.LabelSelectorOpNotIn,
-												Values:   []string{"value1", "value2"},
-											},
-											{
-												Key:      "key2",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"value1"},
-											},
-											{
-												Key:      "key3",
-												Operator: metav1.LabelSelectorOpNotIn,
-												Values:   []string{"value1"},
-											},
-										},
+			}),
+		),
+		"MatchLabelKeys/MismatchLabelKeys in required PodAntiAffinity": *podtest.MakePod("123",
+			podtest.SetAffinity(&core.Affinity{
+				PodAntiAffinity: &core.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1", "value2"},
 									},
-									TopologyKey:       "k8s.io/zone",
-									MatchLabelKeys:    []string{"key2"},
-									MismatchLabelKeys: []string{"key3"},
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1"},
+									},
+									{
+										Key:      "key3",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1"},
+									},
 								},
 							},
+							TopologyKey:       "k8s.io/zone",
+							MatchLabelKeys:    []string{"key2"},
+							MismatchLabelKeys: []string{"key3"},
 						},
 					},
 				},
-			},
-		},
-		"MatchLabelKeys/MismatchLabelKeys in required PodAntiAffinity": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Affinity: &core.Affinity{
-					PodAntiAffinity: &core.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
-							{
+			}),
+		),
+		"MatchLabelKeys/MismatchLabelKeys in preferred PodAntiAffinity": *podtest.MakePod("123",
+			podtest.SetAffinity(&core.Affinity{
+				PodAntiAffinity: &core.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
 										{
@@ -11276,89 +10886,42 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				},
-			},
-		},
-		"MatchLabelKeys/MismatchLabelKeys in preferred PodAntiAffinity": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Affinity: &core.Affinity{
-					PodAntiAffinity: &core.PodAntiAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
-							{
-								Weight: 10,
-								PodAffinityTerm: core.PodAffinityTerm{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "key",
-												Operator: metav1.LabelSelectorOpNotIn,
-												Values:   []string{"value1", "value2"},
-											},
-											{
-												Key:      "key2",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"value1"},
-											},
-											{
-												Key:      "key3",
-												Operator: metav1.LabelSelectorOpNotIn,
-												Values:   []string{"value1"},
-											},
-										},
+			}),
+		),
+		"LabelSelector can have the same key as MismatchLabelKeys": *podtest.MakePod("123",
+			podtest.SetAffinity(&core.Affinity{
+				// Note: On the contrary, in case of matchLabelKeys, keys in matchLabelKeys are not allowed to be specified in labelSelector by users.
+				PodAffinity: &core.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1", "value2"},
 									},
-									TopologyKey:       "k8s.io/zone",
-									MatchLabelKeys:    []string{"key2"},
-									MismatchLabelKeys: []string{"key3"},
+									{
+										// This is the same key as in MismatchLabelKeys
+										// but it's allowed.
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1"},
+									},
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1"},
+									},
 								},
 							},
+							TopologyKey:       "k8s.io/zone",
+							MismatchLabelKeys: []string{"key2"},
 						},
 					},
 				},
-			},
-		},
-		"LabelSelector can have the same key as MismatchLabelKeys": {
-			// Note: On the contrary, in case of matchLabelKeys, keys in matchLabelKeys are not allowed to be specified in labelSelector by users.
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Affinity: &core.Affinity{
-					PodAffinity: &core.PodAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
-										{
-											// This is the same key as in MismatchLabelKeys
-											// but it's allowed.
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpIn,
-											Values:   []string{"value1"},
-										},
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1"},
-										},
-									},
-								},
-								TopologyKey:       "k8s.io/zone",
-								MismatchLabelKeys: []string{"key2"},
-							},
-						},
-					},
-				},
-			},
-		},
+			}),
+		),
 	}
 
 	for k, v := range successCases {
@@ -11375,82 +10938,40 @@ func TestValidatePod(t *testing.T) {
 	}{
 		"bad name": {
 			expectedError: "metadata.name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
-				Spec: core.PodSpec{
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				},
-			},
+			spec:          *podtest.MakePod(""),
 		},
 		"image whitespace": {
 			expectedError: "spec.containers[0].image",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
-				Spec: core.PodSpec{
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Containers:    []core.Container{{Name: "ctr", Image: " ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage(" "))),
+			),
 		},
 		"image leading and trailing whitespace": {
 			expectedError: "spec.containers[0].image",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
-				Spec: core.PodSpec{
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Containers:    []core.Container{{Name: "ctr", Image: " something ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage(" something "))),
+			),
 		},
 		"bad namespace": {
 			expectedError: "metadata.namespace",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""},
-				Spec: core.PodSpec{
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				},
-			},
+			spec:          *podtest.MakePod("123", podtest.SetNamespace("")),
 		},
 		"bad spec": {
 			expectedError: "spec.containers[0].name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{}},
-				},
-			},
+			spec:          *podtest.MakePod("123", podtest.SetContainers(core.Container{})),
 		},
 		"bad label": {
 			expectedError: "NoUppercaseOrSpecialCharsLike=Equals",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: "ns",
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: core.PodSpec{
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetLabels(map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				}),
+			),
 		},
 		"invalid node selector requirement in node affinity, operator can't be null": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{{
@@ -11458,19 +10979,14 @@ func TestValidatePod(t *testing.T) {
 									Key: "key1",
 								}},
 							}},
-						},
-					},
+						}},
 				}),
-			},
+			),
 		},
 		"invalid node selector requirement in node affinity, key is invalid": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{{
@@ -11482,16 +10998,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid node field selector requirement in node affinity, more values for field selector": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{{
@@ -11501,19 +11013,14 @@ func TestValidatePod(t *testing.T) {
 									Values:   []string{"host1", "host2"},
 								}},
 							}},
-						},
-					},
+						}},
 				}),
-			},
+			),
 		},
 		"invalid node field selector requirement in node affinity, invalid operator": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].operator",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{{
@@ -11525,16 +11032,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid node field selector requirement in node affinity, invalid key": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].key",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{{
@@ -11547,16 +11050,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
 			expectedError: "must be in the range 1-100",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
 							Weight: 199,
@@ -11570,32 +11069,24 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{},
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
 			expectedError: "must be in the range 1-100",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 109,
@@ -11613,16 +11104,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchExpressions[0].values",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11640,16 +11127,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, In operator must include Values": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11666,16 +11149,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, Exists operator can not have values": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11693,16 +11172,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, namespace should be valid": {
 			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11719,16 +11194,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod affinity, empty topologyKey is not allowed for hard pod affinity": {
 			expectedError: "can not be empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
 							LabelSelector: &metav1.LabelSelector{
@@ -11742,16 +11213,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
 			expectedError: "can not be empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
 							LabelSelector: &metav1.LabelSelector{
@@ -11765,16 +11232,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod affinity, empty topologyKey is not allowed for soft pod affinity": {
 			expectedError: "can not be empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11791,16 +11254,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod anti-affinity, empty topologyKey is not allowed for soft pod anti-affinity": {
 			expectedError: "can not be empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
 							Weight: 10,
@@ -11817,16 +11276,12 @@ func TestValidatePod(t *testing.T) {
 						}},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -11848,16 +11303,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -11876,16 +11327,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod anti-affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -11907,16 +11354,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod anti-affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -11935,16 +11378,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -11966,16 +11405,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -11994,16 +11429,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod anti-affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -12025,16 +11456,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod anti-affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -12053,17 +11480,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod affinity, key exists in both matchLabelKeys and labelSelector": {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Labels:    map[string]string{"key": "value1"},
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -12091,17 +11513,13 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod affinity, key exists in both matchLabelKeys and labelSelector": {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Labels:    map[string]string{"key": "value1"},
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetLabels(map[string]string{"key": "value1"}),
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -12126,17 +11544,13 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod anti-affinity, key exists in both matchLabelKeys and labelSelector": {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Labels:    map[string]string{"key": "value1"},
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetLabels(map[string]string{"key": "value1"}),
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -12164,17 +11578,13 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod anti-affinity, key exists in both matchLabelKeys and labelSelector": {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Labels:    map[string]string{"key": "value1"},
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetLabels(map[string]string{"key": "value1"}),
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -12199,16 +11609,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -12231,16 +11637,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -12260,16 +11662,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid soft pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
 							{
@@ -12292,16 +11690,12 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid hard pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
 							{
@@ -12321,742 +11715,469 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				}),
-			},
+			),
 		},
 		"invalid toleration key": {
 			expectedError: "spec.tolerations[0].key",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}),
+			),
 		},
 		"invalid toleration operator": {
 			expectedError: "spec.tolerations[0].operator",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}}),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}),
+			),
 		},
 		"value must be empty when `operator` is 'Exists'": {
 			expectedError: "spec.tolerations[0].operator",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}}),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}),
+			),
 		},
-
 		"operator must be 'Exists' when `key` is empty": {
 			expectedError: "spec.tolerations[0].operator",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}),
+			),
 		},
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
 			expectedError: "spec.tolerations[0].effect",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-forgiveness-invalid",
-					Namespace: "ns",
-				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
-			},
+			spec: *podtest.MakePod("pod-forgiveness-invalid",
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}),
+			),
 		},
 		"must be a valid pod seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompPodAnnotationKey: "foo",
+				}),
+			),
 		},
 		"must be a valid container seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
+				}),
+			),
 		},
 		"must be a non-empty container name in seccomp annotation": {
 			expectedError: "name part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix: "foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompContainerAnnotationKeyPrefix: "foo",
+				}),
+			),
 		},
 		"must be a non-empty container profile in seccomp annotation": {
 			expectedError: "must be a valid seccomp profile",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix + "foo": "",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompContainerAnnotationKeyPrefix + "foo": "",
+				}),
+			),
 		},
 		"must match seccomp profile type and pod annotation": {
 			expectedError: "seccomp type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "unconfined",
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompPodAnnotationKey: "unconfined",
+				}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					SeccompProfile: &core.SeccompProfile{
+						Type: core.SeccompProfileTypeRuntimeDefault,
 					},
-				},
-				Spec: core.PodSpec{
-					SecurityContext: &core.PodSecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+				}),
+			),
 		},
 		"must match seccomp profile type and container annotation": {
 			expectedError: "seccomp type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix + "ctr": "unconfined",
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							SeccompProfile: &core.SeccompProfile{
-								Type: core.SeccompProfileTypeRuntimeDefault,
-							},
-						}}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerSecurityContext(core.SecurityContext{
+						SeccompProfile: &core.SeccompProfile{
+							Type: core.SeccompProfileTypeRuntimeDefault,
+						},
+					}),
+				)),
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompContainerAnnotationKeyPrefix + "ctr": "unconfined",
+				}),
+			),
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
 			expectedError: "must be a relative path",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "localhost//foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompPodAnnotationKey: "localhost//foo",
+				}),
+			),
 		},
 		"must not start with '../'": {
 			expectedError: "must not contain '..'",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "localhost/../foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.SeccompPodAnnotationKey: "localhost/../foo",
+				}),
+			),
 		},
 		"AppArmor profile must apply to a container": {
 			expectedError: "metadata.annotations[container.apparmor.security.beta.kubernetes.io/fake-ctr]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "fake-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:  core.RestartPolicyAlways,
-					DNSPolicy:      core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetInitContainers(podtest.MakeContainer("init-ctr")),
+				podtest.SetAnnotations(map[string]string{
+					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "fake-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+				}),
+			),
 		},
 		"AppArmor profile format must be valid": {
 			expectedError: "invalid AppArmor profile name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "bad-name",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "bad-name",
+				}),
+			),
 		},
 		"only default AppArmor profile may start with runtime/": {
 			expectedError: "invalid AppArmor profile name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
+				}),
+			),
 		},
 		"unsupported pod AppArmor profile type": {
 			expectedError: `Unsupported value: "test"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: "test",
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: "test",
 					},
-				},
-			},
+				}),
+			),
 		},
 		"unsupported container AppArmor profile type": {
 			expectedError: `Unsupported value: "test"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type: "test",
-							},
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerSecurityContext(core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: "test",
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
+					}),
+				)),
+			),
 		},
 		"missing pod AppArmor profile type": {
 			expectedError: "Required value: type is required when appArmorProfile is set",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: "",
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: "",
 					},
-				},
-			},
+				}),
+			),
 		},
 		"missing AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeLocalhost,
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: core.AppArmorProfileTypeLocalhost,
 					},
-				},
-			},
+				}),
+			),
 		},
 		"empty AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To(""),
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To(""),
 					},
-				},
-			},
+				}),
+			),
 		},
 		"invalid AppArmor localhost profile type": {
 			expectedError: `Invalid value: "foo-bar"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeRuntimeDefault,
-							LocalhostProfile: ptr.To("foo-bar"),
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeRuntimeDefault,
+						LocalhostProfile: ptr.To("foo-bar"),
 					},
-				},
-			},
+				}),
+			),
 		},
 		"invalid AppArmor localhost profile": {
 			expectedError: `Invalid value: "foo-bar "`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("foo-bar "),
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To("foo-bar "),
 					},
-				},
-			},
+				}),
+			),
 		},
 		"too long AppArmor localhost profile": {
 			expectedError: "Too long: may not be longer than 4095",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To(strings.Repeat("a", 4096)),
-						},
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To(strings.Repeat("a", 4096)),
 					},
-				},
-			},
+				}),
+			),
 		},
 		"mismatched AppArmor field and annotation types": {
 			expectedError: "Forbidden: apparmor type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type: core.AppArmorProfileTypeUnconfined,
-							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
-		},
-		"mismatched AppArmor pod field and annotation types": {
-			expectedError: "Forbidden: apparmor type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					SecurityContext: &core.PodSecurityContext{
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
+				}),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerSecurityContext(core.SecurityContext{
 						AppArmorProfile: &core.AppArmorProfile{
 							Type: core.AppArmorProfileTypeUnconfined,
 						},
+					}),
+				)),
+			),
+		},
+		"mismatched AppArmor pod field and annotation types": {
+			expectedError: "Forbidden: apparmor type in annotation and field must match",
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
+				}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: core.AppArmorProfileTypeUnconfined,
 					},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
+				}),
+			),
 		},
 		"mismatched AppArmor localhost profiles": {
 			expectedError: "Forbidden: apparmor profile in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type:             core.AppArmorProfileTypeLocalhost,
-								LocalhostProfile: ptr.To("bar"),
-							},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{
+					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
+				}),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerSecurityContext(core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeLocalhost,
+							LocalhostProfile: ptr.To("bar"),
 						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
+					}),
+				)),
+			),
 		},
 		"invalid extended resource name in container request": {
 			expectedError: "must be a standard resource for containers",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("invalid-name"): resource.MustParse("2"),
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"invalid-name": "2",
 							},
-							Limits: core.ResourceList{
-								core.ResourceName("invalid-name"): resource.MustParse("2"),
+							map[string]string{
+								"invalid-name": "2",
 							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						))),
+				),
+			),
 		},
 		"invalid extended resource requirement: request must be == limit": {
 			expectedError: "must be equal to example.com/a",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("2"),
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "2",
 							},
-							Limits: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("1"),
+							map[string]string{
+								"example.com/a": "1",
 							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						))),
+				),
+			),
 		},
 		"invalid extended resource requirement without limit": {
 			expectedError: "Limit must be set",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("2"),
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "2",
 							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+							map[string]string{},
+						))),
+				),
+			),
 		},
 		"invalid fractional extended resource in container request": {
 			expectedError: "must be an integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("500m"),
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "500m",
 							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+							map[string]string{},
+						))),
+				),
+			),
 		},
 		"invalid fractional extended resource in init container request": {
 			expectedError: "must be an integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("500m"),
+			spec: *podtest.MakePod("123",
+				podtest.SetInitContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "500m",
 							},
-						},
-					}},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+							map[string]string{},
+						))),
+				),
+			),
 		},
 		"invalid fractional extended resource in container limit": {
 			expectedError: "must be an integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("5"),
+			spec: *podtest.MakePod("123",
+				podtest.SetContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "5",
 							},
-							Limits: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("2.5"),
+							map[string]string{
+								"example.com/a": "2.5",
 							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						))),
+				),
+			),
 		},
 		"invalid fractional extended resource in init container limit": {
 			expectedError: "must be an integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("2.5"),
+			spec: *podtest.MakePod("123",
+				podtest.SetInitContainers(podtest.MakeContainer("invalid",
+					podtest.SetContainerResources(
+						podtest.MakeResourceRequirements(
+							map[string]string{
+								"example.com/a": "2.5",
 							},
-							Limits: core.ResourceList{
-								core.ResourceName("example.com/a"): resource.MustParse("2.5"),
+							map[string]string{
+								"example.com/a": "2.5",
 							},
-						},
-					}},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+						))),
+				),
+			),
 		},
 		"mirror-pod present without nodeName": {
 			expectedError: "mirror",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: ""}),
+			),
 		},
 		"mirror-pod populated without nodeName": {
 			expectedError: "mirror",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: "foo"}),
+			),
 		},
 		"serviceaccount token projected volume with no serviceaccount name specified": {
 			expectedError: "must not be specified when serviceAccountName is not set",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-					Volumes: []core.Volume{{
-						Name: "projected-volume",
-						VolumeSource: core.VolumeSource{
-							Projected: &core.ProjectedVolumeSource{
-								Sources: []core.VolumeProjection{{
-									ServiceAccountToken: &core.ServiceAccountTokenProjection{
-										Audience:          "foo-audience",
-										ExpirationSeconds: 6000,
-										Path:              "foo-path",
-									},
-								}},
-							},
+			spec: *podtest.MakePod("123",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience:          "foo-audience",
+									ExpirationSeconds: 6000,
+									Path:              "foo-path",
+								},
+							}},
 						},
-					}},
-				},
-			},
+					},
+				}),
+			),
 		},
 		"ClusterTrustBundlePEM projected volume using both byName and bySigner": {
 			expectedError: "only one of name and signerName may be used",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-				Spec: core.PodSpec{
-					ServiceAccountName: "some-service-account",
-					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:      core.RestartPolicyAlways,
-					DNSPolicy:          core.DNSClusterFirst,
-					Volumes: []core.Volume{
-						{
-							Name: "projected-volume",
-							VolumeSource: core.VolumeSource{
-								Projected: &core.ProjectedVolumeSource{
-									Sources: []core.VolumeProjection{
-										{
-											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-												Path:       "foo-path",
-												SignerName: utilpointer.String("example.com/foo"),
-												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: map[string]string{
-														"version": "live",
-													},
-												},
-												Name: utilpointer.String("foo"),
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+										Path:       "foo-path",
+										SignerName: utilpointer.String("example.com/foo"),
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"version": "live",
 											},
 										},
+										Name: utilpointer.String("foo"),
 									},
 								},
 							},
 						},
 					},
-				},
-			},
+				}),
+			),
 		},
 		"ClusterTrustBundlePEM projected volume byName with no name": {
 			expectedError: "must be a valid object name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-				Spec: core.PodSpec{
-					ServiceAccountName: "some-service-account",
-					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:      core.RestartPolicyAlways,
-					DNSPolicy:          core.DNSClusterFirst,
-					Volumes: []core.Volume{
-						{
-							Name: "projected-volume",
-							VolumeSource: core.VolumeSource{
-								Projected: &core.ProjectedVolumeSource{
-									Sources: []core.VolumeProjection{
-										{
-											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-												Path: "foo-path",
-												Name: utilpointer.String(""),
-											},
-										},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+										Path: "foo-path",
+										Name: utilpointer.String(""),
 									},
 								},
 							},
 						},
 					},
-				},
-			},
+				}),
+			),
 		},
 		"ClusterTrustBundlePEM projected volume bySigner with no signer name": {
 			expectedError: "must be a valid signer name",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-				Spec: core.PodSpec{
-					ServiceAccountName: "some-service-account",
-					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:      core.RestartPolicyAlways,
-					DNSPolicy:          core.DNSClusterFirst,
-					Volumes: []core.Volume{
-						{
-							Name: "projected-volume",
-							VolumeSource: core.VolumeSource{
-								Projected: &core.ProjectedVolumeSource{
-									Sources: []core.VolumeProjection{
-										{
-											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-												Path:       "foo-path",
-												SignerName: utilpointer.String(""),
-												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: map[string]string{
-														"foo": "bar",
-													},
-												},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+										Path:       "foo-path",
+										SignerName: utilpointer.String(""),
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"foo": "bar",
 											},
 										},
 									},
@@ -13064,102 +12185,67 @@ func TestValidatePod(t *testing.T) {
 							},
 						},
 					},
-				},
-			},
+				}),
+			),
 		},
 		"ClusterTrustBundlePEM projected volume bySigner with invalid signer name": {
 			expectedError: "must be a fully qualified domain and path of the form",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
-				Spec: core.PodSpec{
-					ServiceAccountName: "some-service-account",
-					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:      core.RestartPolicyAlways,
-					DNSPolicy:          core.DNSClusterFirst,
-					Volumes: []core.Volume{
-						{
-							Name: "projected-volume",
-							VolumeSource: core.VolumeSource{
-								Projected: &core.ProjectedVolumeSource{
-									Sources: []core.VolumeProjection{
-										{
-											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
-												Path:       "foo-path",
-												SignerName: utilpointer.String("example.com/foo/invalid"),
-											},
-										},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+										Path:       "foo-path",
+										SignerName: utilpointer.String("example.com/foo/invalid"),
 									},
 								},
 							},
 						},
 					},
-				},
-			},
+				}),
+			),
 		},
 		"final PVC name for ephemeral volume must be valid": {
 			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 characters",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: longPodName, Namespace: "ns"},
-				Spec: core.PodSpec{
-					Volumes: []core.Volume{
-						{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
-						{Name: longVolName, VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
-					},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod(longPodName,
+				podtest.SetVolumes(
+					core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
+					core.Volume{Name: longVolName, VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
+				),
+			),
 		},
 		"PersistentVolumeClaimVolumeSource must not reference a generated PVC": {
 			expectedError: "spec.volumes[0].persistentVolumeClaim.claimName: Invalid value: \"123-ephemeral-volume\": must not reference a PVC that gets created for an ephemeral volume",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: core.PodSpec{
-					Volumes: []core.Volume{
-						{Name: "pvc-volume", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "123-ephemeral-volume"}}},
-						{Name: "ephemeral-volume", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
-					},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("123",
+				podtest.SetVolumes(
+					core.Volume{Name: "pvc-volume", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "123-ephemeral-volume"}}},
+					core.Volume{Name: "ephemeral-volume", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
+				),
+			),
 		},
 		"invalid pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"text\": must be a 32bit integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.PodDeletionCost: "text"}},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "text"}),
+			),
 		},
 		"invalid leading zeros pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"008\": must be a 32bit integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.PodDeletionCost: "008"}},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "008"}),
+			),
 		},
 		"invalid leading plus sign pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"+10\": must be a 32bit integer",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{core.PodDeletionCost: "+10"}},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSClusterFirst,
-				},
-			},
+			spec: *podtest.MakePod("valid-extended",
+				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "+10"}),
+			),
 		},
 	}
+
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
 			if errs := ValidatePodCreate(&v.spec, PodValidationOptions{}); len(errs) == 0 {
@@ -13189,26 +12275,16 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 		wantFieldErrors field.ErrorList
 	}{{
 		name: "create a Pod with nodeName and schedulingGates, feature enabled",
-		pod: &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
-			Spec: core.PodSpec{
-				NodeName: "node",
-				SchedulingGates: []core.PodSchedulingGate{
-					{Name: "foo"},
-				},
-			},
-		},
+		pod: podtest.MakePod("pod",
+			podtest.SetNodeName("node"),
+			podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "foo"}),
+		),
 		wantFieldErrors: []*field.Error{field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared")},
 	}, {
 		name: "create a Pod with schedulingGates, feature enabled",
-		pod: &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
-			Spec: core.PodSpec{
-				SchedulingGates: []core.PodSchedulingGate{
-					{Name: "foo"},
-				},
-			},
-		},
+		pod: podtest.MakePod("pod",
+			podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "foo"}),
+		),
 		wantFieldErrors: nil,
 	},
 	}
@@ -13244,2135 +12320,1355 @@ func TestValidatePodUpdate(t *testing.T) {
 		err  string
 		test string
 	}{
-		{new: core.Pod{}, old: core.Pod{}, err: "", test: "nothing"}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			},
+		{new: *podtest.MakePod(""), old: *podtest.MakePod(""), err: "", test: "nothing"}, {
+			new:  *podtest.MakePod("foo"),
+			old:  *podtest.MakePod("bar"),
 			err:  "metadata.name",
 			test: "ids",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"bar": "foo",
-					},
-				},
-			},
+			new:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"foo": "bar"})),
+			old:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"bar": "foo"})),
 			err:  "",
 			test: "labels",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Annotations: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Annotations: map[string]string{
-						"bar": "foo",
-					},
-				},
-			},
+			new:  *podtest.MakePod("foo", podtest.SetAnnotations(map[string]string{"foo": "bar"})),
+			old:  *podtest.MakePod("foo", podtest.SetAnnotations(map[string]string{"bar": "foo"})),
 			err:  "",
 			test: "annotations",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V1",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V2",
-					}, {
-						Image: "bar:V2",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")))),
+			old: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V1")))),
 			err:  "may not add or remove containers",
 			test: "less containers",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V1",
-					}, {
-						Image: "bar:V2",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V2",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V2")))),
+			old: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")))),
 			err:  "may not add or remove containers",
 			test: "more containers",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Image: "foo:V1",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Image: "foo:V2",
-					}, {
-						Image: "bar:V2",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")))),
+			old: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V1")))),
 			err:  "may not add or remove containers",
 			test: "more init containers",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
+			new:  *podtest.MakePod("foo"),
+			old:  *podtest.MakePod("foo", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now})),
 			err:  "metadata.deletionTimestamp",
 			test: "deletion timestamp removed",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
+			new:  *podtest.MakePod("foo", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now})),
+			old:  *podtest.MakePod("foo"),
 			err:  "metadata.deletionTimestamp",
 			test: "deletion timestamp added",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
-				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace})),
+			old: *podtest.MakePod("foo",
+				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2})),
 			err:  "metadata.deletionGracePeriodSeconds",
 			test: "deletion grace period seconds changed",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V1",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V2",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V1")))),
+			old: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V2")))),
 			err:  "",
 			test: "image change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V1",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V2",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V1")))),
+			old: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V2")))),
 			err:  "",
 			test: "init container image change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V2",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("")))),
+			old: *podtest.MakePod("foo", podtest.SetContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V2")))),
 			err:  "spec.containers[0].image",
 			test: "image change to empty",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{
-						Name:                     "container",
-						Image:                    "foo:V2",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-					}},
-				},
-			},
+			new: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("")))),
+			old: *podtest.MakePod("foo", podtest.SetInitContainers(
+				podtest.MakeContainer("container", podtest.SetContainerImage("foo:V2")))),
 			err:  "spec.initContainers[0].image",
 			test: "init container image change to empty",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					EphemeralContainers: []core.EphemeralContainer{{
-						EphemeralContainerCommon: core.EphemeralContainerCommon{
-							Name:  "ephemeral",
-							Image: "busybox",
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec:       core.PodSpec{},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetEphemeralContainers(core.EphemeralContainer{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:  "ephemeral",
+						Image: "busybox",
+					},
+				}),
+			),
+			old:  *podtest.MakePod("foo"),
 			err:  "Forbidden: pod updates may not change fields other than",
 			test: "ephemeralContainer changes are not allowed via normal pod update",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{},
-			},
+			new:  *podtest.MakePod(""),
+			old:  *podtest.MakePod(""),
 			err:  "",
 			test: "activeDeadlineSeconds no change, nil",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
 			err:  "",
 			test: "activeDeadlineSeconds no change, set",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
-			old:  core.Pod{},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
+			old:  *podtest.MakePod(""),
 			err:  "",
 			test: "activeDeadlineSeconds change to positive from nil",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
-				},
-			},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsLarger)),
 			err:  "",
 			test: "activeDeadlineSeconds change to smaller positive",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsLarger)),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to larger positive",
-		},
-
-		{
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
-				},
-			},
-			old:  core.Pod{},
+		}, {
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsNegative)),
+			old:  *podtest.MakePod(""),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to negative from nil",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsNegative)),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to negative from positive",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero)),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to zero from positive",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
-				},
-			},
-			old:  core.Pod{},
+			new: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero)),
+			old:  *podtest.MakePod(""),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to zero from nil",
 		}, {
-			new: core.Pod{},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
-				},
-			},
+			new: *podtest.MakePod(""),
+			old: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsPositive)),
 			err:  "spec.activeDeadlineSeconds",
 			test: "activeDeadlineSeconds change to nil from positive",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("200m", "0", "1Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("100m", "0", "1Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "0", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "0", "1Gi"),
+					}))),
+			),
 			err:  "",
 			test: "cpu limit change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResourceLimits("100m", "200Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResourceLimits("100m", "200Mi"),
+					}))),
+			),
 			err:  "",
 			test: "memory limit change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("100m", "100Mi", "1Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("100m", "100Mi", "2Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "2Gi"),
+					}))),
+			),
 			err:  "Forbidden: pod updates may not change fields other than",
 			test: "storage limit change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("100m", "0"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("200m", "0"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "0"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("200m", "0"),
+					}))),
+			),
 			err:  "",
 			test: "cpu request change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("0", "200Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("0", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("0", "200Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("0", "100Mi"),
+					}))),
+			),
 			err:  "",
 			test: "memory request change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Requests: getResources("100m", "0", "2Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResources("100m", "0", "1Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "0", "2Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "0", "1Gi"),
+					}))),
+			),
 			err:  "Forbidden: pod updates may not change fields other than",
 			test: "storage request change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("200m", "400Mi", "1Gi"),
-							Requests: getResources("200m", "400Mi", "1Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("100m", "100Mi", "1Gi"),
-							Requests: getResources("100m", "100Mi", "1Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "400Mi", "1Gi"),
+						Requests: getResources("200m", "400Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("100m", "100Mi", "1Gi"),
+						Requests: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, guaranteed -> guaranteed",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("200m", "200Mi", "2Gi"),
-							Requests: getResources("100m", "100Mi", "1Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V1",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("400m", "400Mi", "2Gi"),
-							Requests: getResources("200m", "200Mi", "1Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "200Mi", "2Gi"),
+						Requests: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("400m", "400Mi", "2Gi"),
+						Requests: getResources("200m", "200Mi", "1Gi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("200m", "200Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("200m", "200Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("400m", "", "1Gi"),
-							Requests: getResources("300m", "", "1Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("200m", "500Mi", "1Gi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("400m", "", "1Gi"),
+						Requests: getResources("300m", "", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "500Mi", "1Gi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits: getResources("400m", "500Mi", "2Gi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResources("200m", "300Mi", "2Gi"),
-							Requests: getResourceLimits("100m", "200Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("400m", "500Mi", "2Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "300Mi", "2Gi"),
+						Requests: getResourceLimits("100m", "200Mi"),
+					}))),
+			),
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("200m", "200Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("100m", "100Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("100m", "100Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, guaranteed -> burstable",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("100m", "100Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("100m", "100Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, burstable -> guaranteed",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("200m", "200Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old:  *podtest.MakePod("pod"),
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, besteffort -> burstable",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Name:                     "container",
-						TerminationMessagePolicy: "File",
-						ImagePullPolicy:          "Always",
-						Image:                    "foo:V2",
-						Resources: core.ResourceRequirements{
-							Limits:   getResourceLimits("200m", "200Mi"),
-							Requests: getResourceLimits("100m", "100Mi"),
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod"),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, burstable -> besteffort",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V1",
-					}},
-					SecurityContext: &core.PodSecurityContext{
-						FSGroupChangePolicy: &validfsGroupChangePolicy,
-					},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V2",
-					}},
-					SecurityContext: &core.PodSecurityContext{
-						FSGroupChangePolicy: nil,
-					},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroupChangePolicy: &validfsGroupChangePolicy,
+				}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroupChangePolicy: nil,
+				}),
+			),
 			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "fsGroupChangePolicy change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V1",
-						Ports: []core.ContainerPort{
-							{HostPort: 8080, ContainerPort: 80},
-						},
-					}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{
-						Image: "foo:V2",
-						Ports: []core.ContainerPort{
-							{HostPort: 8000, ContainerPort: 80},
-						},
-					}},
-				},
-			},
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 80}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8000, ContainerPort: 80}))),
+			),
 			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "port change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"Bar": "foo",
-					},
-				},
-			},
+			new:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"foo": "bar"})),
+			old:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"bar": "foo"})),
 			err:  "",
 			test: "bad label change",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value2"}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1"}),
+			),
 			err:  "spec.tolerations: Forbidden",
 			test: "existing toleration value modified in pod spec updates",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+			),
 			err:  "spec.tolerations: Forbidden",
 			test: "existing toleration value modified in pod spec updates with modified tolerationSeconds",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
-				}},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}),
+			),
 			err:  "",
 			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value2"}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName(""),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1"}),
+			),
 			err:  "spec.tolerations: Forbidden",
 			test: "toleration modified in updates to an unscheduled pod",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1"}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1"}),
+			),
 			err:  "",
 			test: "tolerations unmodified in updates to a scheduled pod",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName: "node1",
-					Tolerations: []core.Toleration{
-						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
-						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
-					},
-				}},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:    "node1",
-					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+			),
 			err:  "",
 			test: "added valid new toleration to existing tolerations in pod spec updates",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{
-					NodeName: "node1",
-					Tolerations: []core.Toleration{
-						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
-						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
-					},
-				}},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
-				}},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
+				),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+			),
 			err:  "spec.tolerations[1].effect",
 			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		}, {
-			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("foo")),
+			old:  *podtest.MakePod("foo"),
 			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "removed nodeName from pod spec",
 		}, {
-			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
-			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: ""}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("foo")),
 			err:  "metadata.annotations[kubernetes.io/config.mirror]",
 			test: "added mirror pod annotation",
 		}, {
-			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: ""}),
+				podtest.SetNodeName("foo")),
 			err:  "metadata.annotations[kubernetes.io/config.mirror]",
 			test: "removed mirror pod annotation",
 		}, {
-			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}}, Spec: core.PodSpec{NodeName: "foo"}},
-			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "bar"}}, Spec: core.PodSpec{NodeName: "foo"}},
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: "foo"}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: "bar"}),
+				podtest.SetNodeName("foo")),
 			err:  "metadata.annotations[kubernetes.io/config.mirror]",
 			test: "changed mirror pod annotation",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:          "node1",
-					PriorityClassName: "bar-priority",
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:          "node1",
-					PriorityClassName: "foo-priority",
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetPriorityClassName("bar-priority"),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetPriorityClassName("foo-priority"),
+			),
 			err:  "spec: Forbidden: pod updates",
 			test: "changed priority class name",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:          "node1",
-					PriorityClassName: "",
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					NodeName:          "node1",
-					PriorityClassName: "foo-priority",
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetPriorityClassName(""),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("node1"),
+				podtest.SetPriorityClassName("foo-priority"),
+			),
 			err:  "spec: Forbidden: pod updates",
 			test: "removed priority class name",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(1),
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetTerminationGracePeriodSeconds(1),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetTerminationGracePeriodSeconds(-1),
+			),
 			err:  "",
 			test: "update termination grace period seconds",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(0),
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetTerminationGracePeriodSeconds(0),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetTerminationGracePeriodSeconds(-1),
+			),
 			err:  "spec: Forbidden: pod updates",
 			test: "update termination grace period seconds not 1",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Windows},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Linux},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetOS(core.Windows),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetOS(core.Linux),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Windows},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Linux},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetOS(core.Windows),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetOS(core.Linux),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
 			err:  "spec.securityContext.seLinuxOptions: Forbidden",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS: &core.PodOS{Name: "dummy"},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetOS("dummy"),
+			),
+			old:  *podtest.MakePod("foo"),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "invalid PodOS update, IdentifyPodOS featuregate set",
 		}, {
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS: &core.PodOS{Name: core.Linux},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS: &core.PodOS{Name: core.Windows},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetOS(core.Linux),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetOS(core.Windows),
+			),
 			err:  "Forbidden: pod updates may not change fields other than ",
 			test: "update pod spec OS to a valid value, featuregate disabled",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
-				},
-			},
-			old:  core.Pod{},
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "foo"}),
+			),
+			old:  *podtest.MakePod("foo"),
 			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'foo'",
 			test: "update pod spec schedulingGates: add new scheduling gate",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "bar"}},
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "bar"}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "foo"}),
+			),
 			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'bar'",
 			test: "update pod spec schedulingGates: mutating an existing scheduling gate",
 		}, {
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}, {Name: "bar"}},
-				},
-			},
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(
+					core.PodSchedulingGate{Name: "foo"},
+					core.PodSchedulingGate{Name: "bar"}),
+			),
 			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'baz'",
 			test: "update pod spec schedulingGates: mutating an existing scheduling gate along with deletion",
 		}, {
-			new: core.Pod{},
-			old: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
-				},
-			},
+			new: *podtest.MakePod("foo"),
+			old: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "foo"}),
+			),
 			err:  "",
 			test: "update pod spec schedulingGates: legal deletion",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+			old: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			test: "adding node selector is allowed for gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
 				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo":  "bar",
-						"foo2": "bar2",
-					},
+				),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo":  "bar",
+					"foo2": "bar2",
 				},
-			},
+				),
+			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "adding node selector is not allowed for non-gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.nodeSelector: Invalid value:",
 			test: "removing node selector is not allowed for gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
 				},
-			},
-			new:  core.Pod{},
+				),
+			),
+			new:  *podtest.MakePod("foo"),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "removing node selector is not allowed for non-gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo":  "bar",
-						"foo2": "bar2",
-					},
-				},
-			},
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo":  "bar",
+					"foo2": "bar2",
+				}),
+			),
 			test: "old pod spec has scheduling gate, new pod spec does not, and node selector is added",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "new value",
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "bar",
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeSelector(map[string]string{
+					"foo": "new value",
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.nodeSelector: Invalid value:",
 			test: "modifying value of existing node selector is not allowed",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								// Add 1 MatchExpression and 1 MatchField.
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}, {
-										Key:      "expr2",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+							}},
+						}}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							// Add 1 MatchExpression and 1 MatchField.
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}, {
+									Key:      "expr2",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			test: "addition to nodeAffinity is allowed for gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
 			test: "old RequiredDuringSchedulingIgnoredDuringExecution is non-nil, new RequiredDuringSchedulingIgnoredDuringExecution is nil, pod is gated",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								// Add 1 MatchExpression and 1 MatchField.
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}, {
-										Key:      "expr2",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+							}},
+						}},
+				}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							// Add 1 MatchExpression and 1 MatchField.
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}, {
+									Key:      "expr2",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
 								}},
-							},
-						},
-					},
-				},
-			},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "addition to nodeAffinity is not allowed for non-gated pods",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								// Add 1 MatchExpression and 1 MatchField.
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}, {
-										Key:      "expr2",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							// Add 1 MatchExpression and 1 MatchField.
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}, {
+									Key:      "expr2",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
 								}},
-							},
-						},
-					},
-				},
-			},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+			),
 			test: "old pod spec has scheduling gate, new pod spec does not, and node affinity addition occurs",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "nodeAffinity deletion from MatchExpressions not allowed",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								// Add 1 MatchExpression and 1 MatchField.
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							// Add 1 MatchExpression and 1 MatchField.
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "nodeAffinity deletion from MatchFields not allowed",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								// Add 1 MatchExpression and 1 MatchField.
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							// Add 1 MatchExpression and 1 MatchField.
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "nodeAffinity modification of item in MatchExpressions not allowed",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "nodeAffinity modification of item in MatchFields not allowed",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									}},
-								}, {
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"bar2"},
-									}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+							}, {
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
+								}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar2"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
 			test: "nodeSelectorTerms addition on gated pod should fail",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			test: "preferredDuringSchedulingIgnoredDuringExecution can modified for gated pods",
-		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}, {
-										Key:      "expr2",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo2"},
-									}},
-									MatchFields: []core.NodeSelectorRequirement{{
-										Key:      "metadata.name",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			test: "preferredDuringSchedulingIgnoredDuringExecution can have additions for gated pods",
-		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
-		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
 							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity:        &core.Affinity{},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
+								}},
+							},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			test: "preferredDuringSchedulingIgnoredDuringExecution can modified for gated pods",
+		}, {
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}, {
+									Key:      "expr2",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo2"},
+								}},
+								MatchFields: []core.NodeSelectorRequirement{{
+									Key:      "metadata.name",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+							},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have additions for gated pods",
+		}, {
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
+		}, {
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
 			test: "new node affinity is nil",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-								Weight: 1.0,
-								Preference: core.NodeSelectorTerm{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
-								},
-							}},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
-		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{
-									{},
-								},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1.0,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
 							},
+						}},
+					}}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
+		}, {
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{},
+							},
 						},
 					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "empty NodeSelectorTerm (selects nothing) cannot become populated (selects something)",
 		}, {
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity:        nil,
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(nil),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			test: "nil affinity can be mutated for gated pods",
 		},
 		{
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity:        nil,
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(nil),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
+							}},
+						}},
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
+							TopologyKey: "foo",
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"foo": "bar"},
 							},
-						},
-						PodAffinity: &core.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
-								{
-									TopologyKey: "foo",
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{"foo": "bar"},
-									},
-								},
-							},
-						},
+						}},
 					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "pod updates may not change fields other than",
 			test: "the podAffinity cannot be updated on gated pods",
 		},
 		{
-			old: core.Pod{
-				Spec: core.PodSpec{
-					Affinity:        nil,
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			new: core.Pod{
-				Spec: core.PodSpec{
-					Affinity: &core.Affinity{
-						NodeAffinity: &core.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-								NodeSelectorTerms: []core.NodeSelectorTerm{{
-									MatchExpressions: []core.NodeSelectorRequirement{{
-										Key:      "expr",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"foo"},
-									}},
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(nil),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"foo"},
 								}},
-							},
-						},
-						PodAntiAffinity: &core.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
-								{
-									TopologyKey: "foo",
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{"foo": "bar"},
-									},
+							}},
+						}},
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								TopologyKey: "foo",
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"foo": "bar"},
 								},
 							},
 						},
 					},
-					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
 			err:  "pod updates may not change fields other than",
 			test: "the podAntiAffinity cannot be updated on gated pods",
 		},
@@ -15425,103 +13721,60 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		err  string
 		test string
 	}{{
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{},
-		},
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{}),
+		),
 		"",
 		"removed nominatedNodeName",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
-			},
-		},
+			}),
+		),
 		"",
 		"add valid nominatedNodeName",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "Node1",
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+		),
 		"nominatedNodeName",
 		"Add invalid nominatedNodeName",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				NodeName: "node1",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node2",
-			},
-		},
+			}),
+		),
 		"",
 		"Update nominatedNodeName",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -15546,21 +13799,14 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo"),
 		"",
 		"Container statuses pending",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -15587,13 +13833,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -15617,16 +13860,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"Container statuses running",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15651,13 +13891,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15671,16 +13908,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"Container statuses add ephemeral container",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15706,13 +13940,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15737,16 +13968,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"Container statuses ephemeral container running",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15775,13 +14003,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "nginx:alpine",
@@ -15807,16 +14032,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"Container statuses ephemeral container exited",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -15861,13 +14083,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -15906,135 +14125,76 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"Container statuses all containers terminated",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
 				},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo"),
 		"status.resourceClaimStatuses[0].name: Invalid value: \"no-such-claim\": must match the name of an entry in `spec.resourceClaims`",
 		"Non-existent PodResourceClaim",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-				},
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
+			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
 				},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-				},
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
+		),
 		`status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
 		"Invalid ResourceClaim name",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-					{Name: "my-other-claim"},
-				},
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{Name: "my-claim"},
+				core.PodResourceClaim{Name: "my-other-claim"},
+			),
+			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-				},
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
+		),
 		`status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
 		"Duplicate ResourceClaimStatuses.Name",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-					{Name: "my-other-claim"},
-				},
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{Name: "my-claim"},
+				core.PodResourceClaim{Name: "my-other-claim"},
+			),
+			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "my-claim"},
-				},
-			},
-		},
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
+		),
 		"",
 		"ResourceClaimStatuses okay",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name: "init",
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("init")),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16060,26 +14220,12 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name: "init",
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyNever,
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("init")),
+			podtest.SetRestartPolicy(core.RestartPolicyNever),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16106,30 +14252,15 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		`status.initContainerStatuses[0].state: Forbidden: may not be transitioned to non-terminated state`,
 		"init container cannot restart if RestartPolicyNever",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyNever,
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyNever),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16155,27 +14286,12 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyNever,
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyNever),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16202,30 +14318,15 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"restartable init container can restart if RestartPolicyNever",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyOnFailure,
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16251,27 +14352,12 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyOnFailure,
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16298,30 +14384,15 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"restartable init container can restart if RestartPolicyOnFailure",
 	}, {
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-			},
-			Status: core.PodStatus{
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16347,27 +14418,12 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
-		core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: core.PodSpec{
-				InitContainers: []core.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-				Containers: []core.Container{
-					{
-						Name: "nginx",
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-			},
-			Status: core.PodStatus{
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
+			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
 					Image:       "alpine",
@@ -16394,8 +14450,8 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 						},
 					},
 				}},
-			},
-		},
+			}),
+		),
 		"",
 		"restartable init container can restart if RestartPolicyAlways",
 	},
@@ -16441,26 +14497,17 @@ func makeValidService() core.Service {
 
 func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	makePod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
-		return &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
+		return podtest.MakePod("",
+			podtest.SetObjectMeta(metav1.ObjectMeta{
 				Annotations:     map[string]string{},
 				Labels:          map[string]string{},
 				Name:            "pod",
 				Namespace:       "ns",
 				ResourceVersion: "1",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{
-					Name:                     "cnt",
-					Image:                    "image",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				}},
-				DNSPolicy:           core.DNSClusterFirst,
-				EphemeralContainers: ephemeralContainers,
-				RestartPolicy:       core.RestartPolicyOnFailure,
-			},
-		}
+			}),
+			podtest.SetEphemeralContainers(ephemeralContainers...),
+			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+		)
 	}
 
 	// Some tests use Windows host pods as an example of fields that might
@@ -16469,37 +14516,29 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 		AllowPrivileged: true,
 	})
 	makeWindowsHostPod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
-		return &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{
+		return podtest.MakePod("",
+			podtest.SetObjectMeta(metav1.ObjectMeta{
 				Annotations:     map[string]string{},
 				Labels:          map[string]string{},
 				Name:            "pod",
 				Namespace:       "ns",
 				ResourceVersion: "1",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{
-					Name:            "cnt",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					SecurityContext: &core.SecurityContext{
-						WindowsOptions: &core.WindowsSecurityContextOptions{
-							HostProcess: proto.Bool(true),
-						},
-					},
-					TerminationMessagePolicy: "File",
-				}},
-				DNSPolicy:           core.DNSClusterFirst,
-				EphemeralContainers: ephemeralContainers,
-				RestartPolicy:       core.RestartPolicyOnFailure,
-				SecurityContext: &core.PodSecurityContext{
-					HostNetwork: true,
+			}),
+			podtest.SetContainers(podtest.MakeContainer("cnt",
+				podtest.SetContainerSecurityContext(core.SecurityContext{
 					WindowsOptions: &core.WindowsSecurityContextOptions{
 						HostProcess: proto.Bool(true),
-					},
+					}}),
+			)),
+			podtest.SetEphemeralContainers(ephemeralContainers...),
+			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: true,
+				WindowsOptions: &core.WindowsSecurityContextOptions{
+					HostProcess: proto.Bool(true),
 				},
-			},
-		}
+			}),
+		)
 	}
 
 	tests := []struct {
@@ -18328,11 +16367,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: core.PodSpec{
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Containers:    []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			},
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	readWriteVolumePodTemplate := core.PodTemplate{
@@ -18340,24 +16375,18 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: core.PodSpec{
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Containers:    []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				Volumes:       []core.Volume{{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
-			},
+			Spec: podtest.MakePodSpec(
+				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
+			),
 		},
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
-			Spec: core.PodSpec{
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	type rcUpdateTest struct {
@@ -18489,11 +16518,7 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: core.PodSpec{
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Containers:    []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			},
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	readWriteVolumePodTemplate := core.PodTemplate{
@@ -18501,12 +16526,9 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: core.PodSpec{
-				Volumes:       []core.Volume{{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Containers:    []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			},
+			Spec: podtest.MakePodSpec(
+				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
+			),
 		},
 	}
 	hostnetPodTemplate := core.PodTemplate{
@@ -18514,32 +16536,22 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
+			Spec: podtest.MakePodSpec(
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					HostNetwork: true,
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-				Containers: []core.Container{{
-					Name:                     "abc",
-					Image:                    "image",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-					Ports: []core.ContainerPort{{
+				}),
+				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(
+					core.ContainerPort{
 						ContainerPort: 12345,
 						Protocol:      core.ProtocolTCP,
-					}},
-				}},
-			},
+					}))),
+			),
 		},
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
-			Spec: core.PodSpec{
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
+			Spec: podtest.MakePodSpec(),
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
@@ -18673,11 +16685,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: core.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &core.PodTemplateSpec{
-					Spec: core.PodSpec{
-						RestartPolicy: core.RestartPolicyOnFailure,
-						DNSPolicy:     core.DNSClusterFirst,
-						Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					},
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyOnFailure)),
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
@@ -18692,11 +16700,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: core.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &core.PodTemplateSpec{
-					Spec: core.PodSpec{
-						RestartPolicy: core.RestartPolicyNever,
-						DNSPolicy:     core.DNSClusterFirst,
-						Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					},
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyNever)),
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
@@ -18712,12 +16716,9 @@ func TestValidateReplicationController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
-					Spec: core.PodSpec{
-						RestartPolicy:       core.RestartPolicyAlways,
-						DNSPolicy:           core.DNSClusterFirst,
-						Containers:          []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-						EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}},
-					},
+					Spec: podtest.MakePodSpec(
+						podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
+					),
 				},
 			},
 		},
@@ -21080,7 +19081,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeInfeasible,
 		},
 	})
 
@@ -21110,7 +19111,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeInfeasible,
 		},
 	})
 
@@ -21154,7 +19155,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			validResizeKeyCustom: resource.MustParse("10Gi"),
 		},
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeInfeasible,
 			validResizeKeyCustom: core.PersistentVolumeClaimControllerResizeInProgress,
 		},
 	})
@@ -21343,6 +19344,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			core.ResourceQuotas:                 resource.MustParse("10"),
 			core.ResourceConfigMaps:             resource.MustParse("10"),
 			core.ResourceSecrets:                resource.MustParse("10"),
+
+			// These are unknown and not enforced unless DRA is enabled, but not invalid.
+			"count/resourceclaims.resource.k8s.io":     resource.MustParse("1"),
+			"gold.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
 		},
 	}
 
@@ -21578,7 +19583,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 		"invalid-cross-namespace-affinity": {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
-			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
+			errDetail: "must be 'Exists' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
 	}
 	for name, tc := range testCases {
@@ -22650,8 +20655,8 @@ func TestValidateOSFields(t *testing.T) {
 		"PriorityClassName",
 		"ReadinessGates",
 		"ResourceClaims[*].Name",
-		"ResourceClaims[*].Source.ResourceClaimName",
-		"ResourceClaims[*].Source.ResourceClaimTemplateName",
+		"ResourceClaims[*].ResourceClaimName",
+		"ResourceClaims[*].ResourceClaimTemplateName",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
@@ -24960,26 +22965,16 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 					"container.seccomp.security.alpha.kubernetes.io/test2": "unconfined",
 				},
 			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{
-					Name:                     "test1",
-					Image:                    "alpine",
-					ImagePullPolicy:          core.PullAlways,
-					TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
-				}, {
-					SecurityContext: &core.SecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Name:                     "test2",
-					Image:                    "alpine",
-					ImagePullPolicy:          core.PullAlways,
-					TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+					podtest.MakeContainer("test2",
+						podtest.SetContainerSecurityContext(core.SecurityContext{
+							SeccompProfile: &core.SeccompProfile{
+								Type: core.SeccompProfileTypeRuntimeDefault,
+							},
+						}))),
+			),
 		},
 	}, {
 		description: "seccomp field and pod annotation must match",
@@ -24995,21 +22990,13 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 					"seccomp.security.alpha.kubernetes.io/pod": "runtime/default",
 				},
 			},
-			Spec: core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
+			Spec: podtest.MakePodSpec(
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type: core.SeccompProfileTypeUnconfined,
 					},
-				},
-				Containers: []core.Container{{
-					Name:                     "test",
-					Image:                    "alpine",
-					ImagePullPolicy:          core.PullAlways,
-					TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
+				}),
+			),
 		},
 	}, {
 		description: "init seccomp field and container annotation must match",
@@ -25025,27 +23012,14 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 					"container.seccomp.security.alpha.kubernetes.io/init-test": "unconfined",
 				},
 			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{
-					Name:                     "test",
-					Image:                    "alpine",
-					ImagePullPolicy:          core.PullAlways,
-					TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
-				}},
-				InitContainers: []core.Container{{
-					Name: "init-test",
-					SecurityContext: &core.SecurityContext{
+			Spec: podtest.MakePodSpec(
+				podtest.SetInitContainers(podtest.MakeContainer("init-test",
+					podtest.SetContainerSecurityContext(core.SecurityContext{
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
-					},
-					Image:                    "alpine",
-					ImagePullPolicy:          core.PullAlways,
-					TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
+					}))),
+			),
 		},
 	},
 	}
@@ -25857,226 +23831,213 @@ func TestValidatePVSecretReference(t *testing.T) {
 func TestValidateDynamicResourceAllocation(t *testing.T) {
 	externalClaimName := "some-claim"
 	externalClaimTemplateName := "some-claim-template"
-	goodClaimSource := core.ClaimSource{
-		ResourceClaimName: &externalClaimName,
-	}
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
-	brokenPodName := &metav1.ObjectMeta{
-		Name: ".dot.com",
-	}
-	goodClaimTemplate := core.PodSpec{
-		Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}}},
-		RestartPolicy: core.RestartPolicyAlways,
-		DNSPolicy:     core.DNSClusterFirst,
-		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-template",
-			Source: core.ClaimSource{
-				ResourceClaimTemplateName: &externalClaimTemplateName,
-			},
-		}},
-	}
-	goodClaimReference := core.PodSpec{
-		Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}}},
-		RestartPolicy: core.RestartPolicyAlways,
-		DNSPolicy:     core.DNSClusterFirst,
-		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-reference",
-			Source: core.ClaimSource{
-				ResourceClaimName: &externalClaimName,
-			},
-		}},
-	}
+	requestName := "req-0"
+	anotherRequestName := "req-1"
+	goodClaimTemplate := podtest.MakePod("",
+		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}))),
+		podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		podtest.SetResourceClaims(core.PodResourceClaim{
+			Name:                      "my-claim-template",
+			ResourceClaimTemplateName: &externalClaimTemplateName,
+		}),
+	)
+	goodClaimReference := podtest.MakePod("",
+		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}))),
+		podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		podtest.SetResourceClaims(core.PodResourceClaim{
+			Name:              "my-claim-reference",
+			ResourceClaimName: &externalClaimName,
+		}),
+	)
 
-	successCases := map[string]core.PodSpec{
-		"resource claim reference": goodClaimTemplate,
+	successCases := map[string]*core.Pod{
+		"resource claim reference": goodClaimReference,
 		"resource claim template":  goodClaimTemplate,
-		"multiple claims": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}, {
-				Name:   "another-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"init container": {
-			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			InitContainers: []core.Container{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy:  core.RestartPolicyAlways,
-			DNSPolicy:      core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
+		"multiple claims": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}))),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				},
+				core.PodResourceClaim{
+					Name:              "another-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"multiple claims with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: requestName}, {Name: "another-claim", Request: requestName}}}))),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				},
+				core.PodResourceClaim{
+					Name:              "another-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"single claim with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: requestName}, {Name: "my-claim", Request: anotherRequestName}}}))),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"init container": podtest.MakePod("",
+			podtest.SetInitContainers(podtest.MakeContainer("ctr-init", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
 	}
 
-	failureCases := map[string]core.PodSpec{
-		"pod claim name with prefix": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "../my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"pod claim name with path": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my/claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"pod claim name empty": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "",
-				Source: goodClaimSource,
-			}},
-		},
-		"duplicate pod claim entries": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"resource claim source empty": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: core.ClaimSource{},
-			}},
-		},
-		"resource claim reference and template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name: "my-claim",
-				Source: core.ClaimSource{
-					ResourceClaimName:         &externalClaimName,
-					ResourceClaimTemplateName: &externalClaimTemplateName,
+	failureCases := map[string]*core.Pod{
+		"pod claim name with prefix": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "../my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name with path": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my/claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name empty": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"duplicate pod claim entries": podtest.MakePod("",
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
 				},
-			}},
-		},
-		"claim not found": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"claim name empty": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: ""}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"pod claim name duplicates": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"no claims defined": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"duplicate pod claim name": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"ephemeral container don't support resource requirements": {
-			Containers:          []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}},
-			RestartPolicy:       core.RestartPolicyAlways,
-			DNSPolicy:           core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
-			}},
-		},
-		"invalid claim template name": func() core.PodSpec {
-			spec := goodClaimTemplate.DeepCopy()
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"resource claim source empty": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name: "my-claim",
+			}),
+		),
+		"resource claim reference and template": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:                      "my-claim",
+				ResourceClaimName:         &externalClaimName,
+				ResourceClaimTemplateName: &externalClaimTemplateName,
+			}),
+		),
+		"claim not found": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"claim name empty": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: ""}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates without and with request": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim", Request: "req-0"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates with and without request": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "req-0"}, {Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "req-0"}, {Name: "my-claim", Request: "req-0"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"bad request name": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "*$@%^"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"no claims defined": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		),
+		"duplicate pod claim name": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				},
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"ephemeral container don't support resource requirements": podtest.MakePod("",
+			podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"invalid claim template name": func() *core.Pod {
+			pod := goodClaimTemplate.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimTemplateName = &notLabel
-			return *spec
+			pod.Spec.ResourceClaims[0].ResourceClaimTemplateName = &notLabel
+			return pod
 		}(),
-		"invalid claim reference name": func() core.PodSpec {
-			spec := goodClaimReference.DeepCopy()
+		"invalid claim reference name": func() *core.Pod {
+			pod := goodClaimReference.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimName = &notLabel
-			return *spec
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &notLabel
+			return pod
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
-
-	t.Run("generated-claim-name", func(t *testing.T) {
-		for _, spec := range []*core.PodSpec{&goodClaimTemplate, &goodClaimReference} {
-			claimName := spec.ResourceClaims[0].Name
-			t.Run(claimName, func(t *testing.T) {
-				for _, podMeta := range []*metav1.ObjectMeta{shortPodName, brokenPodName} {
-					t.Run(podMeta.Name, func(t *testing.T) {
-						errs := ValidatePodSpec(spec, podMeta, field.NewPath("field"), PodValidationOptions{})
-						// Only one out of the four combinations fails.
-						expectError := spec == &goodClaimTemplate && podMeta == brokenPodName
-						if expectError && len(errs) == 0 {
-							t.Error("did not get the expected failure")
-						}
-						if !expectError && len(errs) > 0 {
-							t.Errorf("unexpected failures: %+v", errs)
-						}
-					})
-				}
-			})
-		}
-	})
 }
 
 func TestValidateLoadBalancerStatus(t *testing.T) {
@@ -26232,7 +24193,7 @@ func TestValidateSleepAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, tc.gracePeriod, fldPath)
+			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath)
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
@@ -26296,18 +24257,12 @@ func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 	}
 	for name, tt := range validatePodSpecTestCases {
 		t.Run(name, func(t *testing.T) {
-			podSpec := &core.PodSpec{
-				SecurityContext: tt.securityContext,
-				Containers: []core.Container{
-					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			}
+			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetContainers(podtest.MakeContainer("con")))
+
 			if tt.wantFieldErrors == nil {
 				tt.wantFieldErrors = field.ErrorList{}
 			}
-			errs := ValidatePodSpec(podSpec, nil, fldPath, PodValidationOptions{})
+			errs := ValidatePodSpec(&podSpec, nil, fldPath, PodValidationOptions{})
 			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
@@ -26343,19 +24298,11 @@ func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T)
 
 	for name, tt := range testCases {
 		t.Run(name, func(t *testing.T) {
-			podSpec := &core.PodSpec{
-				OS:              &core.PodOS{Name: core.Windows},
-				SecurityContext: tt.securityContext,
-				Containers: []core.Container{
-					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			}
+			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetOS(core.Windows), podtest.SetContainers(podtest.MakeContainer("con")))
 			if tt.wantFieldErrors == nil {
 				tt.wantFieldErrors = field.ErrorList{}
 			}
-			errs := validateWindows(podSpec, fldPath)
+			errs := validateWindows(&podSpec, fldPath)
 			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
@@ -26474,5 +24421,243 @@ func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+func TestValidateContainerStatusNoAllocatedResourcesStatus(t *testing.T) {
+	containerStatuses := []core.ContainerStatus{
+		{
+			Name: "container-1",
+		},
+		{
+			Name: "container-2",
+			AllocatedResourcesStatus: []core.ResourceStatus{
+				{
+					Name:      "test.device/test",
+					Resources: nil,
+				},
+			},
+		},
+		{
+			Name: "container-3",
+			AllocatedResourcesStatus: []core.ResourceStatus{
+				{
+					Name: "test.device/test",
+					Resources: []core.ResourceHealth{
+						{
+							ResourceID: "resource-1",
+							Health:     core.ResourceHealthStatusHealthy,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fldPath := field.NewPath("spec", "containers")
+
+	errs := validateContainerStatusNoAllocatedResourcesStatus(containerStatuses, fldPath)
+
+	assert.Len(t, errs, 2)
+	assert.Equal(t, "spec.containers[1].allocatedResourcesStatus", errs[0].Field)
+	assert.Equal(t, "must not be specified in container status", errs[0].Detail)
+	assert.Equal(t, "spec.containers[2].allocatedResourcesStatus", errs[1].Field)
+	assert.Equal(t, "must not be specified in container status", errs[1].Detail)
+}
+
+func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
+	fldPath := field.NewPath("spec", "containers")
+
+	testCases := map[string]struct {
+		containers        []core.Container
+		containerStatuses []core.ContainerStatus
+		wantFieldErrors   field.ErrorList
+	}{
+		"basic correct status": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"ignoring the missing container (see https://github.com/kubernetes/kubernetes/issues/124915)": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"allow nil": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"don't allow non-unique IDs": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusUnhealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Duplicate(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(1).Child("resourceID"), core.ResourceID("resource-1")),
+			},
+		},
+
+		"don't allow resources that are not in spec": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+						{
+							Name:      "test.device/test2",
+							Resources: []core.ResourceHealth{},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(1).Child("name"), core.ResourceName("test.device/test2"), "must match one of the container's resource requirements"),
+			},
+		},
+
+		"don't allow health status outside the known values": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     "invalid-health-value",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("health"), core.ResourceHealthStatus("invalid-health-value"), []string{"Healthy", "Unhealthy", "Unknown"}),
+			},
+		},
+	}
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := validateContainerStatusAllocatedResourcesStatus(tt.containerStatuses, fldPath, tt.containers)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1beta1
 
-// UserSubjectApplyConfiguration represents an declarative configuration of the UserSubject type for use
+// UserSubjectApplyConfiguration represents a declarative configuration of the UserSubject type for use
 // with apply.
 type UserSubjectApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// UserSubjectApplyConfiguration constructs an declarative configuration of the UserSubject type for use with
+// UserSubjectApplyConfiguration constructs a declarative configuration of the UserSubject type for use with
 // apply.
 func UserSubject() *UserSubjectApplyConfiguration {
 	return &UserSubjectApplyConfiguration{}

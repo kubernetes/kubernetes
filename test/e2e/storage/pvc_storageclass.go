@@ -164,7 +164,7 @@ func temporarilyUnsetDefaultClasses(ctx context.Context, client clientset.Interf
 func waitForPVCStorageClass(ctx context.Context, c clientset.Interface, namespace, pvcName, scName string, timeout time.Duration) (*v1.PersistentVolumeClaim, error) {
 	var watchedPVC *v1.PersistentVolumeClaim
 
-	err := wait.PollWithContext(ctx, 1*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		var err error
 		watchedPVC, err = c.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if err != nil {

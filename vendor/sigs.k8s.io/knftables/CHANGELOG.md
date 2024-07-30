@@ -1,5 +1,28 @@
 # ChangeLog
 
+## v0.0.17
+
+- `ListRules()` now accepts `""` for the chain name, meaning to list
+  all rules in the table. (`@caseydavenport`)
+
+- `ListElements()` now handles elements with prefix/CIDR values (e.g.,
+  `"192.168.0.0/16"`; these are represented specially in the JSON
+  format and the old code didn't handle them). (`@caseydavenport`)
+
+- Added `NumOperations()` to `Transaction` (which lets you figure out
+  belatedly whether you added anything to the transaction or not, and
+  could also be used for metrics). (`@fasaxc`)
+
+- `knftables.Interface` now reuses the same `bytes.Buffer` for each
+  call to `nft` rather than constructing a new one each time, saving
+  time and memory. (`@aroradaman`)
+
+- Fixed map element deletion in `knftables.Fake` to not mistakenly
+  require that you fill in the `.Value` of the element. (`@npinaeva`)
+
+- Added `Fake.LastTransaction`, to retrieve the most-recently-executed
+  transaction. (`@npinaeva`)
+
 ## v0.0.16
 
 - Fixed a bug in `Fake.ParseDump()` when using IPv6. (`@npinaeva`)

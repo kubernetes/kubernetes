@@ -225,11 +225,11 @@ func GetQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 	return getApplier(path).GetQuotaOnDir(path)
 }
 
-func clearQuotaOnDir(m mount.Interface, path string) error {
+func clearQuotaOnDir(m mount.Interface, path string, userNamespacesEnabled bool) error {
 	// Since we may be called without path being in the map,
 	// we explicitly have to check in this case.
 	klog.V(4).Infof("clearQuotaOnDir %s", path)
-	supportsQuotas, err := SupportsQuotas(m, path)
+	supportsQuotas, err := SupportsQuotas(m, path, userNamespacesEnabled)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
@@ -269,9 +269,15 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 // don't cache the result because nothing will clean it up.
 // However, do cache the device->applier map; the number of devices
 // is bounded.
-func SupportsQuotas(m mount.Interface, path string) (bool, error) {
+// User namespaces prevent changes to project IDs on the filesystem,
+// ensuring xfs-quota metrics' reliability; hence, userNamespacesEnabled is checked.
+func SupportsQuotas(m mount.Interface, path string, userNamespacesEnabled bool) (bool, error) {
 	if !enabledQuotasForMonitoring() {
 		klog.V(3).Info("SupportsQuotas called, but quotas disabled")
+		return false, nil
+	}
+	if !userNamespacesEnabled {
+		klog.V(3).Info("SupportQuotas called and LocalStorageCapacityIsolationFSQuotaMonitoring enabled, but pod is not in a user namespace")
 		return false, nil
 	}
 	supportsQuotasLock.Lock()
@@ -307,12 +313,12 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
-func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error { //nolint:staticcheck
+func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity, userNamespacesEnabled bool) error { //nolint:staticcheck
 	if bytes == nil {
 		return fmt.Errorf("attempting to assign null quota to %s", path)
 	}
 	ibytes := bytes.Value()
-	if ok, err := SupportsQuotas(m, path); !ok {
+	if ok, err := SupportsQuotas(m, path, userNamespacesEnabled); !ok {
 		return fmt.Errorf("quotas not supported on %s: %v", path, err)
 	}
 	quotaLock.Lock()
@@ -410,7 +416,7 @@ func GetInodes(path string) (*resource.Quantity, error) {
 }
 
 // ClearQuota -- remove the quota assigned to a directory
-func ClearQuota(m mount.Interface, path string) error {
+func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) error {
 	klog.V(3).Infof("ClearQuota %s", path)
 	if !enabledQuotasForMonitoring() {
 		return fmt.Errorf("clearQuota called, but quotas disabled")
@@ -426,7 +432,7 @@ func ClearQuota(m mount.Interface, path string) error {
 		// be found, which needs to be cleaned up.
 		defer delete(supportsQuotasMap, path)
 		defer clearApplier(path)
-		return clearQuotaOnDir(m, path)
+		return clearQuotaOnDir(m, path, userNamespacesEnabled)
 	}
 	_, ok = podQuotaMap[poduid]
 	if !ok {
@@ -443,7 +449,7 @@ func ClearQuota(m mount.Interface, path string) error {
 	}
 	count, ok := podDirCountMap[poduid]
 	if count <= 1 || !ok {
-		err = clearQuotaOnDir(m, path)
+		err = clearQuotaOnDir(m, path, userNamespacesEnabled)
 		// This error should be noted; we still need to clean up
 		// and otherwise handle in the same way.
 		if err != nil {

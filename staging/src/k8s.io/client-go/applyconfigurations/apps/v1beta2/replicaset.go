@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ReplicaSetApplyConfiguration represents an declarative configuration of the ReplicaSet type for use
+// ReplicaSetApplyConfiguration represents a declarative configuration of the ReplicaSet type for use
 // with apply.
 type ReplicaSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ReplicaSetApplyConfiguration struct {
 	Status                           *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ReplicaSet constructs an declarative configuration of the ReplicaSet type for use with
+// ReplicaSet constructs a declarative configuration of the ReplicaSet type for use with
 // apply.
 func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 	b := &ReplicaSetApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *ReplicaSetApplyConfiguration) WithSpec(value *ReplicaSetSpecApplyConfig
 func (b *ReplicaSetApplyConfiguration) WithStatus(value *ReplicaSetStatusApplyConfiguration) *ReplicaSetApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ReplicaSetApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

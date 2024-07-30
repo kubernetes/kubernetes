@@ -433,6 +433,10 @@
               "volumeAttributesClassName": "volumeAttributesClassNameValue"
             }
           }
+        },
+        "image": {
+          "reference": "referenceValue",
+          "pullPolicy": "pullPolicyValue"
         }
       }
     ],
@@ -505,7 +509,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -800,7 +805,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -1095,7 +1101,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -1697,10 +1704,8 @@
     "resourceClaims": [
       {
         "name": "nameValue",
-        "source": {
-          "resourceClaimName": "resourceClaimNameValue",
-          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
-        }
+        "resourceClaimName": "resourceClaimNameValue",
+        "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
       }
     ]
   },
@@ -1789,7 +1794,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -1809,7 +1815,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "containerStatuses": [
@@ -1869,7 +1886,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -1889,7 +1907,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "qosClass": "qosClassValue",
@@ -1950,7 +1979,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -1970,7 +2000,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "resize": "resizeValue",

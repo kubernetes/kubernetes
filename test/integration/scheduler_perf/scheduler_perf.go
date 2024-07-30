@@ -31,8 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -182,6 +180,11 @@ type testCase struct {
 	DefaultPodTemplatePath *string
 	// Labels can be used to enable or disable workloads inside this test case.
 	Labels []string
+	// DefaultThresholdMetricSelector defines default metric used for threshold comparison.
+	// It is only populated to workloads without their ThresholdMetricSelector set.
+	// If nil, the default metric is set to "SchedulingThroughput".
+	// Optional
+	DefaultThresholdMetricSelector *thresholdMetricSelector
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -214,6 +217,73 @@ type workload struct {
 	Params params
 	// Labels can be used to enable or disable a workload.
 	Labels []string
+	// Threshold is compared to average value of metric specified using thresholdMetricSelector.
+	// The comparison is performed for op with CollectMetrics set to true.
+	// If the measured value is below the threshold, the workload's test case will fail.
+	// If set to zero, the threshold check is disabled.
+	// Optional
+	Threshold float64
+	// ThresholdMetricSelector defines to what metric the Threshold should be compared.
+	// If nil, the metric is set to DefaultThresholdMetricSelector of the testCase.
+	// If DefaultThresholdMetricSelector is nil, the metric is set to "SchedulingThroughput".
+	// Optional
+	ThresholdMetricSelector *thresholdMetricSelector
+}
+
+func (w *workload) isValid(mcc *metricsCollectorConfig) error {
+	if w.Threshold < 0 {
+		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold)
+	}
+
+	return w.ThresholdMetricSelector.isValid(mcc)
+}
+
+func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
+	if w.ThresholdMetricSelector != nil {
+		return
+	}
+	if testCaseThresholdMetricSelector != nil {
+		w.ThresholdMetricSelector = testCaseThresholdMetricSelector
+		return
+	}
+	// By defult, SchedulingThroughput should be compared with the threshold.
+	w.ThresholdMetricSelector = &thresholdMetricSelector{
+		Name: "SchedulingThroughput",
+	}
+}
+
+// thresholdMetricSelector defines the name and labels of metric to compare with threshold.
+type thresholdMetricSelector struct {
+	// Name of the metric is compared to "Metric" field in DataItem labels.
+	Name string
+	// Labels of the metric. All of them needs to match the metric's labels to assume equality.
+	Labels map[string]string
+	// ExpectLower defines whether the threshold should denote the maximum allowable value of the metric.
+	// If false, the threshold defines minimum allowable value.
+	// Optional
+	ExpectLower bool
+}
+
+func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
+	if ms.Name == "SchedulingThroughput" {
+		return nil
+	}
+
+	if mcc == nil {
+		mcc = &defaultMetricsCollectorConfig
+	}
+
+	labels, ok := mcc.Metrics[ms.Name]
+	if !ok {
+		return fmt.Errorf("the metric %v is targeted, but it's not collected during the test. Make sure the MetricsCollectorConfig is valid", ms.Name)
+	}
+
+	for _, labelsComb := range uniqueLVCombos(labels) {
+		if labelsMatch(labelsComb, ms.Labels) {
+			return nil
+		}
+	}
+	return fmt.Errorf("no matching labels found for metric %v", ms.Name)
 }
 
 type params struct {
@@ -692,31 +762,34 @@ func initTestOutput(tb testing.TB) io.Writer {
 	return output
 }
 
-type cleanupKeyType struct{}
-
-var cleanupKey = cleanupKeyType{}
-
-// shouldCleanup returns true if a function should clean up resource in the
-// apiserver when the test is done. This is true for unit tests (etcd and
-// apiserver get reused) and false for benchmarks (each benchmark starts with a
-// clean state, so cleaning up just wastes time).
-//
-// The default if not explicitly set in the context is true.
-func shouldCleanup(ctx context.Context) bool {
-	val := ctx.Value(cleanupKey)
-	if enabled, ok := val.(bool); ok {
-		return enabled
-	}
-	return true
-}
-
-// withCleanup sets whether cleaning up resources in the apiserver
-// should be done. The default is true.
-func withCleanup(tCtx ktesting.TContext, enabled bool) ktesting.TContext {
-	return ktesting.WithValue(tCtx, cleanupKey, enabled)
-}
-
 var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
+
+func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+	tCtx := ktesting.Init(t, initoption.PerTestOutput(*useTestingLog))
+
+	// Ensure that there are no leaked
+	// goroutines.  They could influence
+	// performance of the next benchmark.
+	// This must *after* RedirectKlog
+	// because then during cleanup, the
+	// test will wait for goroutines to
+	// quit *before* restoring klog settings.
+	framework.GoleakCheck(t)
+
+	// Now that we are ready to run, start
+	// etcd.
+	framework.StartEtcd(t, output)
+
+	for feature, flag := range tc.FeatureGates {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
+	}
+
+	// 30 minutes should be plenty enough even for the 5000-node tests.
+	timeout := 30 * time.Minute
+	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
+}
 
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
 //
@@ -749,33 +822,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					if !enabled(*perfSchedulingLabelFilter, append(tc.Labels, w.Labels...)...) {
 						b.Skipf("disabled by label filter %q", *perfSchedulingLabelFilter)
 					}
-					tCtx := ktesting.Init(b, initoption.PerTestOutput(*useTestingLog))
 
-					// Ensure that there are no leaked
-					// goroutines.  They could influence
-					// performance of the next benchmark.
-					// This must *after* RedirectKlog
-					// because then during cleanup, the
-					// test will wait for goroutines to
-					// quit *before* restoring klog settings.
-					framework.GoleakCheck(b)
-
-					// Now that we are ready to run, start
-					// etcd.
-					framework.StartEtcd(b, output)
-
-					// 30 minutes should be plenty enough even for the 5000-node tests.
-					timeout := 30 * time.Minute
-					tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
-
-					for feature, flag := range tc.FeatureGates {
-						featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)
-					}
-					informerFactory, tCtx := setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
-
-					// No need to clean up, each benchmark testcase starts with an empty
-					// etcd database.
-					tCtx = withCleanup(tCtx, false)
+					informerFactory, tCtx := setupTestCase(b, tc, output, outOfTreePluginRegistry)
 
 					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
@@ -816,16 +864,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 }
 
 var testSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
-
-type schedulerConfig struct {
-	schedulerConfigPath string
-	featureGates        map[featuregate.Feature]bool
-}
-
-func (c schedulerConfig) equals(tc *testCase) bool {
-	return c.schedulerConfigPath == tc.SchedulerConfigPath &&
-		cmp.Equal(c.featureGates, tc.FeatureGates)
-}
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := os.ReadFile(file)
@@ -881,6 +919,38 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
 }
 
+func labelsMatch(actualLabels, requiredLabels map[string]string) bool {
+	for requiredLabel, requiredValue := range requiredLabels {
+		actualValue, ok := actualLabels[requiredLabel]
+		if !ok || requiredValue != actualValue {
+			return false
+		}
+	}
+	return true
+}
+
+func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
+	if expectLower {
+		return value < threshold
+	}
+	return value > threshold
+}
+
+func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+	if threshold == 0 {
+		return nil
+	}
+	for _, item := range items {
+		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
+			if metricSelector.ExpectLower {
+				return fmt.Errorf("expected %s Average to be lower: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+			}
+			return fmt.Errorf("expected %s Average to be higher: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+		}
+	}
+	return nil
+}
+
 func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) []DataItem {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
@@ -893,7 +963,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			b.ReportMetric(duration.Seconds(), "runtime_seconds")
 		})
 	}
-	cleanup := shouldCleanup(tCtx)
 
 	// Disable error checking of the sampling interval length in the
 	// throughput collector by default. When running benchmarks, report
@@ -924,11 +993,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
 
-	if cleanup {
-		// This must run before controllers get shut down.
-		defer cleanupWorkload(tCtx, tc, numPodsScheduledPerNamespace)
-	}
-
 	for opIndex, op := range unrollWorkloadTemplate(tCtx, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
 		if err != nil {
@@ -947,13 +1011,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			}
 			if err := nodePreparer.PrepareNodes(tCtx, nextNodeIndex); err != nil {
 				tCtx.Fatalf("op %d: %v", opIndex, err)
-			}
-			if cleanup {
-				defer func() {
-					if err := nodePreparer.CleanupNodes(tCtx); err != nil {
-						tCtx.Fatalf("failed to clean up nodes, error: %v", err)
-					}
-				}()
 			}
 			nextNodeIndex += concreteOp.Count
 
@@ -1033,7 +1090,12 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				collectorWG.Wait()
 				mu.Lock()
 				for _, collector := range collectors {
-					dataItems = append(dataItems, collector.collect()...)
+					items := collector.collect()
+					dataItems = append(dataItems, items...)
+					err := compareMetricWithThreshold(items, w.Threshold, *w.ThresholdMetricSelector)
+					if err != nil {
+						tCtx.Errorf("op %d: %s", opIndex, err)
+					}
 				}
 				mu.Unlock()
 			}
@@ -1110,7 +1172,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 				churnFns = append(churnFns, func(name string) string {
 					if name != "" {
-						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil {
+						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 							tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 						}
 						return ""
@@ -1222,51 +1284,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems
-}
-
-// cleanupWorkload ensures that everything is removed from the API server that
-// might have been created by runWorkload. This must be done before starting
-// the next workload because otherwise it might stumble over previously created
-// objects. For example, the namespaces are the same in different workloads, so
-// not deleting them would cause the next one to fail with "cannot create
-// namespace: already exists".
-//
-// Calling cleanupWorkload can be skipped if it is known that the next workload
-// will run with a fresh etcd instance.
-func cleanupWorkload(tCtx ktesting.TContext, tc *testCase, numPodsScheduledPerNamespace map[string]int) {
-	deleteNow := *metav1.NewDeleteOptions(0)
-	for namespace := range numPodsScheduledPerNamespace {
-		// Pods have to be deleted explicitly, with no grace period. Normally
-		// kubelet will set the DeletionGracePeriodSeconds to zero when it's okay
-		// to remove a deleted pod, but we don't run kubelet...
-		if err := tCtx.Client().CoreV1().Pods(namespace).DeleteCollection(tCtx, deleteNow, metav1.ListOptions{}); err != nil {
-			tCtx.Fatalf("failed to delete pods in namespace %q: %v", namespace, err)
-		}
-		if err := tCtx.Client().CoreV1().Namespaces().Delete(tCtx, namespace, deleteNow); err != nil {
-			tCtx.Fatalf("Deleting Namespace %q in numPodsScheduledPerNamespace: %v", namespace, err)
-		}
-	}
-
-	// We need to wait here because even with deletion timestamp set,
-	// actually removing a namespace can take some time (garbage collecting
-	// other generated object like secrets, etc.) and we don't want to
-	// start the next workloads while that cleanup is still going on.
-	if err := wait.PollUntilContextTimeout(tCtx, time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
-		namespaces, err := tCtx.Client().CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, namespace := range namespaces.Items {
-			if _, ok := numPodsScheduledPerNamespace[namespace.Name]; ok {
-				// A namespace created by the workload, need to wait.
-				return false, nil
-			}
-		}
-		// All namespaces gone.
-		return true, nil
-	}); err != nil {
-		tCtx.Fatalf("failed while waiting for namespace removal: %v", err)
-	}
 }
 
 func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsPerNamespace *map[string]int) {
@@ -1432,6 +1449,11 @@ func getTestCases(path string) ([]*testCase, error) {
 	if err := getSpecFromFile(&path, &testCases); err != nil {
 		return nil, fmt.Errorf("parsing test cases error: %w", err)
 	}
+	for _, tc := range testCases {
+		for _, w := range tc.Workloads {
+			w.setDefaults(tc.DefaultThresholdMetricSelector)
+		}
+	}
 	return testCases, nil
 }
 
@@ -1463,6 +1485,12 @@ func validateTestCases(testCases []*testCase) error {
 		// TODO(#93795): make sure each workload within a test case has a unique
 		// name? The name is used to identify the stats in benchmark reports.
 		// TODO(#94404): check for unused template parameters? Probably a typo.
+		for _, w := range tc.Workloads {
+			err := w.isValid(tc.MetricsCollectorConfig)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

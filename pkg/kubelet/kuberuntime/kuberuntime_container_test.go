@@ -69,7 +69,7 @@ func TestRemoveContainer(t *testing.T) {
 
 	// Create fake sandbox and container
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
-	assert.Equal(t, len(fakeContainers), 1)
+	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
@@ -570,7 +570,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(ctx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
+		_, err := m.startContainer(ctx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{}, nil)
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}
@@ -956,7 +956,7 @@ func TestUpdateContainerResources(t *testing.T) {
 
 	// Create fake sandbox and container
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
-	assert.Equal(t, len(fakeContainers), 1)
+	assert.Len(t, fakeContainers, 1)
 
 	ctx := context.Background()
 	cStatus, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)

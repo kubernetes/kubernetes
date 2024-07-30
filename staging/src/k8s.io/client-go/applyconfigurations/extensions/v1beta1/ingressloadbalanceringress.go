@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// IngressLoadBalancerIngressApplyConfiguration represents an declarative configuration of the IngressLoadBalancerIngress type for use
+// IngressLoadBalancerIngressApplyConfiguration represents a declarative configuration of the IngressLoadBalancerIngress type for use
 // with apply.
 type IngressLoadBalancerIngressApplyConfiguration struct {
 	IP       *string                               `json:"ip,omitempty"`
@@ -26,7 +26,7 @@ type IngressLoadBalancerIngressApplyConfiguration struct {
 	Ports    []IngressPortStatusApplyConfiguration `json:"ports,omitempty"`
 }
 
-// IngressLoadBalancerIngressApplyConfiguration constructs an declarative configuration of the IngressLoadBalancerIngress type for use with
+// IngressLoadBalancerIngressApplyConfiguration constructs a declarative configuration of the IngressLoadBalancerIngress type for use with
 // apply.
 func IngressLoadBalancerIngress() *IngressLoadBalancerIngressApplyConfiguration {
 	return &IngressLoadBalancerIngressApplyConfiguration{}

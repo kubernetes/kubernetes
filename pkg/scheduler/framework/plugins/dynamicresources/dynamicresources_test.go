@@ -31,10 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -51,6 +51,11 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
+	nodeName      = "worker"
+	node2Name     = "worker-2"
+	node3Name     = "worker-3"
+	controller    = "some-driver"
+	driver        = controller
 	podName       = "my-pod"
 	podUID        = "1234"
 	resourceName  = "my-resource"
@@ -59,58 +64,21 @@ var (
 	claimName2    = podName + "-" + resourceName + "-2"
 	className     = "my-resource-class"
 	namespace     = "default"
+	attrName      = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
 
-	resourceClass = &resourcev1alpha2.ResourceClass{
+	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
-		},
-		DriverName: "some-driver",
-	}
-	structuredResourceClass = &resourcev1alpha2.ResourceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: className,
-		},
-		DriverName:           "some-driver",
-		StructuredParameters: ptr.To(true),
-	}
-	structuredResourceClassWithParams = &resourcev1alpha2.ResourceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: className,
-		},
-		DriverName:           "some-driver",
-		StructuredParameters: ptr.To(true),
-		ParametersRef: &resourcev1alpha2.ResourceClassParametersReference{
-			Name:      className,
-			Namespace: namespace,
-			Kind:      "ResourceClassParameters",
-			APIGroup:  "resource.k8s.io",
-		},
-	}
-	structuredResourceClassWithCRD = &resourcev1alpha2.ResourceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: className,
-		},
-		DriverName:           "some-driver",
-		StructuredParameters: ptr.To(true),
-		ParametersRef: &resourcev1alpha2.ResourceClassParametersReference{
-			Name:      className,
-			Namespace: namespace,
-			Kind:      "ResourceClassParameters",
-			APIGroup:  "example.com",
 		},
 	}
 
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
-				Obj()
-	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID + "-II").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
 				Obj()
 	podWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplate.DeepCopy()
@@ -124,104 +92,87 @@ var (
 	}()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, Source: v1.ClaimSource{ResourceClaimName: &claimName2}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 				Obj()
 
-	workerNode      = &st.MakeNode().Name("worker").Label("kubernetes.io/hostname", "worker").Node
-	workerNodeSlice = st.MakeResourceSlice("worker", "some-driver").NamedResourcesInstances("instance-1").Obj()
+	// Node with "instance-1" device and no device attributes.
+	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
+	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
 
-	claimParameters = st.MakeClaimParameters().Name(claimName).Namespace(namespace).
-			NamedResourcesRequests("some-driver", "true").
-			Shareable(true).
-			GeneratedFrom(&resourcev1alpha2.ResourceClaimParametersReference{
-			Name:     claimName,
-			Kind:     "ResourceClaimParameters",
-			APIGroup: "example.com",
-		}).
-		Obj()
-	claimParametersOtherNamespace = st.MakeClaimParameters().Name(claimName).Namespace(namespace+"-2").
-					NamedResourcesRequests("some-driver", "true").
-					Shareable(true).
-					GeneratedFrom(&resourcev1alpha2.ResourceClaimParametersReference{
-			Name:     claimName,
-			Kind:     "ResourceClaimParameters",
-			APIGroup: "example.com",
-		}).
-		Obj()
-	classParameters = st.MakeClassParameters().Name(className).Namespace(namespace).
-			NamedResourcesFilters("some-driver", "true").
-			GeneratedFrom(&resourcev1alpha2.ResourceClassParametersReference{
-			Name:      className,
-			Namespace: namespace,
-			Kind:      "ResourceClassParameters",
-			APIGroup:  "example.com",
-		}).
-		Obj()
+	// Node with same device, but now with a "healthy" boolean attribute.
+	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
+	workerNode2Slice = st.MakeResourceSlice(node2Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
-	claim = st.MakeResourceClaim().
+	// Yet another node, same as the second one.
+	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
+	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
+
+	brokenSelector = resourceapi.DeviceSelector{
+		CEL: &resourceapi.CELDeviceSelector{
+			// Not set for workerNode.
+			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
+		},
+	}
+
+	claim = st.MakeResourceClaim(controller).
 		Name(claimName).
 		Namespace(namespace).
-		ResourceClassName(className).
+		Request(className).
 		Obj()
-	pendingImmediateClaim = st.FromResourceClaim(claim).
-				AllocationMode(resourcev1alpha2.AllocationModeImmediate).
-				Obj()
-	structuredAllocatedImmediateClaim = st.FromResourceClaim(pendingImmediateClaim).
-						Allocation("some-driver", &resourcev1alpha2.AllocationResult{}).
-						Structured("worker", "instance-1").
-						Obj()
-	pendingDelayedClaim = st.FromResourceClaim(claim).
-				OwnerReference(podName, podUID, podKind).
-				AllocationMode(resourcev1alpha2.AllocationModeWaitForFirstConsumer).
-				Obj()
-	pendingDelayedClaim2 = st.FromResourceClaim(pendingDelayedClaim).
-				Name(claimName2).
-				Obj()
-	deallocatingClaim = st.FromResourceClaim(pendingImmediateClaim).
-				Allocation("some-driver", &resourcev1alpha2.AllocationResult{}).
+	pendingClaim = st.FromResourceClaim(claim).
+			OwnerReference(podName, podUID, podKind).
+			Obj()
+	pendingClaim2 = st.FromResourceClaim(pendingClaim).
+			Name(claimName2).
+			Obj()
+	allocationResult = &resourceapi.AllocationResult{
+		Controller: controller,
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "req-1",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			// Label selector...
+			nodeSelector := st.MakeNodeSelector().In("metadata.name", []string{nodeName}).Obj()
+			// ... but we need a field selector, so let's swap.
+			nodeSelector.NodeSelectorTerms[0].MatchExpressions, nodeSelector.NodeSelectorTerms[0].MatchFields = nodeSelector.NodeSelectorTerms[0].MatchFields, nodeSelector.NodeSelectorTerms[0].MatchExpressions
+			return nodeSelector
+		}(),
+	}
+	deallocatingClaim = st.FromResourceClaim(pendingClaim).
+				Allocation(allocationResult).
 				DeallocationRequested(true).
 				Obj()
-	inUseClaim = st.FromResourceClaim(pendingImmediateClaim).
-			Allocation("some-driver", &resourcev1alpha2.AllocationResult{}).
+	inUseClaim = st.FromResourceClaim(pendingClaim).
+			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
 			Obj()
 	structuredInUseClaim = st.FromResourceClaim(inUseClaim).
-				Structured("worker", "instance-1").
+				Structured().
 				Obj()
-	allocatedClaim = st.FromResourceClaim(pendingDelayedClaim).
-			Allocation("some-driver", &resourcev1alpha2.AllocationResult{}).
+	allocatedClaim = st.FromResourceClaim(pendingClaim).
+			Allocation(allocationResult).
 			Obj()
 
-	pendingDelayedClaimWithParams      = st.FromResourceClaim(pendingDelayedClaim).ParametersRef(claimName).Obj()
-	structuredAllocatedClaim           = st.FromResourceClaim(allocatedClaim).Structured("worker", "instance-1").Obj()
-	structuredAllocatedClaimWithParams = st.FromResourceClaim(structuredAllocatedClaim).ParametersRef(claimName).Obj()
-
-	otherStructuredAllocatedClaim = st.FromResourceClaim(structuredAllocatedClaim).Name(structuredAllocatedClaim.Name + "-other").Obj()
-
-	allocatedDelayedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
-						Allocation("some-driver", &resourcev1alpha2.AllocationResult{AvailableOnNodes: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
-						Obj()
-	structuredAllocatedDelayedClaimWithWrongTopology = st.FromResourceClaim(allocatedDelayedClaimWithWrongTopology).
-								Structured("worker-2", "instance-1").
-								Obj()
-	allocatedImmediateClaimWithWrongTopology = st.FromResourceClaim(allocatedDelayedClaimWithWrongTopology).
-							AllocationMode(resourcev1alpha2.AllocationModeImmediate).
-							Obj()
-	structuredAllocatedImmediateClaimWithWrongTopology = st.FromResourceClaim(allocatedImmediateClaimWithWrongTopology).
-								Structured("worker-2", "instance-1").
-								Obj()
-	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
-					Allocation("some-driver", &resourcev1alpha2.AllocationResult{AvailableOnNodes: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{"worker"}).Obj()}).
+	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
 					Obj()
-	structuredAllocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaimWithGoodTopology).
-							Structured("worker", "instance-1").
-							Obj()
-	otherClaim = st.MakeResourceClaim().
+	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}).Obj()}).
+					Obj()
+	otherClaim = st.MakeResourceClaim(controller).
 			Name("not-my-claim").
 			Namespace(namespace).
-			ResourceClassName(className).
+			Request(className).
 			Obj()
+	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
+				Allocation(allocationResult).
+				Obj()
 
 	scheduling = st.MakePodSchedulingContexts().Name(podName).Namespace(namespace).
 			OwnerReference(podName, podUID, podKind).
@@ -233,47 +184,46 @@ var (
 					SelectedNode(workerNode.Name).
 					Obj()
 	schedulingInfo = st.FromPodSchedulingContexts(schedulingPotential).
-			ResourceClaims(resourcev1alpha2.ResourceClaimSchedulingStatus{Name: resourceName},
-			resourcev1alpha2.ResourceClaimSchedulingStatus{Name: resourceName2}).
+			ResourceClaims(resourceapi.ResourceClaimSchedulingStatus{Name: resourceName},
+			resourceapi.ResourceClaimSchedulingStatus{Name: resourceName2}).
 		Obj()
 )
 
-func reserve(claim *resourcev1alpha2.ResourceClaim, pod *v1.Pod) *resourcev1alpha2.ResourceClaim {
+func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
 	return st.FromResourceClaim(claim).
 		ReservedForPod(pod.Name, types.UID(pod.UID)).
 		Obj()
 }
 
-// claimWithCRD replaces the in-tree group with "example.com".
-func claimWithCRD(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+func structuredClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	return st.FromResourceClaim(claim).
+		Structured().
+		Obj()
+}
+
+func breakCELInClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
-	claim.Spec.ParametersRef.APIGroup = "example.com"
+	for i := range claim.Spec.Devices.Requests {
+		for e := range claim.Spec.Devices.Requests[i].Selectors {
+			claim.Spec.Devices.Requests[i].Selectors[e] = brokenSelector
+		}
+		if len(claim.Spec.Devices.Requests[i].Selectors) == 0 {
+			claim.Spec.Devices.Requests[i].Selectors = []resourceapi.DeviceSelector{brokenSelector}
+		}
+	}
 	return claim
 }
 
-// classWithCRD replaces the in-tree group with "example.com".
-func classWithCRD(class *resourcev1alpha2.ResourceClass) *resourcev1alpha2.ResourceClass {
+func breakCELInClass(class *resourceapi.DeviceClass) *resourceapi.DeviceClass {
 	class = class.DeepCopy()
-	class.ParametersRef.APIGroup = "example.com"
+	for i := range class.Spec.Selectors {
+		class.Spec.Selectors[i] = brokenSelector
+	}
+	if len(class.Spec.Selectors) == 0 {
+		class.Spec.Selectors = []resourceapi.DeviceSelector{brokenSelector}
+	}
+
 	return class
-}
-
-func breakCELInClaimParameters(parameters *resourcev1alpha2.ResourceClaimParameters) *resourcev1alpha2.ResourceClaimParameters {
-	parameters = parameters.DeepCopy()
-	for i := range parameters.DriverRequests {
-		for e := range parameters.DriverRequests[i].Requests {
-			parameters.DriverRequests[i].Requests[e].NamedResources.Selector = `attributes.bool["no-such-attribute"]`
-		}
-	}
-	return parameters
-}
-
-func breakCELInClassParameters(parameters *resourcev1alpha2.ResourceClassParameters) *resourcev1alpha2.ResourceClassParameters {
-	parameters = parameters.DeepCopy()
-	for i := range parameters.Filters {
-		parameters.Filters[i].NamedResources.Selector = `attributes.bool["no-such-attribute"]`
-	}
-	return parameters
 }
 
 // result defines the expected outcome of some operation. It covers
@@ -293,19 +243,19 @@ type result struct {
 
 	// assumedClaim is the one claim which is expected to be assumed,
 	// nil if none.
-	assumedClaim *resourcev1alpha2.ResourceClaim
+	assumedClaim *resourceapi.ResourceClaim
 
 	// inFlightClaim is the one claim which is expected to be tracked as
 	// in flight, nil if none.
-	inFlightClaim *resourcev1alpha2.ResourceClaim
+	inFlightClaim *resourceapi.ResourceClaim
 }
 
 // change contains functions for modifying objects of a certain type. These
 // functions will get called for all objects of that type. If they needs to
 // make changes only to a particular instance, then it must check the name.
 type change struct {
-	scheduling func(*resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext
-	claim      func(*resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim
+	scheduling func(*resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext
+	claim      func(*resourceapi.ResourceClaim) *resourceapi.ResourceClaim
 }
 type perNodeResult map[string]result
 
@@ -356,9 +306,9 @@ func TestPlugin(t *testing.T) {
 	testcases := map[string]struct {
 		nodes       []*v1.Node // default if unset is workerNode
 		pod         *v1.Pod
-		claims      []*resourcev1alpha2.ResourceClaim
-		classes     []*resourcev1alpha2.ResourceClass
-		schedulings []*resourcev1alpha2.PodSchedulingContext
+		claims      []*resourceapi.ResourceClaim
+		classes     []*resourceapi.DeviceClass
+		schedulings []*resourceapi.PodSchedulingContext
 
 		// objs get stored directly in the fake client, without passing
 		// through reactors, in contrast to the types above.
@@ -366,7 +316,11 @@ func TestPlugin(t *testing.T) {
 
 		prepare prepare
 		want    want
-		disable bool
+
+		// Feature gates. False is chosen so that the uncommon case
+		// doesn't need to be set.
+		disableDRA        bool
+		disableClassicDRA bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -381,11 +335,11 @@ func TestPlugin(t *testing.T) {
 		},
 		"claim-reference": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
+			claims: []*resourceapi.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
 								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
@@ -398,11 +352,11 @@ func TestPlugin(t *testing.T) {
 		},
 		"claim-reference-structured": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{structuredAllocatedClaim, otherClaim},
+			claims: []*resourceapi.ResourceClaim{structuredClaim(allocatedClaim), otherClaim},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
 								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
@@ -415,11 +369,11 @@ func TestPlugin(t *testing.T) {
 		},
 		"claim-template": {
 			pod:    podWithClaimTemplateInStatus,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
+			claims: []*resourceapi.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
 								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
@@ -432,11 +386,11 @@ func TestPlugin(t *testing.T) {
 		},
 		"claim-template-structured": {
 			pod:    podWithClaimTemplateInStatus,
-			claims: []*resourcev1alpha2.ResourceClaim{structuredAllocatedClaim, otherClaim},
+			claims: []*resourceapi.ResourceClaim{structuredClaim(allocatedClaim), otherClaim},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
 								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
@@ -449,7 +403,7 @@ func TestPlugin(t *testing.T) {
 		},
 		"missing-claim": {
 			pod:    podWithClaimTemplate, // status not set
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
+			claims: []*resourceapi.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
 				preenqueue: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `pod "default/my-pod": ResourceClaim not created yet`),
@@ -458,10 +412,10 @@ func TestPlugin(t *testing.T) {
 		},
 		"deleted-claim": {
 			pod: podWithClaimTemplateInStatus,
-			claims: func() []*resourcev1alpha2.ResourceClaim {
+			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-				return []*resourcev1alpha2.ResourceClaim{claim}
+				return []*resourceapi.ResourceClaim{claim}
 			}(),
 			want: want{
 				preenqueue: result{
@@ -471,10 +425,10 @@ func TestPlugin(t *testing.T) {
 		},
 		"wrong-claim": {
 			pod: podWithClaimTemplateInStatus,
-			claims: func() []*resourcev1alpha2.ResourceClaim {
+			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.OwnerReferences[0].UID += "123"
-				return []*resourcev1alpha2.ResourceClaim{claim}
+				return []*resourceapi.ResourceClaim{claim}
 			}(),
 			want: want{
 				preenqueue: result{
@@ -482,27 +436,14 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"waiting-for-immediate-allocation": {
+		"structured-no-resources": {
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
-			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-		"immediate-allocation-structured-no-resources": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim cannot be allocated for the node (unsuitable)`),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `cannot allocate all claims`),
 					},
 				},
 				postfilter: result{
@@ -510,22 +451,54 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"immediate-allocation-structured-with-resources": {
+		"structured-with-resources": {
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: structuredAllocatedImmediateClaim,
+					inFlightClaim: structuredClaim(allocatedClaim),
 				},
 				prebind: result{
-					assumedClaim: reserve(structuredAllocatedImmediateClaim, podWithClaimName),
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
-								claim.Finalizers = structuredAllocatedImmediateClaim.Finalizers
+								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+								claim.Status = structuredClaim(inUseClaim).Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+				},
+			},
+		},
+		"structured-with-resources-has-finalizer": {
+			// As before. but the finalizer is already set. Could happen if
+			// the scheduler got interrupted.
+			pod: podWithClaimName,
+			claims: func() []*resourceapi.ResourceClaim {
+				claim := structuredClaim(pendingClaim)
+				claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+				return []*resourceapi.ResourceClaim{claim}
+			}(),
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredClaim(allocatedClaim),
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
 								claim.Status = structuredInUseClaim.Status
 							}
 							return claim
@@ -533,41 +506,40 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 				postbind: result{
-					assumedClaim: reserve(structuredAllocatedImmediateClaim, podWithClaimName),
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
 				},
 			},
 		},
-		"delayed-allocation-structured-no-resources": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
-			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim cannot be allocated for the node (unsuitable)`),
+		"structured-with-resources-finalizer-gets-removed": {
+			// As before. but the finalizer is already set. Then it gets
+			// removed before the scheduler reaches PreBind.
+			pod: podWithClaimName,
+			claims: func() []*resourceapi.ResourceClaim {
+				claim := structuredClaim(pendingClaim)
+				claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+				return []*resourceapi.ResourceClaim{claim}
+			}(),
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+						claim.Finalizers = nil
+						return claim
 					},
 				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
-				},
 			},
-		},
-		"delayed-allocation-structured-with-resources": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
-			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: structuredAllocatedClaim,
+					inFlightClaim: structuredClaim(allocatedClaim),
 				},
 				prebind: result{
-					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
 					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
-								claim.Finalizers = structuredAllocatedClaim.Finalizers
+								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
 								claim.Status = structuredInUseClaim.Status
 							}
 							return claim
@@ -575,222 +547,146 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 				postbind: result{
-					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
 				},
 			},
 		},
-		"delayed-allocation-structured-skip-bind": {
+		"structured-with-resources-finalizer-gets-added": {
+			// No finalizer initially, then it gets added before
+			// the scheduler reaches PreBind. Shouldn't happen?
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+						claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+						return claim
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredClaim(allocatedClaim),
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+				},
+			},
+		},
+		"structured-skip-bind": {
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: structuredAllocatedClaim,
+					inFlightClaim: structuredClaim(allocatedClaim),
 				},
 				unreserveBeforePreBind: &result{},
 			},
 		},
-		"delayed-allocation-structured-exhausted-resources": {
+		"structured-exhausted-resources": {
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim, otherStructuredAllocatedClaim},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim), structuredClaim(otherAllocatedClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim cannot be allocated for the node (unsuitable)`),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `cannot allocate all claims`),
 					},
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
-				},
-			},
-		},
-
-		"with-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{claimParameters, classParameters, workerNodeSlice},
-			want: want{
-				reserve: result{
-					inFlightClaim: structuredAllocatedClaimWithParams,
-				},
-				prebind: result{
-					assumedClaim: reserve(structuredAllocatedClaimWithParams, podWithClaimName),
-					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
-							if claim.Name == claimName {
-								claim = claim.DeepCopy()
-								claim.Finalizers = structuredAllocatedClaim.Finalizers
-								claim.Status = structuredInUseClaim.Status
-							}
-							return claim
-						},
-					},
-				},
-				postbind: result{
-					assumedClaim: reserve(structuredAllocatedClaimWithParams, podWithClaimName),
-				},
-			},
-		},
-
-		"with-translated-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
-			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, claimParametersOtherNamespace /* must be ignored */, classParameters, workerNodeSlice},
-			want: want{
-				reserve: result{
-					inFlightClaim: claimWithCRD(structuredAllocatedClaimWithParams),
-				},
-				prebind: result{
-					assumedClaim: reserve(claimWithCRD(structuredAllocatedClaimWithParams), podWithClaimName),
-					changes: change{
-						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
-							if claim.Name == claimName {
-								claim = claim.DeepCopy()
-								claim.Finalizers = structuredAllocatedClaim.Finalizers
-								claim.Status = structuredInUseClaim.Status
-							}
-							return claim
-						},
-					},
-				},
-				postbind: result{
-					assumedClaim: reserve(claimWithCRD(structuredAllocatedClaimWithParams), podWithClaimName),
-				},
-			},
-		},
-
-		"missing-class-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{claimParameters, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `class parameters default/my-resource-class not found`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-
-		"missing-claim-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{classParameters, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim parameters default/my-pod-my-resource not found`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-
-		"missing-translated-class-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
-			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `generated class parameters for ResourceClassParameters.example.com default/my-resource-class not found`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-
-		"missing-translated-claim-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
-			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{classParameters, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `generated claim parameters for ResourceClaimParameters.example.com default/my-pod-my-resource not found`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-
-		"too-many-translated-class-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
-			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, classParameters, st.FromClassParameters(classParameters).Name("other").Obj() /* too many */, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.AsStatus(errors.New(`multiple generated class parameters for ResourceClassParameters.example.com my-resource-class found: [default/my-resource-class default/other]`)),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-
-		"too-many-translated-claim-parameters": {
-			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
-			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, st.FromClaimParameters(claimParameters).Name("other").Obj() /* too many */, classParameters, workerNodeSlice},
-			want: want{
-				prefilter: result{
-					status: framework.AsStatus(errors.New(`multiple generated claim parameters for ResourceClaimParameters.example.com default/my-pod-my-resource found: [default/my-pod-my-resource default/other]`)),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},
 
 		"claim-parameters-CEL-runtime-error": {
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{breakCELInClaimParameters(claimParameters), classParameters, workerNodeSlice},
+			claims:  []*resourceapi.ResourceClaim{breakCELInClaim(structuredClaim(pendingClaim))},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `checking structured parameters failed: checking node "worker" and resources of driver "some-driver": evaluate request CEL expression: no such key: no-such-attribute`),
+						status: framework.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
 					},
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
 				},
 			},
 		},
 
 		"class-parameters-CEL-runtime-error": {
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
-			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{claimParameters, breakCELInClassParameters(classParameters), workerNodeSlice},
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim)},
+			classes: []*resourceapi.DeviceClass{breakCELInClass(deviceClass)},
+			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `checking structured parameters failed: checking node "worker" and resources of driver "some-driver": evaluate filter CEL expression: no such key: no-such-attribute`),
+						status: framework.AsStatus(errors.New(`class my-resource-class: selector #0: CEL runtime error: no such key: ` + string(attrName))),
 					},
 				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+			},
+		},
+
+		// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
+		// it should still not schedule the pod because there is something wrong with it.
+		// Scheduling it would make it harder to detect that there is a problem.
+		//
+		// This matches the "keeps pod pending because of CEL runtime errors" E2E test.
+		"CEL-runtime-error-for-one-of-two-nodes": {
+			nodes:   []*v1.Node{workerNode, workerNode2},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{breakCELInClaim(structuredClaim(pendingClaim))},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice, workerNode2Slice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+					},
+				},
+			},
+		},
+
+		// When two nodes where found, PreScore gets called.
+		"CEL-runtime-error-for-one-of-three-nodes": {
+			nodes:   []*v1.Node{workerNode, workerNode2, workerNode3},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{breakCELInClaim(structuredClaim(pendingClaim))},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice, workerNode2Slice, workerNode3Slice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
+					},
+				},
+				prescore: result{
+					// This is the error found during Filter.
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: healthy`),
 				},
 			},
 		},
 
 		"waiting-for-deallocation": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{deallocatingClaim},
+			claims: []*resourceapi.ResourceClaim{deallocatingClaim},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
@@ -800,24 +696,24 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"delayed-allocation-missing-class": {
+		"missing-class": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
 			want: want{
 				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("resource class %s does not exist", className)),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("request req-1: device class %s does not exist", className)),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},
-		"delayed-allocation-scheduling-select-immediately": {
+		"scheduling-select-immediately": {
 			// Create the PodSchedulingContext object, ask for information
 			// and select a node.
 			pod:     podWithClaimName,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prebind: result{
 					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
@@ -825,13 +721,13 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"delayed-allocation-scheduling-ask": {
+		"scheduling-ask": {
 			// Create the PodSchedulingContext object, ask for
 			// information, but do not select a node because
 			// there are multiple claims.
 			pod:     podWithTwoClaimNames,
-			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim, pendingDelayedClaim2},
-			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prebind: result{
 					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
@@ -839,18 +735,18 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"delayed-allocation-scheduling-finish": {
+		"scheduling-finish": {
 			// Use the populated PodSchedulingContext object to select a
 			// node.
 			pod:         podWithClaimName,
-			claims:      []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
-			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
+			claims:      []*resourceapi.ResourceClaim{pendingClaim},
+			schedulings: []*resourceapi.PodSchedulingContext{schedulingInfo},
+			classes:     []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prebind: result{
 					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					changes: change{
-						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+						scheduling: func(in *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
 							return st.FromPodSchedulingContexts(in).
 								SelectedNode(workerNode.Name).
 								Obj()
@@ -859,16 +755,16 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"delayed-allocation-scheduling-finish-concurrent-label-update": {
+		"scheduling-finish-concurrent-label-update": {
 			// Use the populated PodSchedulingContext object to select a
 			// node.
 			pod:         podWithClaimName,
-			claims:      []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
-			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
+			claims:      []*resourceapi.ResourceClaim{pendingClaim},
+			schedulings: []*resourceapi.PodSchedulingContext{schedulingInfo},
+			classes:     []*resourceapi.DeviceClass{deviceClass},
 			prepare: prepare{
 				prebind: change{
-					scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+					scheduling: func(in *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
 						// This does not actually conflict with setting the
 						// selected node, but because the plugin is not using
 						// patching yet, Update nonetheless fails.
@@ -884,18 +780,18 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"delayed-allocation-scheduling-completed": {
+		"scheduling-completed": {
 			// Remove PodSchedulingContext object once the pod is scheduled.
 			pod:         podWithClaimName,
-			claims:      []*resourcev1alpha2.ResourceClaim{allocatedClaim},
-			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
-			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
+			claims:      []*resourceapi.ResourceClaim{allocatedClaim},
+			schedulings: []*resourceapi.PodSchedulingContext{schedulingInfo},
+			classes:     []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
-								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 								Obj()
 						},
 					},
@@ -905,27 +801,11 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"in-use-by-other": {
-			nodes:       []*v1.Node{},
-			pod:         otherPodWithClaimName,
-			claims:      []*resourcev1alpha2.ResourceClaim{inUseClaim},
-			classes:     []*resourcev1alpha2.ResourceClass{},
-			schedulings: []*resourcev1alpha2.PodSchedulingContext{},
-			prepare:     prepare{},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
-				},
-			},
-		},
-		"wrong-topology-delayed-allocation": {
+		"wrong-topology": {
 			// PostFilter tries to get the pod scheduleable by
 			// deallocating the claim.
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedDelayedClaimWithWrongTopology},
+			claims: []*resourceapi.ResourceClaim{allocatedClaimWithWrongTopology},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -935,7 +815,7 @@ func TestPlugin(t *testing.T) {
 				postfilter: result{
 					// Claims with delayed allocation get deallocated.
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
 								DeallocationRequested(true).
 								Obj()
@@ -945,29 +825,11 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"wrong-topology-immediate-allocation": {
+		"wrong-topology-structured": {
 			// PostFilter tries to get the pod scheduleable by
 			// deallocating the claim.
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedImmediateClaimWithWrongTopology},
-			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
-					},
-				},
-				postfilter: result{
-					// Claims with immediate allocation don't. They would just get allocated again right
-					// away, without considering the needs of the pod.
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
-				},
-			},
-		},
-		"wrong-topology-delayed-allocation-structured": {
-			// PostFilter tries to get the pod scheduleable by
-			// deallocating the claim.
-			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{structuredAllocatedDelayedClaimWithWrongTopology},
+			claims: []*resourceapi.ResourceClaim{structuredClaim(allocatedClaimWithWrongTopology)},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -977,9 +839,9 @@ func TestPlugin(t *testing.T) {
 				postfilter: result{
 					// Claims with delayed allocation and structured parameters get deallocated immediately.
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
-								Allocation("", nil).
+								Allocation(nil).
 								Obj()
 						},
 					},
@@ -987,34 +849,15 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"wrong-topology-immediate-allocation-structured": {
-			// PostFilter tries to get the pod scheduleable by
-			// deallocating the claim.
-			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{structuredAllocatedImmediateClaimWithWrongTopology},
-			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
-					},
-				},
-				postfilter: result{
-					// Claims with immediate allocation don't. The allocation is considered
-					// more important than the pod and pods need to wait for the node to
-					// become available again.
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
-				},
-			},
-		},
 		"good-topology": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaimWithGoodTopology},
+			claims: []*resourceapi.ResourceClaim{allocatedClaimWithGoodTopology},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
-								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 								Obj()
 						},
 					},
@@ -1023,22 +866,22 @@ func TestPlugin(t *testing.T) {
 		},
 		"bind-failure": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaimWithGoodTopology},
+			claims: []*resourceapi.ResourceClaim{allocatedClaimWithGoodTopology},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
-								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 								Obj()
 						},
 					},
 				},
 				unreserveAfterBindFailure: &result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							out := in.DeepCopy()
-							out.Status.ReservedFor = []resourcev1alpha2.ResourceClaimConsumerReference{}
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
 							return out
 						},
 					},
@@ -1047,22 +890,22 @@ func TestPlugin(t *testing.T) {
 		},
 		"bind-failure-structured": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{structuredAllocatedClaimWithGoodTopology},
+			claims: []*resourceapi.ResourceClaim{structuredClaim(allocatedClaimWithGoodTopology)},
 			want: want{
 				prebind: result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return st.FromResourceClaim(in).
-								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 								Obj()
 						},
 					},
 				},
 				unreserveAfterBindFailure: &result{
 					changes: change{
-						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							out := in.DeepCopy()
-							out.Status.ReservedFor = []resourcev1alpha2.ResourceClaimConsumerReference{}
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
 							return out
 						},
 					},
@@ -1071,17 +914,17 @@ func TestPlugin(t *testing.T) {
 		},
 		"reserved-okay": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
+			claims: []*resourceapi.ResourceClaim{inUseClaim},
 		},
-		"disable": {
+		"DRA-disabled": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
+			claims: []*resourceapi.ResourceClaim{inUseClaim},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.Skip),
 				},
 			},
-			disable: true,
+			disableDRA: true,
 		},
 	}
 
@@ -1094,8 +937,11 @@ func TestPlugin(t *testing.T) {
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings, tc.objs)
-			testCtx.p.enabled = !tc.disable
+			features := feature.Features{
+				EnableDynamicResourceAllocation: !tc.disableDRA,
+				EnableDRAControlPlaneController: !tc.disableClassicDRA,
+			}
+			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -1128,15 +974,20 @@ func TestPlugin(t *testing.T) {
 					t.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(t *testing.T) {
 						testCtx.verify(t, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
 					})
-					if status.Code() != framework.Success {
-						unschedulable = true
-					} else {
+					if status.Code() == framework.Success {
 						potentialNodes = append(potentialNodes, nodeInfo)
 					}
+					if status.Code() == framework.Error {
+						// An error aborts scheduling.
+						return
+					}
+				}
+				if len(potentialNodes) == 0 {
+					unschedulable = true
 				}
 			}
 
-			if !unschedulable && len(potentialNodes) > 0 {
+			if !unschedulable && len(potentialNodes) > 1 {
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prescore)
 				status := testCtx.p.PreScore(testCtx.ctx, testCtx.state, tc.pod, potentialNodes)
@@ -1203,7 +1054,7 @@ func TestPlugin(t *testing.T) {
 						})
 					}
 				}
-			} else {
+			} else if len(potentialNodes) == 0 {
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
@@ -1217,17 +1068,23 @@ func TestPlugin(t *testing.T) {
 }
 
 type testContext struct {
-	ctx             context.Context
-	client          *fake.Clientset
-	informerFactory informers.SharedInformerFactory
-	p               *dynamicResources
-	nodeInfos       []*framework.NodeInfo
-	state           *framework.CycleState
+	ctx              context.Context
+	client           *fake.Clientset
+	informerFactory  informers.SharedInformerFactory
+	claimAssumeCache *assumecache.AssumeCache
+	p                *dynamicResources
+	nodeInfos        []*framework.NodeInfo
+	state            *framework.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	assert.Equal(t, expected.status, status)
+	if expectedErr := status.AsError(); expectedErr != nil {
+		// Compare only the error strings.
+		assert.ErrorContains(t, status.AsError(), expectedErr.Error())
+	} else {
+		assert.Equal(t, expected.status, status)
+	}
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
 	wantObjects = append(wantObjects, expected.added...)
@@ -1268,13 +1125,13 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
-	claims, err := tc.client.ResourceV1alpha2().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
+	claims, err := tc.client.ResourceV1alpha3().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
 		objects = append(objects, &claim)
 	}
-	schedulings, err := tc.client.ResourceV1alpha2().PodSchedulingContexts("").List(tc.ctx, metav1.ListOptions{})
+	schedulings, err := tc.client.ResourceV1alpha3().PodSchedulingContexts("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list pod scheduling")
 	for _, scheduling := range schedulings.Items {
 		scheduling := scheduling
@@ -1286,9 +1143,12 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 }
 
 func (tc *testContext) listAssumedClaims() []metav1.Object {
+	if tc.p.claimAssumeCache == nil {
+		return nil
+	}
 	var assumedClaims []metav1.Object
 	for _, obj := range tc.p.claimAssumeCache.List(nil) {
-		claim := obj.(*resourcev1alpha2.ResourceClaim)
+		claim := obj.(*resourceapi.ResourceClaim)
 		obj, _ := tc.p.claimAssumeCache.Get(claim.Namespace + "/" + claim.Name)
 		apiObj, _ := tc.p.claimAssumeCache.GetAPIObj(claim.Namespace + "/" + claim.Name)
 		if obj != apiObj {
@@ -1302,7 +1162,7 @@ func (tc *testContext) listAssumedClaims() []metav1.Object {
 func (tc *testContext) listInFlightClaims() []metav1.Object {
 	var inFlightClaims []metav1.Object
 	tc.p.inFlightAllocations.Range(func(key, value any) bool {
-		inFlightClaims = append(inFlightClaims, value.(*resourcev1alpha2.ResourceClaim))
+		inFlightClaims = append(inFlightClaims, value.(*resourceapi.ResourceClaim))
 		return true
 	})
 	sortObjects(inFlightClaims)
@@ -1317,14 +1177,14 @@ func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, up
 		if diff := cmp.Diff(objects[i], obj); diff != "" {
 			t.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
 			switch obj := obj.(type) {
-			case *resourcev1alpha2.ResourceClaim:
-				obj, err := tc.client.ResourceV1alpha2().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+			case *resourceapi.ResourceClaim:
+				obj, err := tc.client.ResourceV1alpha3().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
 				modified[i] = obj
-			case *resourcev1alpha2.PodSchedulingContext:
-				obj, err := tc.client.ResourceV1alpha2().PodSchedulingContexts(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+			case *resourceapi.PodSchedulingContext:
+				obj, err := tc.client.ResourceV1alpha3().PodSchedulingContexts(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
@@ -1354,11 +1214,11 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 
 	for _, obj := range objects {
 		switch in := obj.(type) {
-		case *resourcev1alpha2.ResourceClaim:
+		case *resourceapi.ResourceClaim:
 			if updates.claim != nil {
 				obj = updates.claim(in)
 			}
-		case *resourcev1alpha2.PodSchedulingContext:
+		case *resourceapi.PodSchedulingContext:
 			if updates.scheduling != nil {
 				obj = updates.scheduling(in)
 			}
@@ -1369,7 +1229,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceClaim, classes []*resourcev1alpha2.ResourceClass, schedulings []*resourcev1alpha2.PodSchedulingContext, objs []apiruntime.Object) (result *testContext) {
+func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, schedulings []*resourceapi.PodSchedulingContext, objs []apiruntime.Object, features feature.Features) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -1380,25 +1240,19 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	reactor := createReactor(tc.client.Tracker())
 	tc.client.PrependReactor("*", "*", reactor)
 
-	// Quick-and-dirty workaround for fake client storing ResourceClassParameters and
-	// ResourceClaimParameters as "resourceclassparameterses" and "resourceclaimparameterses":
-	// intercept the correct LIST from the informers and reply to them with the incorrect
-	// LIST result.
-	tc.client.PrependReactor("list", "resourceclaimparameters", createListReactor(tc.client.Tracker(), "ResourceClaimParameters"))
-	tc.client.PrependReactor("list", "resourceclassparameters", createListReactor(tc.client.Tracker(), "ResourceClassParameters"))
-
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-
+	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
+		runtime.WithResourceClaimCache(tc.claimAssumeCache),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pl, err := New(tCtx, nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
+	pl, err := New(tCtx, nil, fh, features)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1407,15 +1261,15 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	// The tests use the API to create the objects because then reactors
 	// get triggered.
 	for _, claim := range claims {
-		_, err := tc.client.ResourceV1alpha2().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource claim")
 	}
 	for _, class := range classes {
-		_, err := tc.client.ResourceV1alpha2().ResourceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1alpha3().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource class")
 	}
 	for _, scheduling := range schedulings {
-		_, err := tc.client.ResourceV1alpha2().PodSchedulingContexts(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1alpha3().PodSchedulingContexts(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
 		require.NoError(t, err, "create pod scheduling")
 	}
 
@@ -1501,21 +1355,10 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 	}
 }
 
-func createListReactor(tracker cgotesting.ObjectTracker, kind string) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-		// listAction := action.(cgotesting.ListAction)
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		gvr.Resource += "es"
-		list, err := tracker.List(gvr, schema.GroupVersionKind{Group: gvr.Group, Version: gvr.Version, Kind: kind}, ns)
-		return true, list, err
-	}
-}
-
 func Test_isSchedulableAfterClaimChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
-		claims         []*resourcev1alpha2.ResourceClaim
+		claims         []*resourceapi.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
 		expectedErr    bool
@@ -1533,7 +1376,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"skip-wrong-claim": {
 			pod: podWithClaimTemplate,
-			newObj: func() *resourcev1alpha2.ResourceClaim {
+			newObj: func() *resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.OwnerReferences[0].UID += "123"
 				return claim
@@ -1542,8 +1385,8 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"skip-unrelated-claim": {
 			pod:    podWithClaimTemplate,
-			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim},
-			newObj: func() *resourcev1alpha2.ResourceClaim {
+			claims: []*resourceapi.ResourceClaim{allocatedClaim},
+			newObj: func() *resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.Name += "-foo"
 				claim.UID += "123"
@@ -1553,21 +1396,22 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"queue-on-add": {
 			pod:          podWithClaimName,
-			newObj:       pendingImmediateClaim,
+			newObj:       pendingClaim,
 			expectedHint: framework.Queue,
 		},
 		"backoff-wrong-old-object": {
 			pod:         podWithClaimName,
+			claims:      []*resourceapi.ResourceClaim{pendingClaim},
 			oldObj:      "not-a-claim",
-			newObj:      pendingImmediateClaim,
+			newObj:      pendingClaim,
 			expectedErr: true,
 		},
 		"skip-adding-finalizer": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
-			oldObj: pendingImmediateClaim,
-			newObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := pendingImmediateClaim.DeepCopy()
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
+			oldObj: pendingClaim,
+			newObj: func() *resourceapi.ResourceClaim {
+				claim := pendingClaim.DeepCopy()
 				claim.Finalizers = append(claim.Finalizers, "foo")
 				return claim
 			}(),
@@ -1575,26 +1419,21 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"queue-on-status-change": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
-			oldObj: pendingImmediateClaim,
-			newObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := pendingImmediateClaim.DeepCopy()
-				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
+			oldObj: pendingClaim,
+			newObj: func() *resourceapi.ResourceClaim {
+				claim := pendingClaim.DeepCopy()
+				claim.Status.Allocation = &resourceapi.AllocationResult{}
 				return claim
 			}(),
 			expectedHint: framework.Queue,
 		},
 		"structured-claim-deallocate": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			oldObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := structuredAllocatedClaim.DeepCopy()
-				claim.Name += "-other"
-				return claim
-			}(),
-			newObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := structuredAllocatedClaim.DeepCopy()
-				claim.Name += "-other"
+			claims: []*resourceapi.ResourceClaim{pendingClaim, structuredClaim(otherAllocatedClaim)},
+			oldObj: structuredClaim(otherAllocatedClaim),
+			newObj: func() *resourceapi.ResourceClaim {
+				claim := structuredClaim(otherAllocatedClaim).DeepCopy()
 				claim.Status.Allocation = nil
 				return claim
 			}(),
@@ -1606,18 +1445,51 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			testCtx := setup(t, nil, tc.claims, nil, nil, nil)
-			if claim, ok := tc.newObj.(*resourcev1alpha2.ResourceClaim); ok {
-				// Update the informer because the lister gets called and must have the claim.
-				store := testCtx.informerFactory.Resource().V1alpha2().ResourceClaims().Informer().GetStore()
-				if tc.oldObj == nil {
-					require.NoError(t, store.Add(claim))
-				} else {
-					require.NoError(t, store.Update(claim))
-				}
+			logger, tCtx := ktesting.NewTestContext(t)
+			features := feature.Features{
+				EnableDynamicResourceAllocation: true,
 			}
-			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			testCtx := setup(t, nil, tc.claims, nil, nil, nil, features)
+			oldObj := tc.oldObj
+			newObj := tc.newObj
+			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
+				// Add or update through the client and wait until the event is processed.
+				claimKey := claim.Namespace + "/" + claim.Name
+				if tc.oldObj == nil {
+					// Some test claims already have it. Clear for create.
+					createClaim := claim.DeepCopy()
+					createClaim.UID = ""
+					storedClaim, err := testCtx.client.ResourceV1alpha3().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
+					require.NoError(t, err, "create claim")
+					claim = storedClaim
+				} else {
+					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					require.NoError(t, err, "retrieve old claim")
+					updateClaim := claim.DeepCopy()
+					// The test claim doesn't have those (generated dynamically), so copy them.
+					updateClaim.UID = cachedClaim.(*resourceapi.ResourceClaim).UID
+					updateClaim.ResourceVersion = cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion
+
+					storedClaim, err := testCtx.client.ResourceV1alpha3().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
+					require.NoError(t, err, "update claim")
+					claim = storedClaim
+				}
+
+				// Eventually the assume cache will have it, too.
+				require.EventuallyWithT(t, func(t *assert.CollectT) {
+					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					require.NoError(t, err, "retrieve claim")
+					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
+						t.Errorf("cached claim not updated yet")
+					}
+				}, time.Minute, time.Second, "claim assume cache must have new or updated claim")
+
+				// This has the actual UID and ResourceVersion,
+				// which is relevant for
+				// isSchedulableAfterClaimChange.
+				newObj = claim
+			}
+			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, oldObj, newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -1632,8 +1504,8 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
-		schedulings    []*resourcev1alpha2.PodSchedulingContext
-		claims         []*resourcev1alpha2.ResourceClaim
+		schedulings    []*resourceapi.PodSchedulingContext
+		claims         []*resourceapi.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
 		expectedErr    bool
@@ -1666,8 +1538,8 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		},
 		"skip-unrelated-object": {
 			pod:    podWithClaimTemplate,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
+			newObj: func() *resourceapi.PodSchedulingContext {
 				scheduling := scheduling.DeepCopy()
 				scheduling.Name += "-foo"
 				return scheduling
@@ -1688,27 +1560,27 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		},
 		"skip-missing-infos": {
 			pod:          podWithClaimTemplateInStatus,
-			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			claims:       []*resourceapi.ResourceClaim{pendingClaim},
 			oldObj:       scheduling,
 			newObj:       scheduling,
 			expectedHint: framework.QueueSkip,
 		},
 		"queue-new-infos": {
 			pod:          podWithClaimTemplateInStatus,
-			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			claims:       []*resourceapi.ResourceClaim{pendingClaim},
 			oldObj:       scheduling,
 			newObj:       schedulingInfo,
 			expectedHint: framework.Queue,
 		},
 		"queue-bad-selected-node": {
 			pod:    podWithClaimTemplateInStatus,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			oldObj: func() *resourcev1alpha2.PodSchedulingContext {
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
+			oldObj: func() *resourceapi.PodSchedulingContext {
 				scheduling := schedulingInfo.DeepCopy()
 				scheduling.Spec.SelectedNode = workerNode.Name
 				return scheduling
 			}(),
-			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+			newObj: func() *resourceapi.PodSchedulingContext {
 				scheduling := schedulingInfo.DeepCopy()
 				scheduling.Spec.SelectedNode = workerNode.Name
 				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(scheduling.Status.ResourceClaims[0].UnsuitableNodes, scheduling.Spec.SelectedNode)
@@ -1718,9 +1590,9 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		},
 		"skip-spec-changes": {
 			pod:    podWithClaimTemplateInStatus,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
 			oldObj: schedulingInfo,
-			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+			newObj: func() *resourceapi.PodSchedulingContext {
 				scheduling := schedulingInfo.DeepCopy()
 				scheduling.Spec.SelectedNode = workerNode.Name
 				return scheduling
@@ -1729,9 +1601,9 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		},
 		"backoff-other-changes": {
 			pod:    podWithClaimTemplateInStatus,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			claims: []*resourceapi.ResourceClaim{pendingClaim},
 			oldObj: schedulingInfo,
-			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+			newObj: func() *resourceapi.PodSchedulingContext {
 				scheduling := schedulingInfo.DeepCopy()
 				scheduling.Finalizers = append(scheduling.Finalizers, "foo")
 				return scheduling
@@ -1745,7 +1617,11 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
-			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings, nil)
+			features := feature.Features{
+				EnableDynamicResourceAllocation: true,
+				EnableDRAControlPlaneController: true,
+			}
+			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings, nil, features)
 			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)

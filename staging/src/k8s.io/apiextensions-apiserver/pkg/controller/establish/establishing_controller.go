@@ -24,7 +24,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -131,13 +133,29 @@ func (ec *EstablishingController) sync(key string) error {
 	}
 
 	crd := cachedCRD.DeepCopy()
-	establishedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
-		Type:    apiextensionsv1.Established,
-		Status:  apiextensionsv1.ConditionTrue,
-		Reason:  "InitialNamesAccepted",
-		Message: "the initial names have been accepted",
+
+	// If the conversion webhook CABundle is invalid, set Established
+	// condition to false and provide a reason
+	if cachedCRD.Spec.Conversion != nil &&
+		cachedCRD.Spec.Conversion.Webhook != nil &&
+		cachedCRD.Spec.Conversion.Webhook.ClientConfig != nil &&
+		len(webhook.ValidateCABundle(field.NewPath(""), cachedCRD.Spec.Conversion.Webhook.ClientConfig.CABundle)) > 0 {
+		errorCondition := apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Established,
+			Status:  apiextensionsv1.ConditionFalse,
+			Reason:  "InvalidCABundle",
+			Message: "The conversion webhook CABundle is invalid",
+		}
+		apiextensionshelpers.SetCRDCondition(crd, errorCondition)
+	} else {
+		establishedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Established,
+			Status:  apiextensionsv1.ConditionTrue,
+			Reason:  "InitialNamesAccepted",
+			Message: "the initial names have been accepted",
+		}
+		apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 	}
-	apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 
 	// Update server with new CRD condition.
 	_, err = ec.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})

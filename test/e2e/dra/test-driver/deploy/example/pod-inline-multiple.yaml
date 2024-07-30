@@ -6,7 +6,7 @@ metadata:
 data:
   a: b
 ---
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1alpha3
 kind: ResourceClaimTemplate
 metadata:
   name: pause-template
@@ -41,8 +41,6 @@ spec:
       - name: resource2
   resourceClaims:
   - name: resource1
-    source:
-      resourceClaimTemplateName: pause-template
+    resourceClaimTemplateName: pause-template
   - name: resource2
-    source:
-      resourceClaimTemplateName: pause-template
+    resourceClaimTemplateName: pause-template

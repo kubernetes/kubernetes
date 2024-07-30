@@ -118,6 +118,7 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostn
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		forwardHealthCheckVip: true,
 		mapStaleLoadbalancers: make(map[string]bool),
+		terminatedEndpoints:   make(map[string]bool),
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
@@ -680,6 +681,291 @@ func TestCreateLoadBalancer(t *testing.T) {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
 		}
 	}
+}
+
+func TestUpdateLoadBalancerWhenSupported(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+	}
+
+	proxier.supportedFeatures.ModifyLoadbalancer = true
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+		}
+	}
+
+	proxier.setInitialized(false)
+
+	proxier.OnEndpointSliceUpdate(
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epPaAddress},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}))
+
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.mu.Unlock()
+
+	proxier.setInitialized(true)
+
+	epObj, err := proxier.hcn.GetEndpointByID("EPID-3")
+	if err != nil || epObj == nil {
+		t.Errorf("Failed to fetch endpoint: EPID-3")
+	}
+
+	proxier.syncProxyRules()
+
+	// The endpoint should be deleted as it is not present in the new endpoint slice
+	epObj, err = proxier.hcn.GetEndpointByID("EPID-3")
+	if err == nil || epObj != nil {
+		t.Errorf("Failed to fetch endpoint: EPID-3")
+	}
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+
+	epObj, err = proxier.hcn.GetEndpointByID("EPID-5")
+	if err != nil || epObj == nil {
+		t.Errorf("Failed to fetch endpoint: EPID-5")
+	}
+
+	if !ok {
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
+
+	} else {
+		if epInfo.hnsID != "EPID-5" {
+			t.Errorf("%v does not match %v", epInfo.hnsID, "EPID-5")
+		}
+	}
+
+	if *epInfo.refCount != 1 {
+		t.Errorf("Incorrect refcount. Current value: %v", *epInfo.refCount)
+	}
+
+	if *proxier.endPointsRefCount["EPID-5"] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
+	}
+
+	svc = proxier.svcPortMap[svcPortName]
+	svcInfo, ok = svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		// Loadbalancer id should not change after the update
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+		}
+	}
+
+}
+
+func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+	}
+
+	// By default the value is false, for the readibility of the test case setting it to false again
+	proxier.supportedFeatures.ModifyLoadbalancer = false
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+		}
+	}
+
+	proxier.setInitialized(false)
+
+	proxier.OnEndpointSliceUpdate(
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epPaAddress},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}))
+
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.mu.Unlock()
+
+	proxier.setInitialized(true)
+
+	epObj, err := proxier.hcn.GetEndpointByID("EPID-3")
+	if err != nil || epObj == nil {
+		t.Errorf("Failed to fetch endpoint: EPID-3")
+	}
+
+	proxier.syncProxyRules()
+
+	// The endpoint should be deleted as it is not present in the new endpoint slice
+	epObj, err = proxier.hcn.GetEndpointByID("EPID-3")
+	if err == nil || epObj != nil {
+		t.Errorf("Failed to fetch endpoint: EPID-3")
+	}
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+
+	epObj, err = proxier.hcn.GetEndpointByID("EPID-5")
+	if err != nil || epObj == nil {
+		t.Errorf("Failed to fetch endpoint: EPID-5")
+	}
+
+	if !ok {
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
+
+	} else {
+		if epInfo.hnsID != "EPID-5" {
+			t.Errorf("%v does not match %v", epInfo.hnsID, "EPID-5")
+		}
+	}
+
+	if *epInfo.refCount != 1 {
+		t.Errorf("Incorrect refcount. Current value: %v", *epInfo.refCount)
+	}
+
+	if *proxier.endPointsRefCount["EPID-5"] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
+	}
+
+	svc = proxier.svcPortMap[svcPortName]
+	svcInfo, ok = svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		// Loadbalancer id should change after the update
+		if svcInfo.hnsID != "LBID-3" {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, "LBID-3")
+		}
+	}
+
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {

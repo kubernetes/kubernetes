@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "coordination.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "LeaseCandidate",
+      "name": "leasecandidates",
+      "namespaced": true,
+      "singularName": "leasecandidate",
+      "storageVersionHash": "VM2ILh8OBCI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

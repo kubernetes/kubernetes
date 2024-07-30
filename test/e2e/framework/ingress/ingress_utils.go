@@ -775,7 +775,7 @@ func (j *TestJig) WaitForIngress(ctx context.Context, waitForNodePort bool) {
 
 // WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
 func (j *TestJig) WaitForIngressToStable(ctx context.Context) {
-	if err := wait.PollWithContext(ctx, 10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client), func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client), false, func(ctx context.Context) (bool, error) {
 		_, err := j.GetDistinctResponseFromIngress(ctx)
 		if err != nil {
 			return false, nil

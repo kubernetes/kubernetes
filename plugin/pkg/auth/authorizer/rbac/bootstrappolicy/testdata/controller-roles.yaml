@@ -416,6 +416,13 @@ items:
     verbs:
     - update
   - apiGroups:
+    - ""
+    resources:
+    - pods/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
     - '*'
     resources:
     - '*/scale'
@@ -428,13 +435,6 @@ items:
     - events
     verbs:
     - create
-    - patch
-    - update
-  - apiGroups:
-    - ""
-    resources:
-    - pods/status
-    verbs:
     - patch
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
@@ -930,6 +930,7 @@ items:
     - pods
     verbs:
     - delete
+    - get
     - list
   - apiGroups:
     - ""
@@ -940,12 +941,6 @@ items:
     - create
     - patch
     - update
-  - apiGroups:
-    - ""
-    resources:
-    - pods
-    verbs:
-    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

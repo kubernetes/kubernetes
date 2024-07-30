@@ -57,12 +57,12 @@ func (pl *InterPodAffinity) Name() string {
 
 // EventsToRegister returns the possible events that may make a failed Pod
 // schedulable
-func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
 		// deleting an existing Pod may make it schedulable.
-		// - Update. Updating on an existing Pod's labels (e.g., removal) may make
+		// - UpdatePodLabel. Updating on an existing Pod's labels (e.g., removal) may make
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
@@ -75,9 +75,9 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint 
 		// As a workaround, we add UpdateNodeTaint event to catch the case.
 		// We can remove UpdateNodeTaint when we remove the preCheck feature.
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add | framework.UpdatePodLabel | framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 // New initializes a new plugin and returns it.

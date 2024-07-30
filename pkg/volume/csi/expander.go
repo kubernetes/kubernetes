@@ -119,6 +119,11 @@ func (c *csiPlugin) nodeExpandWithClient(
 			failedConditionErr := fmt.Errorf("Expander.NodeExpand failed to expand the volume : %w", volumetypes.NewFailedPreconditionError(err.Error()))
 			return false, failedConditionErr
 		}
+
+		if isInfeasibleError(err) {
+			infeasibleError := volumetypes.NewInfeasibleError(fmt.Sprintf("Expander.NodeExpand failed to expand the volume %s", err.Error()))
+			return false, infeasibleError
+		}
 		return false, fmt.Errorf("Expander.NodeExpand failed to expand the volume : %w", err)
 	}
 	return true, nil
@@ -134,4 +139,26 @@ func inUseError(err error) bool {
 	// of in-use volumes
 	// More info - https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerexpandvolume-errors
 	return st.Code() == codes.FailedPrecondition
+}
+
+// IsInfeasibleError returns true for grpc errors that are considered terminal in a way
+// that they indicate CSI operation as infeasible.
+// This function returns a subset of final errors. All infeasible errors are also final errors.
+func isInfeasibleError(err error) bool {
+	st, ok := status.FromError(err)
+	if !ok {
+		// This is not gRPC error. The operation must have failed before gRPC
+		// method was called, otherwise we would get gRPC error.
+		// We don't know if any previous volume operation is in progress, be on the safe side.
+		return false
+	}
+	switch st.Code() {
+	case codes.InvalidArgument,
+		codes.OutOfRange,
+		codes.NotFound:
+		return true
+	}
+	// All other errors mean that operation either did not
+	// even start or failed. It is for sure are not infeasible errors
+	return false
 }

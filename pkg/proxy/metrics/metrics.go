@@ -299,8 +299,12 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 
 		switch mode {
 		case kubeproxyconfig.ProxyModeIPTables:
-			legacyregistry.CustomMustRegister(iptablesCTStateInvalidDroppedMetricCollector)
-			legacyregistry.CustomMustRegister(localhostNodePortsAcceptedMetricsCollector)
+			if iptablesCTStateInvalidDroppedMetricCollector != nil {
+				legacyregistry.CustomMustRegister(iptablesCTStateInvalidDroppedMetricCollector)
+			}
+			if localhostNodePortsAcceptedMetricsCollector != nil {
+				legacyregistry.CustomMustRegister(localhostNodePortsAcceptedMetricsCollector)
+			}
 			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
@@ -312,6 +316,8 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
+			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
+			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
 
@@ -332,6 +338,7 @@ func newNFAcctMetricCollector(counter string, description *metrics.Desc) *nfacct
 	client, err := nfacct.New()
 	if err != nil {
 		klog.ErrorS(err, "failed to initialize nfacct client")
+		return nil
 	}
 	return &nfacctMetricCollector{
 		client:      client,

@@ -34,13 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podapi "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestEviction(t *testing.T) {
@@ -165,8 +162,6 @@ func TestEviction(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)
-
 				// same test runs multiple times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
 				var pdbsCopy []runtime.Object
@@ -530,8 +525,6 @@ func TestEvictionIgnorePDB(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)
-
 				// same test runs 3 times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
 				prcCopy := tc.prc.DeepCopy()
@@ -806,46 +799,42 @@ func TestAddConditionAndDelete(t *testing.T) {
 	evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 
 	for _, tc := range cases {
-		for _, conditionsEnabled := range []bool{true, false} {
-			name := fmt.Sprintf("%s_conditions=%v", tc.name, conditionsEnabled)
-			t.Run(name, func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)
-				var deleteOptions *metav1.DeleteOptions
-				if tc.initialPod {
-					newPod := validNewPod()
-					createdObj, err := storage.Create(testContext, newPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-					if err != nil {
+		t.Run(tc.name, func(t *testing.T) {
+			var deleteOptions *metav1.DeleteOptions
+			if tc.initialPod {
+				newPod := validNewPod()
+				createdObj, err := storage.Create(testContext, newPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					zero := int64(0)
+					if _, _, err := storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil && !apierrors.IsNotFound(err) {
 						t.Fatal(err)
 					}
-					t.Cleanup(func() {
-						zero := int64(0)
-						if _, _, err := storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil && !apierrors.IsNotFound(err) {
-							t.Fatal(err)
-						}
-					})
-					deleteOptions = tc.makeDeleteOptions(createdObj.(*api.Pod))
-				} else {
-					deleteOptions = tc.makeDeleteOptions(nil)
-				}
-				if deleteOptions == nil {
-					deleteOptions = &metav1.DeleteOptions{}
-				}
+				})
+				deleteOptions = tc.makeDeleteOptions(createdObj.(*api.Pod))
+			} else {
+				deleteOptions = tc.makeDeleteOptions(nil)
+			}
+			if deleteOptions == nil {
+				deleteOptions = &metav1.DeleteOptions{}
+			}
 
-				err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
-				if err == nil {
-					if tc.expectErr != "" {
-						t.Fatalf("expected err containing %q, got none", tc.expectErr)
-					}
-					return
+			err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
+			if err == nil {
+				if tc.expectErr != "" {
+					t.Fatalf("expected err containing %q, got none", tc.expectErr)
 				}
-				if tc.expectErr == "" {
-					t.Fatalf("unexpected err: %v", err)
-				}
-				if !strings.Contains(err.Error(), tc.expectErr) {
-					t.Fatalf("expected err containing %q, got %v", tc.expectErr, err)
-				}
-			})
-		}
+				return
+			}
+			if tc.expectErr == "" {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if !strings.Contains(err.Error(), tc.expectErr) {
+				t.Fatalf("expected err containing %q, got %v", tc.expectErr, err)
+			}
+		})
 	}
 }
 

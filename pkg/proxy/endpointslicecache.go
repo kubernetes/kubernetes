@@ -235,7 +235,8 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 			}
 		}
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal,
+		endpointIP := utilnet.ParseIPSloppy(endpoint.Addresses[0]).String()
+		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
 			ready, serving, terminating, zoneHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints

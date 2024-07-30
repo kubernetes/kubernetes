@@ -29,15 +29,14 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -83,7 +82,7 @@ func validateCounterMetric(ctx context.Context, t *testing.T, counterVec *baseme
 		cmpErr = nil
 		value, err := testutil.GetCounterMetricValue(counterVec.WithLabelValues(wantMetric.Labels...))
 		if err != nil {
-			return true, fmt.Errorf("collecting the %q metric: %q", counterVec.Name, err)
+			return true, fmt.Errorf("collecting the %q metric: %w", counterVec.Name, err)
 		}
 		if wantMetric.Value != int(value) {
 			cmpErr = fmt.Errorf("Unexpected metric delta for %q metric with labels %q. want: %v, got: %v", counterVec.Name, wantMetric.Labels, wantMetric.Value, int(value))
@@ -92,7 +91,7 @@ func validateCounterMetric(ctx context.Context, t *testing.T, counterVec *baseme
 		return true, nil
 	})
 	if err != nil {
-		t.Errorf("Failed waiting for expected metric: %q", err)
+		t.Errorf("Failed waiting for expected metric: %v", err)
 	}
 	if cmpErr != nil {
 		t.Error(cmpErr)
@@ -119,7 +118,7 @@ func validateTerminatedPodsTrackingFinalizerMetric(ctx context.Context, t *testi
 // Note: this scenario requires the use of finalizers. Without finalizers there is no guarantee a failed pod would be
 // checked against the pod failure policy rules before its removal by PodGC.
 func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testing.T) {
-	count := 3
+	count := int32(3)
 	job := batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
@@ -134,8 +133,8 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 					},
 				},
 			},
-			Parallelism: ptr.To(int32(count)),
-			Completions: ptr.To(int32(count)),
+			Parallelism: &count,
+			Completions: &count,
 			PodFailurePolicy: &batchv1.PodFailurePolicy{
 				Rules: []batchv1.PodFailurePolicyRule{
 					{
@@ -162,7 +161,6 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 			},
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, true)
 	closeFn, restConfig, cs, ns := setup(t, "simple")
 	defer closeFn()
 
@@ -183,7 +181,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 		t.Fatalf("Failed to create Job: %v", err)
 	}
 	validateJobPodsStatus(ctx, t, cs, jobObj, podsByStatus{
-		Active:      count,
+		Active:      int(count),
 		Ready:       ptr.To[int32](0),
 		Terminating: ptr.To[int32](0),
 	})
@@ -344,7 +342,6 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	testCases := map[string]struct {
-		enableJobPodFailurePolicy                bool
 		restartController                        bool
 		job                                      batchv1.Job
 		podStatus                                v1.PodStatus
@@ -354,13 +351,12 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		wantJobFinishedMetric                    metricLabelsWithValue
 		wantPodFailuresHandledByPolicyRuleMetric *metricLabelsWithValue
 	}{
-		"pod status matching the configured FailJob rule on exit codes; job terminated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                0,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobFailed,
+		"pod status matching the configured FailJob rule on exit codes; job terminated": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
 				Value:  1,
@@ -370,56 +366,41 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"pod status matching the configured FailJob rule on exit codes; with controller restart; job terminated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			restartController:         true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                0,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobFailed,
+		"pod status matching the configured FailJob rule on exit codes; with controller restart; job terminated": {
+			restartController:    true,
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
 				Value:  1,
 			},
 		},
-		"pod status matching the configured FailJob rule on exit codes; default handling when JobPodFailurePolicy disabled": {
-			enableJobPodFailurePolicy: false,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
-			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
-				Value:  1,
-			},
-		},
-		"pod status matching the configured Ignore rule on pod conditions; pod failure not counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnPodConditionsIgnoreRule,
-			wantActive:                1,
-			wantFailed:                0,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status matching the configured Ignore rule on pod conditions; pod failure not counted": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnPodConditionsIgnoreRule,
+			wantActive:           1,
+			wantFailed:           0,
+			wantJobConditionType: batchv1.JobComplete,
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
 				Labels: []string{"Ignore"},
 				Value:  1,
 			},
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 		},
-		"pod status matching the configured Count rule on exit codes; pod failure counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesCountRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status matching the configured Count rule on exit codes; pod failure counted": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesCountRule,
+			wantActive:           1,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
@@ -427,15 +408,14 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"pod status non-matching any configured rule; pod failure counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusNotMatchingAnyRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status non-matching any configured rule; pod failure counted": {
+			job:                  job,
+			podStatus:            podStatusNotMatchingAnyRule,
+			wantActive:           1,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
@@ -447,7 +427,6 @@ func TestJobPodFailurePolicy(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, test.enableJobPodFailurePolicy)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
@@ -471,8 +450,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				return true
 			}
 
-			if err, _ := updateJobPodsStatus(ctx, clientSet, jobObj, op, 1); err != nil {
-				t.Fatalf("Error %q while updating pod status for Job: %q", err, jobObj.Name)
+			if _, err := updateJobPodsStatus(ctx, clientSet, jobObj, op, 1); err != nil {
+				t.Fatalf("Error %q while updating pod status for Job: %v", err, jobObj.Name)
 			}
 
 			if test.restartController {
@@ -488,8 +467,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			})
 
 			if test.wantJobConditionType == batchv1.JobComplete {
-				if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
-					t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+				if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+					t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
 				}
 			}
 			validateJobCondition(ctx, t, clientSet, jobObj, test.wantJobConditionType)
@@ -562,13 +541,13 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "0",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
@@ -597,13 +576,44 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "0",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
 					Labels: []string{"Indexed", "succeeded", ""},
+					Value:  1,
+				},
+			},
+		},
+		"job without successPolicy; incremented the jobs_finished_total metric with CompletionsReached reason": {
+			enableJobSuccessPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](1),
+					Completions:    ptr.To[int32](1),
+					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			podTerminations: []podTerminationWithExpectations{
+				{
+					index: 0,
+					status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
+					wantActive:           0,
+					wantFailed:           0,
+					wantSucceeded:        1,
+					wantCompletedIndexes: "0",
+					wantTerminating:      ptr.To[int32](0),
+				},
+			},
+			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
+			wantJobFinishedNumMetric: []metricLabelsWithValue{
+				{
+					Labels: []string{"Indexed", "succeeded", "CompletionsReached"},
 					Value:  1,
 				},
 			},
@@ -633,7 +643,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantActiveIndexes: sets.New(0, 1),
 					wantFailed:        0,
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -644,13 +654,13 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(1)),
+					wantTerminating:      ptr.To[int32](1),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
@@ -680,7 +690,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantActiveIndexes: sets.New(0, 1),
 					wantFailed:        0,
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -691,13 +701,13 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(1)),
+					wantTerminating:      ptr.To[int32](1),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
@@ -730,7 +740,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:        1,
 					wantFailedIndexes: ptr.To("0"),
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -742,7 +752,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantSucceeded:        1,
 					wantFailedIndexes:    ptr.To("0"),
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobFailed},
@@ -1034,8 +1044,8 @@ func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1), "", ptr.To("2"))
 
 	// mark remaining pods are Succeeded and verify Job status
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
-		t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
+		t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
 	}
 	validateJobFailed(ctx, t, clientSet, jobObj)
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
@@ -1162,6 +1172,389 @@ func TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff(t *testing.T)
 	}
 }
 
+// TestDelayTerminalPhaseCondition tests the fix for Job controller to delay
+// setting the terminal phase conditions (Failed and Complete) until all Pods
+// are terminal. The fate of the Job is indicated by the interim Job conditions:
+// FailureTarget, or SuccessCriteriaMet.
+func TestDelayTerminalPhaseCondition(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+
+	podTemplateSpec := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"fake.example.com/blockDeletion"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:                     "main-container",
+					Image:                    "foo",
+					ImagePullPolicy:          v1.PullIfNotPresent,
+					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+				},
+			},
+		},
+	}
+	failOnePod := func(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job) {
+		if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+			t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodFailed, err)
+		}
+	}
+	succeedOnePodAndScaleDown := func(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job) {
+		// mark one pod as succeeded
+		if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 0); err != nil {
+			t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
+		}
+		jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+		if _, err := updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+			j.Spec.Parallelism = ptr.To[int32](1)
+			j.Spec.Completions = ptr.To[int32](1)
+		}); err != nil {
+			t.Fatalf("Unexpected error when scaling down the job: %v", err)
+		}
+	}
+
+	testCases := map[string]struct {
+		enableJobManagedBy            bool
+		enableJobPodReplacementPolicy bool
+		enableJobSuccessPolicy        bool
+
+		job                batchv1.Job
+		action             func(context.Context, clientset.Interface, *batchv1.Job)
+		wantInterimStatus  *batchv1.JobStatus
+		wantTerminalStatus batchv1.JobStatus
+	}{
+		"job backoff limit exceeded; JobPodReplacementPolicy and JobManagedBy disabled": {
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](2),
+					Template:     podTemplateSpec,
+					BackoffLimit: ptr.To[int32](0),
+				},
+			},
+			action: failOnePod,
+			wantTerminalStatus: batchv1.JobStatus{
+				Failed: 2,
+				Ready:  ptr.To[int32](0),
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+				},
+			},
+		},
+		"job backoff limit exceeded; JobPodReplacementPolicy enabled": {
+			enableJobPodReplacementPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](2),
+					Template:     podTemplateSpec,
+					BackoffLimit: ptr.To[int32](0),
+				},
+			},
+			action: failOnePod,
+			wantInterimStatus: &batchv1.JobStatus{
+				Failed:      2,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](1),
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailureTarget,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Failed:      2,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailureTarget,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+					{
+						Type:   batchv1.JobFailed,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+				},
+			},
+		},
+		"job backoff limit exceeded; JobManagedBy enabled": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](2),
+					Template:     podTemplateSpec,
+					BackoffLimit: ptr.To[int32](0),
+				},
+			},
+			action: failOnePod,
+			wantInterimStatus: &batchv1.JobStatus{
+				Failed: 2,
+				Ready:  ptr.To[int32](0),
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailureTarget,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Failed: 2,
+				Ready:  ptr.To[int32](0),
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailureTarget,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+					{
+						Type:   batchv1.JobFailed,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonBackoffLimitExceeded,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobPodReplacementPolicy and JobManagedBy disabled": {
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobPodReplacementPolicy enabled": {
+			enableJobPodReplacementPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](1),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobManagedBy enabled": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobManagedBy and JobSuccessPolicy are enabled": {
+			enableJobManagedBy:     true,
+			enableJobSuccessPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobPodReplacementPolicy and JobSuccessPolicy are enabled": {
+			enableJobPodReplacementPolicy: true,
+			enableJobSuccessPolicy:        true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](1),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			resetMetrics()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, test.enableJobSuccessPolicy)
+
+			closeFn, restConfig, clientSet, ns := setup(t, "delay-terminal-condition")
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &test.job)
+			if err != nil {
+				t.Fatalf("Error %q while creating the job %q", err, jobObj.Name)
+			}
+			t.Cleanup(func() { removePodsFinalizer(ctx, t, clientSet, ns.Name) })
+			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+			waitForPodsToBeActive(ctx, t, jobClient, *jobObj.Spec.Parallelism, jobObj)
+
+			test.action(ctx, clientSet, jobObj)
+			if test.wantInterimStatus != nil {
+				validateJobStatus(ctx, t, clientSet, jobObj, *test.wantInterimStatus)
+
+				// Set terminal phase to all the remaining pods to simulate
+				// Kubelet (or other components like PodGC).
+				jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(s v1.PodStatus) bool {
+					return (s.Phase == v1.PodPending || s.Phase == v1.PodRunning)
+				})
+				if err != nil {
+					t.Fatalf("Failed to list Job Pods: %v", err)
+				}
+				if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, len(jobPods)); err != nil {
+					t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
+				}
+			}
+			validateJobStatus(ctx, t, clientSet, jobObj, test.wantTerminalStatus)
+		})
+	}
+}
+
 // TestBackoffLimitPerIndex tests handling of job and its pods when
 // backoff limit per index is used.
 func TestBackoffLimitPerIndex(t *testing.T) {
@@ -1218,7 +1611,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobComplete,
@@ -1249,7 +1642,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 				{
 					status: v1.PodStatus{
@@ -1260,7 +1653,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(2),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 				{
 					status: v1.PodStatus{
@@ -1270,7 +1663,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        3,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1306,7 +1699,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(0, 1, 2),
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1317,7 +1710,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        2,
 					wantActiveIndexes: sets.New(0, 1, 2),
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 2,
@@ -1326,7 +1719,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					},
 					wantFailed:        5,
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(2)),
+					wantTerminating:   ptr.To[int32](2),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1361,7 +1754,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1372,7 +1765,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantSucceeded:        1,
 					wantFailedIndexes:    ptr.To("0"),
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1408,7 +1801,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1, 2),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1418,7 +1811,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActive:        0,
 					wantFailed:        3,
 					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To(int32(1)),
+					wantTerminating:   ptr.To[int32](1),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1478,7 +1871,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1493,7 +1886,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					},
 					wantFailed:        2,
 					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1508,7 +1901,6 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
@@ -1529,11 +1921,11 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 			for _, podTermination := range test.podTerminations {
 				pod, err := getActivePodForIndex(ctx, clientSet, jobObj, podTermination.index)
 				if err != nil {
-					t.Fatalf("listing Job Pods: %q", err)
+					t.Fatalf("listing Job Pods: %v", err)
 				}
 				pod.Status = podTermination.status
 				if _, err = clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
-					t.Fatalf("Error updating the pod %q: %q", klog.KObj(pod), err)
+					t.Fatalf("Error updating the pod %q: %v", klog.KObj(pod), err)
 				}
 				validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 					Active:      podTermination.wantActive,
@@ -1560,8 +1952,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 
 			remainingActive := test.podTerminations[len(test.podTerminations)-1].wantActive
 			if remainingActive > 0 {
-				if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remainingActive); err != nil {
-					t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+				if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remainingActive); err != nil {
+					t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
 				}
 			}
 			validateJobCondition(ctx, t, clientSet, jobObj, test.wantJobConditionType)
@@ -1789,7 +2181,7 @@ func TestManagedBy_Reenabling(t *testing.T) {
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 
 	// Marking the pod as finished, but it does not result in updating of the Job status.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
 		t.Fatalf("Error %v when setting phase %s on the pod of job %v", err, v1.PodSucceeded, klog.KObj(jobObj))
 	}
 
@@ -1855,7 +2247,7 @@ func TestManagedBy_RecreatedJob(t *testing.T) {
 	})
 
 	// Marking the pod as complete queues the job reconciliation
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
 		t.Fatalf("Error %v when setting phase %s on the pod of job %v", err, v1.PodSucceeded, klog.KObj(jobObj))
 	}
 
@@ -1968,16 +2360,14 @@ func TestManagedBy_UsingReservedJobFinalizers(t *testing.T) {
 		t.Fatalf("Error %v when marking the %q pod as succeeded", err, klog.KObj(podObj))
 	}
 
-	// Mark the job as finished so that the built-in controller receives the
+	// Trigger termination for the Job so that the built-in controller receives the
 	// UpdateJob event in reaction to each it would remove the pod's finalizer,
 	// if not for the custom managedBy field.
 	jobObj.Status.Conditions = append(jobObj.Status.Conditions, batchv1.JobCondition{
-		Type:   batchv1.JobComplete,
+		Type:   batchv1.JobSuccessCriteriaMet,
 		Status: v1.ConditionTrue,
 	})
 	jobObj.Status.StartTime = ptr.To(metav1.Now())
-	jobObj.Status.CompletionTime = ptr.To(metav1.Now())
-
 	if jobObj, err = clientSet.BatchV1().Jobs(jobObj.Namespace).UpdateStatus(ctx, jobObj, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Error %v when updating the job as finished %v", err, klog.KObj(jobObj))
 	}
@@ -2053,7 +2443,7 @@ func TestNonParallelJob(t *testing.T) {
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 
 	// Failed Pod is replaced.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodFailed, err)
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -2072,7 +2462,7 @@ func TestNonParallelJob(t *testing.T) {
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 
 	// No more Pods are created after the Pod succeeds.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
 	}
 	validateJobComplete(ctx, t, clientSet, jobObj)
@@ -2084,7 +2474,7 @@ func TestNonParallelJob(t *testing.T) {
 	})
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2117,14 +2507,14 @@ func TestParallelJob(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
 	// Tracks ready pods, if enabled.
-	if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 2); err != nil {
+	if _, err := setJobPodsReady(ctx, clientSet, jobObj, 2); err != nil {
 		t.Fatalf("Failed Marking Pods as ready: %v", err)
 	}
 	want.Ready = ptr.To[int32](2)
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
 	// Failed Pods are replaced.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 	}
 	want = podsByStatus{
@@ -2135,7 +2525,7 @@ func TestParallelJob(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	// Once one Pod succeeds, no more Pods are created, even if some fail.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
 	}
 	want = podsByStatus{
@@ -2146,7 +2536,7 @@ func TestParallelJob(t *testing.T) {
 		Terminating: ptr.To[int32](0),
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 	}
 	want = podsByStatus{
@@ -2158,7 +2548,7 @@ func TestParallelJob(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	// No more Pods are created after remaining Pods succeed.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
 	}
 	validateJobComplete(ctx, t, clientSet, jobObj)
@@ -2172,7 +2562,7 @@ func TestParallelJob(t *testing.T) {
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateTerminatedPodsTrackingFinalizerMetric(ctx, t, 7)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2231,8 +2621,8 @@ func TestParallelJobChangingParallelism(t *testing.T) {
 	})
 
 	// Succeed Job
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 4); err != nil {
-		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 4); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
 	}
 	validateJobComplete(ctx, t, clientSet, jobObj)
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -2271,14 +2661,14 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	// Tracks ready pods, if enabled.
-	if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 52); err != nil {
+	if _, err := setJobPodsReady(ctx, clientSet, jobObj, 52); err != nil {
 		t.Fatalf("Failed Marking Pods as ready: %v", err)
 	}
 	want.Ready = ptr.To[int32](52)
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
 	// Failed Pods are replaced.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 	}
 	want = podsByStatus{
@@ -2289,7 +2679,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	// Pods are created until the number of succeeded Pods equals completions.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 53); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 53); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
 	}
 	want = podsByStatus{
@@ -2301,7 +2691,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	// No more Pods are created after the Job completes.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
 	}
 	validateJobComplete(ctx, t, clientSet, jobObj)
@@ -2314,7 +2704,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2391,7 +2781,7 @@ func TestIndexedJob(t *testing.T) {
 	})
 
 	// Remaining Pods succeed.
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
 		t.Fatal("Failed trying to succeed remaining pods")
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -2410,7 +2800,7 @@ func TestIndexedJob(t *testing.T) {
 		Value:  4,
 	})
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"Indexed", "succeeded", ""},
+		Labels: []string{"Indexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2621,7 +3011,6 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 			t.Cleanup(closeFn)
@@ -2756,25 +3145,10 @@ func TestElasticIndexedJob(t *testing.T) {
 		wantTerminating      *int32
 	}
 	cases := map[string]struct {
-		featureGate bool
-		jobUpdates  []jobUpdate
-		wantErr     *apierrors.StatusError
+		jobUpdates []jobUpdate
+		wantErr    *apierrors.StatusError
 	}{
-		"feature flag off, mutation not allowed": {
-			jobUpdates: []jobUpdate{
-				{
-					completions:     ptr.To[int32](4),
-					wantTerminating: ptr.To[int32](0),
-				},
-			},
-			wantErr: apierrors.NewInvalid(
-				schema.GroupKind{Group: "batch", Kind: "Job"},
-				"test-job",
-				field.ErrorList{field.Invalid(field.NewPath("spec", "completions"), 4, "field is immutable")},
-			),
-		},
 		"scale up": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				{
 					// Scale up completions 3->4 then succeed indexes 0-3
@@ -2786,7 +3160,6 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"scale down": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				// First succeed index 1 and fail index 2 while completions is still original value (3).
 				{
@@ -2810,7 +3183,6 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"index finishes successfully, scale down, scale up": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				// First succeed index 2 while completions is still original value (3).
 				{
@@ -2837,11 +3209,10 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"scale down to 0, verify that the job succeeds": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				{
 					completions:     ptr.To[int32](0),
-					wantTerminating: ptr.To[int32](3),
+					wantTerminating: ptr.To[int32](0),
 				},
 			},
 		},
@@ -2850,7 +3221,6 @@ func TestElasticIndexedJob(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, tc.featureGate)
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -2993,7 +3363,7 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 				})
 				remaining := int(tc.nPods)
 				if err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
-					if err, succ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remaining); err != nil {
+					if succ, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remaining); err != nil {
 						remaining -= succ
 						b.Logf("Transient failure succeeding pods: %v", err)
 						return false, nil
@@ -3086,7 +3456,7 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 				b.StartTimer()
 				remaining := int(tc.nPods)
 				if err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
-					if err, fail := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, remaining); err != nil {
+					if fail, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, remaining); err != nil {
 						remaining -= fail
 						b.Logf("Transient failure failing pods: %v", err)
 						return false, nil
@@ -3205,7 +3575,7 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 
 	// Fail a pod ASAP.
 	err = wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
-		if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+		if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 			return false, nil
 		}
 		return true, nil
@@ -3241,7 +3611,7 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 	})
 
 	// Fail the first pod
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodFailed, err)
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -3252,7 +3622,7 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 	})
 
 	// Fail the second pod
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodFailed, err)
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -3341,12 +3711,12 @@ func TestJobFailedWithInterrupts(t *testing.T) {
 		Terminating: ptr.To[int32](0),
 	})
 	t.Log("Finishing pods")
-	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 		t.Fatalf("Could not fail a pod: %v", err)
 	}
 	remaining := 9
 	if err := wait.PollUntilContextTimeout(ctx, 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
-		if err, succ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remaining); err != nil {
+		if succ, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remaining); err != nil {
 			remaining -= succ
 			t.Logf("Transient failure succeeding pods: %v", err)
 			return false, nil
@@ -3616,6 +3986,25 @@ func validateJobsPodsStatusOnlyWithTimeout(ctx context.Context, t testing.TB, cl
 	}
 }
 
+func validateJobStatus(ctx context.Context, t testing.TB, clientSet clientset.Interface, jobObj *batchv1.Job, wantStatus batchv1.JobStatus) {
+	t.Helper()
+	diff := ""
+	if err := wait.PollUntilContextTimeout(ctx, waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		gotJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get updated Job: %v, last status diff (-want,+got):\n%s", err, diff)
+		}
+		diff = cmp.Diff(wantStatus, gotJob.Status,
+			cmpopts.EquateEmpty(),
+			cmpopts.IgnoreFields(batchv1.JobStatus{}, "StartTime", "UncountedTerminatedPods", "CompletionTime"),
+			cmpopts.IgnoreFields(batchv1.JobCondition{}, "LastProbeTime", "LastTransitionTime", "Message"),
+		)
+		return diff == "", nil
+	}); err != nil {
+		t.Fatalf("Waiting for Job Status: %v\n, Status diff (-want,+got):\n%s", err, diff)
+	}
+}
+
 func validateJobPodsStatus(ctx context.Context, t testing.TB, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus) {
 	t.Helper()
 	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, desired)
@@ -3776,7 +4165,7 @@ func validateJobCondition(ctx context.Context, t testing.TB, clientSet clientset
 	}
 }
 
-func setJobPodsPhase(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, cnt int) (error, int) {
+func setJobPodsPhase(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, cnt int) (int, error) {
 	op := func(p *v1.Pod) bool {
 		p.Status.Phase = phase
 		if phase == v1.PodFailed || phase == v1.PodSucceeded {
@@ -3795,7 +4184,7 @@ func setJobPodsPhase(ctx context.Context, clientSet clientset.Interface, jobObj 
 	return updateJobPodsStatus(ctx, clientSet, jobObj, op, cnt)
 }
 
-func setJobPodsReady(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, cnt int) (error, int) {
+func setJobPodsReady(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, cnt int) (int, error) {
 	op := func(p *v1.Pod) bool {
 		if podutil.IsPodReady(p) {
 			return false
@@ -3809,10 +4198,10 @@ func setJobPodsReady(ctx context.Context, clientSet clientset.Interface, jobObj 
 	return updateJobPodsStatus(ctx, clientSet, jobObj, op, cnt)
 }
 
-func updateJobPodsStatus(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, op func(*v1.Pod) bool, cnt int) (error, int) {
+func updateJobPodsStatus(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, op func(*v1.Pod) bool, cnt int) (int, error) {
 	pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("listing Job Pods: %w", err), 0
+		return 0, fmt.Errorf("listing Job Pods: %w", err)
 	}
 	updates := make([]v1.Pod, 0, cnt)
 	for _, pod := range pods.Items {
@@ -3828,9 +4217,9 @@ func updateJobPodsStatus(ctx context.Context, clientSet clientset.Interface, job
 	}
 	successful, err := updatePodStatuses(ctx, clientSet, updates)
 	if successful != cnt {
-		return fmt.Errorf("couldn't set phase on %d Job pods", cnt-successful), successful
+		return successful, fmt.Errorf("couldn't set phase on %d Job pods", cnt-successful)
 	}
-	return err, successful
+	return successful, err
 }
 
 func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updates []v1.Pod) (int, error) {

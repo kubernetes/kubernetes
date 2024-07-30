@@ -19,11 +19,11 @@ package podresources
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"sort"
 	"testing"
 
-	"go.uber.org/mock/gomock"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,9 +42,6 @@ func TestListPodResourcesV1(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
 	numaID := int64(1)
-
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 
 	devs := []*podresourcesapi.ContainerDevices{
 		{
@@ -88,12 +85,14 @@ func TestListPodResourcesV1(t *testing.T) {
 	}
 
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
+	draDriverName := "dra.example.com"
+	poolName := "worker-1-pool"
+	deviceName := "gpu-1"
 	draDevs := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
-			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices}},
+			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices, DriverName: draDriverName, PoolName: poolName, DeviceName: deviceName}},
 		},
 	}
 
@@ -215,21 +214,21 @@ func TestListPodResourcesV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
-			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
-			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(mockCtrl)
-			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(mockCtrl)
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
 
-			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).AnyTimes()
-			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
-			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).AnyTimes()
-			mockMemoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(tc.memory).AnyTimes()
-			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &containers[0]).Return(tc.dynamicResources).AnyTimes()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).AnyTimes()
-			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).AnyTimes()
-			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).AnyTimes()
+			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
+			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(tc.memory).Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &containers[0]).Return(tc.dynamicResources).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
@@ -243,8 +242,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if !equalListResponse(tc.expectedResponse, resp) {
-				t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
+			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
@@ -327,11 +326,11 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
@@ -377,11 +376,11 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			sidecarContainersEnabled: true,
@@ -429,12 +428,12 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
@@ -481,17 +480,17 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), initContainerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), initContainerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			sidecarContainersEnabled: true,
@@ -524,16 +523,13 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.SidecarContainers, tc.sidecarContainersEnabled)
 
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
 
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
-			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
-			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(mockCtrl)
-			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(mockCtrl)
-
-			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).AnyTimes()
+			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
 			tc.mockFunc(tc.pods, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider, mockDynamicResourcesProvider)
 
 			providers := PodResourcesProviders{
@@ -548,17 +544,14 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if !equalListResponse(tc.expectedResponse, resp) {
-				t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
+			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
 }
 
 func TestAllocatableResources(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	allDevs := []*podresourcesapi.ContainerDevices{
 		{
 			ResourceName: "resource",
@@ -688,6 +681,7 @@ func TestAllocatableResources(t *testing.T) {
 			desc:       "no devices, no CPUs, all memory",
 			allCPUs:    []int64{},
 			allDevices: []*podresourcesapi.ContainerDevices{},
+			allMemory:  allMemory,
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
 				Memory: allMemory,
 			},
@@ -815,18 +809,18 @@ func TestAllocatableResources(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
-			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
-			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(mockCtrl)
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
 
-			mockDevicesProvider.EXPECT().GetDevices("", "").Return([]*podresourcesapi.ContainerDevices{}).AnyTimes()
-			mockCPUsProvider.EXPECT().GetCPUs("", "").Return([]int64{}).AnyTimes()
-			mockMemoryProvider.EXPECT().GetMemory("", "").Return([]*podresourcesapi.ContainerMemory{}).AnyTimes()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return(tc.allDevices).AnyTimes()
-			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return(tc.allCPUs).AnyTimes()
-			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return(tc.allMemory).AnyTimes()
+			mockDevicesProvider.EXPECT().GetDevices("", "").Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockCPUsProvider.EXPECT().GetCPUs("", "").Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory("", "").Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return(tc.allDevices).Maybe()
+			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return(tc.allCPUs).Maybe()
+			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return(tc.allMemory).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:    mockPodsProvider,
@@ -841,8 +835,8 @@ func TestAllocatableResources(t *testing.T) {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
 
-			if !equalAllocatableResourcesResponse(tc.expectedAllocatableResourcesResponse, resp) {
-				t.Errorf("want resp = %s, got %s", tc.expectedAllocatableResourcesResponse.String(), resp.String())
+			if diff := cmp.Diff(tc.expectedAllocatableResourcesResponse, resp, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
@@ -857,9 +851,6 @@ func TestGetPodResourcesV1(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
 	numaID := int64(1)
-
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 
 	devs := []*podresourcesapi.ContainerDevices{
 		{
@@ -904,7 +895,6 @@ func TestGetPodResourcesV1(t *testing.T) {
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
 	draDevs := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
 			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices}},
@@ -984,21 +974,21 @@ func TestGetPodResourcesV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
-			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
-			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(mockCtrl)
-			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(mockCtrl)
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
 
-			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, tc.exist).AnyTimes()
-			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
-			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).AnyTimes()
-			mockMemoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(tc.memory).AnyTimes()
-			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &containers[0]).Return(tc.dynamicResources).AnyTimes()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).AnyTimes()
-			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).AnyTimes()
-			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).AnyTimes()
+			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, tc.exist).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
+			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(tc.memory).Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &containers[0]).Return(tc.dynamicResources).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
@@ -1019,8 +1009,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 				if err != tc.err {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				} else {
-					if !equalGetResponse(tc.expectedResponse, resp) {
-						t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
+					if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
+						t.Fatal(diff)
 					}
 				}
 			}
@@ -1105,11 +1095,11 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
@@ -1151,11 +1141,11 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			sidecarContainersEnabled: true,
@@ -1199,12 +1189,12 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
@@ -1247,17 +1237,17 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				cpusProvider *podresourcetest.MockCPUsProvider,
 				memoryProvider *podresourcetest.MockMemoryProvider,
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), initContainerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), initContainerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).AnyTimes()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).AnyTimes()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).AnyTimes()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).AnyTimes()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
+				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
 			sidecarContainersEnabled: true,
@@ -1288,16 +1278,13 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.SidecarContainers, tc.sidecarContainersEnabled)
 
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
+			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
+			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
+			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
 
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
-			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
-			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(mockCtrl)
-			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(mockCtrl)
-
-			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, true).AnyTimes()
+			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, true).Maybe()
 			tc.mockFunc(tc.pod, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider, mockDynamicResourcesProvider)
 
 			providers := PodResourcesProviders{
@@ -1313,185 +1300,9 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if !equalGetResponse(tc.expectedResponse, resp) {
-				t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
+			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
-}
-
-func equalListResponse(respA, respB *podresourcesapi.ListPodResourcesResponse) bool {
-	if len(respA.PodResources) != len(respB.PodResources) {
-		return false
-	}
-	for idx := 0; idx < len(respA.PodResources); idx++ {
-		podResA := respA.PodResources[idx]
-		podResB := respB.PodResources[idx]
-		if podResA.Name != podResB.Name {
-			return false
-		}
-		if podResA.Namespace != podResB.Namespace {
-			return false
-		}
-		if len(podResA.Containers) != len(podResB.Containers) {
-			return false
-		}
-		for jdx := 0; jdx < len(podResA.Containers); jdx++ {
-			cntA := podResA.Containers[jdx]
-			cntB := podResB.Containers[jdx]
-
-			if cntA.Name != cntB.Name {
-				return false
-			}
-			if !equalInt64s(cntA.CpuIds, cntB.CpuIds) {
-				return false
-			}
-
-			if !equalContainerDevices(cntA.Devices, cntB.Devices) {
-				return false
-			}
-
-			if !equalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func equalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) bool {
-	if len(draResA) != len(draResB) {
-		return false
-	}
-
-	for idx := 0; idx < len(draResA); idx++ {
-		cntDraResA := draResA[idx]
-		cntDraResB := draResB[idx]
-
-		if cntDraResA.ClassName != cntDraResB.ClassName {
-			return false
-		}
-		if cntDraResA.ClaimName != cntDraResB.ClaimName {
-			return false
-		}
-		if cntDraResA.ClaimNamespace != cntDraResB.ClaimNamespace {
-			return false
-		}
-		if len(cntDraResA.ClaimResources) != len(cntDraResB.ClaimResources) {
-			return false
-		}
-		for i := 0; i < len(cntDraResA.ClaimResources); i++ {
-			claimResA := cntDraResA.ClaimResources[i]
-			claimResB := cntDraResB.ClaimResources[i]
-			if len(claimResA.CDIDevices) != len(claimResB.CDIDevices) {
-				return false
-			}
-			for y := 0; y < len(claimResA.CDIDevices); y++ {
-				cdiDeviceA := claimResA.CDIDevices[y]
-				cdiDeviceB := claimResB.CDIDevices[y]
-				if cdiDeviceA.Name != cdiDeviceB.Name {
-					return false
-				}
-			}
-		}
-	}
-
-	return true
-}
-
-func equalContainerDevices(devA, devB []*podresourcesapi.ContainerDevices) bool {
-	if len(devA) != len(devB) {
-		return false
-	}
-
-	for idx := 0; idx < len(devA); idx++ {
-		cntDevA := devA[idx]
-		cntDevB := devB[idx]
-
-		if cntDevA.ResourceName != cntDevB.ResourceName {
-			return false
-		}
-		if !equalTopology(cntDevA.Topology, cntDevB.Topology) {
-			return false
-		}
-		if !equalStrings(cntDevA.DeviceIds, cntDevB.DeviceIds) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func equalInt64s(a, b []int64) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	aCopy := append([]int64{}, a...)
-	sort.Slice(aCopy, func(i, j int) bool { return aCopy[i] < aCopy[j] })
-	bCopy := append([]int64{}, b...)
-	sort.Slice(bCopy, func(i, j int) bool { return bCopy[i] < bCopy[j] })
-	return reflect.DeepEqual(aCopy, bCopy)
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	aCopy := append([]string{}, a...)
-	sort.Strings(aCopy)
-	bCopy := append([]string{}, b...)
-	sort.Strings(bCopy)
-	return reflect.DeepEqual(aCopy, bCopy)
-}
-
-func equalTopology(a, b *podresourcesapi.TopologyInfo) bool {
-	if a == nil && b != nil {
-		return false
-	}
-	if a != nil && b == nil {
-		return false
-	}
-	return reflect.DeepEqual(a, b)
-}
-
-func equalAllocatableResourcesResponse(respA, respB *podresourcesapi.AllocatableResourcesResponse) bool {
-	if !equalInt64s(respA.CpuIds, respB.CpuIds) {
-		return false
-	}
-	return equalContainerDevices(respA.Devices, respB.Devices)
-}
-
-func equalGetResponse(ResA, ResB *podresourcesapi.GetPodResourcesResponse) bool {
-	podResA := ResA.PodResources
-	podResB := ResB.PodResources
-	if podResA.Name != podResB.Name {
-		return false
-	}
-	if podResA.Namespace != podResB.Namespace {
-		return false
-	}
-	if len(podResA.Containers) != len(podResB.Containers) {
-		return false
-	}
-	for jdx := 0; jdx < len(podResA.Containers); jdx++ {
-		cntA := podResA.Containers[jdx]
-		cntB := podResB.Containers[jdx]
-
-		if cntA.Name != cntB.Name {
-			return false
-		}
-		if !equalInt64s(cntA.CpuIds, cntB.CpuIds) {
-			return false
-		}
-
-		if !equalContainerDevices(cntA.Devices, cntB.Devices) {
-			return false
-		}
-
-		if !equalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
-			return false
-		}
-
-	}
-	return true
 }

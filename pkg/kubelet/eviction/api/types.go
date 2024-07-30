@@ -46,7 +46,6 @@ const (
 	// We will override user settings and set to either imagefs or nodefs depending on configuration.
 	SignalContainerFsAvailable Signal = "containerfs.available"
 	// SignalContainerFsInodesFree is amount of inodes available on filesystem that container runtime uses for container writable layers.
-	// SignalContainerFsAvailable is amount of storage available on filesystem that container runtime uses for container writable layers.
 	// In case of a single filesystem, containerfs=nodefs.
 	// In case of a image filesystem, containerfs=imagefs.
 	// We will override user settings and set to either imagefs or nodefs depending on configuration.

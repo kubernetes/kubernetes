@@ -28,6 +28,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1246,6 +1247,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			} else {
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
 			}
+			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
+				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
+			}
 		})
 	}
 }
@@ -1578,6 +1582,7 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	fooKey, fooObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	fooBarKey, fooBarObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foobar", Namespace: "test-ns"}})
 	_, otherNamespaceObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test-ns2"}})
+	lastRev := otherNamespaceObj.ResourceVersion
 
 	tests := []struct {
 		name        string
@@ -1635,19 +1640,47 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			out := &example.PodList{}
-			storageOpts := storage.ListOptions{
-				Recursive: tt.recursive,
-				Predicate: storage.Everything,
+	listTypes := []struct {
+		name            string
+		ResourceVersion string
+		Match           metav1.ResourceVersionMatch
+	}{
+		{
+			name:            "Exact",
+			ResourceVersion: lastRev,
+			Match:           metav1.ResourceVersionMatchExact,
+		},
+		{
+			name:            "Consistent",
+			ResourceVersion: "",
+		},
+		{
+			name:            "NotOlderThan",
+			ResourceVersion: "0",
+			Match:           metav1.ResourceVersionMatchNotOlderThan,
+		},
+	}
+
+	for _, listType := range listTypes {
+		listType := listType
+		t.Run(listType.name, func(t *testing.T) {
+			for _, tt := range tests {
+				tt := tt
+				t.Run(tt.name, func(t *testing.T) {
+					out := &example.PodList{}
+					storageOpts := storage.ListOptions{
+						ResourceVersion:      listType.ResourceVersion,
+						ResourceVersionMatch: listType.Match,
+						Recursive:            tt.recursive,
+						Predicate:            storage.Everything,
+					}
+					err := store.GetList(ctx, tt.key, storageOpts, out)
+					if err != nil {
+						t.Fatalf("GetList failed: %v", err)
+					}
+					expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
+				})
 			}
-			err := store.GetList(ctx, tt.key, storageOpts, out)
-			if err != nil {
-				t.Fatalf("GetList failed: %v", err)
-			}
-			expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 		})
 	}
 }

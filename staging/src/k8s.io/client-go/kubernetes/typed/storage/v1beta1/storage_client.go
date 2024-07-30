@@ -33,6 +33,7 @@ type StorageV1beta1Interface interface {
 	CSIStorageCapacitiesGetter
 	StorageClassesGetter
 	VolumeAttachmentsGetter
+	VolumeAttributesClassesGetter
 }
 
 // StorageV1beta1Client is used to interact with features provided by the storage.k8s.io group.
@@ -58,6 +59,10 @@ func (c *StorageV1beta1Client) StorageClasses() StorageClassInterface {
 
 func (c *StorageV1beta1Client) VolumeAttachments() VolumeAttachmentInterface {
 	return newVolumeAttachments(c)
+}
+
+func (c *StorageV1beta1Client) VolumeAttributesClasses() VolumeAttributesClassInterface {
+	return newVolumeAttributesClasses(c)
 }
 
 // NewForConfig creates a new StorageV1beta1Client for the given config.

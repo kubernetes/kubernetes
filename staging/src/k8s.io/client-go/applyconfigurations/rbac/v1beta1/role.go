@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RoleApplyConfiguration represents an declarative configuration of the Role type for use
+// RoleApplyConfiguration represents a declarative configuration of the Role type for use
 // with apply.
 type RoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type RoleApplyConfiguration struct {
 	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }
 
-// Role constructs an declarative configuration of the Role type for use with
+// Role constructs a declarative configuration of the Role type for use with
 // apply.
 func Role(name, namespace string) *RoleApplyConfiguration {
 	b := &RoleApplyConfiguration{}
@@ -251,4 +251,10 @@ func (b *RoleApplyConfiguration) WithRules(values ...*PolicyRuleApplyConfigurati
 		b.Rules = append(b.Rules, *values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RoleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

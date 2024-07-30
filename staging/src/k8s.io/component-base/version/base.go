@@ -61,3 +61,10 @@ var (
 
 	buildDate = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
 )
+
+const (
+	// DefaultKubeBinaryVersion is the hard coded k8 binary version based on the latest K8s release.
+	// It is supposed to be consistent with gitMajor and gitMinor, except for local tests, where gitMajor and gitMinor are "".
+	// Should update for each minor release!
+	DefaultKubeBinaryVersion = "1.31"
+)

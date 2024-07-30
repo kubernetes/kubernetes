@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -165,7 +166,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		err := wait.PollWithContext(ctx, 1*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(secrets.Items) == found {
@@ -331,7 +332,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		err := wait.PollWithContext(ctx, 1*time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(configmaps.Items) == found {
@@ -485,6 +486,56 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Ensuring resource quota status released usage")
 		usedResources[v1.ResourceName("count/replicasets.apps")] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+	})
+
+	/*
+		Release: v1.31
+		Testname: ResourceQuota, object count quota, ResourceClaim
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create ResourceClaim. Creation MUST be successful and resource usage count against the ResourceClaim object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the ResourceClaim. Deletion MUST succeed and resource usage count against the ResourceClaim object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+		[NotConformancePromotable] alpha feature
+	*/
+	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", feature.DynamicResourceAllocation, func(ctx context.Context) {
+		ginkgo.By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuotaDRA(quotaName)
+		_, err = createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a ResourceClaim")
+		claim := newTestResourceClaimForQuota("test-claim")
+		claim, err = f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status captures resource claim creation")
+		usedResources = v1.ResourceList{}
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("1")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting a ResourceClaim")
+		err = f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released usage")
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 	})
@@ -1906,6 +1957,14 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	}
 }
 
+// newTestResourceQuotaDRA returns a quota that includes hard limits for ResourceClaim objects.
+func newTestResourceQuotaDRA(name string) *v1.ResourceQuota {
+	quota := newTestResourceQuota(name)
+	quota.Spec.Hard[core.ClaimObjectCountName] = resource.MustParse("1")
+	quota.Spec.Hard[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+	return quota
+}
+
 // newTestPodForQuota returns a pod that has the specified requests and limits
 func newTestPodForQuota(f *framework.Framework, name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
@@ -1998,6 +2057,23 @@ func newTestPersistentVolumeClaimForQuota(name string) *v1.PersistentVolumeClaim
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
 				},
+			},
+		},
+	}
+}
+
+// newTestResourceClaimForQuota returns a simple resource claim
+func newTestResourceClaimForQuota(name string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name:            "req-0",
+					DeviceClassName: classGold,
+				}},
 			},
 		},
 	}
@@ -2121,7 +2197,7 @@ func deleteResourceQuota(ctx context.Context, c clientset.Interface, namespace, 
 // Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
 func countResourceQuota(ctx context.Context, c clientset.Interface, namespace string) (int, error) {
 	found, unchanged := 0, 0
-	return found, wait.PollWithContext(ctx, 1*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+	return found, wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		resourceQuotas, err := c.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(resourceQuotas.Items) == found {
@@ -2137,7 +2213,7 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollWithContext(ctx, framework.Poll, resourceQuotaTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -2160,7 +2236,7 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
 // for the specific resource name.
 func updateResourceQuotaUntilUsageAppears(ctx context.Context, c clientset.Interface, ns, quotaName string, resourceName v1.ResourceName) error {
-	return wait.PollWithContext(ctx, framework.Poll, resourceQuotaTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

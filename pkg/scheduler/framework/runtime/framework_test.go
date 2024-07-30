@@ -904,6 +904,11 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fw, err := NewFramework(ctx, registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			defer func() {
+				if fw != nil {
+					_ = fw.Close()
+				}
+			}()
 			if err != nil {
 				if tc.wantErr == "" || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
@@ -913,7 +918,6 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 				}
 			}
-
 			if tc.wantErr == "" {
 				if diff := cmp.Diff(tc.wantPlugins, fw.ListPlugins()); diff != "" {
 					t.Fatalf("Unexpected eventToPlugin map (-want,+got):%s", diff)
@@ -969,7 +973,9 @@ func TestPreEnqueuePlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-
+			defer func() {
+				_ = f.Close()
+			}()
 			got := f.PreEnqueuePlugins()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("PreEnqueuePlugins(): want %v, but got %v", tt.want, got)
@@ -1092,7 +1098,9 @@ func TestRunPreScorePlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-
+			defer func() {
+				_ = f.Close()
+			}()
 			state := framework.NewCycleState()
 			status := f.RunPreScorePlugins(ctx, state, nil, nil)
 			if status.Code() != tt.wantStatusCode {
@@ -1486,6 +1494,9 @@ func TestRunScorePlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			state := framework.NewCycleState()
 			state.SkipScorePlugins = tt.skippedPlugins
@@ -1530,8 +1541,10 @@ func TestPreFilterPlugins(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
+		defer func() {
+			_ = f.Close()
+		}()
 		state := framework.NewCycleState()
-
 		f.RunPreFilterPlugins(ctx, state, nil)
 		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
 		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
@@ -1719,9 +1732,12 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			state := framework.NewCycleState()
-			result, status := f.RunPreFilterPlugins(ctx, state, nil)
+			result, status, _ := f.RunPreFilterPlugins(ctx, state, nil)
 			if d := cmp.Diff(result, tt.wantPreFilterResult); d != "" {
 				t.Errorf("wrong status. got: %v, want: %v, diff: %s", result, tt.wantPreFilterResult, d)
 			}
@@ -1809,6 +1825,9 @@ func TestRunPreFilterExtensionRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			state := framework.NewCycleState()
 			state.SkipFilterPlugins = tt.skippedPluginNames
@@ -1893,6 +1912,9 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			state := framework.NewCycleState()
 			state.SkipFilterPlugins = tt.skippedPluginNames
@@ -2096,6 +2118,9 @@ func TestFilterPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 			state := framework.NewCycleState()
 			state.SkipFilterPlugins = tt.skippedPlugins
 			gotStatus := f.RunFilterPlugins(ctx, state, pod, nil)
@@ -2220,6 +2245,9 @@ func TestPostFilterPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 			_, gotStatus := f.RunPostFilterPlugins(ctx, nil, pod, nil)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
@@ -2357,7 +2385,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 
-			podNominator := internalqueue.NewPodNominator(nil)
+			podNominator := internalqueue.NewTestPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(
 					logger,
@@ -2371,6 +2399,9 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 			tt.nodeInfo.SetNode(tt.node)
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, framework.NewCycleState(), tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(gotStatus, tt.wantStatus, cmpOpts...); diff != "" {
@@ -2528,6 +2559,9 @@ func TestPreBindPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			status := f.RunPreBindPlugins(ctx, nil, pod, "")
 
@@ -2683,6 +2717,9 @@ func TestReservePlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			defer func() {
+				_ = f.Close()
+			}()
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -2811,6 +2848,9 @@ func TestPermitPlugins(t *testing.T) {
 			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile,
 				WithWaitingPods(NewWaitingPodsMap()),
 			)
+			defer func() {
+				_ = f.Close()
+			}()
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -3000,6 +3040,9 @@ func TestRecordingMetrics(t *testing.T) {
 				cancel()
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			tt.action(f)
 
@@ -3113,6 +3156,9 @@ func TestRunBindPlugins(t *testing.T) {
 				cancel()
 				t.Fatal(err)
 			}
+			defer func() {
+				_ = fwk.Close()
+			}()
 
 			st := fwk.RunBindPlugins(context.Background(), state, pod, "")
 			if st.Code() != tt.wantStatus {
@@ -3171,6 +3217,9 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			f.RunPermitPlugins(ctx, nil, pod, "")
 			f.WaitOnPermit(ctx, pod)
@@ -3229,6 +3278,9 @@ func TestWaitOnPermit(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
 			runPermitPluginsStatus := f.RunPermitPlugins(ctx, nil, pod, "")
 			if runPermitPluginsStatus.Code() != framework.Wait {
@@ -3283,6 +3335,9 @@ func TestListPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 			got := f.ListPlugins()
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected plugins (-want,+got):\n%s", diff)

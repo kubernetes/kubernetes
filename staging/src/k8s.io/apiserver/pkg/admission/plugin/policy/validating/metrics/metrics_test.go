@@ -31,7 +31,6 @@ type metricsObserver func()
 func TestNoUtils(t *testing.T) {
 
 	metrics := []string{
-		"apiserver_validating_admission_policy_definition_total",
 		"apiserver_validating_admission_policy_check_total",
 		"apiserver_validating_admission_policy_check_duration_seconds",
 	}
@@ -44,53 +43,43 @@ func TestNoUtils(t *testing.T) {
 		{
 			desc: "observe policy admission",
 			want: `
-			# HELP apiserver_validating_admission_policy_check_duration_seconds [ALPHA] Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding, state and enforcement action taken.
+			# HELP apiserver_validating_admission_policy_check_duration_seconds [BETA] Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding and enforcement action taken.
             # TYPE apiserver_validating_admission_policy_check_duration_seconds histogram
-			apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.0000005"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.001"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.01"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.1"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="1"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="+Inf"} 1
-            apiserver_validating_admission_policy_check_duration_seconds_sum{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 10
-            apiserver_validating_admission_policy_check_duration_seconds_count{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 1
-            # HELP apiserver_validating_admission_policy_check_total [ALPHA] Validation admission policy check total, labeled by policy and further identified by binding, enforcement action taken, and state.
+			apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
+            apiserver_validating_admission_policy_check_duration_seconds_sum{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 10
+            apiserver_validating_admission_policy_check_duration_seconds_count{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
+            # HELP apiserver_validating_admission_policy_check_total [BETA] Validation admission policy check total, labeled by policy and further identified by binding and enforcement action taken.
             # TYPE apiserver_validating_admission_policy_check_total counter
-            apiserver_validating_admission_policy_check_total{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 1
+            apiserver_validating_admission_policy_check_total{enforcement_action="allow",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
 			`,
 			observer: func() {
-				Metrics.ObserveAdmissionWithError(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", "active")
+				Metrics.ObserveAdmission(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", ValidatingInvalidError)
 			},
 		},
 		{
 			desc: "observe policy rejection",
 			want: `
-			# HELP apiserver_validating_admission_policy_check_duration_seconds [ALPHA] Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding, state and enforcement action taken.
+			# HELP apiserver_validating_admission_policy_check_duration_seconds [BETA] Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding and enforcement action taken.
             # TYPE apiserver_validating_admission_policy_check_duration_seconds histogram
-			apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.0000005"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.001"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.01"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="0.1"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="1"} 0
-            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active",le="+Inf"} 1
-            apiserver_validating_admission_policy_check_duration_seconds_sum{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 10
-            apiserver_validating_admission_policy_check_duration_seconds_count{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 1
-            # HELP apiserver_validating_admission_policy_check_total [ALPHA] Validation admission policy check total, labeled by policy and further identified by binding, enforcement action taken, and state.
+			apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
+            apiserver_validating_admission_policy_check_duration_seconds_bucket{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
+            apiserver_validating_admission_policy_check_duration_seconds_sum{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 10
+            apiserver_validating_admission_policy_check_duration_seconds_count{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
+            # HELP apiserver_validating_admission_policy_check_total [BETA] Validation admission policy check total, labeled by policy and further identified by binding and enforcement action taken.
             # TYPE apiserver_validating_admission_policy_check_total counter
-            apiserver_validating_admission_policy_check_total{enforcement_action="deny",policy="policy.example.com",policy_binding="binding.example.com",state="active"} 1
+            apiserver_validating_admission_policy_check_total{enforcement_action="deny",error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
 			`,
 			observer: func() {
-				Metrics.ObserveRejection(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", "active")
-			},
-		},
-		{
-			desc: "observe policy definition",
-			want: `# HELP apiserver_validating_admission_policy_definition_total [ALPHA] Validation admission policy count total, labeled by state and enforcement action.
-            # TYPE apiserver_validating_admission_policy_definition_total counter
-            apiserver_validating_admission_policy_definition_total{enforcement_action="deny",state="active"} 1
-			`,
-			observer: func() {
-				Metrics.ObserveDefinition(context.TODO(), "active", "deny")
+				Metrics.ObserveRejection(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", ValidatingInvalidError)
 			},
 		},
 	}

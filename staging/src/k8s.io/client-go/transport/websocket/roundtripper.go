@@ -111,6 +111,10 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
 		if errors.Is(err, gwebsocket.ErrBadHandshake) {
+			// Enhance the error message with the response status if possible.
+			if resp != nil && len(resp.Status) > 0 {
+				err = fmt.Errorf("%w (%s)", err, resp.Status)
+			}
 			return nil, &httpstream.UpgradeFailureError{Cause: err}
 		}
 		return nil, err

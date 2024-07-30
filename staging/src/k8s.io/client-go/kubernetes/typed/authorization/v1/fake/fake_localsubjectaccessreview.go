@@ -40,7 +40,7 @@ var localsubjectaccessreviewsKind = v1.SchemeGroupVersion.WithKind("LocalSubject
 func (c *FakeLocalSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (result *v1.LocalSubjectAccessReview, err error) {
 	emptyResult := &v1.LocalSubjectAccessReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

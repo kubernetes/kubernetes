@@ -21,13 +21,11 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -106,14 +104,12 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 			status.Phase = v1.PodFailed
 			status.Reason = events.PreemptContainer
 			status.Message = message
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				podutil.UpdatePodCondition(status, &v1.PodCondition{
-					Type:    v1.DisruptionTarget,
-					Status:  v1.ConditionTrue,
-					Reason:  v1.PodReasonTerminationByKubelet,
-					Message: "Pod was preempted by Kubelet to accommodate a critical pod.",
-				})
-			}
+			podutil.UpdatePodCondition(status, &v1.PodCondition{
+				Type:    v1.DisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonTerminationByKubelet,
+				Message: "Pod was preempted by Kubelet to accommodate a critical pod.",
+			})
 		})
 		if err != nil {
 			klog.ErrorS(err, "Failed to evict pod", "pod", klog.KObj(pod))

@@ -25,12 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 
-var encModeNames = map[cbor.EncMode]string{
+var encModeNames = map[modes.EncMode]string{
 	modes.Encode:                 "Encode",
 	modes.EncodeNondeterministic: "EncodeNondeterministic",
 }
 
-var allEncModes = []cbor.EncMode{
+var allEncModes = []modes.EncMode{
 	modes.Encode,
 	modes.EncodeNondeterministic,
 }

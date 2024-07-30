@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -51,6 +52,7 @@ func prefixedName(namePrefix string, name string) string {
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should launch init container serially before a regular container", func() {
@@ -909,6 +911,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {
@@ -1045,10 +1048,361 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 		framework.ExpectNoError(init2Restarted.IsBefore(init3Restarted))
 		framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
 	})
+
+	ginkgo.When("a Pod is initialized and running", func() {
+		var client *e2epod.PodClient
+		var err error
+		var pod *v1.Pod
+		init1 := "init-1"
+		init2 := "init-2"
+		init3 := "init-3"
+		regular1 := "regular-1"
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			pod = &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "initialized-pod",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Name:  init1,
+							Image: busyboxImage,
+							Command: ExecCommand(init1, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+						{
+							Name:  init2,
+							Image: busyboxImage,
+							Command: ExecCommand(init2, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+						{
+							Name:  init3,
+							Image: busyboxImage,
+							Command: ExecCommand(init3, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regular1,
+							Image: busyboxImage,
+							Command: ExecCommand(regular1, execCommand{
+								Delay:    300,
+								ExitCode: 0,
+							}),
+						},
+					},
+				},
+			}
+			preparePod(pod)
+
+			client = e2epod.NewPodClient(f)
+			pod = client.Create(ctx, pod)
+			ginkgo.By("Waiting for the pod to be initialized and run")
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
+			ginkgo.By("stopping the kubelet")
+			startKubelet := stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+
+			ginkgo.By("restarting the kubelet")
+			startKubelet()
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+			ginkgo.By("ensuring that no completed init container is restarted")
+			gomega.Consistently(ctx, func() bool {
+				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
+						continue
+					}
+
+					if status.RestartCount > 0 {
+						return false
+					}
+				}
+				return true
+			}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("no completed init container should be restarted"))
+
+			ginkgo.By("Parsing results")
+			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			results := parseOutput(ctx, f, pod)
+
+			ginkgo.By("Analyzing results")
+			framework.ExpectNoError(results.StartsBefore(init1, init2))
+			framework.ExpectNoError(results.ExitsBefore(init1, init2))
+
+			framework.ExpectNoError(results.StartsBefore(init2, init3))
+			framework.ExpectNoError(results.ExitsBefore(init2, init3))
+
+			gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[2].RestartCount).To(gomega.Equal(int32(0)))
+		})
+
+		ginkgo.It("should not restart any completed init container, even after the completed init container statuses have been removed and the kubelet restarted", func(ctx context.Context) {
+			ginkgo.By("stopping the kubelet")
+			startKubelet := stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+
+			ginkgo.By("removing the completed init container statuses from the container runtime")
+			rs, _, err := getCRIClient()
+			framework.ExpectNoError(err)
+
+			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			for _, c := range pod.Status.InitContainerStatuses {
+				if c.State.Terminated == nil || c.State.Terminated.ExitCode != 0 {
+					continue
+				}
+
+				tokens := strings.Split(c.ContainerID, "://")
+				gomega.Expect(tokens).To(gomega.HaveLen(2))
+
+				containerID := tokens[1]
+
+				err := rs.RemoveContainer(ctx, containerID)
+				framework.ExpectNoError(err)
+			}
+
+			ginkgo.By("restarting the kubelet")
+			startKubelet()
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be restarted"))
+
+			ginkgo.By("ensuring that no completed init container is restarted")
+			gomega.Consistently(ctx, func() bool {
+				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
+						continue
+					}
+
+					if status.RestartCount > 0 {
+						return false
+					}
+				}
+				return true
+			}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("no completed init container should be restarted"))
+
+			ginkgo.By("Analyzing results")
+			// Cannot analyze the results with the container logs as the
+			// container statuses have been removed from container runtime.
+			gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[2].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).ToNot(gomega.BeNil())
+		})
+	})
+
+	ginkgo.When("a Pod is initializing the long-running init container", func() {
+		var client *e2epod.PodClient
+		var err error
+		var pod *v1.Pod
+		init1 := "init-1"
+		init2 := "init-2"
+		longRunningInit3 := "long-running-init-3"
+		regular1 := "regular-1"
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			pod = &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "initializing-long-running-init-container",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Name:  init1,
+							Image: busyboxImage,
+							Command: ExecCommand(init1, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+						{
+							Name:  init2,
+							Image: busyboxImage,
+							Command: ExecCommand(init2, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+						{
+							Name:  longRunningInit3,
+							Image: busyboxImage,
+							Command: ExecCommand(longRunningInit3, execCommand{
+								Delay:    300,
+								ExitCode: 0,
+							}),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regular1,
+							Image: busyboxImage,
+							Command: ExecCommand(regular1, execCommand{
+								Delay:    300,
+								ExitCode: 0,
+							}),
+						},
+					},
+				},
+			}
+			preparePod(pod)
+
+			client = e2epod.NewPodClient(f)
+			pod = client.Create(ctx, pod)
+			ginkgo.By("Waiting for the pod to be initializing the long-running init container")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "long-running init container initializing", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
+				for _, c := range pod.Status.InitContainerStatuses {
+					if c.Name != longRunningInit3 {
+						continue
+					}
+					if c.State.Running != nil && (c.Started != nil && *c.Started == true) {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
+			ginkgo.By("stopping the kubelet")
+			startKubelet := stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+
+			ginkgo.By("restarting the kubelet")
+			startKubelet()
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be restarted"))
+
+			ginkgo.By("ensuring that no completed init container is restarted")
+			gomega.Consistently(ctx, func() bool {
+				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
+						continue
+					}
+
+					if status.RestartCount > 0 {
+						return false
+					}
+				}
+				return true
+			}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("no completed init container should be restarted"))
+
+			ginkgo.By("Parsing results")
+			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			results := parseOutput(ctx, f, pod)
+
+			ginkgo.By("Analyzing results")
+			framework.ExpectNoError(results.StartsBefore(init1, init2))
+			framework.ExpectNoError(results.ExitsBefore(init1, init2))
+
+			gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
+		})
+
+		ginkgo.It("should not restart any completed init container, even after the completed init container statuses have been removed and the kubelet restarted", func(ctx context.Context) {
+			ginkgo.By("stopping the kubelet")
+			startKubelet := stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+
+			ginkgo.By("removing the completed init container statuses from the container runtime")
+			rs, _, err := getCRIClient()
+			framework.ExpectNoError(err)
+
+			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			for _, c := range pod.Status.InitContainerStatuses {
+				if c.State.Terminated == nil || c.State.Terminated.ExitCode != 0 {
+					continue
+				}
+
+				tokens := strings.Split(c.ContainerID, "://")
+				gomega.Expect(tokens).To(gomega.HaveLen(2))
+
+				containerID := tokens[1]
+
+				err := rs.RemoveContainer(ctx, containerID)
+				framework.ExpectNoError(err)
+			}
+
+			ginkgo.By("restarting the kubelet")
+			startKubelet()
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be restarted"))
+
+			ginkgo.By("ensuring that no completed init container is restarted")
+			gomega.Consistently(ctx, func() bool {
+				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
+						continue
+					}
+
+					if status.RestartCount > 0 {
+						return false
+					}
+				}
+				return true
+			}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("no completed init container should be restarted"))
+
+			ginkgo.By("Analyzing results")
+			// Cannot analyze the results with the container logs as the
+			// container statuses have been removed from container runtime.
+			gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
+			gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
+		})
+	})
 })
 
 var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.When("using a Pod with restartPolicy=Never, three init container and two restartable init containers", ginkgo.Ordered, func() {
@@ -3115,10 +3469,112 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		// should delete quickly and not try to start/wait on any sidecars since they never started
 		gomega.Expect(deleteTime).To(gomega.BeNumerically("<", grace+buffer), fmt.Sprintf("should delete in < %d seconds, took %f", grace+buffer, deleteTime))
 	})
+
+	f.It("should terminate restartable init containers gracefully if there is a non-started restartable init container", func(ctx context.Context) {
+		init1 := "init-1"
+		restartableInit2 := "restartable-init-2"
+		restartableInit3 := "restartable-init-3"
+		regular1 := "regular-1"
+
+		podTerminationGracePeriodSeconds := int64(180)
+		containerTerminationSeconds := 1
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "terminate-restartable-init-gracefully",
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &podTerminationGracePeriodSeconds,
+				RestartPolicy:                 v1.RestartPolicyNever,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: busyboxImage,
+						Command: ExecCommand(init1, execCommand{
+							Delay:              1,
+							TerminationSeconds: 5,
+							ExitCode:           0,
+						}),
+					},
+					{
+						Name:  restartableInit2,
+						Image: busyboxImage,
+						Command: ExecCommand(restartableInit2, execCommand{
+							Delay:              600,
+							TerminationSeconds: containerTerminationSeconds,
+							ExitCode:           0,
+						}),
+						StartupProbe: &v1.Probe{
+							FailureThreshold: 600,
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"false"},
+								},
+							},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  restartableInit3,
+						Image: busyboxImage,
+						Command: ExecCommand(restartableInit3, execCommand{
+							Delay:              600,
+							TerminationSeconds: 1,
+							ExitCode:           0,
+						}),
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:              600,
+							TerminationSeconds: 1,
+							ExitCode:           0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "the second init container is running but not started", 2*time.Minute, func(pod *v1.Pod) (bool, error) {
+			if pod.Status.Phase != v1.PodPending {
+				return false, fmt.Errorf("pod should be in pending phase")
+			}
+			if len(pod.Status.InitContainerStatuses) != 3 {
+				return false, fmt.Errorf("pod should have the same number of statuses as init containers")
+			}
+			containerStatus := pod.Status.InitContainerStatuses[1]
+			return containerStatus.State.Running != nil &&
+				(containerStatus.Started == nil || *containerStatus.Started == false), nil
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting the pod")
+		err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the pod to terminate gracefully before its terminationGracePeriodSeconds")
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace,
+			// The duration should be less than the pod's
+			// terminationGracePeriodSeconds while adding a buffer(60s) to the
+			// container termination seconds(1s) to account for the time it
+			// takes to delete the pod.
+			time.Duration(containerTerminationSeconds+60)*time.Second)
+		framework.ExpectNoError(err, "the pod should be deleted before its terminationGracePeriodSeconds if the restartalbe init containers get termination signal correctly")
+	})
 })
 
 var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {

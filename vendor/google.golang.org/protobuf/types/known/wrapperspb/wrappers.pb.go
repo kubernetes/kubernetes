@@ -605,7 +605,7 @@ func file_google_protobuf_wrappers_proto_rawDescGZIP() []byte {
 }
 
 var file_google_protobuf_wrappers_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_google_protobuf_wrappers_proto_goTypes = []interface{}{
+var file_google_protobuf_wrappers_proto_goTypes = []any{
 	(*DoubleValue)(nil), // 0: google.protobuf.DoubleValue
 	(*FloatValue)(nil),  // 1: google.protobuf.FloatValue
 	(*Int64Value)(nil),  // 2: google.protobuf.Int64Value
@@ -630,7 +630,7 @@ func file_google_protobuf_wrappers_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_wrappers_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*DoubleValue); i {
 			case 0:
 				return &v.state
@@ -642,7 +642,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*FloatValue); i {
 			case 0:
 				return &v.state
@@ -654,7 +654,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*Int64Value); i {
 			case 0:
 				return &v.state
@@ -666,7 +666,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[3].Exporter = func(v any, i int) any {
 			switch v := v.(*UInt64Value); i {
 			case 0:
 				return &v.state
@@ -678,7 +678,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[4].Exporter = func(v any, i int) any {
 			switch v := v.(*Int32Value); i {
 			case 0:
 				return &v.state
@@ -690,7 +690,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[5].Exporter = func(v any, i int) any {
 			switch v := v.(*UInt32Value); i {
 			case 0:
 				return &v.state
@@ -702,7 +702,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[6].Exporter = func(v any, i int) any {
 			switch v := v.(*BoolValue); i {
 			case 0:
 				return &v.state
@@ -714,7 +714,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[7].Exporter = func(v any, i int) any {
 			switch v := v.(*StringValue); i {
 			case 0:
 				return &v.state
@@ -726,7 +726,7 @@ func file_google_protobuf_wrappers_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_wrappers_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_wrappers_proto_msgTypes[8].Exporter = func(v any, i int) any {
 			switch v := v.(*BytesValue); i {
 			case 0:
 				return &v.state

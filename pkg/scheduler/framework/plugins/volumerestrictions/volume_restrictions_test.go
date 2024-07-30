@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -473,6 +474,304 @@ func TestAccessModeConflicts(t *testing.T) {
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+	GCEDiskVolState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName: "foo",
+			},
+		},
+	}
+	GCEDiskVolState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName: "bar",
+			},
+		},
+	}
+
+	AWSDiskVolState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: "foo",
+			},
+		},
+	}
+	AWSDiskVolState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: "bar",
+			},
+		},
+	}
+
+	RBDDiskVolState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			RBD: &v1.RBDVolumeSource{
+				CephMonitors: []string{"a", "b"},
+				RBDPool:      "foo",
+				RBDImage:     "bar",
+				FSType:       "ext4",
+			},
+		},
+	}
+	RBDDiskVolState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			RBD: &v1.RBDVolumeSource{
+				CephMonitors: []string{"c", "d"},
+				RBDPool:      "foo",
+				RBDImage:     "bar",
+				FSType:       "ext4",
+			},
+		},
+	}
+
+	ISCSIDiskVolState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			ISCSI: &v1.ISCSIVolumeSource{
+				TargetPortal: "127.0.0.1:3260",
+				IQN:          "iqn.2016-12.server:storage.target01",
+				FSType:       "ext4",
+				Lun:          0,
+			},
+		},
+	}
+	ISCSIDiskVolState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			ISCSI: &v1.ISCSIVolumeSource{
+				TargetPortal: "127.0.0.1:3260",
+				IQN:          "iqn.2017-12.server:storage.target01",
+				FSType:       "ext4",
+				Lun:          0,
+			},
+		},
+	}
+
+	podGCEDisk := st.MakePod().Volume(GCEDiskVolState).Obj()
+	podGCEDiskConflicts := st.MakePod().Volume(GCEDiskVolState).Obj()
+	podGCEDiskNoConflicts := st.MakePod().Volume(GCEDiskVolState2).Obj()
+
+	podAWSDisk := st.MakePod().Volume(AWSDiskVolState).Obj()
+	podAWSDiskConflicts := st.MakePod().Volume(AWSDiskVolState).Obj()
+	podAWSDiskNoConflicts := st.MakePod().Volume(AWSDiskVolState2).Obj()
+
+	podRBDDiskDisk := st.MakePod().Volume(RBDDiskVolState).Obj()
+	podRBDDiskDiskConflicts := st.MakePod().Volume(RBDDiskVolState).Obj()
+	podRBDDiskNoConflicts := st.MakePod().Volume(RBDDiskVolState2).Obj()
+
+	podISCSIDiskDisk := st.MakePod().Volume(ISCSIDiskVolState).Obj()
+	podISCSIDiskConflicts := st.MakePod().Volume(ISCSIDiskVolState).Obj()
+	podISCSIDiskNoConflicts := st.MakePod().Volume(ISCSIDiskVolState2).Obj()
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		existingPods   []*v1.Pod
+		existingPVC    *v1.PersistentVolumeClaim
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"queue-new-object-gcedisk-conflict": {
+			pod:          podGCEDisk,
+			oldObj:       podGCEDiskConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-new-object-gcedisk-no-conflict": {
+			pod:          podGCEDisk,
+			oldObj:       podGCEDiskNoConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-new-object-awsdisk-conflict": {
+			pod:          podAWSDisk,
+			oldObj:       podAWSDiskConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-new-object-awsdisk-no-conflict": {
+			pod:          podAWSDisk,
+			oldObj:       podAWSDiskNoConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-new-object-rbddisk-conflict": {
+			pod:          podRBDDiskDisk,
+			oldObj:       podRBDDiskDiskConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-new-object-rbddisk-no-conflict": {
+			pod:          podRBDDiskDisk,
+			oldObj:       podRBDDiskNoConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-new-object-iscsidisk-conflict": {
+			pod:          podISCSIDiskDisk,
+			oldObj:       podISCSIDiskConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-new-object-iscsidisk-no-conflict": {
+			pod:          podISCSIDiskDisk,
+			oldObj:       podISCSIDiskNoConflicts,
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-has-same-claim": {
+			pod:          st.MakePod().Name("pod1").PVC("claim-rwop").Obj(),
+			oldObj:       st.MakePod().Name("pod2").PVC("claim-rwop").Obj(),
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-no-same-claim": {
+			pod:          st.MakePod().Name("pod1").PVC("claim-1-rwop").Obj(),
+			oldObj:       st.MakePod().Name("pod2").PVC("claim-2-rwop").Obj(),
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPluginWithListers(ctx, t, tc.existingPods, nil, []*v1.PersistentVolumeClaim{tc.existingPVC})
+
+			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("Expect error, but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Unexpected QueueingHint (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
+	podWithOnePVC := st.MakePod().Name("pod-with-one-pvc").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwx-1").Node("node-1").Obj()
+	podWithTwoPVCs := st.MakePod().Name("pod-with-two-pvcs").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwx-1").PVC("claim-with-rwx-2").Node("node-1").Obj()
+	podWithNotEqualNamespace := st.MakePod().Name("pod-with-one-pvc").Namespace(metav1.NamespaceSystem).PVC("claim-with-rwx-1").Node("claim-with-rwx-2").Obj()
+
+	PVC1 := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "claim-with-rwx-1",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+		},
+	}
+
+	PVC2 := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "claim-with-rwx-2",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+		},
+	}
+
+	testcases := map[string]struct {
+		existingPods   []*v1.Pod
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"queue-new-object-pvc-belong-pod": {
+			existingPods: []*v1.Pod{},
+			pod:          podWithTwoPVCs,
+			newObj:       PVC1,
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-new-object-unused": {
+			existingPods: []*v1.Pod{},
+			pod:          podWithOnePVC,
+			newObj:       PVC2,
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-nil-old-object": {
+			existingPods: []*v1.Pod{},
+			pod:          podWithOnePVC,
+			newObj:       PVC2,
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-new-object-not-belong-pod": {
+			existingPods: []*v1.Pod{},
+			pod:          podWithOnePVC,
+			newObj:       PVC2,
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-new-object-namespace-not-equal-pod": {
+			existingPods: []*v1.Pod{},
+			pod:          podWithNotEqualNamespace,
+			newObj:       PVC1,
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPluginWithListers(ctx, t, tc.existingPods, nil, []*v1.PersistentVolumeClaim{tc.newObj.(*v1.PersistentVolumeClaim)})
+
+			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterPersistentVolumeClaimAdded(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("Expect error, but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Unexpected QueueingHint (-want, +got): %s", diff)
 			}
 		})
 	}

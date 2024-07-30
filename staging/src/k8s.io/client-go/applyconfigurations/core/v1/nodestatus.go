@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// NodeStatusApplyConfiguration represents an declarative configuration of the NodeStatus type for use
+// NodeStatusApplyConfiguration represents a declarative configuration of the NodeStatus type for use
 // with apply.
 type NodeStatusApplyConfiguration struct {
 	Capacity        *v1.ResourceList                       `json:"capacity,omitempty"`
@@ -37,9 +37,10 @@ type NodeStatusApplyConfiguration struct {
 	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty"`
 	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty"`
 	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
+	Features        *NodeFeaturesApplyConfiguration        `json:"features,omitempty"`
 }
 
-// NodeStatusApplyConfiguration constructs an declarative configuration of the NodeStatus type for use with
+// NodeStatusApplyConfiguration constructs a declarative configuration of the NodeStatus type for use with
 // apply.
 func NodeStatus() *NodeStatusApplyConfiguration {
 	return &NodeStatusApplyConfiguration{}
@@ -165,5 +166,13 @@ func (b *NodeStatusApplyConfiguration) WithRuntimeHandlers(values ...*NodeRuntim
 		}
 		b.RuntimeHandlers = append(b.RuntimeHandlers, *values[i])
 	}
+	return b
+}
+
+// WithFeatures sets the Features field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Features field is set to the value of the last call.
+func (b *NodeStatusApplyConfiguration) WithFeatures(value *NodeFeaturesApplyConfiguration) *NodeStatusApplyConfiguration {
+	b.Features = value
 	return b
 }

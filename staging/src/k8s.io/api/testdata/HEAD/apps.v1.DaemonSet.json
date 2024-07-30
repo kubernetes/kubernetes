@@ -491,6 +491,10 @@
                   "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
+            },
+            "image": {
+              "reference": "referenceValue",
+              "pullPolicy": "pullPolicyValue"
             }
           }
         ],
@@ -563,7 +567,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -858,7 +863,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -1153,7 +1159,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -1755,10 +1762,8 @@
         "resourceClaims": [
           {
             "name": "nameValue",
-            "source": {
-              "resourceClaimName": "resourceClaimNameValue",
-              "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
-            }
+            "resourceClaimName": "resourceClaimNameValue",
+            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
           }
         ]
       }

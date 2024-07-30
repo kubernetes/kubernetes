@@ -64,7 +64,7 @@ func MarshalKubeadmConfigObject(obj runtime.Object, gv schema.GroupVersion) ([]b
 
 // validateSupportedVersion checks if the supplied GroupVersion is not on the lists of old unsupported or deprecated GVs.
 // If it is, an error is returned.
-func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExperimental bool) error {
+func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allowExperimental bool) error {
 	// The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
@@ -91,18 +91,18 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 		"kubeadm.k8s.io/v1beta3": {},
 	}
 
-	gvString := gv.String()
+	gvString := gvk.GroupVersion().String()
 
 	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
-		return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
+		return errors.Errorf("your configuration file uses an old API spec: %q (kind: %q). Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind, useKubeadmVersion)
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
+		klog.Warningf("your configuration file uses a deprecated API spec: %q (kind: %q). Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind)
 	}
 
 	if _, present := experimentalAPIVersions[gvString]; present && !allowExperimental {
-		return errors.Errorf("experimental API spec: %q is not allowed. You can use the --%s flag if the command supports it.", gv, options.AllowExperimentalAPI)
+		return errors.Errorf("experimental API spec: %q (kind: %q) is not allowed. You can use the --%s flag if the command supports it.", gvString, gvk.Kind, options.AllowExperimentalAPI)
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func validateKnownGVKs(gvks []schema.GroupVersionKind) error {
 
 		// Skip legacy known GVs so that they don't return errors.
 		// This makes the function return errors only for GVs that where never known.
-		if err := validateSupportedVersion(gvk.GroupVersion(), true, true); err != nil {
+		if err := validateSupportedVersion(gvk, true, true); err != nil {
 			continue
 		}
 

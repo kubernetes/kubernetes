@@ -116,6 +116,15 @@ func IsUpgradeFailure(err error) bool {
 	return errors.As(err, &upgradeErr)
 }
 
+// isHTTPSProxyError returns true if error is Gorilla/Websockets HTTPS Proxy dial error;
+// false otherwise (see https://github.com/kubernetes/kubernetes/issues/126134).
+func IsHTTPSProxyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "proxy: unknown scheme: https")
+}
+
 // IsUpgradeRequest returns true if the given request is a connection upgrade request
 func IsUpgradeRequest(req *http.Request) bool {
 	for _, h := range req.Header[http.CanonicalHeaderKey(HeaderConnection)] {

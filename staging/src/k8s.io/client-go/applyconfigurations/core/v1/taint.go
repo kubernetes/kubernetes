@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TaintApplyConfiguration represents an declarative configuration of the Taint type for use
+// TaintApplyConfiguration represents a declarative configuration of the Taint type for use
 // with apply.
 type TaintApplyConfiguration struct {
 	Key       *string         `json:"key,omitempty"`
@@ -32,7 +32,7 @@ type TaintApplyConfiguration struct {
 	TimeAdded *metav1.Time    `json:"timeAdded,omitempty"`
 }
 
-// TaintApplyConfiguration constructs an declarative configuration of the Taint type for use with
+// TaintApplyConfiguration constructs a declarative configuration of the Taint type for use with
 // apply.
 func Taint() *TaintApplyConfiguration {
 	return &TaintApplyConfiguration{}

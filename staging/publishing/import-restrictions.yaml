@@ -91,6 +91,7 @@
   ignoredSubTrees:
   - "./staging/src/k8s.io/client-go/tools/cache/testing"
   - "./staging/src/k8s.io/client-go/tools/leaderelection/resourcelock"
+  - "./staging/src/k8s.io/client-go/tools/leaderelection"
   - "./staging/src/k8s.io/client-go/tools/portforward"
   - "./staging/src/k8s.io/client-go/tools/record"
   - "./staging/src/k8s.io/client-go/tools/events"
@@ -256,6 +257,7 @@
   - k8s.io/apiserver/pkg/cel
   - k8s.io/apiserver/pkg/cel/environment
   - k8s.io/client-go
+  - k8s.io/component-helpers/scheduling/corev1/nodeaffinity
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog
   - k8s.io/kubelet

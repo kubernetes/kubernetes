@@ -40,6 +40,9 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -700,6 +703,8 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 	}
 	defer s.Close()
 
+	labelRequirement, _ := labels.NewRequirement("baz", selection.Equals, []string{"qux"})
+
 	type webhookMatchConditionsTestCase struct {
 		name               string
 		attr               authorizer.AttributesRecord
@@ -709,6 +714,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		expectedDecision   authorizer.Decision
 		expressions        []apiserver.WebhookMatchCondition
 		featureEnabled     bool
+		selectorEnabled    bool
 	}
 	aliceAttr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
@@ -720,6 +726,19 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		ResourceRequest: true,
 		Namespace:       "kittensandponies",
 		Verb:            "get",
+	}
+	aliceWithSelectorsAttr := authorizer.AttributesRecord{
+		User: &user.DefaultInfo{
+			Name:   "alice",
+			UID:    "1",
+			Groups: []string{"group1", "group2"},
+			Extra:  map[string][]string{"key1": {"a", "b", "c"}},
+		},
+		ResourceRequest:           true,
+		Namespace:                 "kittensandponies",
+		Verb:                      "get",
+		FieldSelectorRequirements: fields.Requirements{fields.Requirement{Field: "foo", Operator: selection.Equals, Value: "bar"}},
+		LabelSelectorRequirements: labels.Requirements{*labelRequirement},
 	}
 	tests := []webhookMatchConditionsTestCase{
 		{
@@ -746,7 +765,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		},
 		{
 			name:               "feature enabled, match all against all expressions",
-			attr:               aliceAttr,
+			attr:               aliceWithSelectorsAttr,
 			allow:              true,
 			expectedCompileErr: false,
 			expectedDecision:   authorizer.DecisionAllow,
@@ -763,14 +782,28 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 				{
 					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
 				},
+				{
+					Expression: "request.?resourceAttributes.fieldSelector.requirements.orValue([]).exists(r, r.key=='foo' && r.operator=='In' && ('bar' in r.values))",
+				},
+				{
+					Expression: "request.?resourceAttributes.labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.?labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.labelSelector.?requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
 			},
-			featureEnabled: true,
+			featureEnabled:  true,
+			selectorEnabled: true,
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, test.selectorEnabled)
 			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions, "")
 			if test.expectedCompileErr && err == nil {
 				t.Fatalf("%d: Expected compile error", i)

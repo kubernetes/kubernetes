@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ObjectFieldSelectorApplyConfiguration represents an declarative configuration of the ObjectFieldSelector type for use
+// ObjectFieldSelectorApplyConfiguration represents a declarative configuration of the ObjectFieldSelector type for use
 // with apply.
 type ObjectFieldSelectorApplyConfiguration struct {
 	APIVersion *string `json:"apiVersion,omitempty"`
 	FieldPath  *string `json:"fieldPath,omitempty"`
 }
 
-// ObjectFieldSelectorApplyConfiguration constructs an declarative configuration of the ObjectFieldSelector type for use with
+// ObjectFieldSelectorApplyConfiguration constructs a declarative configuration of the ObjectFieldSelector type for use with
 // apply.
 func ObjectFieldSelector() *ObjectFieldSelectorApplyConfiguration {
 	return &ObjectFieldSelectorApplyConfiguration{}

@@ -1283,7 +1283,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 
 			actions := kubeClient.Actions()
 			if tc.wantPatches == 0 {
-				require.Len(t, actions, 0)
+				require.Empty(t, actions)
 				return
 			}
 
@@ -2732,8 +2732,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	require.Equal(t,
-		true,
+	require.True(t,
 		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
 }

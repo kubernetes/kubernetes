@@ -1,1 +1,1 @@
-codespell==2.2.6
+codespell==2.3.0

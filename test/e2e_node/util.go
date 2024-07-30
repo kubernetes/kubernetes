@@ -171,7 +171,7 @@ func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfigu
 	return e2enodekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false, framework.TestContext.StandaloneMode)
 }
 
-func cleanupPods(f *framework.Framework) {
+func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
 		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})

@@ -17,13 +17,17 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -750,13 +754,73 @@ func TestSync(t *testing.T) {
 			test:            testSyncClaim,
 		},
 	}
-	_, ctx := ktesting.NewTestContext(t)
-	runSyncTests(t, ctx, tests, []*storage.StorageClass{
+
+	// Once the feature-gate VolumeAttributesClass is promoted to GA, merge it with the above tests
+	whenFeatureGateEnabled := []controllerTest{
 		{
-			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
-			VolumeBindingMode: &modeWait,
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, but its volume attributes class does not match. Check that the claim status is reset to Pending
+			name:            "2-11 - claim prebound to unbound volume that volume attributes class is different",
+			initialVolumes:  volumesWithVAC(classGold, newVolumeArray("volume2-11", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			expectedVolumes: volumesWithVAC(classGold, newVolumeArray("volume2-11", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			initialClaims:   newClaimArray("claim2-11", "uid2-11", "1Gi", "volume2-11", v1.ClaimBound, nil),
+			expectedClaims:  newClaimArray("claim2-11", "uid2-11", "1Gi", "volume2-11", v1.ClaimPending, nil),
+			expectedEvents:  []string{"Warning VolumeMismatch"},
+			errors:          noerrors,
+			test:            testSyncClaim,
 		},
-	}, []*v1.Pod{})
+		{
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, they have the same volume attributes class. Check it gets bound and no volume.AnnBoundByController is set.
+			name:            "2-12 - claim prebound to unbound volume that volume attributes class is same",
+			initialVolumes:  volumesWithVAC(classGold, newVolumeArray("volume2-12", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			expectedVolumes: volumesWithVAC(classGold, newVolumeArray("volume2-12", "1Gi", "uid2-12", "claim2-12", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
+			initialClaims:   claimWithVAC(&classGold, newClaimArray("claim2-12", "uid2-12", "1Gi", "volume2-12", v1.ClaimPending, nil)),
+			expectedClaims:  withExpectedVAC(&classGold, claimWithVAC(&classGold, newClaimArray("claim2-12", "uid2-12", "1Gi", "volume2-12", v1.ClaimBound, nil, volume.AnnBindCompleted))),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            testSyncClaim,
+		},
+	}
+
+	// Once the feature-gate VolumeAttributesClass is promoted to GA, remove it
+	whenFeatureGateDisabled := []controllerTest{
+		{
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, they have the same volume attributes class but the feature-gate is disabled. Check that the claim status is reset to Pending
+			name:            "2-13 - claim prebound to unbound volume that volume attributes class is same",
+			initialVolumes:  volumesWithVAC(classGold, newVolumeArray("volume2-13", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			expectedVolumes: volumesWithVAC(classGold, newVolumeArray("volume2-13", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			initialClaims:   withExpectedVAC(&classGold, claimWithVAC(&classGold, newClaimArray("claim2-13", "uid2-13", "1Gi", "volume2-13", v1.ClaimBound, nil))),
+			expectedClaims:  claimWithVAC(&classGold, newClaimArray("claim2-13", "uid2-13", "1Gi", "volume2-13", v1.ClaimPending, nil)),
+			expectedEvents:  []string{"Warning VolumeMismatch"},
+			errors:          noerrors,
+			test:            testSyncClaim,
+		},
+	}
+
+	for _, isEnabled := range []bool{true, false} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, isEnabled)
+
+		allTests := tests
+		if isEnabled {
+			allTests = append(allTests, whenFeatureGateEnabled...)
+		} else {
+			allTests = append(allTests, whenFeatureGateDisabled...)
+		}
+
+		for i := range allTests {
+			allTests[i].name = fmt.Sprintf("features.VolumeAttributesClass=%v %s", isEnabled, allTests[i].name)
+		}
+
+		_, ctx := ktesting.NewTestContext(t)
+		runSyncTests(t, ctx, allTests, []*storage.StorageClass{
+			{
+				ObjectMeta:        metav1.ObjectMeta{Name: classWait},
+				VolumeBindingMode: &modeWait,
+			},
+		}, []*v1.Pod{})
+	}
 }
 
 func TestSyncBlockVolume(t *testing.T) {

@@ -244,6 +244,15 @@ message Mount {
     // - when set to true, readonly must be explicitly set to true, and propagation must be PRIVATE (0).
     // - (readonly == false && recursive_read_only == false) does not make the mount read-only.
     bool recursive_read_only = 8;
+    // Mount an image reference (image ID, with or without digest), which is a
+    // special use case for image volume mounts. If this field is set, then
+    // host_path should be unset. All OCI mounts are per feature definition
+    // readonly. The kubelet does an PullImage RPC and evaluates the returned
+    // PullImageResponse.image_ref value, which is then set to the
+    // ImageSpec.image field. Runtimes are expected to mount the image as
+    // required.
+    // Introduced in the OCI Volume Source KEP: https://kep.k8s.io/4639
+    ImageSpec image = 9;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -1591,6 +1600,7 @@ message StatusRequest {
     bool verbose = 1;
 }
 
+// RuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message RuntimeHandlerFeatures {
     // recursive_read_only_mounts is set to true if the runtime handler supports
     // recursive read-only mounts.
@@ -1611,6 +1621,14 @@ message RuntimeHandler {
     RuntimeHandlerFeatures features = 2;
 }
 
+// RuntimeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the RuntimeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message RuntimeFeatures {
+    // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+    bool supplemental_groups_policy = 1;
+}
+
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
@@ -1621,6 +1639,9 @@ message StatusResponse {
     map<string, string> info = 2;
     // Runtime handlers.
     repeated RuntimeHandler runtime_handlers = 3;
+    // features describes the set of features implemented by the CRI implementation.
+    // This field is supposed to propagate to NodeFeatures in Kubernetes API.
+    RuntimeFeatures features = 4;
 }
 
 message ImageFsInfoRequest {}

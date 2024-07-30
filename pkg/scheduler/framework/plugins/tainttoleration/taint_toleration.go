@@ -58,12 +58,12 @@ func (pl *TaintToleration) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *TaintToleration) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	clusterEventWithHint := []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}
 	if !pl.enableSchedulingQueueHint {
-		return clusterEventWithHint
+		return clusterEventWithHint, nil
 	}
 	// When the QueueingHint feature is enabled,
 	// the scheduling queue uses Pod/Update Queueing Hint
@@ -71,7 +71,7 @@ func (pl *TaintToleration) EventsToRegister() []framework.ClusterEventWithHint {
 	// https://github.com/kubernetes/kubernetes/pull/122234
 	clusterEventWithHint = append(clusterEventWithHint,
 		framework.ClusterEventWithHint{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange})
-	return clusterEventWithHint
+	return clusterEventWithHint, nil
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by

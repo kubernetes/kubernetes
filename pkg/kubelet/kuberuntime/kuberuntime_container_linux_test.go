@@ -40,8 +40,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/utils/ptr"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
@@ -49,7 +51,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
-	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, []string{podIP})
+	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, []string{podIP}, nil)
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
@@ -111,7 +113,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	}
 
 	expectedConfig := makeExpectedConfig(m, pod, 0, false)
-	containerConfig, _, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
+	containerConfig, _, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -142,7 +144,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
@@ -154,7 +156,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
@@ -1031,6 +1033,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		swapBehavior                string
 		addContainerWithoutRequests bool
 		addGuaranteedContainer      bool
+		isCriticalPod               bool
 	}{
 		// With cgroup v1
 		{
@@ -1208,6 +1211,16 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			addContainerWithoutRequests: true,
 			addGuaranteedContainer:      false,
 		},
+
+		// When the pod is considered critical, disallow swap access
+		{
+			name:                       "Best-effort QoS, cgroups v2, LimitedSwap, critical pod",
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBurstable,
+			nodeSwapFeatureGateEnabled: true,
+			swapBehavior:               types.LimitedSwap,
+			isCriticalPod:              true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
@@ -1244,6 +1257,11 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			pod.Spec.Containers[0].Resources = resourceReqsC1
 			pod.Spec.Containers[1].Resources = resourceReqsC2
 
+			if tc.isCriticalPod {
+				pod.Spec.Priority = ptr.To(scheduling.SystemCriticalPriority)
+				assert.True(t, types.IsCriticalPod(pod), "pod is expected to be critical")
+			}
+
 			resourcesC1 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
 			resourcesC2 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[1], false)
 
@@ -1252,7 +1270,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				return
 			}
 
-			if !tc.nodeSwapFeatureGateEnabled || tc.cgroupVersion == cgroupV1 || (tc.swapBehavior == types.LimitedSwap && tc.qosClass != v1.PodQOSBurstable) {
+			if tc.isCriticalPod || !tc.nodeSwapFeatureGateEnabled || tc.cgroupVersion == cgroupV1 || (tc.swapBehavior == types.LimitedSwap && tc.qosClass != v1.PodQOSBurstable) {
 				expectNoSwap(tc.cgroupVersion, resourcesC1, resourcesC2)
 				return
 			}

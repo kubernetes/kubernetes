@@ -109,7 +109,7 @@ func parseMountInfoString(mountString string) (*MountInfo, error) {
 	if mountInfo[6] != "" {
 		mount.OptionalFields, err = mountOptionsParseOptionalFields(mountInfo[6 : mountInfoLength-4])
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", ErrFileParse, err)
+			return nil, fmt.Errorf("%w: %w", ErrFileParse, err)
 		}
 	}
 	return mount, nil

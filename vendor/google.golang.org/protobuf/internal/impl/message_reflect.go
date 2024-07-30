@@ -20,7 +20,7 @@ type reflectMessageInfo struct {
 	// fieldTypes contains the zero value of an enum or message field.
 	// For lists, it contains the element type.
 	// For maps, it contains the entry value type.
-	fieldTypes map[protoreflect.FieldNumber]interface{}
+	fieldTypes map[protoreflect.FieldNumber]any
 
 	// denseFields is a subset of fields where:
 	//	0 < fieldDesc.Number() < len(denseFields)
@@ -28,7 +28,7 @@ type reflectMessageInfo struct {
 	denseFields []*fieldInfo
 
 	// rangeInfos is a list of all fields (not belonging to a oneof) and oneofs.
-	rangeInfos []interface{} // either *fieldInfo or *oneofInfo
+	rangeInfos []any // either *fieldInfo or *oneofInfo
 
 	getUnknown   func(pointer) protoreflect.RawFields
 	setUnknown   func(pointer, protoreflect.RawFields)
@@ -224,7 +224,7 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 		}
 		if ft != nil {
 			if mi.fieldTypes == nil {
-				mi.fieldTypes = make(map[protoreflect.FieldNumber]interface{})
+				mi.fieldTypes = make(map[protoreflect.FieldNumber]any)
 			}
 			mi.fieldTypes[fd.Number()] = reflect.Zero(ft).Interface()
 		}
@@ -247,39 +247,39 @@ func (m *extensionMap) Range(f func(protoreflect.FieldDescriptor, protoreflect.V
 		}
 	}
 }
-func (m *extensionMap) Has(xt protoreflect.ExtensionType) (ok bool) {
+func (m *extensionMap) Has(xd protoreflect.ExtensionTypeDescriptor) (ok bool) {
 	if m == nil {
 		return false
 	}
-	xd := xt.TypeDescriptor()
 	x, ok := (*m)[int32(xd.Number())]
 	if !ok {
 		return false
+	}
+	if x.isUnexpandedLazy() {
+		// Avoid calling x.Value(), which triggers a lazy unmarshal.
+		return true
 	}
 	switch {
 	case xd.IsList():
 		return x.Value().List().Len() > 0
 	case xd.IsMap():
 		return x.Value().Map().Len() > 0
-	case xd.Message() != nil:
-		return x.Value().Message().IsValid()
 	}
 	return true
 }
-func (m *extensionMap) Clear(xt protoreflect.ExtensionType) {
-	delete(*m, int32(xt.TypeDescriptor().Number()))
+func (m *extensionMap) Clear(xd protoreflect.ExtensionTypeDescriptor) {
+	delete(*m, int32(xd.Number()))
 }
-func (m *extensionMap) Get(xt protoreflect.ExtensionType) protoreflect.Value {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Get(xd protoreflect.ExtensionTypeDescriptor) protoreflect.Value {
 	if m != nil {
 		if x, ok := (*m)[int32(xd.Number())]; ok {
 			return x.Value()
 		}
 	}
-	return xt.Zero()
+	return xd.Type().Zero()
 }
-func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Set(xd protoreflect.ExtensionTypeDescriptor, v protoreflect.Value) {
+	xt := xd.Type()
 	isValid := true
 	switch {
 	case !xt.IsValidValue(v):
@@ -292,7 +292,7 @@ func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) 
 		isValid = v.Message().IsValid()
 	}
 	if !isValid {
-		panic(fmt.Sprintf("%v: assigning invalid value", xt.TypeDescriptor().FullName()))
+		panic(fmt.Sprintf("%v: assigning invalid value", xd.FullName()))
 	}
 
 	if *m == nil {
@@ -302,16 +302,15 @@ func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) 
 	x.Set(xt, v)
 	(*m)[int32(xd.Number())] = x
 }
-func (m *extensionMap) Mutable(xt protoreflect.ExtensionType) protoreflect.Value {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Mutable(xd protoreflect.ExtensionTypeDescriptor) protoreflect.Value {
 	if xd.Kind() != protoreflect.MessageKind && xd.Kind() != protoreflect.GroupKind && !xd.IsList() && !xd.IsMap() {
 		panic("invalid Mutable on field with non-composite type")
 	}
 	if x, ok := (*m)[int32(xd.Number())]; ok {
 		return x.Value()
 	}
-	v := xt.New()
-	m.Set(xt, v)
+	v := xd.Type().New()
+	m.Set(xd, v)
 	return v
 }
 
@@ -394,7 +393,7 @@ var (
 // MessageOf returns a reflective view over a message. The input must be a
 // pointer to a named Go struct. If the provided type has a ProtoReflect method,
 // it must be implemented by calling this method.
-func (mi *MessageInfo) MessageOf(m interface{}) protoreflect.Message {
+func (mi *MessageInfo) MessageOf(m any) protoreflect.Message {
 	if reflect.TypeOf(m) != mi.GoReflectType {
 		panic(fmt.Sprintf("type mismatch: got %T, want %v", m, mi.GoReflectType))
 	}
@@ -422,13 +421,13 @@ func (m *messageIfaceWrapper) Reset() {
 func (m *messageIfaceWrapper) ProtoReflect() protoreflect.Message {
 	return (*messageReflectWrapper)(m)
 }
-func (m *messageIfaceWrapper) protoUnwrap() interface{} {
+func (m *messageIfaceWrapper) protoUnwrap() any {
 	return m.p.AsIfaceOf(m.mi.GoReflectType.Elem())
 }
 
 // checkField verifies that the provided field descriptor is valid.
 // Exactly one of the returned values is populated.
-func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, protoreflect.ExtensionType) {
+func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, protoreflect.ExtensionTypeDescriptor) {
 	var fi *fieldInfo
 	if n := fd.Number(); 0 < n && int(n) < len(mi.denseFields) {
 		fi = mi.denseFields[n]
@@ -457,7 +456,7 @@ func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, 
 		if !ok {
 			panic(fmt.Sprintf("extension %v does not implement protoreflect.ExtensionTypeDescriptor", fd.FullName()))
 		}
-		return nil, xtd.Type()
+		return nil, xtd
 	}
 	panic(fmt.Sprintf("field %v is invalid", fd.FullName()))
 }

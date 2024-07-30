@@ -53,6 +53,7 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -188,7 +189,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	tests := []struct {
 		name string
 		// initialNode is the Node to be created at first.
-		initialNode *v1.Node
+		initialNodes []*v1.Node
 		// initialPod is the Pod to be created at first if it's not empty.
 		initialPod *v1.Pod
 		// pods are the list of Pods to be created.
@@ -202,8 +203,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		enableSchedulingQueueHint []bool
 	}{
 		{
-			name:        "Pod without a required toleration to a node isn't requeued to activeQ",
-			initialNode: st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			name:         "Pod without a required toleration to a node isn't requeued to activeQ",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 				//   (TaintToleration plugin is evaluated before NodeResourcesFit plugin.)
@@ -224,9 +225,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
-			name:        "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
-			initialNode: st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			initialPod:  st.MakePod().Label("anti", "anti").Name("pod1").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+			name:         "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			initialPod:   st.MakePod().Label("anti", "anti").Name("pod1").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
 			pods: []*v1.Pod{
 				// - Pod2 will be rejected by the PodAffinity plugin.
 				st.MakePod().Label("anti", "anti").Name("pod2").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
@@ -254,8 +255,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
-			name:        "Pod updated with toleration requeued to activeQ",
-			initialNode: st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			name:         "Pod updated with toleration requeued to activeQ",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
@@ -272,8 +273,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
-			name:        "Pod got resource scaled down requeued to activeQ",
-			initialNode: st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			name:         "Pod got resource scaled down requeued to activeQ",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
@@ -290,8 +291,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
-			name:        "Updating pod condition doesn't retry scheduling if the Pod was rejected by TaintToleration",
-			initialNode: st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			name:         "Updating pod condition doesn't retry scheduling if the Pod was rejected by TaintToleration",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 				st.MakePod().Name("pod1").Container("image").Obj(),
@@ -327,6 +328,60 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			// because QHint of TaintToleration would decide to ignore a Pod update.
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			// The test case makes sure that PreFilter plugins returning PreFilterResult are also inserted into pInfo.UnschedulablePlugins
+			// meaning, they're taken into consideration during requeuing flow of the queue.
+			// https://github.com/kubernetes/kubernetes/issues/122018
+			name: "Pod rejected by the PreFilter of NodeAffinity plugin and Filter of NodeResourcesFit is requeued based on both plugins",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+				st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Label("zone", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			},
+			pods: []*v1.Pod{
+				// - Pod1 will be rejected by the NodeAffinity plugin and NodeResourcesFit plugin.
+				st.MakePod().Label("unscheduled", "plugins").Name("pod1").NodeAffinityIn("metadata.name", []string{"fake-node"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeDeleted event.
+				// It will not requeue pod1 to activeQ,
+				// because both NodeAffinity and NodeResourceFit don't register Node/delete event.
+				err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node", metav1.DeleteOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to delete fake-node node")
+				}
+
+				// Trigger a NodeCreated event.
+				// It will requeue  pod1 to activeQ, because QHint of NodeAffinity return Queue.
+				// It makes sure PreFilter plugins returned PreFilterResult takes an effect for sure,
+				// because NodeResourceFit QHint returns QueueSkip for this event actually.
+				node := st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create a new node: %w", err)
+				}
+
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			initialPod:   st.MakePod().Name("pod1").Label("key", "val").Container("image").Node("fake-node").Obj(),
+			pods: []*v1.Pod{
+				// - Pod2 will be rejected by the PodTopologySpread plugin.
+				st.MakePod().Name("pod2").Label("key", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an assigned Pod add event.
+				pod := st.MakePod().Name("pod3").Label("key", "val").Node("fake-node").Container("image").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
+				}
+
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod2"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -350,9 +405,11 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				defer testCtx.Scheduler.SchedulingQueue.Close()
 
 				cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-				// Create initialNode.
-				if _, err := cs.CoreV1().Nodes().Create(ctx, tt.initialNode, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create an initial Node %q: %v", tt.initialNode.Name, err)
+				// Create one Node with a taint.
+				for _, node := range tt.initialNodes {
+					if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
+					}
 				}
 
 				if tt.initialPod != nil {
@@ -430,10 +487,10 @@ func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
-	}
+	}, nil
 }
 
 // TestCustomResourceEnqueue constructs a fake plugin that registers custom resources
@@ -810,8 +867,8 @@ func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleSta
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 
-func (p *fakePermitPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
-	}
+	}, nil
 }

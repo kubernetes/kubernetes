@@ -25,8 +25,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 
 	"github.com/spf13/pflag"
 )
@@ -45,16 +47,17 @@ const (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
-	CorsAllowedOriginList       []string
-	HSTSDirectives              []string
-	ExternalHost                string
-	MaxRequestsInFlight         int
-	MaxMutatingRequestsInFlight int
-	RequestTimeout              time.Duration
-	GoawayChance                float64
-	LivezGracePeriod            time.Duration
-	MinRequestTimeout           int
-	ShutdownDelayDuration       time.Duration
+	CorsAllowedOriginList        []string
+	HSTSDirectives               []string
+	ExternalHost                 string
+	MaxRequestsInFlight          int
+	MaxMutatingRequestsInFlight  int
+	RequestTimeout               time.Duration
+	GoawayChance                 float64
+	LivezGracePeriod             time.Duration
+	MinRequestTimeout            int
+	StorageInitializationTimeout time.Duration
+	ShutdownDelayDuration        time.Duration
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	JSONPatchMaxCopyBytes int64
@@ -89,9 +92,24 @@ type ServerRunOptions struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry utilversion.ComponentGlobalsRegistry
+	// ComponentName is name under which the server's global variabled are registered in the ComponentGlobalsRegistry.
+	ComponentName string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
+	if utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent) == nil {
+		featureGate := utilfeature.DefaultMutableFeatureGate
+		effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+		utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
+	}
+
+	return NewServerRunOptionsForComponent(utilversion.DefaultKubeComponent, utilversion.DefaultComponentGlobalsRegistry)
+}
+
+func NewServerRunOptionsForComponent(componentName string, componentGlobalsRegistry utilversion.ComponentGlobalsRegistry) *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
@@ -99,16 +117,22 @@ func NewServerRunOptions() *ServerRunOptions {
 		RequestTimeout:                      defaults.RequestTimeout,
 		LivezGracePeriod:                    defaults.LivezGracePeriod,
 		MinRequestTimeout:                   defaults.MinRequestTimeout,
+		StorageInitializationTimeout:        defaults.StorageInitializationTimeout,
 		ShutdownDelayDuration:               defaults.ShutdownDelayDuration,
 		ShutdownWatchTerminationGracePeriod: defaults.ShutdownWatchTerminationGracePeriod,
 		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		ShutdownSendRetryAfter:              false,
+		ComponentName:                       componentName,
+		ComponentGlobalsRegistry:            componentGlobalsRegistry,
 	}
 }
 
 // ApplyTo applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
+	if err := s.ComponentGlobalsRegistry.SetFallback(); err != nil {
+		return err
+	}
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.HSTSDirectives = s.HSTSDirectives
 	c.ExternalAddress = s.ExternalHost
@@ -118,12 +142,15 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.StorageInitializationTimeout = s.StorageInitializationTimeout
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.EffectiveVersion = s.ComponentGlobalsRegistry.EffectiveVersionFor(s.ComponentName)
+	c.FeatureGate = s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName)
 
 	return nil
 }
@@ -173,6 +200,10 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
 	}
 
+	if s.StorageInitializationTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--storage-initialization-timeout can not be negative value"))
+	}
+
 	if s.ShutdownDelayDuration < 0 {
 		errors = append(errors, fmt.Errorf("--shutdown-delay-duration can not be negative value"))
 	}
@@ -195,6 +226,9 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if err := validateCorsAllowedOriginList(s.CorsAllowedOriginList); err != nil {
 		errors = append(errors, err)
+	}
+	if errs := s.ComponentGlobalsRegistry.Validate(); len(errs) != 0 {
+		errors = append(errors, errs...)
 	}
 	return errors
 }
@@ -323,6 +357,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
+	fs.DurationVar(&s.StorageInitializationTimeout, "storage-initialization-timeout", s.StorageInitializationTimeout,
+		"Maximum amount of time to wait for storage initialization before declaring apiserver ready. Defaults to 1m.")
+
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
 		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
 		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
@@ -337,5 +374,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
+	s.ComponentGlobalsRegistry.AddFlags(fs)
+}
+
+// Complete fills missing fields with defaults.
+func (s *ServerRunOptions) Complete() error {
+	return s.ComponentGlobalsRegistry.SetFallback()
 }

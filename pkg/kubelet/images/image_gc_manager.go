@@ -248,6 +248,10 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	// Make a set of images in use by containers.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
+			if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
+				return imagesInUse, err
+			}
+
 			if !isRuntimeClassInImageCriAPIEnabled {
 				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
 				imagesInUse.Insert(container.ImageID)
@@ -306,6 +310,29 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	}
 
 	return imagesInUse, nil
+}
+
+// handleImageVolumes ensures that image volumes are considered as images in use.
+func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUse sets.Set[string], container *container.Container, pod *container.Pod, images []container.Image) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+		return nil
+	}
+
+	status, err := im.runtime.GetContainerStatus(ctx, container.ID)
+	if err != nil {
+		return fmt.Errorf("get container status: %w", err)
+	}
+
+	for _, mount := range status.Mounts {
+		for _, image := range images {
+			if mount.Image != nil && mount.Image.Image == image.ID {
+				klog.V(5).InfoS("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", image.ID)
+				imagesInUse.Insert(image.ID)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {

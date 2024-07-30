@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// LinuxContainerUserApplyConfiguration represents an declarative configuration of the LinuxContainerUser type for use
+// LinuxContainerUserApplyConfiguration represents a declarative configuration of the LinuxContainerUser type for use
 // with apply.
 type LinuxContainerUserApplyConfiguration struct {
 	UID                *int64  `json:"uid,omitempty"`
@@ -26,7 +26,7 @@ type LinuxContainerUserApplyConfiguration struct {
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 
-// LinuxContainerUserApplyConfiguration constructs an declarative configuration of the LinuxContainerUser type for use with
+// LinuxContainerUserApplyConfiguration constructs a declarative configuration of the LinuxContainerUser type for use with
 // apply.
 func LinuxContainerUser() *LinuxContainerUserApplyConfiguration {
 	return &LinuxContainerUserApplyConfiguration{}

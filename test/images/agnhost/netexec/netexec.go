@@ -727,7 +727,6 @@ func startSCTPServer(sctpPort int) {
 
 func getHostName() string {
 	hostName, err := os.Hostname()
-	log.Printf("hostname: %s", hostName)
 	assertNoError(err, "failed to get hostname")
 	return hostName
 }

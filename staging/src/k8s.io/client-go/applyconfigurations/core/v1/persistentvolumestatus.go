@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PersistentVolumeStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeStatus type for use
+// PersistentVolumeStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeStatus type for use
 // with apply.
 type PersistentVolumeStatusApplyConfiguration struct {
 	Phase                   *v1.PersistentVolumePhase `json:"phase,omitempty"`
@@ -32,7 +32,7 @@ type PersistentVolumeStatusApplyConfiguration struct {
 	LastPhaseTransitionTime *metav1.Time              `json:"lastPhaseTransitionTime,omitempty"`
 }
 
-// PersistentVolumeStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeStatus type for use with
+// PersistentVolumeStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeStatus type for use with
 // apply.
 func PersistentVolumeStatus() *PersistentVolumeStatusApplyConfiguration {
 	return &PersistentVolumeStatusApplyConfiguration{}

@@ -419,7 +419,7 @@ type IngressRule struct {
 	// default backend, is left to the controller fulfilling the Ingress. Http is
 	// currently the only supported IngressRuleValue.
 	// +optional
-	IngressRuleValue `json:",inline,omitempty" protobuf:"bytes,2,opt,name=ingressRuleValue"`
+	IngressRuleValue `json:",inline" protobuf:"bytes,2,opt,name=ingressRuleValue"`
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the
@@ -531,6 +531,7 @@ type IngressServiceBackend struct {
 }
 
 // ServiceBackendPort is the service port being referenced.
+// +structType=atomic
 type ServiceBackendPort struct {
 	// name is the name of the port on the Service.
 	// This is a mutually exclusive setting with "Number".

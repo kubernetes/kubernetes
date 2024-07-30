@@ -25,7 +25,7 @@ import (
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -430,23 +430,23 @@ func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *stor
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1alpha1.VolumeAttributesClass {
+func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
 	if !d.VolumeAttributesClass.FromName && d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q has no configured VolumeAttributesClass - skipping", d.DriverInfo.Name)
 		return nil
 	}
 
 	var (
-		vac *storagev1alpha1.VolumeAttributesClass
+		vac *storagev1beta1.VolumeAttributesClass
 		err error
 	)
 
 	f := e2econfig.Framework
 	switch {
 	case d.VolumeAttributesClass.FromName:
-		vac = &storagev1alpha1.VolumeAttributesClass{DriverName: d.DriverInfo.Name}
+		vac = &storagev1beta1.VolumeAttributesClass{DriverName: d.DriverInfo.Name}
 	case d.VolumeAttributesClass.FromExistingClassName != "":
-		vac, err = f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
+		vac, err = f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting VolumeAttributesClass %s", d.VolumeAttributesClass.FromExistingClassName)
 	case d.VolumeAttributesClass.FromFile != "":
 		var ok bool
@@ -456,7 +456,7 @@ func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econf
 		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
 
-		vac, ok = items[0].(*storagev1alpha1.VolumeAttributesClass)
+		vac, ok = items[0].(*storagev1beta1.VolumeAttributesClass)
 		if !ok {
 			framework.Failf("cast VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
 		}

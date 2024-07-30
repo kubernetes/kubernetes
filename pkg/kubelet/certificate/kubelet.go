@@ -32,15 +32,43 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
 )
+
+func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddress) func() *x509.CertificateRequest {
+	return func() *x509.CertificateRequest {
+		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
+		// by default, require at least one IP before requesting a serving certificate
+		hasRequiredAddresses := len(ips) > 0
+
+		// optionally allow requesting a serving certificate with just a DNS name
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowDNSOnlyNodeCSR) {
+			hasRequiredAddresses = hasRequiredAddresses || len(hostnames) > 0
+		}
+
+		// don't return a template if we have no addresses to request for
+		if !hasRequiredAddresses {
+			return nil
+		}
+		return &x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+				Organization: []string{"system:nodes"},
+			},
+			DNSNames:    hostnames,
+			IPAddresses: ips,
+		}
+	}
+}
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
@@ -92,21 +120,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	)
 	legacyregistry.MustRegister(certificateRotationAge)
 
-	getTemplate := func() *x509.CertificateRequest {
-		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
-		// don't return a template if we have no addresses to request for
-		if len(hostnames) == 0 && len(ips) == 0 {
-			return nil
-		}
-		return &x509.CertificateRequest{
-			Subject: pkix.Name{
-				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-				Organization: []string{"system:nodes"},
-			},
-			DNSNames:    hostnames,
-			IPAddresses: ips,
-		}
-	}
+	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn:             clientsetFn,

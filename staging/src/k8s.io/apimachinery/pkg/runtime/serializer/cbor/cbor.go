@@ -99,16 +99,39 @@ func (s *serializer) Identifier() runtime.Identifier {
 	return "cbor"
 }
 
+// Encode writes a CBOR representation of the given object.
+//
+// Because the CBOR data item written by a call to Encode is always enclosed in the "self-described
+// CBOR" tag, its encoded form always has the prefix 0xd9d9f7. This prefix is suitable for use as a
+// "magic number" for distinguishing encoded CBOR from other protocols.
+//
+// The default serialization behavior for any given object replicates the behavior of the JSON
+// serializer as far as it is necessary to allow the CBOR serializer to be used as a drop-in
+// replacement for the JSON serializer, with limited exceptions. For example, the distinction
+// between integers and floating-point numbers is preserved in CBOR due to its distinct
+// representations for each type.
+//
+// Objects implementing runtime.Unstructured will have their unstructured content encoded rather
+// than following the default behavior for their dynamic type.
 func (s *serializer) Encode(obj runtime.Object, w io.Writer) error {
+	return s.encode(modes.Encode, obj, w)
+}
+
+func (s *serializer) encode(mode modes.EncMode, obj runtime.Object, w io.Writer) error {
+	var v interface{} = obj
+	if u, ok := obj.(runtime.Unstructured); ok {
+		v = u.UnstructuredContent()
+	}
+
+	if err := modes.RejectCustomMarshalers(v); err != nil {
+		return err
+	}
+
 	if _, err := w.Write(selfDescribedCBOR); err != nil {
 		return err
 	}
 
-	e := modes.Encode.NewEncoder(w)
-	if u, ok := obj.(runtime.Unstructured); ok {
-		return e.Encode(u.UnstructuredContent())
-	}
-	return e.Encode(obj)
+	return mode.MarshalTo(v, w)
 }
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
@@ -218,6 +241,8 @@ func (s *serializer) unmarshal(data []byte, into interface{}) (strict, lax error
 			}
 		}()
 		into = &content
+	} else if err := modes.RejectCustomMarshalers(into); err != nil {
+		return nil, err
 	}
 
 	if !s.options.strict {
@@ -298,6 +323,12 @@ func (s *serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runt
 	if err != nil {
 		return nil, actual, err
 	}
+
+	// TODO: Make possible to disable this behavior.
+	if err := transcodeRawTypes(obj); err != nil {
+		return nil, actual, err
+	}
+
 	return obj, actual, strict
 }
 

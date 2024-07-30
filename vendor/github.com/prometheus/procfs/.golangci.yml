@@ -1,9 +1,16 @@
 ---
 linters:
   enable:
+  - errcheck
   - godot
+  - gosimple
+  - govet
+  - ineffassign
   - misspell
   - revive
+  - staticcheck
+  - testifylint
+  - unused
 
 linter-settings:
   godot:

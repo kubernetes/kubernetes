@@ -25,12 +25,12 @@ import (
 
 func TestRunAsNonRoot(t *testing.T) {
 	tests := []struct {
-		name                                     string
-		pod                                      *corev1.Pod
-		expectReason                             string
-		expectDetail                             string
-		allowed                                  bool
-		enableUserNamespacesPodSecurityStandards bool
+		name           string
+		pod            *corev1.Pod
+		expectReason   string
+		expectDetail   string
+		expectAllowed  bool
+		relaxForUserNS bool
 	}{
 		{
 			name: "no explicit runAsNonRoot",
@@ -87,8 +87,8 @@ func TestRunAsNonRoot(t *testing.T) {
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				HostUsers: utilpointer.Bool(false),
 			}},
-			allowed:                                  true,
-			enableUserNamespacesPodSecurityStandards: true,
+			expectAllowed:  true,
+			relaxForUserNS: true,
 		},
 		{
 			name: "UserNamespacesPodSecurityStandards enabled with HostUsers",
@@ -98,21 +98,24 @@ func TestRunAsNonRoot(t *testing.T) {
 				},
 				HostUsers: utilpointer.Bool(true),
 			}},
-			expectReason:                             `runAsNonRoot != true`,
-			expectDetail:                             `pod or container "a" must set securityContext.runAsNonRoot=true`,
-			allowed:                                  false,
-			enableUserNamespacesPodSecurityStandards: true,
+			expectReason:   `runAsNonRoot != true`,
+			expectDetail:   `pod or container "a" must set securityContext.runAsNonRoot=true`,
+			expectAllowed:  false,
+			relaxForUserNS: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.enableUserNamespacesPodSecurityStandards {
+			if tc.relaxForUserNS {
 				RelaxPolicyForUserNamespacePods(true)
+				t.Cleanup(func() {
+					RelaxPolicyForUserNamespacePods(false)
+				})
 			}
 			result := runAsNonRoot_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
-			if result.Allowed && !tc.allowed {
-				t.Fatal("expected disallowed")
+			if result.Allowed != tc.expectAllowed {
+				t.Fatalf("expected Allowed to be %v was %v", tc.expectAllowed, result.Allowed)
 			}
 			if e, a := tc.expectReason, result.ForbiddenReason; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)

@@ -133,6 +133,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
+    - testifylint
     - unused
   disable:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
@@ -219,3 +220,5 @@ linters-settings: # please keep this alphabetized
   staticcheck:
     checks:
       - "all"
+  testifylint:
+    enable-all: true

@@ -56,8 +56,9 @@ var (
 	noLimits *resource.Quantity = nil
 )
 
-var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
+var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("swap-qos")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
@@ -83,6 +84,19 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
 			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
 		)
+
+		ginkgo.It("with a critical pod - should avoid swap", func() {
+			ginkgo.By("Creating a critical pod")
+			const memoryRequestEqualLimit = false
+			pod := getSwapTestPod(f, v1.PodQOSBurstable, memoryRequestEqualLimit)
+			pod.Spec.PriorityClassName = "system-node-critical"
+
+			pod = runPodAndWaitUntilScheduled(f, pod)
+			gomega.Expect(types.IsCriticalPod(pod)).To(gomega.BeTrueBecause("pod should be critical"))
+
+			ginkgo.By("expecting pod to not have swap access")
+			expectNoSwap(f, pod)
+		})
 	})
 
 	f.Context(framework.WithSerial(), func() {
@@ -153,7 +167,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 				gomega.Expect(nodeUsedMemory.IsZero()).To(gomega.BeFalseBecause("node used memory is zero"))
 
 				swapCapacity = getSwapCapacity(f, sleepingPod)
-				gomega.Expect(swapCapacity.IsZero()).To(gomega.BeFalseBecause("node swap capacity is zero"))
+				if swapCapacity.IsZero() {
+					e2eskipper.Skipf("swap is not provisioned on the node")
+				}
 
 				err := podClient.Delete(context.Background(), sleepingPod.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)

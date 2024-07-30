@@ -37,7 +37,6 @@ import (
 	netutil "k8s.io/utils/net"
 
 	_ "k8s.io/kubernetes/pkg/features"
-	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -115,7 +114,7 @@ func NewOptions() *Options {
 		Logs:                    logs.NewOptions(),
 		Traces:                  genericoptions.NewTracingOptions(),
 
-		EnableLogsHandler:                   true,
+		EnableLogsHandler:                   false,
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
@@ -151,7 +150,7 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
+	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.33") //nolint:errcheck
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -203,6 +202,10 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 		Options: *o,
 	}
 
+	if err := completed.GenericServerRunOptions.Complete(); err != nil {
+		return CompletedOptions{}, err
+	}
+
 	// set defaults
 	if err := completed.GenericServerRunOptions.DefaultAdvertiseAddress(completed.SecureServing.SecureServingOptions); err != nil {
 		return CompletedOptions{}, err
@@ -230,49 +233,36 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 	// adjust authentication for completed authorization
 	completed.Authentication.ApplyAuthorization(completed.Authorization)
 
-	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
-	// TokenRequest functionality. This defaulting was convenient, but messed up
-	// a lot of people when they rotated their serving cert with no idea it was
-	// connected to their service account keys. We are taking this opportunity to
-	// remove this problematic defaulting.
-	if completed.ServiceAccountSigningKeyFile == "" {
-		// Default to the private server key for service account token signing
-		if len(completed.Authentication.ServiceAccounts.KeyFiles) == 0 && completed.SecureServing.ServerCert.CertKey.KeyFile != "" {
-			if kubeauthenticator.IsValidServiceAccountKeyFile(completed.SecureServing.ServerCert.CertKey.KeyFile) {
-				completed.Authentication.ServiceAccounts.KeyFiles = []string{completed.SecureServing.ServerCert.CertKey.KeyFile}
-			} else {
-				klog.Warning("No TLS key provided, service account token authentication disabled")
+	// verify and adjust ServiceAccountTokenMaxExpiration
+	if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
+		lowBound := time.Hour
+		upBound := time.Duration(1<<32) * time.Second
+		if completed.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+			completed.Authentication.ServiceAccounts.MaxExpiration > upBound {
+			return CompletedOptions{}, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
+		}
+		if completed.Authentication.ServiceAccounts.ExtendExpiration {
+			if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
+				klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)", serviceaccount.WarnOnlyBoundTokenExpirationSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
+			}
+			if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
+				klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s seconds", serviceaccount.ExpirationExtensionSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
 			}
 		}
 	}
+	completed.ServiceAccountTokenMaxExpiration = completed.Authentication.ServiceAccounts.MaxExpiration
 
-	if completed.ServiceAccountSigningKeyFile != "" && len(completed.Authentication.ServiceAccounts.Issuers) != 0 && completed.Authentication.ServiceAccounts.Issuers[0] != "" {
-		sk, err := keyutil.PrivateKeyFromFile(completed.ServiceAccountSigningKeyFile)
-		if err != nil {
-			return CompletedOptions{}, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
-		}
-		if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
-			lowBound := time.Hour
-			upBound := time.Duration(1<<32) * time.Second
-			if completed.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
-				completed.Authentication.ServiceAccounts.MaxExpiration > upBound {
-				return CompletedOptions{}, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
+	if len(completed.Authentication.ServiceAccounts.Issuers) != 0 && completed.Authentication.ServiceAccounts.Issuers[0] != "" {
+		if completed.ServiceAccountSigningKeyFile != "" {
+			sk, err := keyutil.PrivateKeyFromFile(completed.ServiceAccountSigningKeyFile)
+			if err != nil {
+				return CompletedOptions{}, fmt.Errorf("failed to parse service-account-issuer-key-file: %w", err)
 			}
-			if completed.Authentication.ServiceAccounts.ExtendExpiration {
-				if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)", serviceaccount.WarnOnlyBoundTokenExpirationSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
-				}
-				if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s seconds", serviceaccount.ExpirationExtensionSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
-				}
+			completed.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(completed.Authentication.ServiceAccounts.Issuers[0], sk)
+			if err != nil {
+				return CompletedOptions{}, fmt.Errorf("failed to build token generator: %w", err)
 			}
 		}
-
-		completed.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(completed.Authentication.ServiceAccounts.Issuers[0], sk)
-		if err != nil {
-			return CompletedOptions{}, fmt.Errorf("failed to build token generator: %v", err)
-		}
-		completed.ServiceAccountTokenMaxExpiration = completed.Authentication.ServiceAccounts.MaxExpiration
 	}
 
 	for key, value := range completed.APIEnablement.RuntimeConfig {

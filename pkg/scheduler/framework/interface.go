@@ -38,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -362,7 +363,7 @@ type QueueSortPlugin interface {
 // Failures from other extension points are regarded as temporal errors (e.g., network failure),
 // and the scheduler requeue Pods without this extension point - always requeue Pods to activeQ after backoff.
 // This is because such temporal errors cannot be resolved by specific cluster events,
-// and we have no choise but keep retrying scheduling until the failure is resolved.
+// and we have no choose but keep retrying scheduling until the failure is resolved.
 //
 // Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) should implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
@@ -374,11 +375,13 @@ type EnqueueExtensions interface {
 	// filters out events to reduce useless retry of Pod's scheduling.
 	// The events will be registered when instantiating the internal scheduling queue,
 	// and leveraged to build event handlers dynamically.
-	// Note: the returned list needs to be static (not depend on configuration parameters);
-	// otherwise it would lead to undefined behavior.
+	// When it returns an error, the scheduler fails to start.
+	// Note: the returned list needs to be determined at a startup,
+	// and the scheduler only evaluates it once during start up.
+	// Do not change the result during runtime, for example, based on the cluster's state etc.
 	//
 	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
-	EventsToRegister() []ClusterEventWithHint
+	EventsToRegister(context.Context) ([]ClusterEventWithHint, error)
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
@@ -588,7 +591,10 @@ type Framework interface {
 	// cycle is aborted.
 	// It also returns a PreFilterResult, which may influence what or how many nodes to
 	// evaluate downstream.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status)
+	// The third returns value contains PreFilter plugin that rejected some or all Nodes with PreFilterResult.
+	// But, note that it doesn't contain any plugin when a plugin rejects this Pod with non-success status,
+	// not with PreFilterResult.
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status, sets.Set[string])
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
@@ -702,6 +708,11 @@ type Handle interface {
 	EventRecorder() events.EventRecorder
 
 	SharedInformerFactory() informers.SharedInformerFactory
+
+	// ResourceClaimCache returns an assume cache of ResourceClaim objects
+	// which gets populated by the shared informer factory and the dynamic resources
+	// plugin.
+	ResourceClaimCache() *assumecache.AssumeCache
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state *CycleState, pod *v1.Pod, info *NodeInfo) *Status

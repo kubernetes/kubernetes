@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -26,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
@@ -42,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/features"
@@ -59,6 +60,10 @@ var (
 	// IdentityLeaseRenewIntervalPeriod is the interval of kube-apiserver renewing its lease in seconds
 	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+
+	// LeaseCandidateGCPeriod is the interval which the leasecandidate GC controller checks for expired leases
+	// This is exposed so integration tests can tune this value.
+	LeaseCandidateGCPeriod = 30 * time.Minute
 )
 
 const (
@@ -93,13 +98,11 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		routes.Logs{}.Install(generic.Handler.GoRestfulContainer)
 	}
 
-	// Metadata and keys are expected to only change across restarts at present,
-	// so we just marshal immediately and serve the cached JSON bytes.
-	md, err := serviceaccount.NewOpenIDMetadata(
+	md, err := serviceaccount.NewOpenIDMetadataProvider(
 		c.ServiceAccountIssuerURL,
 		c.ServiceAccountJWKSURI,
 		c.Generic.ExternalAddress,
-		c.ServiceAccountPublicKeys,
+		c.ServiceAccountPublicKeysGetter,
 	)
 	if err != nil {
 		// If there was an error, skip installing the endpoints and log the
@@ -120,8 +123,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			klog.Info(msg)
 		}
 	} else {
-		routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
-			Install(generic.Handler.GoRestfulContainer)
+		routes.NewOpenIDMetadataServer(md).Install(generic.Handler.GoRestfulContainer)
 	}
 
 	s := &Server{
@@ -139,7 +141,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	}
 	if len(c.SystemNamespaces) > 0 {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.Done())
 			return nil
 		})
 	}
@@ -147,6 +149,35 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	_, publicServicePort, err := c.Generic.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
+		lcInformer := s.VersionedInformers.Coordination().V1alpha1().LeaseCandidates()
+		// Ensure that informers are registered before starting. Coordinated Leader Election leader-elected
+		// and may register informer handlers after they are started.
+		_ = leaseInformer.Informer()
+		_ = lcInformer.Informer()
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			go leaderelection.RunWithLeaderElection(hookContext, s.GenericAPIServer.LoopbackClientConfig, func() (func(ctx context.Context, workers int), error) {
+				controller, err := leaderelection.NewController(
+					leaseInformer,
+					lcInformer,
+					client.CoordinationV1(),
+					client.CoordinationV1alpha1(),
+				)
+				gccontroller := leaderelection.NewLeaseCandidateGC(
+					client,
+					LeaseCandidateGCPeriod,
+					lcInformer,
+				)
+				return func(ctx context.Context, workers int) {
+					go controller.Run(ctx, workers)
+					go gccontroller.Run(ctx)
+				}, err
+			})
+			return nil
+		})
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
@@ -157,12 +188,9 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			c.Extra.PeerEndpointLeaseReconciler,
 			c.Extra.PeerEndpointReconcileInterval,
 			client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create peer endpoint lease controller: %w", err)
-		}
 		s.GenericAPIServer.AddPostStartHookOrDie("peer-endpoint-reconciler-controller",
 			func(hookContext genericapiserver.PostStartHookContext) error {
-				peerEndpointCtrl.Start(hookContext.StopCh)
+				peerEndpointCtrl.Start(hookContext.Done())
 				return nil
 			})
 		s.GenericAPIServer.AddPreShutdownHookOrDie("peer-endpoint-reconciler-controller",
@@ -172,7 +200,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			})
 		if c.Extra.PeerProxy != nil {
 			s.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
-				err := c.Extra.PeerProxy.WaitForCacheSync(context.StopCh)
+				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
 				return err
 			})
 		}
@@ -180,43 +208,34 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(s.ClusterAuthenticationInfo, client)
-
-		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-		// TODO: See if we can pass ctx to the current method
-		ctx := wait.ContextForChannel(hookContext.StopCh)
-
 		// prime values and start listeners
 		if s.ClusterAuthenticationInfo.ClientCA != nil {
 			s.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := s.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(ctx); err != nil {
+				if err := controller.RunOnce(hookContext); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(ctx, 1)
+				go controller.Run(hookContext, 1)
 			}
 		}
 		if s.ClusterAuthenticationInfo.RequestHeaderCA != nil {
 			s.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := s.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(ctx); err != nil {
+				if err := controller.RunOnce(hookContext); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(ctx, 1)
+				go controller.Run(hookContext, 1)
 			}
 		}
 
-		go controller.Run(ctx, 1)
+		go controller.Run(hookContext, 1)
 		return nil
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-			// TODO: See if we can pass ctx to the current method
-			ctx := wait.ContextForChannel(hookContext.StopCh)
-
 			leaseName := s.GenericAPIServer.APIServerID
 			holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
@@ -233,7 +252,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
 				labelAPIServerHeartbeatFunc(name, peeraddress))
-			go controller.Run(ctx)
+			go controller.Run(hookContext)
 			return nil
 		})
 		// TODO: move this into generic apiserver and make the lease identity value configurable
@@ -243,13 +262,17 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				IdentityLeaseComponentLabelKey+"="+name,
-			).Run(hookContext.StopCh)
+			).Run(hookContext.Done())
 			return nil
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.WatchCacheInitializationPostStartHook) {
+		s.GenericAPIServer.AddPostStartHookOrDie("storage-readiness", s.GenericAPIServer.StorageReadinessHook.Hook)
+	}
+
 	s.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go legacytokentracking.NewController(client).Run(hookContext.StopCh)
+		go legacytokentracking.NewController(client).Run(hookContext.Done())
 		return nil
 	})
 

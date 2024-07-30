@@ -45,7 +45,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicepkg "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Most of the tests related to EndpointSlice allocation can be found in reconciler_test.go
@@ -194,8 +194,8 @@ func TestSyncServiceNoSelector(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	require.NoError(t, err)
+	assert.Empty(t, client.Actions())
 }
 
 func TestServiceExternalNameTypeSync(t *testing.T) {
@@ -255,18 +255,18 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 
 			pod := newPod(1, namespace, true, 0, false)
 			err := esController.podStore.Add(pod)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			err = esController.serviceStore.Add(tc.service)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
-			assert.NoError(t, err)
-			assert.Len(t, client.Actions(), 0)
+			require.NoError(t, err)
+			assert.Empty(t, client.Actions())
 
 			sliceList, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
-			assert.NoError(t, err)
-			assert.Len(t, sliceList.Items, 0, "Expected 0 endpoint slices")
+			require.NoError(t, err)
+			assert.Empty(t, sliceList.Items, "Expected 0 endpoint slices")
 		})
 	}
 }
@@ -287,8 +287,8 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	require.NoError(t, err)
+	assert.Empty(t, client.Actions())
 }
 
 // Ensure SyncService for service with selector but no pods results in placeholder EndpointSlice
@@ -300,7 +300,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	sliceList, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
-	assert.Nil(t, err, "Expected no error fetching endpoint slices")
+	require.NoError(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
 	assert.Regexp(t, "^"+serviceName, slice.Name)
@@ -338,10 +338,10 @@ func TestSyncServiceMissing(t *testing.T) {
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, missingServiceName))
 
 	// nil should be returned when the service doesn't exist
-	assert.Nil(t, err, "Expected no error syncing service")
+	require.NoError(t, err, "Expected no error syncing service")
 
 	// That should mean no client actions were performed
-	assert.Len(t, client.Actions(), 0)
+	assert.Empty(t, client.Actions())
 
 	// TriggerTimeTracker should have removed the reference to the missing service
 	assert.NotContains(t, esController.triggerTimeTracker.ServiceStates, missingServiceKey)
@@ -368,13 +368,13 @@ func TestSyncServicePodSelection(t *testing.T) {
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
 	slices, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
-	assert.Nil(t, err, "Expected no error fetching endpoint slices")
+	require.NoError(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
 	slice := slices.Items[0]
 	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoint in first slice")
 	assert.NotEmpty(t, slice.Annotations[v1.EndpointsLastChangeTriggerTime])
 	endpoint := slice.Endpoints[0]
-	assert.EqualValues(t, endpoint.TargetRef, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name})
+	assert.EqualValues(t, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name}, endpoint.TargetRef)
 }
 
 func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
@@ -384,7 +384,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	service := createService(t, esController, ns, serviceName)
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err, "Expected no error syncing service")
+	require.NoError(t, err, "Expected no error syncing service")
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
@@ -415,7 +415,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	logger, _ = ktesting.NewTestContext(t)
 	numActionsBefore := len(client.Actions())
 	err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err, "Expected no error syncing service")
+	require.NoError(t, err, "Expected no error syncing service")
 
 	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
 	// should not result in any action.
@@ -505,7 +505,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	numActionsBefore := len(client.Actions())
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err, "Expected no error syncing service")
+	require.NoError(t, err, "Expected no error syncing service")
 
 	if len(client.Actions()) != numActionsBefore+2 {
 		t.Errorf("Expected 2 more actions, got %d", len(client.Actions())-numActionsBefore)
@@ -643,41 +643,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.String("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32(3456),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.String("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32(161),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.String("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32(80),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -760,31 +760,31 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.String("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32(3456),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.String("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32(161),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.String("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32(80),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -865,41 +865,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.String("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32(3456),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.String("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32(161),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.String("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32(80),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(false),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(true),
+						Ready:       ptr.To(false),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -980,41 +980,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.String("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32(3456),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.String("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32(161),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.String("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32(80),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.Bool(false),
-						Serving:     pointer.Bool(false),
-						Terminating: pointer.Bool(true),
+						Ready:       ptr.To(false),
+						Serving:     ptr.To(false),
+						Terminating: ptr.To(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.String("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -1110,41 +1110,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.StringPtr("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32Ptr(int32(3456)),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.StringPtr("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32Ptr(int32(161)),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.StringPtr("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32Ptr(int32(80)),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.BoolPtr(true),
-						Serving:     pointer.BoolPtr(true),
-						Terminating: pointer.BoolPtr(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  pointer.StringPtr("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.BoolPtr(false),
-						Serving:     pointer.BoolPtr(false),
-						Terminating: pointer.BoolPtr(false),
+						Ready:       ptr.To(false),
+						Serving:     ptr.To(false),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.StringPtr("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -1242,41 +1242,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     pointer.StringPtr("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     pointer.Int32Ptr(int32(3456)),
+					Name:     ptr.To("sctp-example"),
+					Protocol: ptr.To(v1.ProtocolSCTP),
+					Port:     ptr.To[int32](3456),
 				},
 				{
-					Name:     pointer.StringPtr("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     pointer.Int32Ptr(int32(161)),
+					Name:     ptr.To("udp-example"),
+					Protocol: ptr.To(v1.ProtocolUDP),
+					Port:     ptr.To[int32](161),
 				},
 				{
-					Name:     pointer.StringPtr("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     pointer.Int32Ptr(int32(80)),
+					Name:     ptr.To("tcp-example"),
+					Protocol: ptr.To(v1.ProtocolTCP),
+					Port:     ptr.To[int32](80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.BoolPtr(true),
-						Serving:     pointer.BoolPtr(true),
-						Terminating: pointer.BoolPtr(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  pointer.StringPtr("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       pointer.BoolPtr(true),
-						Serving:     pointer.BoolPtr(true),
-						Terminating: pointer.BoolPtr(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  pointer.StringPtr("node-1"),
+					NodeName:  ptr.To("node-1"),
 				},
 			},
 		},
@@ -1292,16 +1292,16 @@ func TestSyncService(t *testing.T) {
 			esController.serviceStore.Add(testcase.service)
 
 			_, err := esController.client.CoreV1().Services(testcase.service.Namespace).Create(context.TODO(), testcase.service, metav1.CreateOptions{})
-			assert.Nil(t, err, "Expected no error creating service")
+			require.NoError(t, err, "Expected no error creating service")
 
 			logger, _ := ktesting.NewTestContext(t)
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
-			assert.Nil(t, err)
+			require.NoError(t, err)
 
 			// last action should be to create endpoint slice
 			expectActions(t, client.Actions(), 1, "create", "endpointslices")
 			sliceList, err := client.DiscoveryV1().EndpointSlices(testcase.service.Namespace).List(context.TODO(), metav1.ListOptions{})
-			assert.Nil(t, err, "Expected no error fetching endpoint slices")
+			require.NoError(t, err, "Expected no error fetching endpoint slices")
 			assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
 			// ensure all attributes of endpoint slice match expected state
@@ -1684,8 +1684,8 @@ func TestPodDeleteBatching(t *testing.T) {
 				time.Sleep(update.delay)
 
 				old, exists, err := esController.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
-				assert.Nil(t, err, "error while retrieving old value of %q: %v", update.podName, err)
-				assert.Equal(t, true, exists, "pod should exist")
+				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
+				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
 				esController.deletePod(old)
 			}
@@ -1983,13 +1983,13 @@ func TestUpdateNode(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Addresses:  []string{"172.18.0.2"},
-						Zone:       pointer.String("zone-a"),
-						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+						Zone:       ptr.To("zone-a"),
+						Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 					},
 					{
 						Addresses:  []string{"172.18.1.2"},
-						Zone:       pointer.String("zone-b"),
-						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+						Zone:       ptr.To("zone-b"),
+						Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 					},
 				},
 				AddressType: discovery.AddressTypeIPv4,
@@ -2050,7 +2050,7 @@ func standardSyncService(t *testing.T, esController *endpointSliceController, na
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
-	assert.Nil(t, err, "Expected no error syncing service")
+	require.NoError(t, err, "Expected no error syncing service")
 }
 
 func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) *v1.Service {
@@ -2070,7 +2070,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 	}
 	esController.serviceStore.Add(service)
 	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
-	assert.Nil(t, err, "Expected no error creating service")
+	require.NoError(t, err, "Expected no error creating service")
 	return service
 }
 
@@ -2088,11 +2088,6 @@ func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, re
 	if action.GetResource().Resource != resource {
 		t.Errorf("Expected action %d resource to be %s, got %s", index, resource, action.GetResource().Resource)
 	}
-}
-
-// protoPtr takes a Protocol and returns a pointer to it.
-func protoPtr(proto v1.Protocol) *v1.Protocol {
-	return &proto
 }
 
 // cacheMutationCheck helps ensure that cached objects have not been changed

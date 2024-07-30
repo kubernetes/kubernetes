@@ -27,7 +27,7 @@ import (
 )
 
 func TestBugs(t *testing.T) {
-	assert.NoError(t, framework.FormatBugs())
+	require.NoError(t, framework.FormatBugs())
 	RecordBugs()
 	Describe()
 

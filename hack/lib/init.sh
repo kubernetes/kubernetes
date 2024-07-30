@@ -89,11 +89,12 @@ batch/v1beta1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
 certificates.k8s.io/v1alpha1 \
+coordination.k8s.io/v1alpha1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
 discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
-resource.k8s.io/v1alpha2 \
+resource.k8s.io/v1alpha3 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \

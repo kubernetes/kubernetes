@@ -75,14 +75,14 @@ func ResponseFormat(h http.Header) Format {
 func NewDecoder(r io.Reader, format Format) Decoder {
 	switch format.FormatType() {
 	case TypeProtoDelim:
-		return &protoDecoder{r: r}
+		return &protoDecoder{r: bufio.NewReader(r)}
 	}
 	return &textDecoder{r: r}
 }
 
 // protoDecoder implements the Decoder interface for protocol buffers.
 type protoDecoder struct {
-	r io.Reader
+	r protodelim.Reader
 }
 
 // Decode implements the Decoder interface.
@@ -90,7 +90,7 @@ func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 	opts := protodelim.UnmarshalOptions{
 		MaxSize: -1,
 	}
-	if err := opts.UnmarshalFrom(bufio.NewReader(d.r), v); err != nil {
+	if err := opts.UnmarshalFrom(d.r, v); err != nil {
 		return err
 	}
 	if !model.IsValidMetricName(model.LabelValue(v.GetName())) {

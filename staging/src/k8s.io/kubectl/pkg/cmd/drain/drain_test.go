@@ -636,17 +636,6 @@ func TestDrain(t *testing.T) {
 			expectOutputToContain: "node/node drained",
 		},
 		{
-			description:           "Ensure compatibility for --delete-local-data until fully deprecated",
-			node:                  node,
-			expected:              cordonedNode,
-			pods:                  []corev1.Pod{jobPod},
-			rcs:                   []corev1.ReplicationController{rc},
-			args:                  []string{"node", "--force", "--delete-local-data=true"},
-			expectFatal:           false,
-			expectDelete:          true,
-			expectOutputToContain: "node/node drained",
-		},
-		{
 			description:           "Job-managed terminated pod",
 			node:                  node,
 			expected:              cordonedNode,

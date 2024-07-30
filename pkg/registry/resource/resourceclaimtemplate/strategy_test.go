@@ -29,12 +29,6 @@ var resourceClaimTemplate = &resource.ResourceClaimTemplate{
 		Name:      "valid-claim-template",
 		Namespace: "default",
 	},
-	Spec: resource.ResourceClaimTemplateSpec{
-		Spec: resource.ResourceClaimSpec{
-			ResourceClassName: "valid-class",
-			AllocationMode:    resource.AllocationModeImmediate,
-		},
-	},
 }
 
 func TestClaimTemplateStrategy(t *testing.T) {

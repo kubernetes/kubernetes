@@ -311,7 +311,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "POST /api/v1/nodes",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
@@ -430,7 +430,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "GET /api/v1/nodes/{:name}",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
@@ -520,7 +520,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "GET /api/v1/nodes",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
@@ -561,38 +561,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Listing from storage done",
 						"Writing http response done",
 					},
-				},
-				{
-					name: "List(recursive=true) etcd3",
-					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"audit-id": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() != ""
-						},
-						"key": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "/minions"
-						},
-						"resourceVersion": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-						"resourceVersionMatch": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-						"limit": func(v *commonv1.AnyValue) bool {
-							return v.GetIntValue() == 0
-						},
-						"continue": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-					},
-				},
-				{
-					name: "etcdserverpb.KV/Range",
-					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "grpc"
-						},
-					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -638,7 +606,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "PUT /api/v1/nodes/{:name}",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
@@ -782,7 +750,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "PATCH /api/v1/nodes/{:name}",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
@@ -903,7 +871,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "DELETE /api/v1/nodes/{:name}",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"http.user_agent": func(v *commonv1.AnyValue) bool {
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {

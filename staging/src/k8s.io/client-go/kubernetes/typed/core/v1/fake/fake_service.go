@@ -46,7 +46,7 @@ var servicesKind = v1.SchemeGroupVersion.WithKind("Service")
 func (c *FakeServices) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Service, err error) {
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(servicesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(servicesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeServices) Get(ctx context.Context, name string, options metav1.GetO
 func (c *FakeServices) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceList, err error) {
 	emptyResult := &v1.ServiceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(servicesResource, servicesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(servicesResource, servicesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeServices) List(ctx context.Context, opts metav1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested services.
 func (c *FakeServices) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(servicesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(servicesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeServices) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 func (c *FakeServices) Create(ctx context.Context, service *v1.Service, opts metav1.CreateOptions) (result *v1.Service, err error) {
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(servicesResource, c.ns, service), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(servicesResource, c.ns, service, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeServices) Create(ctx context.Context, service *v1.Service, opts met
 func (c *FakeServices) Update(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (result *v1.Service, err error) {
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(servicesResource, c.ns, service), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(servicesResource, c.ns, service, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeServices) Update(ctx context.Context, service *v1.Service, opts met
 func (c *FakeServices) UpdateStatus(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (result *v1.Service, err error) {
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(servicesResource, "status", c.ns, service), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(servicesResource, "status", c.ns, service, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -133,7 +133,7 @@ func (c *FakeServices) Delete(ctx context.Context, name string, opts metav1.Dele
 func (c *FakeServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Service, err error) {
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(servicesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -156,7 +156,7 @@ func (c *FakeServices) Apply(ctx context.Context, service *corev1.ServiceApplyCo
 	}
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(servicesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -180,7 +180,7 @@ func (c *FakeServices) ApplyStatus(ctx context.Context, service *corev1.ServiceA
 	}
 	emptyResult := &v1.Service{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(servicesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

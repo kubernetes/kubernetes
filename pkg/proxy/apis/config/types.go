@@ -22,42 +22,42 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
+// KubeProxyLinuxConfiguration contains Linux platform related configuration details for the
+// Kubernetes proxy server that aren't specific to a particular backend.
+type KubeProxyLinuxConfiguration struct {
+	// conntrack contains conntrack-related configuration options.
+	Conntrack KubeProxyConntrackConfiguration
+	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs. This may
+	// be required with some CNI plugins.
+	MasqueradeAll bool
+	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
+	// the range [-1000, 1000]
+	OOMScoreAdj *int32
+}
+
+// KubeProxyWindowsConfiguration contains Windows platform related configuration details for the
+// Kubernetes proxy server that aren't specific to a particular backend
+type KubeProxyWindowsConfiguration struct {
+	// runAsService, if true, enables Windows service control manager API integration.
+	RunAsService bool
+}
+
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the iptables or ipvs proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
-	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs,
-	// when using the iptables or ipvs proxy mode. This may be required with some CNI
-	// plugins.
-	MasqueradeAll bool
 	// localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior
 	// of allowing NodePort services to be accessed via localhost. (Applies only to
 	// iptables mode and IPv4; localhost NodePorts are never allowed with other proxy
 	// modes or with IPv6.)
 	LocalhostNodePorts *bool
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s',
-	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
-	// result in an immediate iptables resync.
-	MinSyncPeriod metav1.Duration
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPVSConfiguration struct {
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between IPVS rule resyncs (e.g. '5s', '1m',
-	// '2h22m'). A value of 0 means every Service or EndpointSlice change will result
-	// in an immediate IPVS resync.
-	MinSyncPeriod metav1.Duration
 	// scheduler is the IPVS scheduler to use
 	Scheduler string
 	// excludeCIDRs is a list of CIDRs which the ipvs proxier should not touch
@@ -83,17 +83,6 @@ type KubeProxyNFTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the nftables proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
-	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs,
-	// when using the nftables mode. This may be required with some CNI plugins.
-	MasqueradeAll bool
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s',
-	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
-	// result in an immediate iptables resync.
-	MinSyncPeriod metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -152,6 +141,10 @@ type DetectLocalConfiguration struct {
 	// LocalModeBridgeInterface, kube-proxy will consider traffic to be local if
 	// it originates from this bridge.
 	BridgeInterface string
+	// clusterCIDRs is the dual-stack list of CIDR ranges of the pods in the cluster. When
+	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
+	// traffic to be local if its source IP is in the range of any given CIDR.
+	ClusterCIDRs []string
 	// interfaceNamePrefix is an interface name prefix. When DetectLocalMode is set to
 	// LocalModeInterfaceNamePrefix, kube-proxy will consider traffic to be local if
 	// it originates from any interface whose name begins with this prefix.
@@ -164,6 +157,12 @@ type DetectLocalConfiguration struct {
 // Kubernetes proxy server.
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
+
+	// linux contains Linux-related configuration options.
+	Linux KubeProxyLinuxConfiguration
+
+	// windows contains Windows-related configuration options.
+	Windows KubeProxyWindowsConfiguration
 
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool
@@ -217,12 +216,6 @@ type KubeProxyConfiguration struct {
 	DetectLocalMode LocalMode
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration
-	// clusterCIDR is the CIDR range of the pods in the cluster. (For dual-stack
-	// clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When
-	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
-	// traffic to be local if its source IP is in this range. (Otherwise it is not
-	// used.)
-	ClusterCIDR string
 
 	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
 	// alternatively, the single string 'primary'. If set to a list of CIDRs,
@@ -232,17 +225,17 @@ type KubeProxyConfiguration struct {
 	// object. If unset, NodePort connections will be accepted on all local IPs.
 	NodePortAddresses []string
 
-	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
-	// the range [-1000, 1000]
-	OOMScoreAdj *int32
-	// conntrack contains conntrack-related configuration options.
-	Conntrack KubeProxyConntrackConfiguration
+	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
+	// various re-synchronizing and cleanup operations are performed. Must be greater
+	// than 0.
+	SyncPeriod metav1.Duration
+	// minSyncPeriod is the minimum period between proxier rule resyncs (e.g. '5s',
+	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
+	// result in an immediate proxier resync.
+	MinSyncPeriod metav1.Duration
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration
-
-	// portRange was previously used to configure the userspace proxy, but is now unused.
-	PortRange string
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.

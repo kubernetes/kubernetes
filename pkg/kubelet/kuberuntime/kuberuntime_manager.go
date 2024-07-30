@@ -28,6 +28,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/trace"
+	grpcstatus "google.golang.org/grpc/status"
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 
@@ -347,7 +348,7 @@ func (m *kubeGenericRuntimeManager) Status(ctx context.Context) (*kubecontainer.
 	if resp.GetStatus() == nil {
 		return nil, errors.New("runtime status is nil")
 	}
-	return toKubeRuntimeStatus(resp.GetStatus(), resp.GetRuntimeHandlers()), nil
+	return toKubeRuntimeStatus(resp.GetStatus(), resp.GetRuntimeHandlers(), resp.GetFeatures()), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
@@ -1218,6 +1219,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		return
 	}
 
+	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+	if err != nil {
+		klog.ErrorS(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
+		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, err.Error())
+		return
+	}
+
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a description used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
@@ -1239,8 +1247,15 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
 		}
 		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
+
+		// We fail late here to populate the "ErrImagePull" and "ImagePullBackOff" correctly to the end user.
+		imageVolumes, err := m.toKubeContainerImageVolumes(imageVolumePullResults, spec.container, pod, startContainerResult)
+		if err != nil {
+			return err
+		}
+
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
+		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes); err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
 			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
@@ -1313,6 +1328,92 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return
+}
+
+// imageVolumePulls are the pull results for each image volume name.
+type imageVolumePulls = map[string]imageVolumePullResult
+
+// imageVolumePullResult is a pull result for a single image volume.
+// If spec is nil, then err and msg should be set.
+// If err is nil, then spec should be set.
+type imageVolumePullResult struct {
+	spec runtimeapi.ImageSpec
+	err  error
+	msg  string
+}
+
+func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(imageVolumePullResults imageVolumePulls, container *v1.Container, pod *v1.Pod, syncResult *kubecontainer.SyncResult) (kubecontainer.ImageVolumes, error) {
+	if len(imageVolumePullResults) == 0 {
+		return nil, nil
+	}
+
+	imageVolumes := kubecontainer.ImageVolumes{}
+	var (
+		lastErr error
+		lastMsg string
+	)
+	for _, v := range container.VolumeMounts {
+		res, ok := imageVolumePullResults[v.Name]
+		if !ok {
+			continue
+		}
+
+		if res.err != nil {
+			s, _ := grpcstatus.FromError(res.err)
+			m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
+			lastErr = res.err
+			lastMsg = res.msg
+			continue
+		}
+
+		imageVolumes[v.Name] = &res.spec
+	}
+
+	if lastErr != nil {
+		syncResult.Fail(lastErr, lastMsg)
+		return nil, lastErr
+	}
+
+	return imageVolumes, nil
+}
+
+func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+		return nil, nil
+	}
+
+	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
+		return nil, err
+	}
+
+	res := make(imageVolumePulls)
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Image == nil {
+			continue
+		}
+
+		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+		ref, msg, err := m.imagePuller.EnsureImageExists(
+			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
+		)
+		if err != nil {
+			klog.ErrorS(err, "Failed to ensure image", "pod", klog.KObj(pod))
+			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
+			continue
+		}
+
+		klog.V(4).InfoS("Pulled image", "ref", ref, "pod", klog.KObj(pod))
+		res[volume.Name] = imageVolumePullResult{spec: runtimeapi.ImageSpec{
+			Image:              ref,
+			UserSpecifiedImage: volume.Image.Reference,
+			RuntimeHandler:     podRuntimeHandler,
+			Annotations:        pod.Annotations,
+		}}
+	}
+
+	return res, nil
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
@@ -1509,6 +1610,14 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		ContainerStatuses: containerStatuses,
 		TimeStamp:         timestamp,
 	}, nil
+}
+
+func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, id kubecontainer.ContainerID) (*kubecontainer.Status, error) {
+	resp, err := m.runtimeService.ContainerStatus(ctx, id.ID, false)
+	if err != nil {
+		return nil, fmt.Errorf("runtime container status: %w", err)
+	}
+	return m.convertToKubeContainerStatus(resp.GetStatus()), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.

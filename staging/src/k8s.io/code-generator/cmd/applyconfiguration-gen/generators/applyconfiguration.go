@@ -115,6 +115,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 		}
 	}
 	g.generateWithFuncs(t, typeParams, sw, nil)
+	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()
 }
 
@@ -139,6 +140,40 @@ func blocklisted(t *types.Type, member types.Member) bool {
 		return true
 	}
 	return false
+}
+
+func needsGetter(t *types.Type, member types.Member) bool {
+	// Needed when applying an ApplyConfiguration
+	return objectMeta.Name == t.Name && member.Name == "Name"
+}
+
+func (g *applyConfigurationGenerator) generateGetters(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
+	for _, member := range t.Members {
+		if blocklisted(t, member) {
+			continue
+		}
+		memberType := g.refGraph.applyConfigForType(member.Type)
+		if g.refGraph.isApplyConfig(member.Type) {
+			memberType = &types.Type{Kind: types.Pointer, Elem: memberType}
+		}
+		if jsonTags, ok := lookupJSONTags(member); ok {
+			memberParams := memberParams{
+				TypeParams: typeParams,
+				Member:     member,
+				MemberType: memberType,
+				JSONTags:   jsonTags,
+				EmbeddedIn: embed,
+			}
+			if memberParams.Member.Embedded {
+				g.generateGetters(member.Type, typeParams, sw, &memberParams)
+				continue
+			}
+
+			if needsGetter(t, member) {
+				g.generateMemberGetter(sw, memberParams)
+			}
+		}
+	}
 }
 
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
@@ -195,7 +230,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 }
 
 func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter, typeParams TypeParams) {
-	sw.Do("// $.ApplyConfig.ApplyConfiguration|public$ represents an declarative configuration of the $.ApplyConfig.Type|public$ type for use\n", typeParams)
+	sw.Do("// $.ApplyConfig.ApplyConfiguration|public$ represents a declarative configuration of the $.ApplyConfig.Type|public$ type for use\n", typeParams)
 	sw.Do("// with apply.\n", typeParams)
 	sw.Do("type $.ApplyConfig.ApplyConfiguration|public$ struct {\n", typeParams)
 	for _, structMember := range typeParams.Struct.Members {
@@ -244,13 +279,25 @@ func (g *applyConfigurationGenerator) generateMemberWith(sw *generator.SnippetWr
 	sw.Do("// and returns the receiver, so that objects can be built by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, the $.Member.Name$ field is set to the value of the last call.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(value $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 	if g.refGraph.isApplyConfig(memberParams.Member.Type) || isNillable(memberParams.Member.Type) {
 		sw.Do("b.$.Member.Name$ = value\n", memberParams)
 	} else {
 		sw.Do("b.$.Member.Name$ = &value\n", memberParams)
 	}
 	sw.Do("  return b\n", memberParams)
+	sw.Do("}\n", memberParams)
+}
+
+func (g *applyConfigurationGenerator) generateMemberGetter(sw *generator.SnippetWriter, memberParams memberParams) {
+	sw.Do("// Get$.Member.Name$ retrieves the value of the $.Member.Name$ field in the declarative configuration.\n", memberParams)
+	if g.refGraph.isApplyConfig(memberParams.Member.Type) || isNillable(memberParams.Member.Type) {
+		sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() $.MemberType|raw$ {\n", memberParams)
+	} else {
+		sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() *$.MemberType|raw$ {\n", memberParams)
+	}
+	g.ensureEmbedExistsIfApplicable(sw, memberParams)
+	sw.Do("  return b.$.Member.Name$\n", memberParams)
 	sw.Do("}\n", memberParams)
 }
 
@@ -264,7 +311,7 @@ func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.S
 	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, values provided by each call will be appended to the $.Member.Name$ field.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(values ...$.ArgType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 
 	if memberIsPointerToSlice {
 		sw.Do("b.ensure$.MemberType.Elem|public$Exists()\n", memberParams)
@@ -299,7 +346,7 @@ func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.Sni
 	sw.Do("// If called multiple times, the entries provided by each call will be put on the $.Member.Name$ field,\n", memberParams)
 	sw.Do("// overwriting an existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 	sw.Do("  if b.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
 	sw.Do("    b.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
 	sw.Do("  }\n", memberParams)
@@ -310,7 +357,7 @@ func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.Sni
 	sw.Do("}\n", memberParams)
 }
 
-func (g *applyConfigurationGenerator) ensureEnbedExistsIfApplicable(sw *generator.SnippetWriter, memberParams memberParams) {
+func (g *applyConfigurationGenerator) ensureEmbedExistsIfApplicable(sw *generator.SnippetWriter, memberParams memberParams) {
 	// Embedded types that are not inlined must be nillable so they are not included in the apply configuration
 	// when all their fields are omitted.
 	if memberParams.EmbeddedIn != nil && !memberParams.EmbeddedIn.JSONTags.inline {
@@ -335,7 +382,7 @@ func (b *$.ApplyConfig.ApplyConfiguration|public$) ensure$.MemberType.Elem|publi
 `
 
 var clientgenTypeConstructorNamespaced = `
-// $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.Type|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$(name, namespace string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -348,7 +395,7 @@ func $.ApplyConfig.Type|public$(name, namespace string) *$.ApplyConfig.ApplyConf
 `
 
 var clientgenTypeConstructorNonNamespaced = `
-// $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.Type|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -360,7 +407,7 @@ func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|p
 `
 
 var constructorWithTypeMeta = `
-// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.ApplyConfiguration|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -371,7 +418,7 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
 `
 
 var constructor = `
-// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.ApplyConfiguration|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
   return &$.ApplyConfig.ApplyConfiguration|public${}

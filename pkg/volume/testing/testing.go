@@ -88,7 +88,8 @@ const (
 
 	FailVolumeExpansion = "fail-expansion-test"
 
-	AlwaysFailNodeExpansion = "always-fail-node-expansion"
+	InfeasibleNodeExpansion      = "infeasible-fail-node-expansion"
+	OtherFinalNodeExpansionError = "other-final-node-expansion-error"
 
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
@@ -179,6 +180,7 @@ type FakeVolumePlugin struct {
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
 	LastProvisionerOptions volume.VolumeOptions
+	LastResizeOptions      volume.NodeResizeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
 	NodeExpandCallCount    int
@@ -294,7 +296,7 @@ func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 	return plugin.SupportsSELinux, nil
 }
 
-func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	if spec.Name() == FailNewMounter {
@@ -336,7 +338,7 @@ func (plugin *FakeVolumePlugin) GetUnmounters() (Unmounters []*FakeVolume) {
 }
 
 // Block volume support
-func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod) (volume.BlockVolumeMapper, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.BlockVolumeMappers)
@@ -493,6 +495,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
 	plugin.NodeExpandCallCount++
+	plugin.LastResizeOptions = resizeOptions
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
@@ -500,8 +503,12 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOption
 		return false, volumetypes.NewOperationNotSupportedError("volume-unsupported")
 	}
 
-	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
-		return false, fmt.Errorf("test failure: NodeExpand")
+	if resizeOptions.VolumeSpec.Name() == InfeasibleNodeExpansion {
+		return false, volumetypes.NewInfeasibleError("infeasible-expansion")
+	}
+
+	if resizeOptions.VolumeSpec.Name() == OtherFinalNodeExpansionError {
+		return false, fmt.Errorf("other-final-node-expansion-error")
 	}
 
 	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
@@ -548,8 +555,8 @@ func (f *FakeBasicVolumePlugin) Init(ost volume.VolumeHost) error {
 	return f.Plugin.Init(ost)
 }
 
-func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return f.Plugin.NewMounter(spec, pod, opts)
+func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+	return f.Plugin.NewMounter(spec, pod)
 }
 
 func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -645,7 +652,7 @@ func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spe
 	return false, nil
 }
 
-func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return nil, nil
 }
 

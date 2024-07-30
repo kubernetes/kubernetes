@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PodOSApplyConfiguration represents an declarative configuration of the PodOS type for use
+// PodOSApplyConfiguration represents a declarative configuration of the PodOS type for use
 // with apply.
 type PodOSApplyConfiguration struct {
 	Name *v1.OSName `json:"name,omitempty"`
 }
 
-// PodOSApplyConfiguration constructs an declarative configuration of the PodOS type for use with
+// PodOSApplyConfiguration constructs a declarative configuration of the PodOS type for use with
 // apply.
 func PodOS() *PodOSApplyConfiguration {
 	return &PodOSApplyConfiguration{}

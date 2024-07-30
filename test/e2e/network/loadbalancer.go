@@ -480,10 +480,10 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2eservice.TestReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("checking reachability from pods when LoadBalancerSourceRanges is unset")
-		// We can use timeout 0 here since we know from above that the service is
-		// already running (and we aren't waiting for changes to it to propagate).
-		checkReachabilityFromPod(ctx, true, 0, namespace, acceptPod.Name, ingress)
-		checkReachabilityFromPod(ctx, true, 0, namespace, dropPod.Name, ingress)
+		// There are different propagation delay for the APIs for different nodes, so it tries
+		// a few times, despite previously it was confirmed that the Service was reachable.
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
 
 		// Create source ranges that allow acceptPod but not dropPod or
 		// cluster-external sources. We assume that the LBSR rules will either see

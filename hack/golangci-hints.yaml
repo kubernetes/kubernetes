@@ -90,6 +90,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
+    - testifylint
     - unused
 
 linters-settings: # please keep this alphabetized
@@ -179,3 +180,5 @@ linters-settings: # please keep this alphabetized
   staticcheck:
     checks:
       - "all"
+  testifylint:
+    enable-all: true

@@ -20,24 +20,26 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
+	"k8s.io/klog/v2"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	message := "invalid configuration: %v (%v) %v is not supported on Windows"
-	allErrors := []error{}
+	message := "ignored configuration option: %v (%v) %v is not supported on Windows"
 
 	if kc.CgroupsPerQOS {
-		allErrors = append(allErrors, fmt.Errorf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS))
+		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
 	}
 
-	if len(kc.EnforceNodeAllocatable) > 0 {
-		allErrors = append(allErrors, fmt.Errorf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable))
+	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)
+	if len(enforceNodeAllocatableWithoutNone) > 0 {
+		klog.Warningf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable)
 	}
 
-	return utilerrors.NewAggregate(allErrors)
+	return nil
 }

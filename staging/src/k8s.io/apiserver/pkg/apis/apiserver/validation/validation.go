@@ -78,6 +78,15 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 		}
 	}
 
+	if c.Anonymous != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.AnonymousAuthConfigurableEndpoints) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("anonymous"), "anonymous is not supported when AnonymousAuthConfigurableEnpoints feature gate is disabled"))
+		}
+		if !c.Anonymous.Enabled && len(c.Anonymous.Conditions) > 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("anonymous", "conditions"), c.Anonymous.Conditions, "enabled should be set to true when conditions are defined"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -727,6 +736,7 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	seenExpressions := sets.NewString()
 	var compilationResults []authorizationcel.CompilationResult
+	var usesFieldSelector, usesLabelSelector bool
 
 	for i, condition := range matchConditions {
 		fldPath := fldPath.Child("matchConditions").Index(i).Child("expression")
@@ -745,12 +755,16 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 			continue
 		}
 		compilationResults = append(compilationResults, compilationResult)
+		usesFieldSelector = usesFieldSelector || compilationResult.UsesFieldSelector
+		usesLabelSelector = usesLabelSelector || compilationResult.UsesLabelSelector
 	}
 	if len(compilationResults) == 0 {
 		return nil, allErrs
 	}
 	return &authorizationcel.CELMatcher{
 		CompilationResults: compilationResults,
+		UsesFieldSelector:  usesFieldSelector,
+		UsesLabelSelector:  usesLabelSelector,
 	}, allErrs
 }
 

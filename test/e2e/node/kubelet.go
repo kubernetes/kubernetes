@@ -87,7 +87,7 @@ func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, 
 // the scope of this test, we do not expect pod naming conflicts so
 // podNamePrefix should be sufficient to identify the pods.
 func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nodeNames sets.String, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
-	return wait.PollWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, false, func(ctx context.Context) (bool, error) {
 		matchCh := make(chan sets.String, len(nodeNames))
 		for _, item := range nodeNames.List() {
 			// Launch a goroutine per node to check the pods running on the nodes.
@@ -249,11 +249,11 @@ func checkPodCleanup(ctx context.Context, c clientset.Interface, pod *v1.Pod, ex
 
 	for _, test := range tests {
 		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
-		err = wait.PollWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, poll, timeout, false, func(ctx context.Context) (bool, error) {
 			result, err := e2essh.NodeExec(ctx, nodeIP, test.cmd, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			e2essh.LogResult(result)
-			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
+			ok := result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0
 			if expectClean && ok { // keep trying
 				return false, nil
 			}
@@ -679,7 +679,7 @@ func isNode(node *v1.Node, os string) bool {
 		return false
 	}
 	if foundOS, found := node.Labels[v1.LabelOSStable]; found {
-		return (os == foundOS)
+		return os == foundOS
 	}
 	return false
 }

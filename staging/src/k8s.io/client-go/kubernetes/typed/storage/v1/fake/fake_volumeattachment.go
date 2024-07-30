@@ -45,7 +45,7 @@ var volumeattachmentsKind = v1.SchemeGroupVersion.WithKind("VolumeAttachment")
 func (c *FakeVolumeAttachments) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.VolumeAttachment, err error) {
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(volumeattachmentsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(volumeattachmentsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeVolumeAttachments) Get(ctx context.Context, name string, options me
 func (c *FakeVolumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
 	emptyResult := &v1.VolumeAttachmentList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(volumeattachmentsResource, volumeattachmentsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(volumeattachmentsResource, volumeattachmentsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeVolumeAttachments) List(ctx context.Context, opts metav1.ListOption
 // Watch returns a watch.Interface that watches the requested volumeAttachments.
 func (c *FakeVolumeAttachments) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(volumeattachmentsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(volumeattachmentsResource, opts))
 }
 
 // Create takes the representation of a volumeAttachment and creates it.  Returns the server's representation of the volumeAttachment, and an error, if there is any.
 func (c *FakeVolumeAttachments) Create(ctx context.Context, volumeAttachment *v1.VolumeAttachment, opts metav1.CreateOptions) (result *v1.VolumeAttachment, err error) {
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(volumeattachmentsResource, volumeAttachment), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(volumeattachmentsResource, volumeAttachment, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeVolumeAttachments) Create(ctx context.Context, volumeAttachment *v1
 func (c *FakeVolumeAttachments) Update(ctx context.Context, volumeAttachment *v1.VolumeAttachment, opts metav1.UpdateOptions) (result *v1.VolumeAttachment, err error) {
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(volumeattachmentsResource, volumeAttachment), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(volumeattachmentsResource, volumeAttachment, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -107,7 +107,7 @@ func (c *FakeVolumeAttachments) Update(ctx context.Context, volumeAttachment *v1
 func (c *FakeVolumeAttachments) UpdateStatus(ctx context.Context, volumeAttachment *v1.VolumeAttachment, opts metav1.UpdateOptions) (result *v1.VolumeAttachment, err error) {
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(volumeattachmentsResource, "status", volumeAttachment), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(volumeattachmentsResource, "status", volumeAttachment, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -123,7 +123,7 @@ func (c *FakeVolumeAttachments) Delete(ctx context.Context, name string, opts me
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeVolumeAttachments) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(volumeattachmentsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(volumeattachmentsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.VolumeAttachmentList{})
 	return err
@@ -133,7 +133,7 @@ func (c *FakeVolumeAttachments) DeleteCollection(ctx context.Context, opts metav
 func (c *FakeVolumeAttachments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.VolumeAttachment, err error) {
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(volumeattachmentsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -155,7 +155,7 @@ func (c *FakeVolumeAttachments) Apply(ctx context.Context, volumeAttachment *sto
 	}
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(volumeattachmentsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -178,7 +178,7 @@ func (c *FakeVolumeAttachments) ApplyStatus(ctx context.Context, volumeAttachmen
 	}
 	emptyResult := &v1.VolumeAttachment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(volumeattachmentsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
