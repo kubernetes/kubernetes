@@ -207,7 +207,7 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] OpenAPIV3 should contain OpenAPI V3 for Aggregated APIServer": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] OpenAPIV3 should contain OpenAPI V3 for Aggregated APIServer [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-api-machinery] OpenAPIV3 should publish OpenAPI V3 for CustomResourceDefinition": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
