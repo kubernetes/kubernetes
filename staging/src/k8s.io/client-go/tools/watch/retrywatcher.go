@@ -59,7 +59,7 @@ type RetryWatcher struct {
 // It will make sure that watches gets restarted in case of recoverable errors.
 // The initialResourceVersion will be given to watch method when first called.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewRetryWatcherWithContext should be used instead of NewRetryWatcher in code which supports contextual logging.
+//logcheck:context // NewRetryWatcherWithContext should be used instead of NewRetryWatcher in code which supports contextual logging.
 func NewRetryWatcher(initialResourceVersion string, watcherClient cache.Watcher) (*RetryWatcher, error) {
 	return NewRetryWatcherWithContext(context.Background(), initialResourceVersion, watcherClient)
 }

@@ -29,7 +29,7 @@ type SharedInformerFactory interface {
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
 	//
-	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
+	//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
 
 	// ForResource gives generic access to a shared informer of the matching type.
@@ -37,7 +37,7 @@ type SharedInformerFactory interface {
 
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
-	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
+	//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool
 
 	// Shutdown marks a factory as shutting down. At that point no new

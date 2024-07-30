@@ -656,7 +656,7 @@ func (config *inClusterClientConfig) Possible() bool {
 // are passed in we fallback to inClusterConfig. If inClusterConfig fails, we fallback
 // to the default config.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // BuildConfigFromFlagsWithContext should be used instead of BuildConfigFromFlags in code which supports contextual logging.
+//logcheck:context // BuildConfigFromFlagsWithContext should be used instead of BuildConfigFromFlags in code which supports contextual logging.
 func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
 	return BuildConfigFromFlagsWithContext(context.Background(), masterUrl, kubeconfigPath)
 }

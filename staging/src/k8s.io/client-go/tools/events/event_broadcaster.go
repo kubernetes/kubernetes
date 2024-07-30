@@ -345,7 +345,7 @@ func (e *eventBroadcasterImpl) StartLogging(logger klog.Logger) (func(), error) 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
 //
-// TODO: logcheck:context // StartEventWatcherWithContext should be used instead of StartEventWatcher in code which supports contextual logging.
+//logcheck:context // StartEventWatcherWithContext should be used instead of StartEventWatcher in code which supports contextual logging.
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) (func(), error) {
 	return e.StartEventWatcherWithContext(context.Background(), eventHandler)
 }

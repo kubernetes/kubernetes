@@ -105,7 +105,7 @@ func (e *eventProcessor) stop() {
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewIndexerInformerWatcherWithContext should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
+//logcheck:context // NewIndexerInformerWatcherWithContext should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
 func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	return NewIndexerInformerWatcherWithContext(context.Background(), lw, objType)
 }

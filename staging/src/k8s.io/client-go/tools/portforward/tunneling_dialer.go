@@ -46,7 +46,7 @@ type tunnelingDialer struct {
 // interface. The dialer can upgrade a websocket request, creating a websocket connection. This function
 // returns an error if one occurs.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewSPDYOverWebsocketDialerWithContext should be used instead of NewSPDYOverWebsocketDialer in code which supports contextual logging.
+//logcheck:context // NewSPDYOverWebsocketDialerWithContext should be used instead of NewSPDYOverWebsocketDialer in code which supports contextual logging.
 func NewSPDYOverWebsocketDialer(url *url.URL, config *restclient.Config) (httpstream.Dialer, error) {
 	return NewSPDYOverWebsocketDialerWithContext(context.Background(), url, config)
 }

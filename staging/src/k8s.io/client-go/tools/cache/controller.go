@@ -81,7 +81,7 @@ type Config struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	//
-	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
+	//logcheck:context // WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
 	WatchErrorHandler WatchErrorHandler
 
 	// Called whenever the ListAndWatch drops the connection with an error.
@@ -124,7 +124,7 @@ type Controller interface {
 	// Run does the same as RunWithContext with a stop channel instead of
 	// a context.
 	//
-	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // RunWithcontext should be used instead of Run in code which supports contextual logging.
+	//logcheck:context // RunWithcontext should be used instead of Run in code which supports contextual logging.
 	Run(stopCh <-chan struct{})
 
 	// HasSynced delegates to the Config's Queue

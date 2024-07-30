@@ -302,7 +302,7 @@ var _ Interface = &ProxyWatcher{}
 // NewProxyWatcher creates new ProxyWatcher by wrapping a channel.
 // The ProxyWatcher runs until Stop is called.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewProxyWatcherWithContext should be used instead of NewProxyWatcher in code which supports contextual logging.
+//logcheck:context // NewProxyWatcherWithContext should be used instead of NewProxyWatcher in code which supports contextual logging.
 func NewProxyWatcher(ch chan Event) *ProxyWatcher {
 	return NewProxyWatcherWithContext(context.Background(), ch)
 }
@@ -347,7 +347,7 @@ func (pw *ProxyWatcher) ResultChan() <-chan Event {
 
 // StopChan returns stop channel
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // Context should be used instead of StopCh in code which supports contextual logging.
+//logcheck:context // Context should be used instead of StopCh in code which supports contextual logging.
 func (pw *ProxyWatcher) StopChan() <-chan struct{} {
 	return pw.ctx.Done()
 }

@@ -140,7 +140,7 @@ type EventBroadcaster interface {
 	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
 	//
-	// TODO (https://github.com/kubernetes/kubernetes/issues/126379) logcheck:context // StartStructuredLogging should be used instead of StartLogging in code which supports contextual logging.
+	//logcheck:context // StartStructuredLogging should be used instead of StartLogging in code which supports contextual logging.
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured

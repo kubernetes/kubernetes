@@ -157,7 +157,7 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 
 // New creates a new PortForwarder with localhost listen addresses.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewWithContext should be used instead of New in code which supports contextual logging.
+//logcheck:context // NewWithContext should be used instead of New in code which supports contextual logging.
 func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	return NewWithContext(wait.ContextForChannel(stopChan), dialer, ports, readyChan, out, errOut)
 }
@@ -169,7 +169,7 @@ func NewWithContext(ctx context.Context, dialer httpstream.Dialer, ports []strin
 
 // NewOnAddresses creates a new PortForwarder with custom listen addresses.
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewOnAddressesWithContext should be used instead of NewOnAddresses in code which supports contextual logging.
+//logcheck:context // NewOnAddressesWithContext should be used instead of NewOnAddresses in code which supports contextual logging.
 func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	return NewOnAddressesWithContext(wait.ContextForChannel(stopChan), dialer, addresses, ports, readyChan, out, errOut)
 }

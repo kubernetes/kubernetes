@@ -45,7 +45,7 @@ type TunnelingConnection struct {
 // NewTunnelingConnection wraps the passed gorilla/websockets connection
 // with the TunnelingConnection struct (implementing net.Conn).
 //
-// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewTunnelingConnectionWithContext should be used instead of NewTunnelingConnection in code which supports contextual logging.
+//logcheck:context // NewTunnelingConnectionWithContext should be used instead of NewTunnelingConnection in code which supports contextual logging.
 func NewTunnelingConnection(name string, conn *gwebsocket.Conn) *TunnelingConnection {
 	return NewTunnelingConnectionWithContext(context.Background(), name, conn)
 }

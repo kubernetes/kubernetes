@@ -161,7 +161,7 @@ type SharedInformer interface {
 	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
 	//
-	// TODO: logcheck:context // AddEventHandlerWithConfig should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
+	//logcheck:context // AddEventHandlerWithConfig should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
 	// AddEventHandler is a variant of AddEventHandler and AddEventHandlerWithResyncPeriod
 	// where additional optional parameters are passed in a struct. If no resync period
@@ -179,7 +179,7 @@ type SharedInformer interface {
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
 	//
-	// TODO: logcheck:context // RunWithContext should be used instead of Run in code which uses contextual logging.
+	//logcheck:context // RunWithContext should be used instead of Run in code which uses contextual logging.
 	Run(stopCh <-chan struct{})
 	// RunWithContext starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when the context is canceled.
@@ -211,7 +211,7 @@ type SharedInformer interface {
 	// The handler should return quickly - any expensive processing should be
 	// offloaded.
 	//
-	// TODO: logcheck:context // SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
+	//logcheck:context // SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
 
 	// SetWatchErrorHandlerWithContext is a variant of SetWatchErrorHandler where
@@ -334,7 +334,7 @@ const (
 // indicating that the caller identified by name is waiting for syncs, followed by
 // either a successful or failed sync.
 //
-// TODO: logcheck:context // WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
+//logcheck:context // WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
 func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
 	klog.Background().Info("Waiting for caches to sync", "controller", controllerName)
 
