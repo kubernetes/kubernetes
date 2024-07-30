@@ -360,7 +360,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
+	APIServingWithRoutine: {Default: false, PreRelease: featuregate.Alpha},
 
 	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
