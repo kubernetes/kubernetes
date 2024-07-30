@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -174,7 +175,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Millisecond))),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
@@ -439,8 +440,6 @@ func TestReconcileElectionStep(t *testing.T) {
 }
 
 func TestController(t *testing.T) {
-	fakeClock := testingclock.NewFakeClock(time.Now())
-
 	cases := []struct {
 		name                            string
 		leases                          []*v1.Lease
@@ -461,7 +460,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -490,7 +489,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -503,7 +502,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -516,7 +515,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -543,7 +542,7 @@ func TestController(t *testing.T) {
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity:       ptr.To("some-other-component"),
-						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(time.Second))),
+						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(time.Second))),
 						LeaseDurationSeconds: ptr.To(int32(10)),
 					},
 				},
@@ -558,7 +557,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -588,7 +587,7 @@ func TestController(t *testing.T) {
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity:       ptr.To("some-other-component"),
-						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-11 * time.Second))),
+						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-11 * time.Second))),
 						LeaseDurationSeconds: ptr.To(int32(10)),
 						Strategy:             ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
 					},
@@ -604,7 +603,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -632,7 +631,7 @@ func TestController(t *testing.T) {
 					Spec: v1.LeaseSpec{
 						HolderIdentity:       ptr.To("component-identity-1"),
 						Strategy:             ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
-						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(time.Second))),
+						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(time.Second))),
 						LeaseDurationSeconds: ptr.To(int32(10)),
 					},
 				},
@@ -647,7 +646,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -662,7 +661,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -683,6 +682,10 @@ func TestController(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// collect go routines using t.logf
+			var wg sync.WaitGroup
+			defer wg.Wait()
+
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 
@@ -722,7 +725,9 @@ func TestController(t *testing.T) {
 				time.Sleep(time.Second)
 			}
 
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				ticker := time.NewTicker(10 * time.Millisecond)
 				// Mock out the removal of preferredHolder leases.
 				// When controllers are running, they are expected to do this voluntarily
@@ -756,7 +761,9 @@ func TestController(t *testing.T) {
 				}
 			}()
 
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				ticker := time.NewTicker(10 * time.Millisecond)
 				// Mock out leasecandidate ack.
 				// When controllers are running, they are expected to watch and ack
@@ -765,16 +772,18 @@ func TestController(t *testing.T) {
 					case <-ctx.Done():
 						return
 					case <-ticker.C:
-						for _, lc := range tc.createAfterControllerStart {
-							c, err := client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Get(ctx, lc.Name, metav1.GetOptions{})
-							if err == nil {
-								if c.Spec.PingTime != nil {
-									t.Logf("Answering ping for %s/%s", c.Namespace, c.Name)
-									c.Spec.RenewTime = &metav1.MicroTime{Time: fakeClock.Now()}
-									_, err = client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Update(ctx, c, metav1.UpdateOptions{})
-									if err != nil {
-										t.Logf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
-									}
+						cs, err := client.CoordinationV1alpha1().LeaseCandidates("").List(ctx, metav1.ListOptions{})
+						if err != nil {
+							t.Logf("Error listing lease candidates: %v", err)
+							continue
+						}
+						for _, c := range cs.Items {
+							if c.Spec.PingTime != nil && (c.Spec.RenewTime == nil || c.Spec.PingTime.Time.After(c.Spec.RenewTime.Time)) {
+								t.Logf("Answering ping for %s/%s", c.Namespace, c.Name)
+								c.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+								_, err = client.CoordinationV1alpha1().LeaseCandidates(c.Namespace).Update(ctx, &c, metav1.UpdateOptions{})
+								if err != nil {
+									t.Logf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
 								}
 							}
 						}
@@ -815,10 +824,7 @@ func TestController(t *testing.T) {
 					if lease.Spec.HolderIdentity == nil {
 						return false, nil
 					}
-					if *expectedLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity {
-						return false, nil
-					}
-					return true, nil
+					return *expectedLease.Spec.HolderIdentity == *lease.Spec.HolderIdentity, nil
 				})
 				if err != nil {
 					if lease == nil {
