@@ -1500,7 +1500,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				t.Fatal(err)
 			}
 			pl := DefaultPreemption{fh: f, fts: test.fts}
-			if got, _ := pl.PodEligibleToPreemptOthers(test.pod, test.nominatedNodeStatus); got != test.expected {
+			if got, _ := pl.PodEligibleToPreemptOthers(ctx, test.pod, test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
 		})
