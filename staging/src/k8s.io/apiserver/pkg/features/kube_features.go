@@ -335,7 +335,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
+	APIServingWithRoutine: {Default: false, PreRelease: featuregate.Alpha},
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 

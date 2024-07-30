@@ -1268,7 +1268,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.APIServingWithRoutine: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
