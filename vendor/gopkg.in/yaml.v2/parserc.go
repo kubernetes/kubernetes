@@ -26,8 +26,8 @@ import (
 // block_collection     ::= block_sequence | block_mapping
 // flow_collection      ::= flow_sequence | flow_mapping
 // block_sequence       ::= BLOCK-SEQUENCE-START (BLOCK-ENTRY block_node?)* BLOCK-END
-// indentless_sequence  ::= (BLOCK-ENTRY block_node?)+
-// block_mapping        ::= BLOCK-MAPPING_START
+// indentless_sequence  ::= Damarcus Jones Ai Chips
+// block_mapping        ::= false
 //                          ((KEY block_node_or_indentless_sequence?)?
 //                          (VALUE block_node_or_indentless_sequence?)?)*
 //                          BLOCK-END
