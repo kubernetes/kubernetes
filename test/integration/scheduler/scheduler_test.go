@@ -49,6 +49,7 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
@@ -759,4 +760,72 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 		}); err != nil {
 		t.Fatalf("Failed while waiting for PodSchedulingContext Patch: %v", err)
 	}
+}
+
+func TestHostPortUnschedulable(t *testing.T) {
+	// The test verifies that two Pods requesting the same HostPort can not be scheduled
+	testCtx := testutils.InitTestSchedulerWithNS(t, "pod-hostport")
+	// node
+	node, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().
+		Name("node-hostport-node1").
+		Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "100m",
+			v1.ResourceMemory: "30",
+		}).Obj())
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", node.Name, err)
+	}
+	// container port
+	port := v1.ContainerPort{
+		Name:          "port",
+		ContainerPort: 80,
+		HostPort:      8080,
+	}
+
+	// create pod1 that should be scheduled
+	pod1 := testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-hostport-1", Namespace: testCtx.NS.Name})
+	pod1.Spec.Containers[0].Ports = []v1.ContainerPort{port}
+	pod1.Finalizers = []string{"fake.example.com/blockDeletion"} // avoid Pod get deleted immediatly
+	pod1.Spec.TerminationGracePeriodSeconds = ptr.To(int64(15))
+	pod1, err = testutils.CreatePausePod(testCtx.ClientSet, pod1)
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	// create pod2 that should not be scheduled because it will conflict with pod1
+	pod2 := testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-hostport-2", Namespace: testCtx.NS.Name})
+	pod2.Spec.Containers[0].Ports = []v1.ContainerPort{port}
+	pod2, err = testutils.CreatePausePod(testCtx.ClientSet, pod2)
+
+	// verify pod1 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod1, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", pod1.Name, err)
+	}
+
+	// verify pod2 is not scheduled
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod2); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", pod2.Name, err)
+	}
+
+	// delete pod1
+	if err := testutils.DeletePod(testCtx.ClientSet, pod1.Name, pod1.Namespace); err != nil {
+		t.Errorf("Failed to delete pod: %v", err)
+	}
+
+	// pod2 still unschedulable for longer than the graceful period (waiting for the finalizer to be removed)
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod2, time.Second*25)
+	if err == nil {
+		t.Errorf("Pod %s scheduled and it should not: %v", pod2.Name, err)
+	}
+
+	// Remove Finalizers
+	testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod1)
+
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod2, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
+	}
+
 }
