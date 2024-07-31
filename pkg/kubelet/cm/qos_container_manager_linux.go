@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -289,6 +290,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 	burstableMin := qosMemoryRequests[v1.PodQOSBurstable]
 	guaranteedMin := qosMemoryRequests[v1.PodQOSGuaranteed] + burstableMin
 
+	burstableMin = int64(math.Floor(float64(burstableMin) * Cgroup2MemoryMinFactor))
 	if burstableMin > 0 {
 		if configs[v1.PodQOSBurstable].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSBurstable].ResourceParameters.Unified = make(map[string]string)
@@ -297,6 +299,10 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSBurstable, "memoryMin", burstableMin)
 	}
 
+	// NOTE that setting memory.min equal to memory.max for pods with guaranteed QoS
+	// prevents the system from reclaiming page cache that would otherwise be reclaimable.
+	// So, let's set it just a bit lower than memory.max
+	guaranteedMin = int64(math.Floor(float64(burstableMin) * Cgroup2MemoryMinFactor))
 	if guaranteedMin > 0 {
 		if configs[v1.PodQOSGuaranteed].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSGuaranteed].ResourceParameters.Unified = make(map[string]string)
