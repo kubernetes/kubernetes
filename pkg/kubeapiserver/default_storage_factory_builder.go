@@ -17,6 +17,7 @@ limitations under the License.
 package kubeapiserver
 
 import (
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"

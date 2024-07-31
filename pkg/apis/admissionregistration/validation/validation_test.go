@@ -5410,7 +5410,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 		},
 	}
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 	extended, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MustParseGeneric("1.999"),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -5418,9 +5418,9 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessCELCompiler = plugincel.NewCompiler(extended)
+	_ = plugincel.NewCompiler(extended)
 	defer func() {
-		statelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+		_ = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	}()
 
 	for _, test := range tests {

@@ -784,7 +784,7 @@ func TestMAP(t *testing.T) {
 				t.Fatalf("expected must be set")
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "MutatingAdmissionPolicy",
 			}, framework.SharedEtcd())

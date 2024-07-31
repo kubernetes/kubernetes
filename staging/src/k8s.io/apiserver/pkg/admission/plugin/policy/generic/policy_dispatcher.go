@@ -203,18 +203,18 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 	var filteredErrors []PolicyError
 	for _, e := range policyErrors {
 		// we always default the FailurePolicy if it is unset and validate it in API level
-		var policy v1beta1.FailurePolicyType
+		var policy v1.FailurePolicyType
 		if fp := e.Policy.GetFailurePolicy(); fp == nil {
-			policy = v1beta1.Fail
+			policy = v1.Fail
 		} else {
 			policy = *fp
 		}
 
 		switch policy {
-		case v1beta1.Ignore:
+		case v1.Ignore:
 			// TODO: add metrics for ignored error here
 			continue
-		case v1beta1.Fail:
+		case v1.Fail:
 			filteredErrors = append(filteredErrors, e)
 		default:
 			filteredErrors = append(filteredErrors, e)

@@ -1167,7 +1167,7 @@ type MatchCondition struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
@@ -1180,7 +1180,7 @@ type MutatingAdmissionPolicy struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 type MutatingAdmissionPolicyList struct {
@@ -1337,7 +1337,7 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
 
 // MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with paramerized resources.
 // MutatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
@@ -1360,7 +1360,7 @@ type MutatingAdmissionPolicyBinding struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingList struct {
