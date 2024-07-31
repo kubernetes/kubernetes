@@ -24,7 +24,7 @@ import (
 	"math/big"
 	"testing"
 
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -32,10 +32,6 @@ import (
 )
 
 func TestCTBSignerNameChangeForbidden(t *testing.T) {
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	// TODO: Remove this line once certificates v1alpha1 types to be removed in 1.32 are fully removed
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
 	testCases := []struct {
 		objectName string
 		signer1    string
@@ -63,16 +59,16 @@ func TestCTBSignerNameChangeForbidden(t *testing.T) {
 
 			ctx := context.Background()
 
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1alpha1.SchemeGroupVersion)}, framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion)}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := kubernetes.NewForConfigOrDie(server.ClientConfig)
 
-			bundle1 := &certsv1alpha1.ClusterTrustBundle{
+			bundle1 := &certsv1beta1.ClusterTrustBundle{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tc.objectName,
 				},
-				Spec: certsv1alpha1.ClusterTrustBundleSpec{
+				Spec: certsv1beta1.ClusterTrustBundleSpec{
 					SignerName: tc.signer1,
 					TrustBundle: mustMakePEMBlock("CERTIFICATE", nil, mustMakeCertificate(t, &x509.Certificate{
 						SerialNumber: big.NewInt(0),
@@ -84,7 +80,7 @@ func TestCTBSignerNameChangeForbidden(t *testing.T) {
 					})),
 				},
 			}
-			bundle1, err := client.CertificatesV1alpha1().ClusterTrustBundles().Create(ctx, bundle1, metav1.CreateOptions{})
+			bundle1, err := client.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, bundle1, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error while creating bundle1: %v", err)
 			}
@@ -95,7 +91,7 @@ func TestCTBSignerNameChangeForbidden(t *testing.T) {
 			// cluster trust bundle.
 			bundle1.Spec.SignerName = tc.signer2
 
-			_, err = client.CertificatesV1alpha1().ClusterTrustBundles().Update(ctx, bundle1, metav1.UpdateOptions{})
+			_, err = client.CertificatesV1beta1().ClusterTrustBundles().Update(ctx, bundle1, metav1.UpdateOptions{})
 			if err == nil {
 				t.Fatalf("Got nil error from updating bundle foo-com--bar from signerName=foo.com/bar to signerName=foo.com/bar2, but wanted an error")
 			}
