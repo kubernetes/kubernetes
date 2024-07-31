@@ -26,6 +26,7 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 	utilstrings "k8s.io/utils/strings"
@@ -305,6 +306,11 @@ func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 // GetPodCgroupRoot returns the listeral cgroupfs value for the cgroup containing all pods
 func (kl *Kubelet) GetPodCgroupRoot() string {
 	return kl.containerManager.GetPodCgroupRoot()
+}
+
+// GetNodeCgroupStats returns the cgroup stats of system containers on the node.
+func (kl *Kubelet) GetNodeCgroupStats() (*statsapi.NodeStats, error) {
+	return kl.containerManager.GetNodeCgroupStats()
 }
 
 // GetHostIPs returns host IPs or nil in case of error.

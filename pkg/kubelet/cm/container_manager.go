@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -107,6 +108,9 @@ type ContainerManager interface {
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
+
+	// GetNodeCgroupStats returns the cgroup stats of system containers on the node.
+	GetNodeCgroupStats() (*statsapi.NodeStats, error)
 
 	// GetPluginRegistrationHandler returns a plugin registration handler
 	// The pluginwatcher's Handlers allow to have a single module for handling

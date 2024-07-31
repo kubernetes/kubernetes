@@ -22,11 +22,15 @@ package cm
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"sync"
 	"time"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
+	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
+	info "github.com/google/cadvisor/info/v1"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -36,6 +40,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,6 +51,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -64,6 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -104,6 +111,10 @@ type containerManagerImpl struct {
 	status Status
 	// External containers being managed.
 	systemContainers []*systemContainer
+	// System containers
+	sysContainers   map[string]*systemContainer
+	rootContainer   *systemContainer
+	lastCgroupStats map[string]*info.ContainerStats
 	// Tasks that are run periodically
 	periodicTasks []func()
 	// Holds all the mounted cgroup subsystems
@@ -132,6 +143,9 @@ type containerManagerImpl struct {
 	topologyManager topologymanager.Manager
 	// Interface for Dynamic Resource Allocation management.
 	draManager dra.Manager
+
+	kubeletCreationTime metav1.Time
+	systemBootTime      metav1.Time
 }
 
 type features struct {
@@ -200,6 +214,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+	kubeletCreationTime := metav1.Now()
+	bootTime, err := util.GetBootTime()
+	if err != nil {
+		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
+	}
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -277,6 +296,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cadvisorInterface:   cadvisorInterface,
 		mountUtil:           mountUtil,
 		NodeConfig:          nodeConfig,
+		lastCgroupStats:     make(map[string]*info.ContainerStats),
 		subsystems:          subsystems,
 		cgroupManager:       cgroupManager,
 		capacity:            capacity,
@@ -284,6 +304,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cgroupRoot:          cgroupRoot,
 		recorder:            recorder,
 		qosContainerManager: qosContainerManager,
+		kubeletCreationTime: kubeletCreationTime,
+		systemBootTime:      metav1.NewTime(bootTime),
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
@@ -477,6 +499,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	}
 
 	systemContainers := []*systemContainer{}
+	sysContainers := make(map[string]*systemContainer)
 
 	if cm.SystemCgroupsName != "" {
 		if cm.SystemCgroupsName == "/" {
@@ -490,6 +513,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
+		sysContainers[statsapi.SystemContainerMisc] = cont
 	}
 
 	if cm.KubeletCgroupsName != "" {
@@ -502,6 +526,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			return ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), cont.manager)
 		}
 		systemContainers = append(systemContainers, cont)
+		sysContainers[statsapi.SystemContainerKubelet] = cont
 	} else {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
 			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), nil); err != nil {
@@ -518,9 +543,38 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 
 			cm.KubeletCgroupsName = cont
 		})
+		kubeletCgroupsName, err := getContainer(os.Getpid())
+		if err != nil {
+			return err
+		}
+		cont, err := newSystemCgroups(kubeletCgroupsName)
+		if err != nil {
+			return err
+		}
+		sysContainers[statsapi.SystemContainerKubelet] = cont
 	}
 
 	cm.systemContainers = systemContainers
+
+	if cm.RuntimeCgroupsName != "" {
+		cont, err := newSystemCgroups(cm.RuntimeCgroupsName)
+		if err != nil {
+			return err
+		}
+		sysContainers[statsapi.SystemContainerRuntime] = cont
+	}
+
+	cont, err := newSystemCgroups(cm.GetPodCgroupRoot())
+	if err != nil {
+		return err
+	}
+	sysContainers[statsapi.SystemContainerPods] = cont
+	cm.sysContainers = sysContainers
+
+	cm.rootContainer, err = newSystemCgroups("/")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1040,4 +1094,156 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
 	return cm.deviceManager.Updates()
+}
+
+func (cm *containerManagerImpl) GetNodeCgroupStats() (*statsapi.NodeStats, error) {
+	nodeStats, err := cm.getRootCgroupStats()
+	if err != nil {
+		return nil, err
+	}
+	containersStats, err := cm.GetSystemContainersStats()
+	if err != nil {
+		return nil, err
+	}
+	for _, stats := range containersStats {
+		nodeStats.SystemContainers = append(nodeStats.SystemContainers, *stats)
+	}
+	return nodeStats, nil
+
+}
+
+func (cm *containerManagerImpl) getRootCgroupStats() (*statsapi.NodeStats, error) {
+	includedMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:     struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
+		cadvisormetrics.NetworkUsageMetrics: struct{}{},
+	}
+	handler := containerlibcontainer.NewHandler(cm.rootContainer.manager, "/" /* rootFs*/, 1 /* pid */, includedMetrics)
+	stats, err := handler.GetStats()
+	if err != nil {
+		return nil, err
+	}
+
+	resource := cm.internalCapacity[v1.ResourceMemory]
+	limit, ok := resource.AsInt64()
+	if !ok {
+		klog.InfoS("Unable to get machine memory capacity", "capacity", cm.internalCapacity)
+		limit = 0
+	}
+
+	cm.Lock()
+	last := cm.lastCgroupStats["/"]
+	cm.lastCgroupStats["/"] = stats
+	cm.Unlock()
+
+	cpuStats, memStats, swapStats := convertCPUAndMemory(last, stats, uint64(limit))
+	netStats := &statsapi.NetworkStats{
+		Time: metav1.NewTime(stats.Timestamp),
+	}
+
+	for i := range stats.Network.Interfaces {
+		inter := stats.Network.Interfaces[i]
+		iStat := statsapi.InterfaceStats{
+			Name:     inter.Name,
+			RxBytes:  &inter.RxBytes,
+			RxErrors: &inter.RxErrors,
+			TxBytes:  &inter.TxBytes,
+			TxErrors: &inter.TxErrors,
+		}
+
+		if inter.Name == "eth0" {
+			netStats.InterfaceStats = iStat
+		}
+
+		netStats.Interfaces = append(netStats.Interfaces, iStat)
+	}
+	return &statsapi.NodeStats{
+		CPU:       cpuStats,
+		Memory:    memStats,
+		Network:   netStats,
+		Swap:      swapStats,
+		StartTime: cm.systemBootTime,
+	}, nil
+}
+
+func (cm *containerManagerImpl) GetSystemContainersStats() ([]*statsapi.ContainerStats, error) {
+	var results []*statsapi.ContainerStats
+
+	// Only 'cpu', 'memory' and 'swap' are collected for system containers' stats
+	includedMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:    struct{}{},
+		cadvisormetrics.MemoryUsageMetrics: struct{}{},
+	}
+
+	for name, cont := range cm.sysContainers {
+		handler := containerlibcontainer.NewHandler(cont.manager, "/" /* rootFs*/, 0 /* pid */, includedMetrics)
+		stats, err := handler.GetStats()
+		if err != nil {
+			return nil, err
+		}
+
+		s, err := cont.manager.GetStats()
+		if err != nil {
+			return nil, err
+		}
+		limit := s.MemoryStats.Usage.Limit
+
+		cm.Lock()
+		last := cm.lastCgroupStats[name]
+		cm.lastCgroupStats[name] = stats
+		cm.Unlock()
+
+		startTime := cm.systemBootTime
+		if name == statsapi.SystemContainerKubelet {
+			startTime = cm.kubeletCreationTime
+		}
+		cpuStats, memStats, swapStats := convertCPUAndMemory(last, stats, limit)
+		results = append(results, &statsapi.ContainerStats{
+			Name:      name,
+			StartTime: startTime,
+			CPU:       cpuStats,
+			Memory:    memStats,
+			Swap:      swapStats,
+		})
+	}
+	return results, nil
+}
+
+func convertCPUAndMemory(last, stats *info.ContainerStats, memLimit uint64) (*statsapi.CPUStats, *statsapi.MemoryStats, *statsapi.SwapStats) {
+	cpuStats := &statsapi.CPUStats{
+		Time:                 metav1.NewTime(stats.Timestamp),
+		UsageNanoCores:       instCPUUsage(last, stats),
+		UsageCoreNanoSeconds: &stats.Cpu.Usage.Total,
+	}
+	memStats := &statsapi.MemoryStats{
+		Time:            metav1.NewTime(stats.Timestamp),
+		UsageBytes:      &stats.Memory.Usage,
+		WorkingSetBytes: &stats.Memory.WorkingSet,
+		RSSBytes:        &stats.Memory.RSS,
+		PageFaults:      &stats.Memory.ContainerData.Pgfault,
+		MajorPageFaults: &stats.Memory.ContainerData.Pgmajfault,
+	}
+	if memLimit != 0 && memLimit != math.MaxUint64 {
+		availableBytes := memLimit - *memStats.WorkingSetBytes
+		memStats.AvailableBytes = &availableBytes
+	}
+	swapStats := &statsapi.SwapStats{
+		Time:           metav1.NewTime(stats.Timestamp),
+		SwapUsageBytes: &stats.Memory.Swap,
+	}
+	return cpuStats, memStats, swapStats
+}
+
+func instCPUUsage(last, cur *info.ContainerStats) *uint64 {
+	if last == nil {
+		return nil
+	}
+	timeDelta := cur.Timestamp.Sub(last.Timestamp)
+	// Nanoseconds to gain precision and avoid having zero seconds if the
+	// difference between the timestamps is just under a second
+	timeDeltaNs := uint64(timeDelta.Nanoseconds())
+	valueDelta := cur.Cpu.Usage.Total - last.Cpu.Usage.Total
+	// Use float64 to keep precision
+	i := uint64(float64(valueDelta) / float64(timeDeltaNs) * 1e9)
+	return &i
 }

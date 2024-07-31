@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -258,4 +259,8 @@ func (cm *FakeContainerManager) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 }
 func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 	return nil
+}
+
+func (cm *FakeContainerManager) GetNodeCgroupStats() (*statsapi.NodeStats, error) {
+	return nil, nil
 }

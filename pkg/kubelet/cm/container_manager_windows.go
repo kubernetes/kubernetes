@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -285,4 +286,8 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(*v1.Pod) error {
 
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *containerManagerImpl) GetNodeCgroupStats() (*statsapi.NodeStats, error) {
+	return nil, nil
 }

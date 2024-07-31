@@ -288,6 +288,9 @@ func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsa
 func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	return nil, nil
 }
+func (*fakeKubelet) GetNodeCgroupStats() (*statsapi.NodeStats, error) {
+	return nil, nil
+}
 
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
