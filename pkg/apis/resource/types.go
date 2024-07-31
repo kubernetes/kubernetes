@@ -1005,7 +1005,7 @@ type ResourceClaimTemplate struct {
 
 // ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 type ResourceClaimTemplateSpec struct {
-	// ObjectMeta may contain labels and annotations that will be copied into the PVC
+	// ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
 	// +optional
