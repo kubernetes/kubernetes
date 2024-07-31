@@ -107,10 +107,10 @@ func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtim
 	}, nil
 }
 
-func (f *FakeRuntimeHelper) PrepareDynamicResources(pod *v1.Pod) error {
+func (f *FakeRuntimeHelper) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
-func (f *FakeRuntimeHelper) UnprepareDynamicResources(pod *v1.Pod) error {
+func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }

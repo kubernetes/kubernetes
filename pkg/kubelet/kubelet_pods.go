@@ -591,7 +591,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(pod)
 
-	opts, err := kl.containerManager.GetResources(pod, container)
+	opts, err := kl.containerManager.GetResources(ctx, pod, container)
 	if err != nil {
 		return nil, nil, err
 	}

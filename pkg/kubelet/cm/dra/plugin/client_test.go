@@ -97,7 +97,7 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
-	ctx := ktesting.Init(t)
+	tCtx := ktesting.Init(t)
 	addr, teardown, err := setupFakeGRPCServer(v1alpha4Version)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +109,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	m := sync.Mutex{}
 
 	p := &Plugin{
-		backgroundCtx:     ctx,
+		backgroundCtx:     tCtx,
 		endpoint:          addr,
 		clientCallTimeout: defaultClientCallTimeout,
 	}
@@ -149,7 +149,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 					},
 				},
 			}
-			_, err = client.NodePrepareResources(context.TODO(), req)
+
+			_, err = client.NodePrepareResources(tCtx, req)
 			assert.NoError(t, err)
 
 			client.mutex.Lock()
@@ -237,7 +238,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
 			if err != nil {
 				t.Fatal(err)
@@ -245,7 +246,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 			defer teardown()
 
 			p := &Plugin{
-				backgroundCtx:     ctx,
+				backgroundCtx:     tCtx,
 				endpoint:          addr,
 				clientCallTimeout: defaultClientCallTimeout,
 			}
@@ -269,7 +270,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = client.NodeUnprepareResources(context.TODO(), test.request)
+			_, err = client.NodeUnprepareResources(tCtx, test.request)
 			if err != nil {
 				t.Fatal(err)
 			}
