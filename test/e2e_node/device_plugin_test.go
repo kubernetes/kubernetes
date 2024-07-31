@@ -106,7 +106,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
-			}, time.Minute, time.Second).Should(gomega.BeTrue())
+			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected node to be ready"))
 
 			// Before we run the device plugin test, we need to ensure
 			// that the cluster is in a clean state and there are no
@@ -143,7 +143,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready && CountSampleDeviceCapacity(node) > 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be available on local node"))
 			framework.Logf("Successfully created device plugin pod")
 
 			ginkgo.By(fmt.Sprintf("Waiting for the resource exported by the sample device plugin to become available on the local node (instances: %d)", expectedSampleDevsAmount))
@@ -152,7 +152,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available on local node"))
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -177,7 +177,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready && CountSampleDeviceCapacity(node) <= 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be unavailable on local node"))
 
 			ginkgo.By("devices now unavailable on the local node")
 		})
@@ -336,7 +336,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available after restart"))
 
 			ginkgo.By("Checking the same instance of the pod is still running")
 			gomega.Eventually(ctx, getPodByName).
@@ -465,7 +465,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available after re-registration"))
 
 			// crosscheck that after device plugin restart the device assignment is preserved and
 			// stable from the kubelet's perspective.
@@ -540,7 +540,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available after restart"))
 
 			ginkgo.By("Checking the same instance of the pod is still running after the device plugin restart")
 			gomega.Eventually(ctx, getPodByName).
@@ -570,7 +570,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				ok := kubeletHealthCheck(kubeletHealthCheckURL)
 				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
 				return ok
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.Logf("Delete the pod while the kubelet is not running")
 			// Delete pod sync by name will force delete the pod, removing it from kubelet's config
@@ -584,7 +584,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				ok := kubeletHealthCheck(kubeletHealthCheckURL)
 				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
 				return ok
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			framework.Logf("wait for the pod %v to disappear", pod.Name)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -714,11 +714,13 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Wait for node to be ready")
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
-				return nodes == 1
-			}, time.Minute, time.Second).Should(gomega.BeTrue())
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := e2enode.TotalReady(ctx, f.ClientSet)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Equal(1), "one node should be ready")
 
 			// Before we run the device plugin test, we need to ensure
 			// that the cluster is in a clean state and there are no
@@ -800,7 +802,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready && CountSampleDeviceCapacity(node) > 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be available on the local node"))
 			framework.Logf("Successfully created device plugin pod")
 
 			ginkgo.By(fmt.Sprintf("Waiting for the resource exported by the sample device plugin to become available on the local node (instances: %d)", expectedSampleDevsAmount))
@@ -809,7 +811,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available on local node"))
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -835,7 +837,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready && CountSampleDeviceCapacity(node) <= 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be unavailable on local node"))
 
 			ginkgo.By("devices now unavailable on the local node")
 		})
@@ -934,15 +936,15 @@ func ensurePodContainerRestart(ctx context.Context, f *framework.Framework, podN
 		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
-	gomega.Eventually(ctx, func() bool {
+	gomega.Eventually(ctx, func() int {
 		p, err = e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil || len(p.Status.ContainerStatuses) < 1 {
-			return false
+			return 0
 		}
 		currentCount = p.Status.ContainerStatuses[0].RestartCount
 		framework.Logf("initial %v, current %v", initialCount, currentCount)
-		return currentCount > initialCount
-	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+		return int(currentCount)
+	}, 5*time.Minute, framework.Poll).Should(gomega.BeNumerically(">", initialCount))
 }
 
 // parseLog returns the matching string for the specified regular expression parsed from the container logs.

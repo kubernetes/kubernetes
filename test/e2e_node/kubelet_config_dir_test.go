@@ -59,7 +59,7 @@ var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			configDir := framework.TestContext.KubeletConfigDropinDir
 
@@ -132,7 +132,7 @@ featureGates:
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			mergedConfig, err := getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)

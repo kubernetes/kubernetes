@@ -740,7 +740,7 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 		expectedCPUs := onlineCPUs.Difference(reservedSystemCPUs)
 
 		ginkgo.By(fmt.Sprintf("expecting CPUs '%v'='%v'", allocatableCPUs, expectedCPUs))
-		gomega.ExpectWithOffset(1, allocatableCPUs.Equals(expectedCPUs)).To(gomega.BeTrue(), "mismatch expecting CPUs")
+		gomega.ExpectWithOffset(1, allocatableCPUs.Equals(expectedCPUs)).To(gomega.BeTrueBecause("mismatch expecting CPUs"))
 	}
 
 	if sd == nil { // no devices in the environment, so expect no devices
@@ -1326,7 +1326,7 @@ func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework
 		node := getLocalNode(ctx, f)
 		resourceAmount := CountSampleDeviceAllocatable(node)
 		return resourceAmount > 0
-	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected %q resources to be available, got no resources", defaultTopologyUnawareResourceName))
 }
 
 func getPodResourcesMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
