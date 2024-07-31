@@ -94,8 +94,14 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 	compiledRules, err := Compile(s, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), StoredExpressionsEnvLoader())
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
+	var elemType *cel.DeclType
+	if declType != nil {
+		elemType = declType.ElemType
+	} else {
+		elemType = declType
+	}
 	if s.Items != nil {
-		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, declType.ElemType, perCallLimit)
+		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, elemType, perCallLimit)
 	}
 	if len(s.Properties) > 0 {
 		propertiesValidators = make(map[string]Validator, len(s.Properties))
@@ -103,6 +109,9 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 			prop := p
 			var fieldType *cel.DeclType
 			if escapedPropName, ok := cel.Escape(k); ok {
+				if declType == nil {
+					continue
+				}
 				if f, ok := declType.Fields[escapedPropName]; ok {
 					fieldType = f.Type
 				} else {
@@ -123,7 +132,7 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 		}
 	}
 	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
-		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
+		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, elemType, perCallLimit)
 	}
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
 		activationFactory := validationActivationWithoutOldSelf
