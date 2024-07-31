@@ -101,6 +101,11 @@ const (
 	// Allows authorization to use field and label selectors.
 	AuthorizeWithSelectors featuregate.Feature = "AuthorizeWithSelectors"
 
+	// owner: @serathius
+	// beta: v1.31
+	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
+	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
+
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
@@ -364,6 +369,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServingWithRoutine: {Default: false, PreRelease: featuregate.Alpha},
 
 	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
+
+	ConcurrentWatchObjectDecode: {Default: false, PreRelease: featuregate.Beta},
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
