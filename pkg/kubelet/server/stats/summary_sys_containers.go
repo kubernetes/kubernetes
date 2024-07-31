@@ -22,15 +22,52 @@ package stats
 import (
 	"errors"
 
-	"k8s.io/klog/v2"
-
 	cadvisormemory "github.com/google/cadvisor/cache/memory"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetNodeCgroupStats(_ []statsapi.PodStats, updateStats bool) (*statsapi.NodeStats, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletNodeCgroupStats) {
+		nodeCgroupStats, err := sp.provider.GetNodeCgroupStats()
+		if err != nil {
+			return nil, err
+		}
+		for i := range nodeCgroupStats.SystemContainers {
+			s := &nodeCgroupStats.SystemContainers[i]
+			s.Logs, s.Rootfs = nil, nil
+		}
+		return &statsapi.NodeStats{
+			CPU:              nodeCgroupStats.CPU,
+			Memory:           nodeCgroupStats.Memory,
+			Swap:             nodeCgroupStats.Swap,
+			Network:          nodeCgroupStats.Network,
+			SystemContainers: nodeCgroupStats.SystemContainers,
+		}, nil
+	}
+
+	nodeConfig := sp.provider.GetNodeConfig()
+	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
+	if err != nil {
+		return nil, err
+	}
+
+	return &statsapi.NodeStats{
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
+		Network:          networkStats,
+		SystemContainers: sp.getSystemContainersStats(nodeConfig, nil, updateStats),
+	}, nil
+
+}
+
+func (sp *summaryProviderImpl) getSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	systemContainers := map[string]struct {
 		name             string
 		forceStatsUpdate bool
@@ -65,7 +102,35 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 	return stats
 }
 
-func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetNodeCgroupCPUAndMemoryStats(_ []statsapi.PodStats, updateStats bool) (*statsapi.NodeStats, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletNodeCgroupStats) {
+		nodeCgroupStats, err := sp.provider.GetNodeCgroupStats()
+		if err != nil {
+			return nil, err
+		}
+		return &statsapi.NodeStats{
+			CPU:              nodeCgroupStats.CPU,
+			Memory:           nodeCgroupStats.Memory,
+			Swap:             nodeCgroupStats.Swap,
+			SystemContainers: nodeCgroupStats.SystemContainers,
+		}, nil
+	}
+
+	nodeConfig := sp.provider.GetNodeConfig()
+	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", updateStats)
+	if err != nil {
+		return nil, err
+	}
+
+	return &statsapi.NodeStats{
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
+		SystemContainers: sp.getSystemContainersCPUAndMemoryStats(nodeConfig, nil, updateStats),
+	}, nil
+
+}
+func (sp *summaryProviderImpl) getSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	systemContainers := map[string]struct {
 		name             string
 		forceStatsUpdate bool

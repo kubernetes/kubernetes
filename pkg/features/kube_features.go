@@ -386,6 +386,15 @@ const (
 	// All the node components such as CRI need to be running in the same user namespace.
 	KubeletInUserNamespace featuregate.Feature = "KubeletInUserNamespace"
 
+	// owner: @linxiulei
+	// beta: v1.31
+	//
+	// Enable collecting node cgroup stats directly by Kubelet. Node Cgroups, as
+	// opposed to cgroups of managed pods, are system cgroups on the node and
+	// tracked with usage by the Kubelet. Enabling this stops relying on cadvisor
+	// to collect those node cgroup stats. Only effective on Linux.
+	KubeletNodeCgroupStats featuregate.Feature = "KubeletNodeCgroupStats"
+
 	// owner: @moshe010
 	// alpha: v1.27
 	//
@@ -1096,6 +1105,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletCgroupDriverFromCRI: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
+
+	KubeletNodeCgroupStats: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletPodResourcesDynamicResources: {Default: false, PreRelease: featuregate.Alpha},
 

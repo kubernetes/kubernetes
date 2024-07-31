@@ -29,6 +29,35 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
+func (sp *summaryProviderImpl) GetNodeCgroupStats(podStats []statsapi.PodStats, updateStats bool) (*statsapi.NodeStats, error) {
+	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
+	if err != nil {
+		return nil, err
+	}
+	nodeConfig := sp.provider.GetNodeConfig()
+	return &statsapi.NodeStats{
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
+		Network:          networkStats,
+		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+	}, nil
+}
+
+func (sp *summaryProviderImpl) GetNodeCgroupCPUAndMemoryStats(podStats []statsapi.PodStats, updateStats bool) (*statsapi.NodeStats, error) {
+	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", updateStats)
+	if err != nil {
+		return nil, err
+	}
+	nodeConfig := sp.provider.GetNodeConfig()
+	return &statsapi.NodeStats{
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
+		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+	}, nil
+}
+
 func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
 	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())

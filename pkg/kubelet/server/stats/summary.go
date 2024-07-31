@@ -71,20 +71,15 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get node info: %v", err)
-	}
-	nodeConfig := sp.provider.GetNodeConfig()
-	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
 	rootFsStats, err := sp.provider.RootFsStats()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rootFs stats: %v", err)
+		return nil, fmt.Errorf("failed to get rootFs stats: %w", err)
 	}
 	imageFsStats, containerFsStats, err := sp.provider.ImageFsStats(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
+		return nil, fmt.Errorf("failed to get imageFs stats: %w", err)
 	}
 	var podStats []statsapi.PodStats
 	if updateStats {
@@ -93,25 +88,29 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		podStats, err = sp.provider.ListPodStats(ctx)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+		return nil, fmt.Errorf("failed to list pod stats: %w", err)
+	}
+	nodeCgroupStats, err := sp.GetNodeCgroupStats(podStats, updateStats)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node cgroup stats: %w", err)
 	}
 
 	rlimit, err := sp.provider.RlimitStats()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
+		return nil, fmt.Errorf("failed to get rlimit stats: %w", err)
 	}
 
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
-		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
-		Swap:             rootStats.Swap,
-		Network:          networkStats,
+		CPU:              nodeCgroupStats.CPU,
+		Memory:           nodeCgroupStats.Memory,
+		Swap:             nodeCgroupStats.Swap,
+		Network:          nodeCgroupStats.Network,
 		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
 		Runtime:          &statsapi.RuntimeStats{ContainerFs: containerFsStats, ImageFs: imageFsStats},
 		Rlimit:           rlimit,
-		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+		SystemContainers: nodeCgroupStats.SystemContainers,
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,
@@ -125,26 +124,24 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get node info: %v", err)
+		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
-	nodeConfig := sp.provider.GetNodeConfig()
-	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
-	}
-
 	podStats, err := sp.provider.ListPodCPUAndMemoryStats(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+		return nil, fmt.Errorf("failed to list pod stats: %w", err)
+	}
+	nodeCgroupStats, err := sp.GetNodeCgroupCPUAndMemoryStats(podStats, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node cgroup stats: %w", err)
 	}
 
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
-		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
-		Swap:             rootStats.Swap,
-		StartTime:        rootStats.StartTime,
-		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
+		CPU:              nodeCgroupStats.CPU,
+		Memory:           nodeCgroupStats.Memory,
+		Swap:             nodeCgroupStats.Swap,
+		StartTime:        sp.systemBootTime,
+		SystemContainers: nodeCgroupStats.SystemContainers,
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,
