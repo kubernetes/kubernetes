@@ -3315,15 +3315,31 @@ oom_score = -999
   default_runtime_name = "runc"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
-# Enable registry.k8s.io as the primary mirror for k8s.gcr.io
-# See: https://github.com/kubernetes/k8s.io/issues/3411
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
-  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   SystemdCgroup = ${systemdCgroup}
+# enable hosts config
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = "/etc/containerd/certs.d"
 EOF
+
+  # used for 5k node scale tests with private pull-through cache
+  if [[ -n "${KUBERNETES_REGISTRY_PULL_THROUGH_HOST:-}" ]]; then
+    registry_config_dir="/etc/containerd/certs.d/registry.k8s.io"
+    mkdir -p "${registry_config_dir}"
+    {
+      # NOTE: we need literal double quotes around some of these values
+      echo 'server="'"${KUBERNETES_REGISTRY_PULL_THROUGH_HOST}"'"'
+      echo ''
+      echo '[host."'"${KUBERNETES_REGISTRY_PULL_THROUGH_HOST}"'"]'
+      echo '  override_path = true'
+      echo '  capabilities = ["pull", "resolve"]'
+      # TODO: this is a hack. https://github.com/containerd/containerd/issues/7385
+      echo '[host."'"${KUBERNETES_REGISTRY_PULL_THROUGH_HOST}"'".header]'
+      if [[ -n "${KUBERNETES_REGISTRY_PULL_THROUGH_BASIC_AUTH_TOKEN:-}" ]]; then
+        echo "  authorization = '""${KUBERNETES_REGISTRY_PULL_THROUGH_BASIC_AUTH_TOKEN}""'"
+      fi
+    } > "${registry_config_dir}/hosts.toml"
+  fi
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
   cat >> "${config_path}" <<EOF

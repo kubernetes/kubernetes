@@ -167,6 +167,15 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"resource"})
+
+	ConsistentReadTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "consistent_read_total",
+			Help:           "Counter for consistent reads from cache.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		}, []string{"resource", "success", "fallback"})
 )
 
 var registerMetrics sync.Once
@@ -188,6 +197,7 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
 		legacyregistry.MustRegister(WatchCacheReadWait)
+		legacyregistry.MustRegister(ConsistentReadTotal)
 	})
 }
 
