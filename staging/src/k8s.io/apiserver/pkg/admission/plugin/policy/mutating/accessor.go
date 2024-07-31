@@ -17,8 +17,8 @@ limitations under the License.
 package mutating
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
-	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 )
@@ -47,26 +47,26 @@ func (v *mutatingAdmissionPolicyAccessor) GetName() string {
 	return v.Name
 }
 
-func (v *mutatingAdmissionPolicyAccessor) GetParamKind() *v1beta1.ParamKind {
+func (v *mutatingAdmissionPolicyAccessor) GetParamKind() *v1.ParamKind {
 	pk := v.Spec.ParamKind
 	if pk == nil {
 		return nil
 	}
-	return &v1beta1.ParamKind{
+	return &v1.ParamKind{
 		APIVersion: pk.APIVersion,
 		Kind:       pk.Kind,
 	}
 }
 
-func (v *mutatingAdmissionPolicyAccessor) GetMatchConstraints() *v1beta1.MatchResources {
-	return convertV1alpha1ResourceRulesToV1beta1(v.Spec.MatchConstraints)
+func (v *mutatingAdmissionPolicyAccessor) GetMatchConstraints() *v1.MatchResources {
+	return convertV1alpha1ResourceRulesToV1(v.Spec.MatchConstraints)
 }
 
-func (v *mutatingAdmissionPolicyAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
+func (v *mutatingAdmissionPolicyAccessor) GetFailurePolicy() *v1.FailurePolicyType {
 	if v.Spec.FailurePolicy == nil {
 		return nil
 	}
-	fp := v1beta1.FailurePolicyType(*v.Spec.FailurePolicy)
+	fp := v1.FailurePolicyType(*v.Spec.FailurePolicy)
 	return &fp
 }
 
@@ -89,22 +89,22 @@ func (v *mutatingAdmissionPolicyBindingAccessor) GetPolicyName() types.Namespace
 	}
 }
 
-func (v *mutatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1beta1.MatchResources {
-	return convertV1alpha1ResourceRulesToV1beta1(v.Spec.MatchResources)
+func (v *mutatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1.MatchResources {
+	return convertV1alpha1ResourceRulesToV1(v.Spec.MatchResources)
 }
 
-func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1beta1.ParamRef {
+func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
 	if v.Spec.ParamRef == nil {
 		return nil
 	}
 
-	var nfa *v1beta1.ParameterNotFoundActionType
+	var nfa *v1.ParameterNotFoundActionType
 	if v.Spec.ParamRef.ParameterNotFoundAction != nil {
-		nfa = new(v1beta1.ParameterNotFoundActionType)
-		*nfa = v1beta1.ParameterNotFoundActionType(*v.Spec.ParamRef.ParameterNotFoundAction)
+		nfa = new(v1.ParameterNotFoundActionType)
+		*nfa = v1.ParameterNotFoundActionType(*v.Spec.ParamRef.ParameterNotFoundAction)
 	}
 
-	return &v1beta1.ParamRef{
+	return &v1.ParamRef{
 		Name:                    v.Spec.ParamRef.Name,
 		Namespace:               v.Spec.ParamRef.Namespace,
 		Selector:                v.Spec.ParamRef.Selector,
@@ -112,28 +112,28 @@ func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1beta1.ParamRef
 	}
 }
 
-func convertV1alpha1ResourceRulesToV1beta1(mc *v1alpha1.MatchResources) *v1beta1.MatchResources {
+func convertV1alpha1ResourceRulesToV1(mc *v1alpha1.MatchResources) *v1.MatchResources {
 	if mc == nil {
 		return nil
 	}
 
-	var res v1beta1.MatchResources
+	var res v1.MatchResources
 	res.NamespaceSelector = mc.NamespaceSelector
 	res.ObjectSelector = mc.ObjectSelector
 	for _, ex := range mc.ExcludeResourceRules {
-		res.ExcludeResourceRules = append(res.ExcludeResourceRules, v1beta1.NamedRuleWithOperations{
+		res.ExcludeResourceRules = append(res.ExcludeResourceRules, v1.NamedRuleWithOperations{
 			ResourceNames:      ex.ResourceNames,
 			RuleWithOperations: ex.RuleWithOperations,
 		})
 	}
 	for _, ex := range mc.ResourceRules {
-		res.ResourceRules = append(res.ResourceRules, v1beta1.NamedRuleWithOperations{
+		res.ResourceRules = append(res.ResourceRules, v1.NamedRuleWithOperations{
 			ResourceNames:      ex.ResourceNames,
 			RuleWithOperations: ex.RuleWithOperations,
 		})
 	}
 	if mc.MatchPolicy != nil {
-		mp := v1beta1.MatchPolicyType(*mc.MatchPolicy)
+		mp := v1.MatchPolicyType(*mc.MatchPolicy)
 		res.MatchPolicy = &mp
 	}
 	return &res

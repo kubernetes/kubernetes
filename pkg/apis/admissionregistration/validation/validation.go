@@ -1383,7 +1383,7 @@ func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admission
 	var compiler plugincel.Compiler // composition compiler is stateful, create one lazily per policy
 	getCompiler := func() plugincel.Compiler {
 		if compiler == nil {
-			compiler = createCompiler(false)
+			compiler = createCompiler(false, true)
 		}
 		return compiler
 	}

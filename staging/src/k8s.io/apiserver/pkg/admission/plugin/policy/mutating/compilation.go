@@ -119,7 +119,7 @@ func createEnvSet(vars plugincel.OptionalVariableDeclarations) (*environment.Env
 	if vars.HasParams {
 		options = append(options, cel.Variable("params", cel.DynType))
 	}
-	return environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(environment.VersionedOptions{
+	return environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 30),
 		EnvOptions:        options,
 	})

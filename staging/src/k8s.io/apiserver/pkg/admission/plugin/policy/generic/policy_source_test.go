@@ -219,7 +219,7 @@ func (fb *FakePolicy) GetMatchConstraints() *v1.MatchResources {
 	return nil
 }
 
-func (fb *FakePolicy) GetFailurePolicy() *v1beta1.FailurePolicyType {
+func (fb *FakePolicy) GetFailurePolicy() *v1.FailurePolicyType {
 	return nil
 }
 
