@@ -848,6 +848,218 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 			addExtendedResource: true,
 		},
+		{
+			name: "Burstable QoS pod, one container with only cpu requests - increase cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with only cpu requests - decrease cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu requests and memory requests + limits- increase cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu requests and memory requests + limits- decrease cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu requests and memory requests + limits - increase cpu requests & memory limits",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}, "limits": {"memory": "350Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m", MemReq: "200Mi", MemLim: "350Mi"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, three container without cpu limits - no change for c3, increase c1 cpu requests, decrease c2 cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+				{
+					Name:      "c3",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"150m"}}},
+						{"name":"c2", "resources":{"requests":{"cpu":"100m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "150m"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+				{
+					Name:      "c3",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, two container with + without memory limits - increase c1 memory limits",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"150Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "150Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, two container with + without cpu limits - increase c1 cpu limits",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"limits":{"cpu":"150m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "150m"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, three container with + without memory limits - no change for c3, increase c1 memory requests, decrease c2 memory limits",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+				{
+					Name:      "c3",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"150Mi"}}},
+						{"name":"c2", "resources":{"limits":{"memory":"250Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "150Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", MemReq: "200Mi", MemLim: "250Mi"},
+				},
+				{
+					Name:      "c3",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m"},
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
