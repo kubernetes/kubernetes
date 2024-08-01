@@ -26,11 +26,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"sort"
 	"strconv"
 	"syscall"
 	"testing"
 
 	"k8s.io/klog/v2"
+
 	"k8s.io/mount-utils"
 )
 
@@ -661,6 +664,25 @@ func getTestPaths(base string) (string, string) {
 		filepath.Join(base, testPod, containerSubPathDirectoryName, testVol, testContainer, strconv.Itoa(testSubpath))
 }
 
+type FakeMountOptionsGetter []string
+
+func (f FakeMountOptionsGetter) GetMountOptions(_ string) ([]string, error) {
+	return f, nil
+}
+
+func getMountOptions(path string, mountInterface mount.Interface) ([]string, error) {
+	points, err := mountInterface.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list mount points: %w", err)
+	}
+	for _, point := range points {
+		if point.Path == path {
+			return point.Opts, nil
+		}
+	}
+	return nil, nil
+}
+
 func TestBindSubPath(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
 
@@ -668,201 +690,210 @@ func TestBindSubPath(t *testing.T) {
 		name string
 		// Function that prepares directory structure for the test under given
 		// base.
-		prepare     func(base string) ([]string, string, string, error)
+		prepare     func(base string) ([]string, string, string, []string, error)
 		expectError bool
 	}{
 		{
 			name: "subpath-dir",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "dir0")
-				return nil, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+				return nil, volpath, subpath, nil, os.MkdirAll(subpath, defaultPerm)
 			},
 			expectError: false,
 		},
 		{
 			name: "subpath-dir-symlink",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "dir0")
 				if err := os.MkdirAll(subpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 				subpathLink := filepath.Join(volpath, "dirLink")
-				return nil, volpath, subpath, os.Symlink(subpath, subpathLink)
+				return nil, volpath, subpath, nil, os.Symlink(subpath, subpathLink)
 			},
 			expectError: false,
 		},
 		{
 			name: "subpath-file",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "file0")
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
-				return nil, volpath, subpath, ioutil.WriteFile(subpath, []byte{}, defaultPerm)
+				return nil, volpath, subpath, nil, ioutil.WriteFile(subpath, []byte{}, defaultPerm)
 			},
 			expectError: false,
 		},
 		{
 			name: "subpath-not-exists",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "file0")
-				return nil, volpath, subpath, nil
+				return nil, volpath, subpath, nil, nil
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-outside",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "dir0")
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
-				return nil, volpath, subpath, os.Symlink(base, subpath)
+				return nil, volpath, subpath, nil, os.Symlink(base, subpath)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-symlink-child-outside",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpathDir := filepath.Join(volpath, "dir0")
 				subpath := filepath.Join(subpathDir, "child0")
 				if err := os.MkdirAll(subpathDir, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
-				return nil, volpath, subpath, os.Symlink(base, subpath)
+				return nil, volpath, subpath, nil, os.Symlink(base, subpath)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-child-outside-exists",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpathDir := filepath.Join(volpath, "dir0")
 				child := filepath.Join(base, "child0")
 				subpath := filepath.Join(subpathDir, "child0")
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 				// touch file outside
 				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				// create symlink for subpath dir
-				return nil, volpath, subpath, os.Symlink(base, subpathDir)
+				return nil, volpath, subpath, nil, os.Symlink(base, subpathDir)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-child-outside-not-exists",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpathDir := filepath.Join(volpath, "dir0")
 				subpath := filepath.Join(subpathDir, "child0")
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 				// create symlink for subpath dir
-				return nil, volpath, subpath, os.Symlink(base, subpathDir)
+				return nil, volpath, subpath, nil, os.Symlink(base, subpathDir)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-child-outside-exists-middle-dir-symlink",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpathDir := filepath.Join(volpath, "dir0")
 				symlinkDir := filepath.Join(subpathDir, "linkDir0")
 				child := filepath.Join(base, "child0")
 				subpath := filepath.Join(symlinkDir, "child0")
 				if err := os.MkdirAll(subpathDir, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 				// touch file outside
 				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				// create symlink for middle dir
-				return nil, volpath, subpath, os.Symlink(base, symlinkDir)
+				return nil, volpath, subpath, nil, os.Symlink(base, symlinkDir)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-backstepping",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, _ := getTestPaths(base)
 				subpath := filepath.Join(volpath, "dir0")
 				symlinkBase := filepath.Join(volpath, "..")
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				// create symlink for subpath
-				return nil, volpath, subpath, os.Symlink(symlinkBase, subpath)
+				return nil, volpath, subpath, nil, os.Symlink(symlinkBase, subpath)
 			},
 			expectError: true,
 		},
 		{
 			name: "subpath-mountdir-already-exists",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, subpathMount := getTestPaths(base)
 				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				subpath := filepath.Join(volpath, "dir0")
-				return nil, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+				return nil, volpath, subpath, nil, os.MkdirAll(subpath, defaultPerm)
 			},
 			expectError: false,
 		},
 		{
 			name: "subpath-mount-already-exists",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, subpathMount := getTestPaths(base)
 				mounts := []string{subpathMount}
 				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				subpath := filepath.Join(volpath, "dir0")
-				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+				return mounts, volpath, subpath, nil, os.MkdirAll(subpath, defaultPerm)
 			},
 			expectError: false,
 		},
 		{
 			name: "mount-unix-socket",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, subpathMount := getTestPaths(base)
 				mounts := []string{subpathMount}
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				socketFile, socketCreateError := createSocketFile(volpath)
 
-				return mounts, volpath, socketFile, socketCreateError
+				return mounts, volpath, socketFile, nil, socketCreateError
 			},
 			expectError: false,
 		},
 		{
 			name: "subpath-mounting-fifo",
-			prepare: func(base string) ([]string, string, string, error) {
+			prepare: func(base string) ([]string, string, string, []string, error) {
 				volpath, subpathMount := getTestPaths(base)
 				mounts := []string{subpathMount}
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
+					return nil, "", "", nil, err
 				}
 
 				testFifo := filepath.Join(volpath, "mount_test.fifo")
 				err := syscall.Mkfifo(testFifo, 0)
-				return mounts, volpath, testFifo, err
+				return mounts, volpath, testFifo, nil, err
+			},
+			expectError: false,
+		},
+		{
+			name: "subpath-dir-with-options",
+			prepare: func(base string) ([]string, string, string, []string, error) {
+				volpath, _ := getTestPaths(base)
+				subpath := filepath.Join(volpath, "dir0")
+				return nil, volpath, subpath, []string{"ro", "noexec", "nosuid", "nodev"}, os.MkdirAll(subpath, defaultPerm)
 			},
 			expectError: false,
 		},
@@ -870,18 +901,19 @@ func TestBindSubPath(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
+		base, err := os.MkdirTemp("", "bind-subpath-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		mounts, volPath, subPath, err := test.prepare(base)
+		mounts, volPath, subPath, mountOpts, err := test.prepare(base)
 		if err != nil {
 			os.RemoveAll(base)
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
 		fm := setupFakeMounter(mounts)
+		optsGetter := FakeMountOptionsGetter(mountOpts)
 
 		subpath := Subpath{
 			VolumeMountIndex: testSubpath,
@@ -893,7 +925,8 @@ func TestBindSubPath(t *testing.T) {
 		}
 
 		_, subpathMount := getTestPaths(base)
-		bindPathTarget, err := doBindSubPath(fm, subpath)
+		bindPathTarget, err := doBindSubPath(fm, subpath, optsGetter)
+
 		if test.expectError {
 			if err == nil {
 				t.Errorf("test %q failed: expected error, got success", test.name)
@@ -911,6 +944,20 @@ func TestBindSubPath(t *testing.T) {
 			}
 			if bindPathTarget != subpathMount {
 				t.Errorf("test %q failed: expected bindPathTarget %v, got %v", test.name, subpathMount, bindPathTarget)
+			}
+			if len(mountOpts) > 0 {
+				targetMountOpts, err := getMountOptions(bindPathTarget, fm)
+				if err != nil {
+					t.Errorf("test %q failed: %v", test.name, err)
+				}
+				expectedMountOpts := []string{"bind"}
+				expectedMountOpts = append(expectedMountOpts, mountOpts...)
+				sort.Strings(expectedMountOpts)
+				sort.Strings(targetMountOpts)
+
+				if !slices.Equal(expectedMountOpts, targetMountOpts) {
+					t.Errorf("test %q failed: expected mountOptions %v, got %v", test.name, expectedMountOpts, targetMountOpts)
+				}
 			}
 			if err = validateFileExists(subpathMount); err != nil {
 				t.Errorf("test %q failed: %v", test.name, err)

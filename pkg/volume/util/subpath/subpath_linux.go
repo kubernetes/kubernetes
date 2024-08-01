@@ -45,6 +45,20 @@ const (
 	openFDFlags = unix.O_NOFOLLOW | unix.O_PATH
 )
 
+type MountOptionsGetter interface {
+	GetMountOptions(path string) ([]string, error)
+}
+
+type mountOptionsGetter struct{}
+
+func (g *mountOptionsGetter) GetMountOptions(path string) ([]string, error) {
+	info, err := hostutil.NewHostUtil().FindMountInfo(path)
+	if err != nil {
+		return nil, err
+	}
+	return info.MountOptions, nil
+}
+
 type subpath struct {
 	mounter mount.Interface
 }
@@ -72,7 +86,7 @@ func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) err
 }
 
 func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	newHostPath, err = doBindSubPath(sp.mounter, subPath)
+	newHostPath, err = doBindSubPath(sp.mounter, subPath, &mountOptionsGetter{})
 
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
@@ -179,7 +193,7 @@ func getSubpathBindTarget(subpath Subpath) string {
 	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
 }
 
-func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, err error) {
+func doBindSubPath(mounter mount.Interface, subpath Subpath, optsGetter MountOptionsGetter) (hostPath string, err error) {
 	// Linux, kubelet runs on the host:
 	// - safely open the subpath
 	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
@@ -226,13 +240,13 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	kubeletPid := os.Getpid()
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
-	info, err := hostutil.NewHostUtil().FindMountInfo(subpath.Path)
+	mountOptions, err := optsGetter.GetMountOptions(subpath.Path)
 	if err != nil {
-		klog.Warningf("Failed to parse mount info for %q: %v", subpath.Path, err)
+		klog.Warningf("Failed to get mount options for %q: %v", subpath.Path, err)
 	}
 	// Do the bind mount<
 	options := []string{"bind"}
-	options = append(options, info.MountOptions...)
+	options = append(options, mountOptions...)
 	mountFlags := []string{"--no-canonicalize"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
 	if err = mounter.MountSensitiveWithoutSystemdWithMountFlags(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
