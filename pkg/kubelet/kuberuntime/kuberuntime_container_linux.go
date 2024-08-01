@@ -116,7 +116,15 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		memoryLimit := container.Resources.Limits.Memory().Value()
 		if memoryRequest != 0 {
-			unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+			// NOTE: Setting memory.min equal to memory.max for a container prevents the system
+			// from reclaiming page cache that would otherwise be reclaimable.
+			// So, let's set it just a bit lower than memory.max
+			defaultPageSize := int64(os.Getpagesize())
+			memMin := int64(math.Floor(
+				float64(memoryRequest)*cm.Cgroup2MemoryMinFactor/float64(defaultPageSize))) * defaultPageSize
+			if memMin > 0 {
+				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memMin, 10)
+			}
 		}
 
 		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
