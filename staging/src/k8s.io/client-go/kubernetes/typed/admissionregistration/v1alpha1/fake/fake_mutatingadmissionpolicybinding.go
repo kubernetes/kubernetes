@@ -19,133 +19,37 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
-
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 )
 
-// FakeMutatingAdmissionPolicyBindings implements MutatingAdmissionPolicyBindingInterface
-type FakeMutatingAdmissionPolicyBindings struct {
+// fakeMutatingAdmissionPolicyBindings implements MutatingAdmissionPolicyBindingInterface
+type fakeMutatingAdmissionPolicyBindings struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicyBinding, *v1alpha1.MutatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1alpha1
 }
 
-var mutatingadmissionpolicybindingsResource = v1alpha1.SchemeGroupVersion.WithResource("mutatingadmissionpolicybindings")
-
-var mutatingadmissionpolicybindingsKind = v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding")
-
-// Get takes name of the mutatingAdmissionPolicyBinding, and returns the corresponding mutatingAdmissionPolicyBinding object, and an error if there is any.
-func (c *FakeMutatingAdmissionPolicyBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(mutatingadmissionpolicybindingsResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeMutatingAdmissionPolicyBindings(fake *FakeAdmissionregistrationV1alpha1) typedadmissionregistrationv1alpha1.MutatingAdmissionPolicyBindingInterface {
+	return &fakeMutatingAdmissionPolicyBindings{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicyBinding, *v1alpha1.MutatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("mutatingadmissionpolicybindings"),
+			v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding"),
+			func() *v1alpha1.MutatingAdmissionPolicyBinding { return &v1alpha1.MutatingAdmissionPolicyBinding{} },
+			func() *v1alpha1.MutatingAdmissionPolicyBindingList {
+				return &v1alpha1.MutatingAdmissionPolicyBindingList{}
+			},
+			func(dst, src *v1alpha1.MutatingAdmissionPolicyBindingList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.MutatingAdmissionPolicyBindingList) []*v1alpha1.MutatingAdmissionPolicyBinding {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.MutatingAdmissionPolicyBindingList, items []*v1alpha1.MutatingAdmissionPolicyBinding) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
-}
-
-// List takes label and field selectors, and returns the list of MutatingAdmissionPolicyBindings that match those selectors.
-func (c *FakeMutatingAdmissionPolicyBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.MutatingAdmissionPolicyBindingList, err error) {
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBindingList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingadmissionpolicybindingsKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.MutatingAdmissionPolicyBindingList{ListMeta: obj.(*v1alpha1.MutatingAdmissionPolicyBindingList).ListMeta}
-	for _, item := range obj.(*v1alpha1.MutatingAdmissionPolicyBindingList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested mutatingAdmissionPolicyBindings.
-func (c *FakeMutatingAdmissionPolicyBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(mutatingadmissionpolicybindingsResource, opts))
-}
-
-// Create takes the representation of a mutatingAdmissionPolicyBinding and creates it.  Returns the server's representation of the mutatingAdmissionPolicyBinding, and an error, if there is any.
-func (c *FakeMutatingAdmissionPolicyBindings) Create(ctx context.Context, mutatingAdmissionPolicyBinding *v1alpha1.MutatingAdmissionPolicyBinding, opts v1.CreateOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
-}
-
-// Update takes the representation of a mutatingAdmissionPolicyBinding and updates it. Returns the server's representation of the mutatingAdmissionPolicyBinding, and an error, if there is any.
-func (c *FakeMutatingAdmissionPolicyBindings) Update(ctx context.Context, mutatingAdmissionPolicyBinding *v1alpha1.MutatingAdmissionPolicyBinding, opts v1.UpdateOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
-}
-
-// Delete takes name of the mutatingAdmissionPolicyBinding and deletes it. Returns an error if one occurs.
-func (c *FakeMutatingAdmissionPolicyBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(mutatingadmissionpolicybindingsResource, name, opts), &v1alpha1.MutatingAdmissionPolicyBinding{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeMutatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(mutatingadmissionpolicybindingsResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.MutatingAdmissionPolicyBindingList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched mutatingAdmissionPolicyBinding.
-func (c *FakeMutatingAdmissionPolicyBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpolicybindingsResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied mutatingAdmissionPolicyBinding.
-func (c *FakeMutatingAdmissionPolicyBindings) Apply(ctx context.Context, mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
-	if mutatingAdmissionPolicyBinding == nil {
-		return nil, fmt.Errorf("mutatingAdmissionPolicyBinding provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(mutatingAdmissionPolicyBinding)
-	if err != nil {
-		return nil, err
-	}
-	name := mutatingAdmissionPolicyBinding.Name
-	if name == nil {
-		return nil, fmt.Errorf("mutatingAdmissionPolicyBinding.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }

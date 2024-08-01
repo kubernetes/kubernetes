@@ -21,6 +21,7 @@ import (
 	json "encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +32,7 @@ import (
 )
 
 // FakeClient represents a fake client
-type FakeClient[T objectWithMeta] struct {
+type FakeClient[T runtime.Object] struct {
 	*testing.Fake
 	ns        string
 	resource  schema.GroupVersionResource
@@ -40,26 +41,26 @@ type FakeClient[T objectWithMeta] struct {
 }
 
 // FakeClientWithList represents a fake client with support for lists.
-type FakeClientWithList[T objectWithMeta, L runtime.Object] struct {
+type FakeClientWithList[T runtime.Object, L runtime.Object] struct {
 	*FakeClient[T]
 	alsoFakeLister[T, L]
 }
 
 // FakeClientWithApply represents a fake client with support for apply declarative configurations.
-type FakeClientWithApply[T objectWithMeta, C namedObject] struct {
+type FakeClientWithApply[T runtime.Object, C namedObject] struct {
 	*FakeClient[T]
 	alsoFakeApplier[T, C]
 }
 
 // FakeClientWithListAndApply represents a fake client with support for lists and apply declarative configurations.
-type FakeClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject] struct {
+type FakeClientWithListAndApply[T runtime.Object, L runtime.Object, C namedObject] struct {
 	*FakeClient[T]
 	alsoFakeLister[T, L]
 	alsoFakeApplier[T, C]
 }
 
 // Helper types for composition
-type alsoFakeLister[T objectWithMeta, L runtime.Object] struct {
+type alsoFakeLister[T runtime.Object, L runtime.Object] struct {
 	client       *FakeClient[T]
 	newList      func() L
 	copyListMeta func(L, L)
@@ -67,13 +68,13 @@ type alsoFakeLister[T objectWithMeta, L runtime.Object] struct {
 	setItems     func(L, []T)
 }
 
-type alsoFakeApplier[T objectWithMeta, C namedObject] struct {
+type alsoFakeApplier[T runtime.Object, C namedObject] struct {
 	client *FakeClient[T]
 }
 
 // NewFakeClient constructs a fake client, namespaced or not, with no support for lists or apply.
 // Non-namespaced clients are constructed by passing an empty namespace ("").
-func NewFakeClient[T objectWithMeta](
+func NewFakeClient[T runtime.Object](
 	fake *testing.Fake, namespace string, resource schema.GroupVersionResource, kind schema.GroupVersionKind, emptyObjectCreator func() T,
 ) *FakeClient[T] {
 	return &FakeClient[T]{fake, namespace, resource, kind, emptyObjectCreator}
@@ -149,7 +150,7 @@ func FromPointerSlice[T any](src []*T) []T {
 	return result
 }
 
-// List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
+// List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoFakeLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (result L, err error) {
 	emptyResult := l.newList()
 	obj, err := l.client.Fake.
@@ -160,13 +161,19 @@ func (l *alsoFakeLister[T, L]) List(ctx context.Context, opts metav1.ListOptions
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
-		label = labels.Everything()
+		// Everything matches
+		return obj.(L), nil
 	}
 	list := l.newList()
 	l.copyListMeta(list, obj.(L))
 	var items []T
 	for _, item := range l.getItems(obj.(L)) {
-		if label.Matches(labels.Set(item.GetLabels())) {
+		itemMeta, err := meta.Accessor(item)
+		if err != nil {
+			// No ObjectMeta, nothing can match
+			continue
+		}
+		if label.Matches(labels.Set(itemMeta.GetLabels())) {
 			items = append(items, item)
 		}
 	}

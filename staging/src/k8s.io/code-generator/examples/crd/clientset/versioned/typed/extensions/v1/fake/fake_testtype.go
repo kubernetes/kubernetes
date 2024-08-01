@@ -24,183 +24,42 @@ import (
 	fmt "fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	gentype "k8s.io/client-go/gentype"
 	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 	extensionsv1 "k8s.io/code-generator/examples/crd/applyconfiguration/extensions/v1"
+	typedextensionsv1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/extensions/v1"
 )
 
-// FakeTestTypes implements TestTypeInterface
-type FakeTestTypes struct {
+// fakeTestTypes implements TestTypeInterface
+type fakeTestTypes struct {
+	*gentype.FakeClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *extensionsv1.TestTypeApplyConfiguration]
 	Fake *FakeExtensionsExampleV1
-	ns   string
 }
 
-var testtypesResource = v1.SchemeGroupVersion.WithResource("testtypes")
-
-var testtypesKind = v1.SchemeGroupVersion.WithKind("TestType")
-
-// Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *FakeTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(testtypesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeTestTypes(fake *FakeExtensionsExampleV1, namespace string) typedextensionsv1.TestTypeInterface {
+	return &fakeTestTypes{
+		gentype.NewFakeClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *extensionsv1.TestTypeApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("testtypes"),
+			v1.SchemeGroupVersion.WithKind("TestType"),
+			func() *v1.TestType { return &v1.TestType{} },
+			func() *v1.TestTypeList { return &v1.TestTypeList{} },
+			func(dst, src *v1.TestTypeList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.TestTypeList) []*v1.TestType { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.TestTypeList, items []*v1.TestType) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.TestType), err
-}
-
-// List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *FakeTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.TestTypeList, err error) {
-	emptyResult := &v1.TestTypeList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(testtypesResource, testtypesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.TestTypeList{ListMeta: obj.(*v1.TestTypeList).ListMeta}
-	for _, item := range obj.(*v1.TestTypeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested testTypes.
-func (c *FakeTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(testtypesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(testtypesResource, c.ns, testType, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
-}
-
-// Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(testtypesResource, c.ns, testType, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(testtypesResource, "status", c.ns, testType, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
-}
-
-// Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *FakeTestTypes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(testtypesResource, c.ns, name, opts), &v1.TestType{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(testtypesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.TestTypeList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied testType.
-func (c *FakeTestTypes) Apply(ctx context.Context, testType *extensionsv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
-	if testType == nil {
-		return nil, fmt.Errorf("testType provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(testType)
-	if err != nil {
-		return nil, err
-	}
-	name := testType.Name
-	if name == nil {
-		return nil, fmt.Errorf("testType.Name must be provided to Apply")
-	}
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeTestTypes) ApplyStatus(ctx context.Context, testType *extensionsv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
-	if testType == nil {
-		return nil, fmt.Errorf("testType provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(testType)
-	if err != nil {
-		return nil, err
-	}
-	name := testType.Name
-	if name == nil {
-		return nil, fmt.Errorf("testType.Name must be provided to Apply")
-	}
-	emptyResult := &v1.TestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.TestType), err
 }
 
 // GetExtended takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *FakeTestTypes) GetExtended(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
+func (c *fakeTestTypes) GetExtended(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(testtypesResource, c.ns, name, options), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(c.Resource(), c.Namespace(), name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -209,10 +68,10 @@ func (c *FakeTestTypes) GetExtended(ctx context.Context, name string, options me
 }
 
 // ListExtended takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *FakeTestTypes) ListExtended(ctx context.Context, opts metav1.ListOptions) (result *v1.TestTypeList, err error) {
+func (c *fakeTestTypes) ListExtended(ctx context.Context, opts metav1.ListOptions) (result *v1.TestTypeList, err error) {
 	emptyResult := &v1.TestTypeList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(testtypesResource, testtypesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(c.Resource(), c.Kind(), c.Namespace(), opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -221,10 +80,10 @@ func (c *FakeTestTypes) ListExtended(ctx context.Context, opts metav1.ListOption
 }
 
 // CreateExtended takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) CreateExtended(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
+func (c *fakeTestTypes) CreateExtended(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(testtypesResource, c.ns, testType, opts), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(c.Resource(), c.Namespace(), testType, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -233,10 +92,10 @@ func (c *FakeTestTypes) CreateExtended(ctx context.Context, testType *v1.TestTyp
 }
 
 // UpdateExtended takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) UpdateExtended(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
+func (c *fakeTestTypes) UpdateExtended(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(testtypesResource, c.ns, testType, opts), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(c.Resource(), c.Namespace(), testType, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -245,10 +104,10 @@ func (c *FakeTestTypes) UpdateExtended(ctx context.Context, testType *v1.TestTyp
 }
 
 // PatchExtended applies the patch and returns the patched testType.
-func (c *FakeTestTypes) PatchExtended(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
+func (c *fakeTestTypes) PatchExtended(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(c.Resource(), c.Namespace(), name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -257,7 +116,7 @@ func (c *FakeTestTypes) PatchExtended(ctx context.Context, name string, pt types
 }
 
 // ApplyExtended takes the given apply declarative configuration, applies it and returns the applied testType.
-func (c *FakeTestTypes) ApplyExtended(ctx context.Context, testType *extensionsv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
+func (c *fakeTestTypes) ApplyExtended(ctx context.Context, testType *extensionsv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
 	if testType == nil {
 		return nil, fmt.Errorf("testType provided to ApplyExtended must not be nil")
 	}
@@ -271,7 +130,7 @@ func (c *FakeTestTypes) ApplyExtended(ctx context.Context, testType *extensionsv
 	}
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(c.Resource(), c.Namespace(), *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -280,10 +139,10 @@ func (c *FakeTestTypes) ApplyExtended(ctx context.Context, testType *extensionsv
 }
 
 // GetSubresource takes name of the testType, and returns the corresponding testSubresource object, and an error if there is any.
-func (c *FakeTestTypes) GetSubresource(ctx context.Context, testTypeName string, options metav1.GetOptions) (result *v1.TestSubresource, err error) {
+func (c *fakeTestTypes) GetSubresource(ctx context.Context, testTypeName string, options metav1.GetOptions) (result *v1.TestSubresource, err error) {
 	emptyResult := &v1.TestSubresource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceActionWithOptions(testtypesResource, c.ns, "testsubresource", testTypeName, options), emptyResult)
+		Invokes(testing.NewGetSubresourceActionWithOptions(c.Resource(), c.Namespace(), "testsubresource", testTypeName, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -292,10 +151,10 @@ func (c *FakeTestTypes) GetSubresource(ctx context.Context, testTypeName string,
 }
 
 // CreateSubresource takes the representation of a testSubresource and creates it.  Returns the server's representation of the testSubresource, and an error, if there is any.
-func (c *FakeTestTypes) CreateSubresource(ctx context.Context, testTypeName string, testSubresource *v1.TestSubresource, opts metav1.CreateOptions) (result *v1.TestSubresource, err error) {
+func (c *fakeTestTypes) CreateSubresource(ctx context.Context, testTypeName string, testSubresource *v1.TestSubresource, opts metav1.CreateOptions) (result *v1.TestSubresource, err error) {
 	emptyResult := &v1.TestSubresource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateSubresourceActionWithOptions(testtypesResource, testTypeName, "testsubresource", c.ns, testSubresource, opts), emptyResult)
+		Invokes(testing.NewCreateSubresourceActionWithOptions(c.Resource(), testTypeName, "testsubresource", c.Namespace(), testSubresource, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -304,10 +163,10 @@ func (c *FakeTestTypes) CreateSubresource(ctx context.Context, testTypeName stri
 }
 
 // UpdateSubresource takes the representation of a testSubresource and updates it. Returns the server's representation of the testSubresource, and an error, if there is any.
-func (c *FakeTestTypes) UpdateSubresource(ctx context.Context, testTypeName string, testSubresource *v1.TestSubresource, opts metav1.UpdateOptions) (result *v1.TestSubresource, err error) {
+func (c *fakeTestTypes) UpdateSubresource(ctx context.Context, testTypeName string, testSubresource *v1.TestSubresource, opts metav1.UpdateOptions) (result *v1.TestSubresource, err error) {
 	emptyResult := &v1.TestSubresource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(testtypesResource, "subresource", c.ns, testSubresource, opts), &v1.TestSubresource{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(c.Resource(), "subresource", c.Namespace(), testSubresource, opts), &v1.TestSubresource{})
 
 	if obj == nil {
 		return emptyResult, err
@@ -317,7 +176,7 @@ func (c *FakeTestTypes) UpdateSubresource(ctx context.Context, testTypeName stri
 
 // ApplySubresource takes top resource name and the apply declarative configuration for subresource,
 // applies it and returns the applied testSubresource, and an error, if there is any.
-func (c *FakeTestTypes) ApplySubresource(ctx context.Context, testTypeName string, testSubresource *extensionsv1.TestSubresourceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestSubresource, err error) {
+func (c *fakeTestTypes) ApplySubresource(ctx context.Context, testTypeName string, testSubresource *extensionsv1.TestSubresourceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestSubresource, err error) {
 	if testSubresource == nil {
 		return nil, fmt.Errorf("testSubresource provided to ApplySubresource must not be nil")
 	}
@@ -327,7 +186,7 @@ func (c *FakeTestTypes) ApplySubresource(ctx context.Context, testTypeName strin
 	}
 	emptyResult := &v1.TestSubresource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(testtypesResource, c.ns, testTypeName, types.ApplyPatchType, data, opts.ToPatchOptions(), "testSubresource"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(c.Resource(), c.Namespace(), testTypeName, types.ApplyPatchType, data, opts.ToPatchOptions(), "testSubresource"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
