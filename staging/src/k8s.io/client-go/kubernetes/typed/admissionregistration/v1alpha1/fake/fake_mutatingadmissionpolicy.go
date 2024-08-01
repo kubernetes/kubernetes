@@ -43,20 +43,22 @@ var mutatingadmissionpoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("Mutati
 
 // Get takes name of the mutatingAdmissionPolicy, and returns the corresponding mutatingAdmissionPolicy object, and an error if there is any.
 func (c *FakeMutatingAdmissionPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(mutatingadmissionpoliciesResource, name), &v1alpha1.MutatingAdmissionPolicy{})
+		Invokes(testing.NewRootGetActionWithOptions(mutatingadmissionpoliciesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of MutatingAdmissionPolicies that match those selectors.
 func (c *FakeMutatingAdmissionPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.MutatingAdmissionPolicyList, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(mutatingadmissionpoliciesResource, mutatingadmissionpoliciesKind, opts), &v1alpha1.MutatingAdmissionPolicyList{})
+		Invokes(testing.NewRootListActionWithOptions(mutatingadmissionpoliciesResource, mutatingadmissionpoliciesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,25 +77,27 @@ func (c *FakeMutatingAdmissionPolicies) List(ctx context.Context, opts v1.ListOp
 // Watch returns a watch.Interface that watches the requested mutatingAdmissionPolicies.
 func (c *FakeMutatingAdmissionPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(mutatingadmissionpoliciesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(mutatingadmissionpoliciesResource, opts))
 }
 
 // Create takes the representation of a mutatingAdmissionPolicy and creates it.  Returns the server's representation of the mutatingAdmissionPolicy, and an error, if there is any.
 func (c *FakeMutatingAdmissionPolicies) Create(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.CreateOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(mutatingadmissionpoliciesResource, mutatingAdmissionPolicy), &v1alpha1.MutatingAdmissionPolicy{})
+		Invokes(testing.NewRootCreateActionWithOptions(mutatingadmissionpoliciesResource, mutatingAdmissionPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicy), err
 }
 
 // Update takes the representation of a mutatingAdmissionPolicy and updates it. Returns the server's representation of the mutatingAdmissionPolicy, and an error, if there is any.
 func (c *FakeMutatingAdmissionPolicies) Update(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.UpdateOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(mutatingadmissionpoliciesResource, mutatingAdmissionPolicy), &v1alpha1.MutatingAdmissionPolicy{})
+		Invokes(testing.NewRootUpdateActionWithOptions(mutatingadmissionpoliciesResource, mutatingAdmissionPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicy), err
 }
@@ -107,7 +111,7 @@ func (c *FakeMutatingAdmissionPolicies) Delete(ctx context.Context, name string,
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeMutatingAdmissionPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(mutatingadmissionpoliciesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(mutatingadmissionpoliciesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.MutatingAdmissionPolicyList{})
 	return err
@@ -115,10 +119,11 @@ func (c *FakeMutatingAdmissionPolicies) DeleteCollection(ctx context.Context, op
 
 // Patch applies the patch and returns the patched mutatingAdmissionPolicy.
 func (c *FakeMutatingAdmissionPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingadmissionpoliciesResource, name, pt, data, subresources...), &v1alpha1.MutatingAdmissionPolicy{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpoliciesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicy), err
 }
@@ -136,10 +141,11 @@ func (c *FakeMutatingAdmissionPolicies) Apply(ctx context.Context, mutatingAdmis
 	if name == nil {
 		return nil, fmt.Errorf("mutatingAdmissionPolicy.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.MutatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingadmissionpoliciesResource, *name, types.ApplyPatchType, data), &v1alpha1.MutatingAdmissionPolicy{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicy), err
 }

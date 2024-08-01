@@ -43,20 +43,22 @@ var mutatingadmissionpolicybindingsKind = v1alpha1.SchemeGroupVersion.WithKind("
 
 // Get takes name of the mutatingAdmissionPolicyBinding, and returns the corresponding mutatingAdmissionPolicyBinding object, and an error if there is any.
 func (c *FakeMutatingAdmissionPolicyBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(mutatingadmissionpolicybindingsResource, name), &v1alpha1.MutatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootGetActionWithOptions(mutatingadmissionpolicybindingsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }
 
 // List takes label and field selectors, and returns the list of MutatingAdmissionPolicyBindings that match those selectors.
 func (c *FakeMutatingAdmissionPolicyBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.MutatingAdmissionPolicyBindingList, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBindingList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(mutatingadmissionpolicybindingsResource, mutatingadmissionpolicybindingsKind, opts), &v1alpha1.MutatingAdmissionPolicyBindingList{})
+		Invokes(testing.NewRootListActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingadmissionpolicybindingsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,25 +77,27 @@ func (c *FakeMutatingAdmissionPolicyBindings) List(ctx context.Context, opts v1.
 // Watch returns a watch.Interface that watches the requested mutatingAdmissionPolicyBindings.
 func (c *FakeMutatingAdmissionPolicyBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(mutatingadmissionpolicybindingsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(mutatingadmissionpolicybindingsResource, opts))
 }
 
 // Create takes the representation of a mutatingAdmissionPolicyBinding and creates it.  Returns the server's representation of the mutatingAdmissionPolicyBinding, and an error, if there is any.
 func (c *FakeMutatingAdmissionPolicyBindings) Create(ctx context.Context, mutatingAdmissionPolicyBinding *v1alpha1.MutatingAdmissionPolicyBinding, opts v1.CreateOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding), &v1alpha1.MutatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootCreateActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }
 
 // Update takes the representation of a mutatingAdmissionPolicyBinding and updates it. Returns the server's representation of the mutatingAdmissionPolicyBinding, and an error, if there is any.
 func (c *FakeMutatingAdmissionPolicyBindings) Update(ctx context.Context, mutatingAdmissionPolicyBinding *v1alpha1.MutatingAdmissionPolicyBinding, opts v1.UpdateOptions) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding), &v1alpha1.MutatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootUpdateActionWithOptions(mutatingadmissionpolicybindingsResource, mutatingAdmissionPolicyBinding, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }
@@ -107,7 +111,7 @@ func (c *FakeMutatingAdmissionPolicyBindings) Delete(ctx context.Context, name s
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeMutatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(mutatingadmissionpolicybindingsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(mutatingadmissionpolicybindingsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.MutatingAdmissionPolicyBindingList{})
 	return err
@@ -115,10 +119,11 @@ func (c *FakeMutatingAdmissionPolicyBindings) DeleteCollection(ctx context.Conte
 
 // Patch applies the patch and returns the patched mutatingAdmissionPolicyBinding.
 func (c *FakeMutatingAdmissionPolicyBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.MutatingAdmissionPolicyBinding, err error) {
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingadmissionpolicybindingsResource, name, pt, data, subresources...), &v1alpha1.MutatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpolicybindingsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }
@@ -136,10 +141,11 @@ func (c *FakeMutatingAdmissionPolicyBindings) Apply(ctx context.Context, mutatin
 	if name == nil {
 		return nil, fmt.Errorf("mutatingAdmissionPolicyBinding.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.MutatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data), &v1alpha1.MutatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(mutatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.MutatingAdmissionPolicyBinding), err
 }

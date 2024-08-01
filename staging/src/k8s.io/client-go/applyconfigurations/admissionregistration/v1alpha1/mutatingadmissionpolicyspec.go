@@ -22,7 +22,7 @@ import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 )
 
-// MutatingAdmissionPolicySpecApplyConfiguration represents an declarative configuration of the MutatingAdmissionPolicySpec type for use
+// MutatingAdmissionPolicySpecApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicySpec type for use
 // with apply.
 type MutatingAdmissionPolicySpecApplyConfiguration struct {
 	ParamKind        *ParamKindApplyConfiguration                     `json:"paramKind,omitempty"`
@@ -32,7 +32,7 @@ type MutatingAdmissionPolicySpecApplyConfiguration struct {
 	MatchConditions  []MatchConditionApplyConfiguration               `json:"matchConditions,omitempty"`
 }
 
-// MutatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the MutatingAdmissionPolicySpec type for use with
+// MutatingAdmissionPolicySpecApplyConfiguration constructs a declarative configuration of the MutatingAdmissionPolicySpec type for use with
 // apply.
 func MutatingAdmissionPolicySpec() *MutatingAdmissionPolicySpecApplyConfiguration {
 	return &MutatingAdmissionPolicySpecApplyConfiguration{}

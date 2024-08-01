@@ -206,7 +206,7 @@ message MatchResources {
 message MutatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the MutatingAdmissionPolicy.
   optional MutatingAdmissionPolicySpec spec = 2;
@@ -226,7 +226,7 @@ message MutatingAdmissionPolicy {
 message MutatingAdmissionPolicyBinding {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the MutatingAdmissionPolicyBinding.
   optional MutatingAdmissionPolicyBindingSpec spec = 2;
@@ -237,7 +237,7 @@ message MutatingAdmissionPolicyBindingList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of PolicyBinding.
   repeated MutatingAdmissionPolicyBinding items = 2;
@@ -271,7 +271,7 @@ message MutatingAdmissionPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ValidatingAdmissionPolicy.
   repeated MutatingAdmissionPolicy items = 2;

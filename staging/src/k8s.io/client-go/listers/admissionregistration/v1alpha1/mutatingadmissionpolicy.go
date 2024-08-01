@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type MutatingAdmissionPolicyLister interface {
 
 // mutatingAdmissionPolicyLister implements the MutatingAdmissionPolicyLister interface.
 type mutatingAdmissionPolicyLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha1.MutatingAdmissionPolicy]
 }
 
 // NewMutatingAdmissionPolicyLister returns a new MutatingAdmissionPolicyLister.
 func NewMutatingAdmissionPolicyLister(indexer cache.Indexer) MutatingAdmissionPolicyLister {
-	return &mutatingAdmissionPolicyLister{indexer: indexer}
-}
-
-// List lists all MutatingAdmissionPolicies in the indexer.
-func (s *mutatingAdmissionPolicyLister) List(selector labels.Selector) (ret []*v1alpha1.MutatingAdmissionPolicy, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.MutatingAdmissionPolicy))
-	})
-	return ret, err
-}
-
-// Get retrieves the MutatingAdmissionPolicy from the index for a given name.
-func (s *mutatingAdmissionPolicyLister) Get(name string) (*v1alpha1.MutatingAdmissionPolicy, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("mutatingadmissionpolicy"), name)
-	}
-	return obj.(*v1alpha1.MutatingAdmissionPolicy), nil
+	return &mutatingAdmissionPolicyLister{listers.New[*v1alpha1.MutatingAdmissionPolicy](indexer, v1alpha1.Resource("mutatingadmissionpolicy"))}
 }

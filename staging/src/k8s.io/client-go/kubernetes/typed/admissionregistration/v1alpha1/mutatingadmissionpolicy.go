@@ -20,17 +20,14 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // MutatingAdmissionPoliciesGetter has a method to return a MutatingAdmissionPolicyInterface.
@@ -55,143 +52,18 @@ type MutatingAdmissionPolicyInterface interface {
 
 // mutatingAdmissionPolicies implements MutatingAdmissionPolicyInterface
 type mutatingAdmissionPolicies struct {
-	client rest.Interface
+	*gentype.ClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicy, *v1alpha1.MutatingAdmissionPolicyList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration]
 }
 
 // newMutatingAdmissionPolicies returns a MutatingAdmissionPolicies
 func newMutatingAdmissionPolicies(c *AdmissionregistrationV1alpha1Client) *mutatingAdmissionPolicies {
 	return &mutatingAdmissionPolicies{
-		client: c.RESTClient(),
+		gentype.NewClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicy, *v1alpha1.MutatingAdmissionPolicyList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration](
+			"mutatingadmissionpolicies",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1alpha1.MutatingAdmissionPolicy { return &v1alpha1.MutatingAdmissionPolicy{} },
+			func() *v1alpha1.MutatingAdmissionPolicyList { return &v1alpha1.MutatingAdmissionPolicyList{} }),
 	}
-}
-
-// Get takes name of the mutatingAdmissionPolicy, and returns the corresponding mutatingAdmissionPolicy object, and an error if there is any.
-func (c *mutatingAdmissionPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
-	result = &v1alpha1.MutatingAdmissionPolicy{}
-	err = c.client.Get().
-		Resource("mutatingadmissionpolicies").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of MutatingAdmissionPolicies that match those selectors.
-func (c *mutatingAdmissionPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.MutatingAdmissionPolicyList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.MutatingAdmissionPolicyList{}
-	err = c.client.Get().
-		Resource("mutatingadmissionpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested mutatingAdmissionPolicies.
-func (c *mutatingAdmissionPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("mutatingadmissionpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a mutatingAdmissionPolicy and creates it.  Returns the server's representation of the mutatingAdmissionPolicy, and an error, if there is any.
-func (c *mutatingAdmissionPolicies) Create(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.CreateOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
-	result = &v1alpha1.MutatingAdmissionPolicy{}
-	err = c.client.Post().
-		Resource("mutatingadmissionpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(mutatingAdmissionPolicy).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a mutatingAdmissionPolicy and updates it. Returns the server's representation of the mutatingAdmissionPolicy, and an error, if there is any.
-func (c *mutatingAdmissionPolicies) Update(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.UpdateOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
-	result = &v1alpha1.MutatingAdmissionPolicy{}
-	err = c.client.Put().
-		Resource("mutatingadmissionpolicies").
-		Name(mutatingAdmissionPolicy.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(mutatingAdmissionPolicy).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the mutatingAdmissionPolicy and deletes it. Returns an error if one occurs.
-func (c *mutatingAdmissionPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("mutatingadmissionpolicies").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *mutatingAdmissionPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("mutatingadmissionpolicies").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched mutatingAdmissionPolicy.
-func (c *mutatingAdmissionPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
-	result = &v1alpha1.MutatingAdmissionPolicy{}
-	err = c.client.Patch(pt).
-		Resource("mutatingadmissionpolicies").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied mutatingAdmissionPolicy.
-func (c *mutatingAdmissionPolicies) Apply(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error) {
-	if mutatingAdmissionPolicy == nil {
-		return nil, fmt.Errorf("mutatingAdmissionPolicy provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(mutatingAdmissionPolicy)
-	if err != nil {
-		return nil, err
-	}
-	name := mutatingAdmissionPolicy.Name
-	if name == nil {
-		return nil, fmt.Errorf("mutatingAdmissionPolicy.Name must be provided to Apply")
-	}
-	result = &v1alpha1.MutatingAdmissionPolicy{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("mutatingadmissionpolicies").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

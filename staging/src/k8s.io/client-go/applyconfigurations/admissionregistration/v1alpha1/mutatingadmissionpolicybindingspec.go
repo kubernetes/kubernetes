@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// MutatingAdmissionPolicyBindingSpecApplyConfiguration represents an declarative configuration of the MutatingAdmissionPolicyBindingSpec type for use
+// MutatingAdmissionPolicyBindingSpecApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicyBindingSpec type for use
 // with apply.
 type MutatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	PolicyName     *string                           `json:"policyName,omitempty"`
@@ -26,7 +26,7 @@ type MutatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	MatchResources *MatchResourcesApplyConfiguration `json:"matchResources,omitempty"`
 }
 
-// MutatingAdmissionPolicyBindingSpecApplyConfiguration constructs an declarative configuration of the MutatingAdmissionPolicyBindingSpec type for use with
+// MutatingAdmissionPolicyBindingSpecApplyConfiguration constructs a declarative configuration of the MutatingAdmissionPolicyBindingSpec type for use with
 // apply.
 func MutatingAdmissionPolicyBindingSpec() *MutatingAdmissionPolicyBindingSpecApplyConfiguration {
 	return &MutatingAdmissionPolicyBindingSpecApplyConfiguration{}

@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MutationApplyConfiguration represents an declarative configuration of the Mutation type for use
+// MutationApplyConfiguration represents a declarative configuration of the Mutation type for use
 // with apply.
 type MutationApplyConfiguration struct {
 	Expression         *string                                         `json:"expression,omitempty"`
@@ -35,7 +35,7 @@ type MutationApplyConfiguration struct {
 	PatchType          *v1alpha1.PatchType                             `json:"patchType,omitempty"`
 }
 
-// MutationApplyConfiguration constructs an declarative configuration of the Mutation type for use with
+// MutationApplyConfiguration constructs a declarative configuration of the Mutation type for use with
 // apply.
 func Mutation() *MutationApplyConfiguration {
 	return &MutationApplyConfiguration{}

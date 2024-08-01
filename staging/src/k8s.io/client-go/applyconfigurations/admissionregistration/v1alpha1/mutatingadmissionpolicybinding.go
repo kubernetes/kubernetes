@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// MutatingAdmissionPolicyBindingApplyConfiguration represents an declarative configuration of the MutatingAdmissionPolicyBinding type for use
+// MutatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicyBinding type for use
 // with apply.
 type MutatingAdmissionPolicyBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type MutatingAdmissionPolicyBindingApplyConfiguration struct {
 	Spec                             *MutatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// MutatingAdmissionPolicyBinding constructs an declarative configuration of the MutatingAdmissionPolicyBinding type for use with
+// MutatingAdmissionPolicyBinding constructs a declarative configuration of the MutatingAdmissionPolicyBinding type for use with
 // apply.
 func MutatingAdmissionPolicyBinding(name string) *MutatingAdmissionPolicyBindingApplyConfiguration {
 	b := &MutatingAdmissionPolicyBindingApplyConfiguration{}
@@ -244,4 +244,10 @@ func (b *MutatingAdmissionPolicyBindingApplyConfiguration) ensureObjectMetaApply
 func (b *MutatingAdmissionPolicyBindingApplyConfiguration) WithSpec(value *MutatingAdmissionPolicyBindingSpecApplyConfiguration) *MutatingAdmissionPolicyBindingApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *MutatingAdmissionPolicyBindingApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }
