@@ -17,75 +17,260 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"google.golang.org/grpc"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func getFakeNode() (*v1.Node, error) {
-	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
+const (
+	v1alpha4Version = "v1alpha4"
+)
+
+type fakeV1alpha4GRPCServer struct {
+	drapb.UnimplementedNodeServer
 }
 
-func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
-	newRegistrationHandler := func() *RegistrationHandler {
-		return NewRegistrationHandler(nil, getFakeNode)
+var _ drapb.NodeServer = &fakeV1alpha4GRPCServer{}
+
+func (f *fakeV1alpha4GRPCServer) NodePrepareResources(ctx context.Context, in *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+	return &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"claim-uid": {
+		Devices: []*drapb.Device{
+			{
+				RequestNames: []string{"test-request"},
+				CDIDeviceIDs: []string{"test-cdi-id"},
+			},
+		},
+	}}}, nil
+}
+
+func (f *fakeV1alpha4GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+
+	return &drapb.NodeUnprepareResourcesResponse{}, nil
+}
+
+type tearDown func()
+
+func setupFakeGRPCServer(version string) (string, tearDown, error) {
+	p, err := os.MkdirTemp("", "dra_plugin")
+	if err != nil {
+		return "", nil, err
 	}
 
+	closeCh := make(chan struct{})
+	addr := filepath.Join(p, "server.sock")
+	teardown := func() {
+		close(closeCh)
+		os.RemoveAll(addr)
+	}
+
+	listener, err := net.Listen("unix", addr)
+	if err != nil {
+		teardown()
+		return "", nil, err
+	}
+
+	s := grpc.NewServer()
+	switch version {
+	case v1alpha4Version:
+		fakeGRPCServer := &fakeV1alpha4GRPCServer{}
+		drapb.RegisterNodeServer(s, fakeGRPCServer)
+	default:
+		return "", nil, fmt.Errorf("unsupported version: %s", version)
+	}
+
+	go func() {
+		go s.Serve(listener)
+		<-closeCh
+		s.GracefulStop()
+	}()
+
+	return addr, teardown, nil
+}
+
+func TestGRPCConnIsReused(t *testing.T) {
+	ctx := ktesting.Init(t)
+	addr, teardown, err := setupFakeGRPCServer(v1alpha4Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	reusedConns := make(map[*grpc.ClientConn]int)
+	wg := sync.WaitGroup{}
+	m := sync.Mutex{}
+
+	p := &Plugin{
+		backgroundCtx: ctx,
+		endpoint:      addr,
+	}
+
+	conn, err := p.getOrCreateGRPCConn()
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ensure the plugin we are using is registered
+	draPlugins.add("dummy-plugin", p)
+	defer draPlugins.delete("dummy-plugin")
+
+	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			client, err := NewDRAPluginClient("dummy-plugin")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
+			req := &drapb.NodePrepareResourcesRequest{
+				Claims: []*drapb.Claim{
+					{
+						Namespace: "dummy-namespace",
+						UID:       "dummy-uid",
+						Name:      "dummy-claim",
+					},
+				},
+			}
+			client.NodePrepareResources(context.TODO(), req)
+
+			client.mutex.Lock()
+			conn := client.conn
+			client.mutex.Unlock()
+
+			m.Lock()
+			defer m.Unlock()
+			reusedConns[conn]++
+		}()
+	}
+
+	wg.Wait()
+	// We should have only one entry otherwise it means another gRPC connection has been created
+	if len(reusedConns) != 1 {
+		t.Errorf("expected length to be 1 but got %d", len(reusedConns))
+	}
+	if counter, ok := reusedConns[conn]; ok && counter != 2 {
+		t.Errorf("expected counter to be 2 but got %d", counter)
+	}
+}
+
+func TestNewDRAPluginClient(t *testing.T) {
 	for _, test := range []struct {
 		description string
-		handler     func() *RegistrationHandler
+		setup       func(string) tearDown
 		pluginName  string
-		endpoint    string
-		versions    []string
 		shouldError bool
 	}{
 		{
-			description: "no versions provided",
-			handler:     newRegistrationHandler,
-			shouldError: true,
-		},
-		{
-			description: "unsupported version",
-			handler:     newRegistrationHandler,
-			versions:    []string{"v2.0.0"},
-			shouldError: true,
-		},
-		{
-			description: "plugin already registered with a higher supported version",
-			handler: func() *RegistrationHandler {
-				handler := newRegistrationHandler()
-				if err := handler.RegisterPlugin("this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide", "", []string{"v1.1.0"}, nil); err != nil {
-					t.Fatal(err)
-				}
-				return handler
+			description: "plugin name is empty",
+			setup: func(_ string) tearDown {
+				return func() {}
 			},
-			pluginName:  "this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide",
-			versions:    []string{"v1.0.0"},
+			pluginName:  "",
 			shouldError: true,
 		},
 		{
-			description: "should validate the plugin",
-			handler:     newRegistrationHandler,
-			pluginName:  "this-is-a-dummy-plugin-with-a-long-name-so-it-doesnt-collide",
-			versions:    []string{"v1.3.0"},
+			description: "plugin name not found in the list",
+			setup: func(_ string) tearDown {
+				return func() {}
+			},
+			pluginName:  "plugin-name-not-found-in-the-list",
+			shouldError: true,
+		},
+		{
+			description: "plugin exists",
+			setup: func(name string) tearDown {
+				draPlugins.add(name, &Plugin{})
+				return func() {
+					draPlugins.delete(name)
+				}
+			},
+			pluginName: "dummy-plugin",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			handler := test.handler()
-			err := handler.ValidatePlugin(test.pluginName, test.endpoint, test.versions)
+			teardown := test.setup(test.pluginName)
+			defer teardown()
+
+			client, err := NewDRAPluginClient(test.pluginName)
 			if test.shouldError {
+				assert.Nil(t, client)
 				assert.Error(t, err)
 			} else {
+				assert.NotNil(t, client)
 				assert.Nil(t, err)
 			}
 		})
 	}
+}
 
-	t.Cleanup(func() {
-		handler := newRegistrationHandler()
-		handler.DeRegisterPlugin("this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide")
-		handler.DeRegisterPlugin("this-is-a-dummy-plugin-with-a-long-name-so-it-doesnt-collide")
-	})
+func TestNodeUnprepareResources(t *testing.T) {
+	for _, test := range []struct {
+		description   string
+		serverSetup   func(string) (string, tearDown, error)
+		serverVersion string
+		request       *drapb.NodeUnprepareResourcesRequest
+	}{
+		{
+			description:   "server supports v1alpha4",
+			serverSetup:   setupFakeGRPCServer,
+			serverVersion: v1alpha4Version,
+			request:       &drapb.NodeUnprepareResourcesRequest{},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer teardown()
+
+			p := &Plugin{
+				backgroundCtx:     ctx,
+				endpoint:          addr,
+				clientCallTimeout: defaultClientCallTimeout,
+			}
+
+			conn, err := p.getOrCreateGRPCConn()
+			defer func() {
+				err := conn.Close()
+				if err != nil {
+					t.Error(err)
+				}
+			}()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			draPlugins.add("dummy-plugin", p)
+			defer draPlugins.delete("dummy-plugin")
+
+			client, err := NewDRAPluginClient("dummy-plugin")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.NodeUnprepareResources(context.TODO(), test.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }
