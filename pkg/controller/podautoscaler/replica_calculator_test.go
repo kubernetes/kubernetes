@@ -348,6 +348,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
+	informerFactory.WaitForCacheSync(stop)
 	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
 		return
 	}
