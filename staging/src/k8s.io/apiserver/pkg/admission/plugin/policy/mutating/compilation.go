@@ -48,7 +48,7 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 	var res []MutationEvaluationFunc
 	for _, m := range policy.Spec.Mutations {
 		e := &evaluator{}
-		e.program, e.err = compileMutation(m, plugincel.OptionalVariableDeclarations{HasParams: hasParams})
+		e.program, e.err = CompileMutation(m, plugincel.OptionalVariableDeclarations{HasParams: hasParams})
 		res = append(res, e.Invoke)
 	}
 	return res
@@ -60,7 +60,7 @@ type evaluator struct {
 	err error
 }
 
-func compileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariableDeclarations) (cel.Program, error) {
+func CompileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariableDeclarations) (cel.Program, error) {
 	if mutation.PatchType == nil {
 		return nil, fmt.Errorf("patch type is not set")
 	} else if *mutation.PatchType != v1alpha1.ApplyConfigurationPatchType {
@@ -120,7 +120,9 @@ func createEnvSet(vars plugincel.OptionalVariableDeclarations) (*environment.Env
 		options = append(options, cel.Variable("params", cel.DynType))
 	}
 	return environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(environment.VersionedOptions{
-		IntroducedVersion: version.MajorMinor(1, 30),
+		// Feature epoch was actually 1.32, but we artificially set it to 1.0 because these
+		// options should always be present.
+		IntroducedVersion: version.MajorMinor(1, 0),
 		EnvOptions:        options,
 	})
 }

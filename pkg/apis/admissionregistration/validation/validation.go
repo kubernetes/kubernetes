@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/cel"
@@ -322,12 +324,12 @@ func findValidatingPolicyPreexistingExpressions(validatingPolicy *admissionregis
 	return preexisting
 }
 
-func findMutatingPolicyPreexistingExpressions(validatingPolicy *admissionregistration.MutatingAdmissionPolicy) preexistingExpressions {
+func findMutatingPolicyPreexistingExpressions(mutatingPolicy *admissionregistration.MutatingAdmissionPolicy) preexistingExpressions {
 	preexisting := newPreexistingExpressions()
-	for _, mc := range validatingPolicy.Spec.MatchConditions {
+	for _, mc := range mutatingPolicy.Spec.MatchConditions {
 		preexisting.matchConditionExpressions.Insert(mc.Expression)
 	}
-	for _, v := range validatingPolicy.Spec.Mutations {
+	for _, v := range mutatingPolicy.Spec.Mutations {
 		preexisting.validationExpressions.Insert(v.Expression)
 		if len(v.MessageExpression) > 0 {
 			preexisting.validationMessageExpressions.Insert(v.MessageExpression)
@@ -1359,6 +1361,7 @@ func ValidateMutatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.Mut
 	return validateMutatingAdmissionPolicy(newC, validationOptions{
 		ignoreMatchConditions:  ignoreMutatingAdmissionPolicyMatchConditions(newC, oldC),
 		preexistingExpressions: findMutatingPolicyPreexistingExpressions(oldC),
+		strictCostEnforcement:  true,
 	})
 }
 
@@ -1369,7 +1372,7 @@ func ValidateMutatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistrat
 
 // ValidateMutatingAdmissionPolicy validates a MutatingAdmissionPolicy before creation.
 func ValidateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy) field.ErrorList {
-	return validateMutatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false})
+	return validateMutatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false, strictCostEnforcement: true})
 }
 
 func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy, opts validationOptions) field.ErrorList {
@@ -1426,7 +1429,14 @@ func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Muta
 	if len(trimmedExpression) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), "expression is not specified"))
 	} else {
-		allErrors = append(allErrors, validateMutationExpression(compiler, m.Expression, paramKind != nil, opts, fldPath.Child("expression"))...)
+		_, err := mutating.CompileMutation(convertInternalMutationToVersionedMuatation(m), plugincel.OptionalVariableDeclarations{
+			HasParams:     paramKind != nil,
+			HasAuthorizer: true,
+			StrictCost:    opts.strictCostEnforcement,
+		})
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("expression"), m.Expression, err.Error()))
+		}
 	}
 	if len(m.MessageExpression) > 0 && len(trimmedMessageExpression) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("messageExpression"), m.MessageExpression, "must be non-empty if specified"))
@@ -1454,19 +1464,15 @@ func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Muta
 	return allErrors
 }
 
-// TODO: Add mutation compilation check
-func validateMutationExpression(compiler plugincel.Compiler, expression string, hasParams bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
-	// envType := environment.NewExpressions
-	// if opts.preexistingExpressions.validationExpressions.Has(expression) {
-	//	envType = environment.StoredExpressions
-	// }
-	// return validateCELCondition(compiler, &validatingadmissionpolicy.ValidationCondition{
-	//	Expression: expression,
-	// }, plugincel.OptionalVariableDeclarations{
-	//	HasParams:     hasParams,
-	//	HasAuthorizer: false,
-	// }, envType, fldPath)
-	return nil
+func convertInternalMutationToVersionedMuatation(m *admissionregistration.Mutation) v1alpha1.Mutation {
+	return v1alpha1.Mutation{
+		Expression:         m.Expression,
+		Message:            m.Message,
+		MessageExpression:  m.MessageExpression,
+		Reason:             m.Reason,
+		ReinvocationPolicy: (*v1alpha1.ReinvocationPolicyType)(m.ReinvocationPolicy),
+		PatchType:          (*v1alpha1.PatchType)(m.PatchType),
+	}
 }
 
 // ValidateMutatingAdmissionPolicyBinding validates a MutatingAdmissionPolicyBinding before create.
