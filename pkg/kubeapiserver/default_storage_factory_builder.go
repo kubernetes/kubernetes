@@ -17,7 +17,6 @@ limitations under the License.
 package kubeapiserver
 
 import (
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -78,8 +78,6 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		networking.Resource("servicecidrs").WithVersion("v1beta1"),
 		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1alpha1"),
 		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1alpha1"),
-		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
-		networking.Resource("servicecidrs").WithVersion("v1alpha1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
 		storage.Resource("volumeattributesclasses").WithVersion("v1beta1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1alpha1"),

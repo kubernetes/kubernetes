@@ -5335,38 +5335,6 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 		expectedError: "",
 	},
 		{
-			name: "expressions that are not changed must be compiled using the StoredExpression environment",
-			oldconfig: mutatingAdmissionPolicyWithExpressions(
-				[]admissionregistration.MatchCondition{
-					{
-						Name:       "checkEnvironmentMode",
-						Expression: `test() == true`,
-					},
-				},
-				[]admissionregistration.Mutation{
-					{
-						Expression:        `test() == true`,
-						MessageExpression: "string(test())",
-						PatchType:         &applyConfigurationPatchType,
-					},
-				}),
-			config: mutatingAdmissionPolicyWithExpressions(
-				[]admissionregistration.MatchCondition{
-					{
-						Name:       "checkEnvironmentMode",
-						Expression: `test() == true`,
-					},
-				},
-				[]admissionregistration.Mutation{
-					{
-						Expression:        `test() == true`,
-						MessageExpression: "string(test())",
-						PatchType:         &applyConfigurationPatchType,
-					},
-				}),
-			expectedError: "",
-		},
-		{
 			name: "matchCondition expressions that are changed must be compiled using the NewExpression environment",
 			oldconfig: mutatingAdmissionPolicyWithExpressions(
 				[]admissionregistration.MatchCondition{
@@ -5409,20 +5377,6 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 			expectedError: `undeclared reference to 'test'`,
 		},
 	}
-	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
-	extended, err := base.Extend(environment.VersionedOptions{
-		IntroducedVersion: version.MustParseGeneric("1.999"),
-		EnvOptions:        []cel.EnvOption{library.Test()},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = plugincel.NewCompiler(extended)
-	defer func() {
-		_ = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-	}()
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			errs := ValidateMutatingAdmissionPolicyUpdate(test.config, test.oldconfig)

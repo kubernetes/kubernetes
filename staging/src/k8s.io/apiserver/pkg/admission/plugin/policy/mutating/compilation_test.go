@@ -85,7 +85,7 @@ func TestCompilation(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			program, err := compileMutation(tc.policy.Spec.Mutations[0], plugincel.OptionalVariableDeclarations{HasParams: tc.policy.Spec.ParamKind != nil})
+			program, err := CompileMutation(tc.policy.Spec.Mutations[0], plugincel.OptionalVariableDeclarations{HasParams: tc.policy.Spec.ParamKind != nil})
 			if err != nil {
 				if tc.expectedErr == "" {
 					t.Fatalf("unexpected error: %v", err)

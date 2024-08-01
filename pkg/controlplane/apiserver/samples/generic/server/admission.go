@@ -19,6 +19,7 @@ package server
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
@@ -45,7 +46,8 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		certsigning.PluginName,               // CertificateSigning
 		ctbattest.PluginName,                 // ClusterTrustBundleAttest
 		certsubjectrestriction.PluginName,    // CertificateSubjectRestriction
-		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
+		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
+		mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
 	)
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)

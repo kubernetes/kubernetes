@@ -134,9 +134,12 @@ func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPoli
 			},
 			Mutations: []admissionregistration.Mutation{
 				{
-					// TODO cici37: update the expression when ready
-					Expression: "{spec.replicas = 1}",
-					PatchType:  &applyConfigurationPatchType,
+					Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+					PatchType: &applyConfigurationPatchType,
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{
