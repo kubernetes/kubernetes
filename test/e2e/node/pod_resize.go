@@ -105,6 +105,7 @@ type patchSpec struct {
 }
 
 func isInPlaceResizeSupportedByRuntime(c clientset.Interface, nodeName string) bool {
+
 	//TODO(vinaykul,InPlacePodVerticalScaling): Can we optimize this?
 	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
