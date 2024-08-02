@@ -250,7 +250,7 @@ func (o *CreateSecretDockerRegistryOptions) Run() error {
 		}
 		secretDockerRegistry, err = o.Client.Secrets(o.Namespace).Create(context.TODO(), secretDockerRegistry, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create secret %v", err)
+			return fmt.Errorf("failed to create secret: %v", err)
 		}
 	}
 
