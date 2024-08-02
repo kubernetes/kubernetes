@@ -271,6 +271,15 @@ type KubeletConfiguration struct {
 	HairpinMode string
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
+	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
+	// between successive executions
+	// default 100ms
+	ReconcilerLoopSleepPeriod metav1.Duration
+	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
+	// DesiredStateOfWorldPopulator loop waits between successive executions
+	// default 100ms
+	DesiredStateOfWorldPopulatorLoopSleepPeriod metav1.Duration
+
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string

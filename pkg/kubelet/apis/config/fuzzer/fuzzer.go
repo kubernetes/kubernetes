@@ -70,6 +70,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MemoryManagerPolicy = v1beta1.NoneMemoryManagerPolicy
 			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
+			obj.DesiredStateOfWorldPopulatorLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
+			obj.ReconcilerLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"

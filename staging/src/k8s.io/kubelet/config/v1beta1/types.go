@@ -696,6 +696,16 @@ type KubeletConfiguration struct {
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	// +optional
 	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
+	// between successive executions
+	// Default: 100ms
+	// +optional
+	ReconcilerLoopSleepPeriod metav1.Duration `json:"reconcilerLoopSleepPeriod,omitempty"`
+	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
+	// DesiredStateOfWorldPopulator loop waits between successive executions
+	// Default: 100ms
+	// +optional
+	DesiredStateOfWorldPopulatorLoopSleepPeriod metav1.Duration `json:"desiredStateOfWorldPopulatorLoopSleepPeriod,omitempty"`
 	// providerID, if set, sets the unique ID of the instance that an external
 	// provider (i.e. cloudprovider) can use to identify a specific node.
 	// Default: ""

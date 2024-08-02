@@ -298,7 +298,8 @@ func newTestKubeletWithImageList(
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider()
-
+	kubelet.kubeletConfiguration.DesiredStateOfWorldPopulatorLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
+	kubelet.kubeletConfiguration.ReconcilerLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
 	kubelet.StatsProvider = stats.NewCadvisorStatsProvider(
 		kubelet.cadvisor,
 		kubelet.resourceAnalyzer,
@@ -383,6 +384,8 @@ func newTestKubeletWithImageList(
 
 	kubelet.volumeManager = kubeletvolume.NewVolumeManager(
 		controllerAttachDetachEnabled,
+		kubelet.kubeletConfiguration.ReconcilerLoopSleepPeriod,
+		kubelet.kubeletConfiguration.DesiredStateOfWorldPopulatorLoopSleepPeriod,
 		kubelet.nodeName,
 		kubelet.podManager,
 		kubelet.podWorkers,

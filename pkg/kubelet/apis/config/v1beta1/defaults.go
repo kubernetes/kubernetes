@@ -254,6 +254,12 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.VolumePluginDir == "" {
 		obj.VolumePluginDir = DefaultVolumePluginDir
 	}
+	if obj.ReconcilerLoopSleepPeriod == zeroDuration {
+		obj.ReconcilerLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
+	}
+	if obj.DesiredStateOfWorldPopulatorLoopSleepPeriod == zeroDuration {
+		obj.DesiredStateOfWorldPopulatorLoopSleepPeriod = metav1.Duration{Duration: 100 * time.Millisecond}
+	}
 	// Use the Default LoggingConfiguration option
 	logsapi.SetRecommendedLoggingConfiguration(&obj.Logging)
 	if obj.EnableSystemLogHandler == nil {

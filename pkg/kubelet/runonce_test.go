@@ -109,6 +109,8 @@ func TestRunOnce(t *testing.T) {
 	}
 	kb.volumeManager = volumemanager.NewVolumeManager(
 		true,
+		kb.kubeletConfiguration.ReconcilerLoopSleepPeriod,
+		kb.kubeletConfiguration.DesiredStateOfWorldPopulatorLoopSleepPeriod,
 		kb.nodeName,
 		kb.podManager,
 		kb.podWorkers,

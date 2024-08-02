@@ -493,6 +493,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.VolumePluginDir = in.VolumePluginDir
+	out.ReconcilerLoopSleepPeriod = in.ReconcilerLoopSleepPeriod
+	out.DesiredStateOfWorldPopulatorLoopSleepPeriod = in.DesiredStateOfWorldPopulatorLoopSleepPeriod
 	out.ProviderID = in.ProviderID
 	out.KernelMemcgNotification = in.KernelMemcgNotification
 	out.Logging = in.Logging
@@ -617,6 +619,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
+	out.ReconcilerLoopSleepPeriod = in.ReconcilerLoopSleepPeriod
+	out.DesiredStateOfWorldPopulatorLoopSleepPeriod = in.DesiredStateOfWorldPopulatorLoopSleepPeriod
 	out.PodCIDR = in.PodCIDR
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
 		return err

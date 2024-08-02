@@ -67,6 +67,8 @@ var (
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
 		MemoryThrottlingFactor:          utilpointer.Float64(0.9),
+		ReconcilerLoopSleepPeriod:       metav1.Duration{Duration: 100 * time.Second},
+		DesiredStateOfWorldPopulatorLoopSleepPeriod: metav1.Duration{Duration: 100 * time.Second},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,

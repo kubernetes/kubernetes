@@ -861,6 +861,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// setup volumeManager
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
+		kubeCfg.ReconcilerLoopSleepPeriod,
+		kubeCfg.DesiredStateOfWorldPopulatorLoopSleepPeriod,
 		nodeName,
 		klet.podManager,
 		klet.podWorkers,

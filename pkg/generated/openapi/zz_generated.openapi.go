@@ -62659,6 +62659,18 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"reconcilerLoopSleepPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits between successive executions Default: 100ms",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"desiredStateOfWorldPopulatorLoopSleepPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the DesiredStateOfWorldPopulator loop waits between successive executions Default: 100ms",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 					"providerID": {
 						SchemaProps: spec.SchemaProps{
 							Description: "providerID, if set, sets the unique ID of the instance that an external provider (i.e. cloudprovider) can use to identify a specific node. Default: \"\"",

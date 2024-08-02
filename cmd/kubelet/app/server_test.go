@@ -100,10 +100,12 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 port: 8080
 readOnlyPort: 10255
+reconcilerLoopSleepPeriod: 200ms
 `,
 			overwrittenConfigFields: map[string]interface{}{
-				"Port":         int32(8080),
-				"ReadOnlyPort": int32(10255),
+				"Port":                      int32(8080),
+				"ReadOnlyPort":              int32(10255),
+				"ReconcilerLoopSleepPeriod": metav1.Duration{Duration: 200 * time.Millisecond},
 			},
 			name: "kubelet.conf.d overrides kubelet.conf",
 		},
@@ -121,6 +123,7 @@ readOnlyPort: 10255
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 readOnlyPort: 10255
+reconcilerLoopSleepPeriod: 200ms
 kubeReserved:
   memory: 150Mi
   cpu: 200m
@@ -163,6 +166,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 port: 8080
 readOnlyPort: 10255
+reconcilerLoopSleepPeriod: 200ms
 systemReserved:
   memory: 2Gi
 clusterDNS:
@@ -192,6 +196,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 port: 8080
 readOnlyPort: 10255
+reconcilerLoopSleepPeriod: 200ms
 `,
 			overwrittenConfigFields: map[string]interface{}{
 				"Port":         int32(8081),

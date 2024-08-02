@@ -418,6 +418,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	out.ReconcilerLoopSleepPeriod = in.ReconcilerLoopSleepPeriod
+	out.DesiredStateOfWorldPopulatorLoopSleepPeriod = in.DesiredStateOfWorldPopulatorLoopSleepPeriod
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler

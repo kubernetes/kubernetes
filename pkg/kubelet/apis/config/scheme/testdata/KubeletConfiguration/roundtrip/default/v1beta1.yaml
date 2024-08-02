@@ -25,6 +25,7 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
+desiredStateOfWorldPopulatorLoopSleepPeriod: 100ms
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
@@ -77,6 +78,7 @@ oomScoreAdj: -999
 podLogsDir: /var/log/pods
 podPidsLimit: -1
 port: 10250
+reconcilerLoopSleepPeriod: 100ms
 registerNode: true
 registryBurst: 10
 registryPullQPS: 5

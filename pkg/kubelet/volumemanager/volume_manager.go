@@ -30,6 +30,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,13 +54,6 @@ import (
 )
 
 const (
-	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
-	// between successive executions
-	reconcilerLoopSleepPeriod = 100 * time.Millisecond
-
-	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
-	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -172,6 +166,8 @@ type PodManager interface {
 // Must be pre-initialized.
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
+	reconcilerLoopSleepPeriod metav1.Duration,
+	desiredStateOfWorldPopulatorLoopSleepPeriod metav1.Duration,
 	nodeName k8stypes.NodeName,
 	podManager PodManager,
 	podStateProvider PodStateProvider,
@@ -204,7 +200,7 @@ func NewVolumeManager(
 	vm.csiMigratedPluginManager = csiMigratedPluginManager
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
-		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		desiredStateOfWorldPopulatorLoopSleepPeriod.Duration,
 		podManager,
 		podStateProvider,
 		vm.desiredStateOfWorld,
@@ -216,7 +212,7 @@ func NewVolumeManager(
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
-		reconcilerLoopSleepPeriod,
+		reconcilerLoopSleepPeriod.Duration,
 		waitForAttachTimeout,
 		nodeName,
 		vm.desiredStateOfWorld,

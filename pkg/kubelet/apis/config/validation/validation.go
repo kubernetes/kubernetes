@@ -180,6 +180,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
+	if kc.DesiredStateOfWorldPopulatorLoopSleepPeriod.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: desiredStateOfWorldPopulatorLoopSleepPeriod %v must be >= 0 ms", kc.DesiredStateOfWorldPopulatorLoopSleepPeriod.Duration))
+	}
+	if kc.ReconcilerLoopSleepPeriod.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: reconcilerLoopSleepPeriod %v must be >= 0 ms", kc.ReconcilerLoopSleepPeriod.Duration))
+	}
 	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Cannot specify both shutdownGracePeriodByPodPriority and shutdownGracePeriod at the same time"))

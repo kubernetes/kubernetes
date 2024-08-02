@@ -227,6 +227,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.ReconcilerLoopSleepPeriod = in.ReconcilerLoopSleepPeriod
+	out.DesiredStateOfWorldPopulatorLoopSleepPeriod = in.DesiredStateOfWorldPopulatorLoopSleepPeriod
 	out.CPUCFSQuotaPeriod = in.CPUCFSQuotaPeriod
 	if in.MaxParallelImagePulls != nil {
 		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls

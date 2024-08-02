@@ -405,6 +405,8 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 	fakePathHandler := volumetest.NewBlockVolumePathHandler()
 	vm := NewVolumeManager(
 		true,
+		metav1.Duration{Duration: 100 * time.Millisecond},
+		metav1.Duration{Duration: 100 * time.Millisecond},
 		testHostname,
 		podManager,
 		stateProvider,
