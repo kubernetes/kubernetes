@@ -117,14 +117,20 @@ git ls-files -mo --exclude-standard -z | while read -r -d $'\0' file; do
     tail -n +2 "$file" >"${tmp}"
   fi
 
-  # if the header is generated
-  if [ -n "$new_header" ]
+  # if the file has none of both
+  if [ -z "$build_tag_string" ] && [ -z "$go_build_tag_string" ]
+  then
+    # create a new header with the copyright text
+    new_header=$(cat hack/boilerplate/boilerplate.generatego.txt)
+    cat "$file" >"${tmp}"
+  fi
+
+  content=$(<"$tmp")
+  repr=${content/${new_header}}
+  # if the new header is not already included in the file
+  if [ "$content" == "$repr"  ]
   then
     # write the newly generated header file to the original file
     echo -e "$new_header" | cat - "${tmp}" > "$file"
-  else
-    # if no build string insert at the top
-    cat hack/boilerplate/boilerplate.generatego.txt "$file" >"${tmp}" && \
-    mv "${tmp}" "$file"
   fi
 done
