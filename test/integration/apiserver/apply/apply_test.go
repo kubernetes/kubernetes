@@ -30,14 +30,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,7 +50,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"sigs.k8s.io/yaml"
 )
 
 func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
@@ -4779,4 +4782,120 @@ func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry
 	if len(diff) > 0 {
 		t.Fatalf("Want:\n%s\nGot:\n%s\nDiff:\n%s", string(want), string(got), diff)
 	}
+}
+
+// TestCreateOnApplyFailsWithForbidden makes sure that PATCH requests with the apply content type
+// will not create the object if the user does not have both patch and create permissions.
+func TestCreateOnApplyFailsWithForbidden(t *testing.T) {
+	// Enable RBAC so we can exercise authorization errors.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, append([]string{"--authorization-mode=RBAC"}, framework.DefaultTestServerFlags()...), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	pandaConfig := restclient.CopyConfig(server.ClientConfig)
+	pandaConfig.Impersonate.UserName = "panda"
+	pandaClient := clientset.NewForConfigOrDie(pandaConfig)
+
+	errPatch := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errPatch, `pods "test-pod" is forbidden: User "panda" cannot patch resource "pods" in API group "" in the namespace "default"`)
+
+	createPodRBACAndWait(t, adminClient, "patch")
+
+	errCreate := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errCreate, `pods "test-pod" is forbidden: `) // TODO make this error better
+
+	createPodRBACAndWait(t, adminClient, "create")
+
+	errNone := ssaPod(pandaClient)
+	require.NoError(t, errNone, "pod create via SSA should succeed now that RBAC is correct")
+}
+
+func requireForbiddenPodErr(t *testing.T, err error, message string) {
+	t.Helper()
+
+	require.Truef(t, apierrors.IsForbidden(err), "Expected forbidden error but got: %v", err)
+
+	wantStatusErr := &apierrors.StatusError{ErrStatus: metav1.Status{
+		Status:  "Failure",
+		Message: message,
+		Reason:  "Forbidden",
+		Details: &metav1.StatusDetails{
+			Name: "test-pod",
+			Kind: "pods",
+		},
+		Code: http.StatusForbidden,
+	}}
+	require.Equal(t, wantStatusErr, err, "unexpected status error")
+}
+
+func ssaPod(client *clientset.Clientset) error {
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"spec": {
+				"containers": [{
+					"name":  "test-container",
+					"image": "test-image"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	return err
+}
+
+func createPodRBACAndWait(t *testing.T, client *clientset.Clientset, verb string) {
+	t.Helper()
+
+	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{verb},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = client.RbacV1().RoleBindings("default").Create(context.TODO(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: rbacv1.UserKind,
+				Name: "panda",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     fmt.Sprintf("can-%s-pods", verb),
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
+		"panda",
+		"default",
+		verb,
+		"",
+		schema.GroupResource{Resource: "pods"},
+		true,
+	)
 }
