@@ -34,8 +34,13 @@ var sanitizer = strings.NewReplacer(`&`, "&amp;", `<`, "&lt;", `>`, "&gt;")
 
 // Forbidden renders a simple forbidden error
 func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
-	msg := sanitizer.Replace(forbiddenMessage(attributes))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
+	ErrorNegotiated(ForbiddenStatusError(attributes, reason), s, gv, w, req)
+}
+
+func ForbiddenStatusError(attributes authorizer.Attributes, reason string) *apierrors.StatusError {
+	msg := sanitizer.Replace(forbiddenMessage(attributes))
 
 	var errMsg string
 	if len(reason) == 0 {
@@ -43,9 +48,10 @@ func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.Res
 	} else {
 		errMsg = fmt.Sprintf("%s: %s", msg, reason)
 	}
-	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
+
 	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
-	ErrorNegotiated(apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg)), s, gv, w, req)
+
+	return apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg))
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {

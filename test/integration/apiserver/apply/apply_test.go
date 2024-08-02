@@ -4805,7 +4805,7 @@ func TestCreateOnApplyFailsWithForbidden(t *testing.T) {
 
 	errCreate := ssaPod(pandaClient)
 
-	requireForbiddenPodErr(t, errCreate, `pods "test-pod" is forbidden: `) // TODO make this error better
+	requireForbiddenPodErr(t, errCreate, `pods "test-pod" is forbidden: User "panda" cannot create resource "pods" in API group "" in the namespace "default"`)
 
 	createPodRBACAndWait(t, adminClient, "create")
 
