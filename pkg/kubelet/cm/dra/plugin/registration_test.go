@@ -78,7 +78,7 @@ func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 			if test.shouldError {
 				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
