@@ -9,7 +9,7 @@ CRI is a plugin interface which enables kubelet to use a wide variety of contain
 without the need to recompile. CRI consists of a protocol buffers and gRPC API.
 Read more about CRI at [kubernetes docs](https://kubernetes.io/docs/concepts/architecture/cri/).
 
-The repository [kubernetes/cri-client](https://github.com/kubernetes/cri-api) is a mirror of https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-client.
+The repository [kubernetes/cri-client](https://github.com/kubernetes/cri-client) is a mirror of https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-client.
 Please do **not** file issues or submit PRs against the [kubernetes/cri-client](https://github.com/kubernetes/cri-client)
 repository as it is readonly, all development is done in [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
 
