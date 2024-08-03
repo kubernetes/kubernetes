@@ -545,7 +545,7 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
-// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// spec.template and spec.volumeClaimTemplates. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	data, err := runtime.Encode(patchCodec, set)
@@ -560,9 +560,17 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
+
 	template := spec["template"].(map[string]interface{})
 	specCopy["template"] = template
 	template["$patch"] = "replace"
+
+	if set.Spec.VolumeClaimUpdatePolicy != "" {
+		// This means the StatefulSet is updated at least once since the UpdateVolumeClaimTemplate is enabled.
+		// This is an atomic typed list
+		specCopy["volumeClaimTemplates"] = spec["volumeClaimTemplates"]
+	}
+
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err
