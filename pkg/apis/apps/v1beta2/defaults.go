@@ -93,6 +93,12 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		if obj.Spec.VolumeClaimUpdatePolicy == "" {
+			obj.Spec.VolumeClaimUpdatePolicy = appsv1beta2.OnDeleteStatefulSetVolumeClaimUpdatePolicy
+		}
+	}
+
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1

@@ -1922,7 +1922,8 @@
     },
     "ordinals": {
       "start": 1
-    }
+    },
+    "volumeClaimUpdatePolicy": "volumeClaimUpdatePolicyValue"
   },
   "status": {
     "observedGeneration": 1,

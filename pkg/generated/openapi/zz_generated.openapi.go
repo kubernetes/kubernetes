@@ -8304,6 +8304,14 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 							Ref:         ref("k8s.io/api/apps/v1.StatefulSetOrdinals"),
 						},
 					},
+					"volumeClaimUpdatePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeClaimUpdatePolicy indicates when PersistentVolumeClaims should be updated to match the volumeClaimTemplates. By default, PersistentVolumeClaims are not patched to match the volumeClaimTemplates. This policy allows propagating changes of volumeClaimTemplates to the existing PersistentVolumeClaims. The claims can be updated with pods or during a claims-only rolling update. The update process is similar to the process of pods, and is also affected by updateStrategy, etc. This requires the UpdateVolumeClaimTemplate feature gate to be enabled, which is alpha.\n\nPossible enum values:\n - `\"InPlace\"` indicates that the updates to volumeClaimTemplate will be propagated to the managed PersistentVolumeClaims in-place without interruption or data loss.\n - `\"OnDelete\"` triggers the legacy behavior. Updates to volumeClaimTemplate only affects the new claims. Version tracking and ordered rolling restarts are disabled. Claims are recreated from the StatefulSetSpec when they are manually deleted.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"InPlace", "OnDelete"},
+						},
+					},
 				},
 				Required: []string{"selector", "template"},
 			},
@@ -9454,6 +9462,14 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested.",
 							Ref:         ref("k8s.io/api/apps/v1beta1.StatefulSetOrdinals"),
+						},
+					},
+					"volumeClaimUpdatePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeClaimUpdatePolicy indicates when PersistentVolumeClaims should be updated to match the volumeClaimTemplates. By default, PersistentVolumeClaims are not patched to match the volumeClaimTemplates. This policy allows propagating changes of volumeClaimTemplates to the existing PersistentVolumeClaims. The claims can be updated with pods or during a claims-only rolling update. The update process is similar to the process of pods, and is also affected by updateStrategy, etc. This requires the UpdateVolumeClaimTemplate feature gate to be enabled, which is alpha.\n\nPossible enum values:\n - `\"InPlace\"` indicates that the updates to volumeClaimTemplate will be propagated to the managed PersistentVolumeClaims in-place without interruption or data loss.\n - `\"OnDelete\"` triggers the legacy behavior. Updates to volumeClaimTemplate only affects the new claims. Version tracking and ordered rolling restarts are disabled. Claims are recreated from the StatefulSetSpec when they are manually deleted.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"InPlace", "OnDelete"},
 						},
 					},
 				},
@@ -11167,6 +11183,14 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested.",
 							Ref:         ref("k8s.io/api/apps/v1beta2.StatefulSetOrdinals"),
+						},
+					},
+					"volumeClaimUpdatePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeClaimUpdatePolicy indicates when PersistentVolumeClaims should be updated to match the volumeClaimTemplates. By default, PersistentVolumeClaims are not patched to match the volumeClaimTemplates. This policy allows propagating changes of volumeClaimTemplates to the existing PersistentVolumeClaims. The claims can be updated with pods or during a claims-only rolling update. The update process is similar to the process of pods, and is also affected by updateStrategy, etc. This requires the UpdateVolumeClaimTemplate feature gate to be enabled, which is alpha.\n\nPossible enum values:\n - `\"InPlace\"` indicates that the updates to volumeClaimTemplate will be propagated to the managed PersistentVolumeClaims in-place without interruption or data loss.\n - `\"OnDelete\"` triggers the legacy behavior. Updates to volumeClaimTemplate only affects the new claims. Version tracking and ordered rolling restarts are disabled. Claims are recreated from the StatefulSetSpec when they are manually deleted.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"InPlace", "OnDelete"},
 						},
 					},
 				},

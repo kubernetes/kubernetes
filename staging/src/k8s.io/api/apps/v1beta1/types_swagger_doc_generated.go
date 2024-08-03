@@ -261,6 +261,7 @@ var map_StatefulSetSpec = map[string]string{
 	"minReadySeconds":                      "minReadySeconds is the minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"persistentVolumeClaimRetentionPolicy": "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
 	"ordinals":                             "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested.",
+	"volumeClaimUpdatePolicy":              "volumeClaimUpdatePolicy indicates when PersistentVolumeClaims should be updated to match the volumeClaimTemplates. By default, PersistentVolumeClaims are not patched to match the volumeClaimTemplates. This policy allows propagating changes of volumeClaimTemplates to the existing PersistentVolumeClaims. The claims can be updated with pods or during a claims-only rolling update. The update process is similar to the process of pods, and is also affected by updateStrategy, etc. This requires the UpdateVolumeClaimTemplate feature gate to be enabled, which is alpha.",
 }
 
 func (StatefulSetSpec) SwaggerDoc() map[string]string {

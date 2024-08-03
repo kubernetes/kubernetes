@@ -46,6 +46,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Spec.UpdateStrategy.Type) == 0 {
 				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 			}
+			if len(s.Spec.VolumeClaimUpdatePolicy) == 0 {
+				s.Spec.VolumeClaimUpdatePolicy = apps.InPlaceStatefulSetVolumeClaimUpdatePolicy
+			}
 			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
 			}

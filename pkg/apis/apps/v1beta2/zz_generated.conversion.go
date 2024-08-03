@@ -1313,6 +1313,7 @@ func autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2
 	out.MinReadySeconds = in.MinReadySeconds
 	out.PersistentVolumeClaimRetentionPolicy = (*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
 	out.Ordinals = (*apps.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	out.VolumeClaimUpdatePolicy = apps.StatefulSetVolumeClaimUpdatePolicyType(in.VolumeClaimUpdatePolicy)
 	return nil
 }
 
@@ -1334,6 +1335,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.Statef
 	out.MinReadySeconds = in.MinReadySeconds
 	out.PersistentVolumeClaimRetentionPolicy = (*appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
 	out.Ordinals = (*appsv1beta2.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	out.VolumeClaimUpdatePolicy = appsv1beta2.StatefulSetVolumeClaimUpdatePolicyType(in.VolumeClaimUpdatePolicy)
 	return nil
 }
 

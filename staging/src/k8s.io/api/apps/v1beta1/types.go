@@ -152,6 +152,23 @@ const (
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
 
+// StatefulSetVolumeClaimUpdatePolicyType is a string enumeration type that enumerates
+// all possible update policy for the PersistentVolumeClaims managed by StatefulSet.
+// +enum
+type StatefulSetVolumeClaimUpdatePolicyType string
+
+const (
+	// InPlaceStatefulSetVolumeClaimUpdatePolicy indicates that the updates to
+	// volumeClaimTemplate will be propagated to the managed PersistentVolumeClaims
+	// in-place without interruption or data loss.
+	InPlaceStatefulSetVolumeClaimUpdatePolicy StatefulSetVolumeClaimUpdatePolicyType = "InPlace"
+	// OnDeleteStatefulSetVolumeClaimUpdatePolicy triggers the legacy behavior.
+	// Updates to volumeClaimTemplate only affects the new claims. Version
+	// tracking and ordered rolling restarts are disabled. Claims are recreated
+	// from the StatefulSetSpec when they are manually deleted.
+	OnDeleteStatefulSetVolumeClaimUpdatePolicy StatefulSetVolumeClaimUpdatePolicyType = "OnDelete"
+)
+
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
 	// Partition indicates the ordinal at which the StatefulSet should be partitioned
@@ -300,6 +317,17 @@ type StatefulSetSpec struct {
 	// increments the index by one for each additional replica requested.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
+
+	// volumeClaimUpdatePolicy indicates when PersistentVolumeClaims should be
+	// updated to match the volumeClaimTemplates. By default, PersistentVolumeClaims
+	// are not patched to match the volumeClaimTemplates. This policy allows propagating
+	// changes of volumeClaimTemplates to the existing PersistentVolumeClaims.
+	// The claims can be updated with pods or during a claims-only rolling update.
+	// The update process is similar to the process of pods, and is also affected by
+	// updateStrategy, etc.
+	// This requires the UpdateVolumeClaimTemplate feature gate to be enabled, which is alpha.
+	// +optional
+	VolumeClaimUpdatePolicy StatefulSetVolumeClaimUpdatePolicyType `json:"volumeClaimUpdatePolicy,omitempty" protobuf:"bytes,12,opt,name=volumeClaimUpdatePolicy,casttype=StatefulSetVolumeClaimUpdatePolicyType"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.

@@ -222,11 +222,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		original                   *appsv1beta1.StatefulSet
-		expected                   *appsv1beta1.StatefulSet
-		enableMaxUnavailablePolicy bool
-		disablePVCDeletionPolicy   bool
+		name                            string
+		original                        *appsv1beta1.StatefulSet
+		expected                        *appsv1beta1.StatefulSet
+		enableMaxUnavailablePolicy      bool
+		disablePVCDeletionPolicy        bool
+		enableUpdateVolumeClaimTemplate bool
 	}{
 		{
 			name: "labels and default update strategy",
@@ -555,6 +556,33 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 			disablePVCDeletionPolicy: true,
 		},
+		{
+			name: "UpdateVolumeClaimTemplate enabled",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: appsv1beta1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit:    ptr.To[int32](10),
+					VolumeClaimUpdatePolicy: appsv1beta1.OnDeleteStatefulSetVolumeClaimUpdatePolicy,
+				},
+			},
+			enableUpdateVolumeClaimTemplate: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -566,6 +594,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UpdateVolumeClaimTemplate, test.enableUpdateVolumeClaimTemplate)
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1beta1.StatefulSet)
 			if !ok {

@@ -1322,6 +1322,7 @@ spec:
         status: statusValue
         targetVolumeAttributesClassName: targetVolumeAttributesClassNameValue
       phase: phaseValue
+  volumeClaimUpdatePolicy: volumeClaimUpdatePolicyValue
 status:
   availableReplicas: 11
   collisionCount: 9
