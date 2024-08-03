@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // StatefulSetValidationOptions is a struct that can be passed to ValidateStatefulSetSpec to record the validate options
@@ -212,9 +214,26 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(f(&statefulSet.Spec), f(&oldStatefulSet.Spec), field.NewPath("spec", fName))...)
 	}
 	validateSpecImmutable(func(s *apps.StatefulSetSpec) any { return s.Selector }, "selector")
-	validateSpecImmutable(func(s *apps.StatefulSetSpec) any { return s.VolumeClaimTemplates }, "volumeClaimTemplates")
 	validateSpecImmutable(func(s *apps.StatefulSetSpec) any { return s.ServiceName }, "serviceName")
 	validateSpecImmutable(func(s *apps.StatefulSetSpec) any { return s.PodManagementPolicy }, "podManagementPolicy")
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		if len(statefulSet.Spec.VolumeClaimTemplates) != len(oldStatefulSet.Spec.VolumeClaimTemplates) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), statefulSet.Spec.VolumeClaimTemplates, "cannot change the number of volumes"))
+		} else {
+			for i := range statefulSet.Spec.VolumeClaimTemplates {
+				tOld := oldStatefulSet.Spec.VolumeClaimTemplates[i].DeepCopy()
+				t := &statefulSet.Spec.VolumeClaimTemplates[i]
+
+				tOld.Spec.Resources.Requests = t.Spec.Resources.Requests
+				if !apiequality.Semantic.DeepEqual(tOld, t) {
+					allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumeClaimTemplates").Index(i), t, "fields other than .spec.resources.requests are immutable"))
+				}
+			}
+		}
+	} else {
+		validateSpecImmutable(func(s *apps.StatefulSetSpec) any { return s.VolumeClaimTemplates }, "volumeClaimTemplates")
+	}
 
 	return allErrs
 }
