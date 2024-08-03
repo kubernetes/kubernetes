@@ -906,21 +906,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakSelectorLabels(validLabels2),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "selector"), nil, ""),
 		},
 	}, {
 		name:   "update pod management policy 1",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 		},
 	}, {
 		name:   "update pod management policy 2",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 		},
 	}, {
 		name:   "update to negative replicas",
@@ -934,21 +934,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
 		},
 	}, {
 		name:   "update pvc template storage class",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
 		},
 	}, {
 		name:   "add new pvc template",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
 		},
 	},
 	}
