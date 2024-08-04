@@ -1086,7 +1086,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		logger := klog.FromContext(ctx)
 		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
 	}
 
@@ -1103,7 +1102,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		Reason:  reason,
 		Message: errMsg,
 	}, nominatingInfo); err != nil {
-		klog.FromContext(ctx).Error(err, "Error updating pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Error updating pod", "pod", klog.KObj(pod))
 	}
 }
 
