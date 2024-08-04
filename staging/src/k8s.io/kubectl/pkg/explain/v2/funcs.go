@@ -56,6 +56,9 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 			return "", errors.New(message)
 		},
 		"wrap": func(l int, s string) (string, error) {
+			// realign all line breaks
+			s = strings.ReplaceAll(s, "\n", "")
+
 			buf := bytes.NewBuffer(nil)
 			writer := term.NewWordWrapWriter(buf, uint(l))
 			_, err := writer.Write([]byte(s))

@@ -57,6 +57,13 @@ func TestFuncs(t *testing.T) {
 			Expect:   "[this is a slash separated thing]",
 		},
 		{
+			Name:     "realign line breaks",
+			FuncName: "wrap",
+			Source:   `{{wrap 76 .}}`,
+			Context:  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus pulvinar in libero id sagittis. \nAliquam sem enim, vehicula et urna ac, vehicula ullamcorper sem. Morbi turpis arcu, aliquet at \neros quis, sodales dignissim eros. \nQuisque ut lectus quis magna maximus elementum a nec felis. \nNulla ultricies pulvinar quam, id tincidunt.",
+			Expect:   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus pulvinar in\nlibero id sagittis. Aliquam sem enim, vehicula et urna ac, vehicula\nullamcorper sem. Morbi turpis arcu, aliquet at eros quis, sodales dignissim\neros. Quisque ut lectus quis magna maximus elementum a nec felis. Nulla\nultricies pulvinar quam, id tincidunt.",
+		},
+		{
 			Name:     "basic",
 			FuncName: "join",
 			Source:   `{{join "/" "this" "is" "a" "slash" "separated" "thing"}}`,
