@@ -169,20 +169,20 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	notFoundHandler := notfoundhandler.New(config.KubeAPIs.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create API Extensions server: %w", err)
 	}
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
 
 	kubeAPIServer, err := config.KubeAPIs.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create Kube API server: %w", err)
 	}
 
 	// aggregator comes last in the chain
 	aggregatorServer, err := controlplaneapiserver.CreateAggregatorServer(config.Aggregator, kubeAPIServer.ControlPlane.GenericAPIServer, apiExtensionsServer.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdAPIEnabled, apiVersionPriorities)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
-		return nil, err
+		return nil, fmt.Errorf("failed to create Aggregator server: %w", err)
 	}
 
 	return aggregatorServer, nil
