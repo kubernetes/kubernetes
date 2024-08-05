@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -1584,6 +1585,18 @@ func TestValidateCertValidity(t *testing.T) {
 				},
 			},
 			expectedErrors: 2,
+		},
+		{
+			name: "one error from mismatched durations (CertificateValidityPeriod > CACertificateValidityPeriod) ",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour * 2,
+				},
+				CACertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour,
+				},
+			},
+			expectedErrors: 1,
 		},
 	}
 
