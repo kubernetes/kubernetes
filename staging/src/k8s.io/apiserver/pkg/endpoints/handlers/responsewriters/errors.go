@@ -42,16 +42,16 @@ func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.Res
 func ForbiddenStatusError(attributes authorizer.Attributes, reason string) *apierrors.StatusError {
 	msg := sanitizer.Replace(forbiddenMessage(attributes))
 
-	var errMsg string
+	var errMsg error
 	if len(reason) == 0 {
-		errMsg = fmt.Sprintf("%s", msg)
+		errMsg = fmt.Errorf("%s", msg)
 	} else {
-		errMsg = fmt.Sprintf("%s: %s", msg, reason)
+		errMsg = fmt.Errorf("%s: %s", msg, reason)
 	}
 
 	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
 
-	return apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg))
+	return apierrors.NewForbidden(gr, attributes.GetName(), errMsg)
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {
