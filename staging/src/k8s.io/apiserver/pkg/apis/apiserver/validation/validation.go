@@ -355,6 +355,11 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		if mapping.Key != strings.ToLower(mapping.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "key must be lowercase"))
 		}
+
+		if isKubernetesDomainPrefix(mapping.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use"))
+		}
+
 		if seenExtraKeys.Has(mapping.Key) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("key"), mapping.Key))
 			continue
@@ -392,6 +397,24 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 	}
 
 	return allErrs
+}
+
+func isKubernetesDomainPrefix(key string) bool {
+	domainPrefix := getDomainPrefix(key)
+	if domainPrefix == "kubernetes.io" || strings.HasSuffix(domainPrefix, ".kubernetes.io") {
+		return true
+	}
+	if domainPrefix == "k8s.io" || strings.HasSuffix(domainPrefix, ".k8s.io") {
+		return true
+	}
+	return false
+}
+
+func getDomainPrefix(key string) string {
+	if parts := strings.SplitN(key, "/", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 func usesEmailClaim(ast *celgo.Ast) bool {

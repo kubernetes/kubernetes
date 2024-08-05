@@ -1364,6 +1364,69 @@ func TestValidateClaimMappings(t *testing.T) {
 			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
 		},
 		{
+			name: "extra mapping key prefix is k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix is kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix with ak8s.io, *.ak8s.io, bkubernetes.io, *.bkubernetes.io are still valid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "bkubernetes.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.bkubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
+		},
+		{
 			name: "valid claim mappings but uses email without verification",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
