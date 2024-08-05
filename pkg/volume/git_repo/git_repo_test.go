@@ -267,6 +267,20 @@ func TestPlugin(t *testing.T) {
 			},
 			isExpectedFailure: true,
 		},
+		{
+			name: "invalid-revision-directory-combo",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitURL,
+						Revision:   "main",
+						Directory:  "foo/bar",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
 	}
 
 	for _, scenario := range scenarios {
