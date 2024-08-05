@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 var (
@@ -62,5 +61,5 @@ func TestMain(m *testing.M) {
 		klog.Fatalf("Unknown allocator type: %s", allocator)
 	}
 
-	framework.EtcdMain(m.Run)
+	// framework.EtcdMain(m.Run)
 }

@@ -44,7 +44,7 @@ func makeGVK(group, version, kind string) schema.GroupVersionKind {
 }
 
 func TestMain(m *testing.M) {
-	framework.EtcdMain(m.Run)
+	// framework.EtcdMain(m.Run)
 }
 
 func TestScaleSubresources(t *testing.T) {

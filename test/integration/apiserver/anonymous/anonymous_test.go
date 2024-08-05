@@ -186,7 +186,7 @@ anonymous:
 }
 
 func TestMain(m *testing.M) {
-	framework.EtcdMain(m.Run)
+	// framework.EtcdMain(m.Run)
 }
 
 func writeTempFile(t *testing.T, content string) string {

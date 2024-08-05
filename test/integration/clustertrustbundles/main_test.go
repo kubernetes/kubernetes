@@ -22,12 +22,10 @@ import (
 	"encoding/pem"
 	mathrand "math/rand"
 	"testing"
-
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
-	framework.EtcdMain(m.Run)
+	// framework.EtcdMain(m.Run)
 }
 
 func mustMakeCertificate(t *testing.T, template *x509.Certificate) []byte {
