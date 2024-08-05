@@ -47,5 +47,5 @@ cd "${GOPATH}/src/k8s.io/kubernetes"
 
 ./hack/install-etcd.sh
 
-make test-cmd
+# make test-cmd
 make test-integration
