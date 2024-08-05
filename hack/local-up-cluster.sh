@@ -173,6 +173,21 @@ function usage {
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
 }
 
+function sudo {
+    if [ "$UID" = "0" ]; then
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --) shift; break;;
+                -*) shift;;
+                *) break;;
+            esac
+        done
+        "$@"
+    else
+        command sudo "$@"
+    fi
+}
+
 # This function guesses where the existing cached binary build is for the `-O`
 # flag
 function guess_built_binary_path {
@@ -1188,7 +1203,6 @@ function parse_eviction {
 }
 
 function update_packages {
-  apt-get update && apt-get install -y sudo
   apt-get remove -y systemd
 
   # Do not update docker / containerd / runc
