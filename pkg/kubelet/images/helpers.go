@@ -19,6 +19,9 @@ package images
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/flowcontrol"
@@ -49,4 +52,71 @@ func (ts throttledImageService) PullImage(ctx context.Context, image kubecontain
 		return ts.ImageService.PullImage(ctx, image, secrets, podSandboxConfig)
 	}
 	return "", fmt.Errorf("pull QPS exceeded")
+}
+
+// ParallelBlocker for parallel puller control.
+type ParallelBlocker interface {
+	// Wait if it needs block pull request.
+	// Recover is used to unblock after process.
+	Wait(image kubecontainer.ImageSpec) Recover
+}
+
+// Recover function of release lock of ParallelBlocker from Wait() was called.
+type Recover func()
+
+// defaultParallelBlocker creates a ParallelBlocker with default implementation blockerWithMaxParallel.
+// Blocker will not limit concurrency  with maxParallelImagePulls nil or less than 1.
+func defaultParallelBlocker(maxParallelImagePulls *int32) ParallelBlocker {
+	if maxParallelImagePulls == nil || *maxParallelImagePulls < 1 {
+		return &blockerWithMaxParallel{
+			imagePullingMap:          sync.Map{},
+			tokensForDistinctImageID: nil,
+		}
+	} else {
+		return &blockerWithMaxParallel{
+			imagePullingMap:          sync.Map{},
+			tokensForDistinctImageID: make(chan struct{}, *maxParallelImagePulls),
+		}
+	}
+}
+
+// blockerWithMaxParallel implements ParallelBlocker as default.
+// limits the number of concurrent calls.
+type blockerWithMaxParallel struct {
+	imagePullingMap          sync.Map
+	tokensForDistinctImageID chan struct{}
+}
+
+// Wait limits with tokensForDistinctImageID
+// Image pull requests with the same imageID will not be executed concurrently.
+// This ensures that if a Node serving numerous Pods with the same image `X`
+// and one Pod with the different image `Y`, The same image name will be pulled serially,
+// instead of `Y` waiting on `maxParallelImagePulls`'s pulls of `X`.
+func (b *blockerWithMaxParallel) Wait(image kubecontainer.ImageSpec) Recover {
+	if b.tokensForDistinctImageID != nil {
+		tokensForSameImageID, _ := b.imagePullingMap.LoadOrStore(genKeyOfPullingMap(image), make(chan struct{}, 1))
+		tokensForSameImageID.(chan struct{}) <- struct{}{}
+		b.tokensForDistinctImageID <- struct{}{}
+		return func() {
+			<-b.tokensForDistinctImageID
+			<-tokensForSameImageID.(chan struct{})
+		}
+	} else {
+		return func() {}
+	}
+}
+
+func genKeyOfPullingMap(image kubecontainer.ImageSpec) string {
+	res := []string{}
+	for _, annotation := range image.Annotations {
+		res = append(res, fmt.Sprintf("%s-%s", annotation.Name, annotation.Value))
+	}
+	sort.Strings(res)
+	if image.RuntimeHandler != "" {
+		res = append([]string{image.RuntimeHandler}, res...)
+	}
+	if image.Image != "" {
+		res = append([]string{image.Image}, res...)
+	}
+	return strings.Join(res, "-")
 }

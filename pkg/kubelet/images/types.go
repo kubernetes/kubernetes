@@ -41,6 +41,12 @@ var (
 	ErrInvalidImageName = errors.New("InvalidImageName")
 )
 
+const (
+	// RuntimeNoEffectAnnotationKey is the annotation keys to filter annotation
+	// which has no effect to runtime.
+	RuntimeNoEffectAnnotationKey = "node.kubernetes.io/runtime-no-effect-annotations"
+)
+
 // ImageManager provides an interface to manage the lifecycle of images.
 // Implementations of this interface are expected to deal with pulling (downloading),
 // managing, and deleting container images.

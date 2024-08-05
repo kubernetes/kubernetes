@@ -18,7 +18,9 @@ package images
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"time"
 
@@ -110,13 +112,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return "", msg, ErrInvalidImageName
 	}
 
-	var podAnnotations []kubecontainer.Annotation
-	for k, v := range pod.GetAnnotations() {
-		podAnnotations = append(podAnnotations, kubecontainer.Annotation{
-			Name:  k,
-			Value: v,
-		})
-	}
+	podAnnotations := filterAnnotationsWithRuntimeNoEffect(pod.GetAnnotations())
 
 	spec := kubecontainer.ImageSpec{
 		Image:          image,
@@ -169,6 +165,33 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
+}
+
+// filterAnnotationsWithRuntimeNoEffect filter out annotations that meaningless for runtime.
+func filterAnnotationsWithRuntimeNoEffect(annotationMap map[string]string) []kubecontainer.Annotation {
+	podAnnotations := []kubecontainer.Annotation{}
+
+	noEffectKeySet := sets.Set[string]{}
+	val, exist := annotationMap[RuntimeNoEffectAnnotationKey]
+	if exist {
+		var noEffectAnnotationKeys []string
+		if err := json.Unmarshal([]byte(val), &noEffectAnnotationKeys); err != nil {
+			klog.ErrorS(err, "Unable to unmarshal runtime no effect keys from 'node.kubernetes.io/runtime-no-effect-annotations'", "value", val)
+		} else {
+			noEffectKeySet.Insert(noEffectAnnotationKeys...)
+		}
+		noEffectKeySet.Insert(RuntimeNoEffectAnnotationKey)
+	}
+
+	for k, v := range annotationMap {
+		if !noEffectKeySet.Has(k) {
+			podAnnotations = append(podAnnotations, kubecontainer.Annotation{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
+	return podAnnotations
 }
 
 func evalCRIPullErr(imgRef string, err error) (errMsg string, errRes error) {
