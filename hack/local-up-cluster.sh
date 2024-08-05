@@ -131,11 +131,12 @@ ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRa
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
-# START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
+# START_MODE can be 'all', 'control-plane', 'worker', 'kubelet', 'kubeproxy'
+# legacy options: 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
 if [[ -z "${START_MODE:-}" ]]; then
     case "$(uname -s)" in
       Darwin)
-        START_MODE=nokubelet,nokubeproxy
+        START_MODE=control-plane
         ;;
       Linux)
         START_MODE=all
@@ -146,6 +147,38 @@ if [[ -z "${START_MODE:-}" ]]; then
         ;;
     esac
 fi
+
+declare -A COMPONENTS
+for mode in ${START_MODE//,/ }; do
+    case "${mode}" in
+    all)
+        COMPONENTS["control-plane"]=true
+        ;&
+    worker)
+        COMPONENTS["kubelet"]=true
+        COMPONENTS["kube-proxy"]=true
+        ;;
+    control-plane)
+        COMPONENTS["control-plane"]=true
+        ;;
+    kubelet|kubeletonly)
+        COMPONENTS["kubelet"]=true
+        ;;
+    kubeproxy)
+        COMPONENTS["kube-proxy"]=true
+        ;;
+    nokubelet)
+        COMPONENTS["kubelet"]=false
+        COMPONENTS["control-plane"]="${COMPONENTS["control-plane"]:-true}"
+        COMPONENTS["kube-proxy"]="${COMPONENTS["kube-proxy"]:-true}"
+        ;;
+    nokubeproxy)
+        COMPONENTS["kube-proxy"]=false
+        COMPONENTS["control-plane"]="${COMPONENTS["control-plane"]:-true}"
+        COMPONENTS["kubelet"]="${COMPONENTS["kubelet"]:-true}"
+        ;;
+    esac
+done
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
@@ -228,12 +261,18 @@ do
 done
 
 if [ -z "${GO_OUT}" ]; then
-    binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
-    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
-      binaries_to_build="${binaries_to_build} cmd/kubelet"
+    binaries_to_build="cmd/kubectl"
+    if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
+        binaries_to_build+=" cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler"
+        if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]] && [ -z "${EXTERNAL_CLOUD_PROVIDER_BINARY}" ]; then
+            binaries_to_build+=" cmd/cloud-controller-manager"
+        fi
     fi
-    if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
-      binaries_to_build="${binaries_to_build} cmd/kube-proxy"
+    if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
+        binaries_to_build="${binaries_to_build} cmd/kubelet"
+    fi
+    if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
+        binaries_to_build="${binaries_to_build} cmd/kube-proxy"
     fi
     make -C "${KUBE_ROOT}" WHAT="${binaries_to_build}"
 else
@@ -988,7 +1027,7 @@ EOF
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+    if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
       # wait for kubelet collect node information
       echo "wait kubelet ready"
       wait_node_ready
@@ -1107,7 +1146,7 @@ function create_storage_class {
 }
 
 function print_success {
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
   else
@@ -1127,20 +1166,22 @@ Logs:
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
   ${CLOUD_CTLRMGR_LOG:-}
-  ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
 EOF
 fi
 
-if [[ "${START_MODE}" == "all" ]]; then
+if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
+  echo "  ${PROXY_LOG}"
+fi
+if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
   echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == *"nokubelet"* ]]; then
+else
   echo
-  echo "No kubelet was started because you set START_MODE=nokubelet"
-  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
+  echo "No kubelet was enabled in START_MODE"
+  echo "Run this script again with START_MODE=worker to run a kubelet"
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   echo
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     echo "To start using your cluster, you can open up another terminal/tab and run:"
@@ -1360,11 +1401,11 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   kube::etcd::validate
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   test_apiserver_off
 fi
 
@@ -1386,7 +1427,7 @@ fi
 KUBECTL=$(kube::util::find-binary "kubectl")
 
 echo "Starting services now!"
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
@@ -1402,7 +1443,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_csi_snapshotter
 fi
 
-if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1420,8 +1461,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
     esac
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
+if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
     ## TODO remove this check if/when kubelet is supported on darwin
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1436,7 +1476,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
         ;;
     esac
-  fi
 fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
