@@ -30,30 +30,61 @@ import (
 )
 
 func Test_getLoggingCmd(t *testing.T) {
+	var emptyCmdEnv []string
 	tests := []struct {
-		name        string
-		args        nodeLogQuery
-		wantLinux   []string
-		wantWindows []string
-		wantOtherOS []string
+		name              string
+		args              nodeLogQuery
+		services          []string
+		wantLinux         []string
+		wantWindows       []string
+		wantLinuxCmdEnv   []string
+		wantWindowsCmdEnv []string
 	}{
 		{
-			args:        nodeLogQuery{},
-			wantLinux:   []string{"--utc", "--no-pager", "--output=short-precise"},
-			wantWindows: []string{"-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "Get-WinEvent -FilterHashtable @{LogName='Application'} | Sort-Object TimeCreated | Format-Table -AutoSize -Wrap"},
+			name:              "basic",
+			args:              nodeLogQuery{},
+			services:          []string{},
+			wantLinux:         []string{"--utc", "--no-pager", "--output=short-precise"},
+			wantLinuxCmdEnv:   emptyCmdEnv,
+			wantWindows:       []string{"-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "Get-WinEvent -FilterHashtable @{LogName='Application'} | Sort-Object TimeCreated | Format-Table -AutoSize -Wrap"},
+			wantWindowsCmdEnv: emptyCmdEnv,
+		},
+		{
+			name:              "two providers",
+			args:              nodeLogQuery{},
+			services:          []string{"p1", "p2"},
+			wantLinux:         []string{"--utc", "--no-pager", "--output=short-precise", "--unit=p1", "--unit=p2"},
+			wantLinuxCmdEnv:   emptyCmdEnv,
+			wantWindows:       []string{"-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName=$Env:kubelet_provider0,$Env:kubelet_provider1} | Sort-Object TimeCreated | Format-Table -AutoSize -Wrap"},
+			wantWindowsCmdEnv: []string{"kubelet_provider0=p1", "kubelet_provider1=p2"},
+		},
+		{
+			name:              "empty provider",
+			args:              nodeLogQuery{},
+			services:          []string{"p1", "", "p2"},
+			wantLinux:         []string{"--utc", "--no-pager", "--output=short-precise", "--unit=p1", "--unit=p2"},
+			wantLinuxCmdEnv:   emptyCmdEnv,
+			wantWindows:       []string{"-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName=$Env:kubelet_provider0,$Env:kubelet_provider2} | Sort-Object TimeCreated | Format-Table -AutoSize -Wrap"},
+			wantWindowsCmdEnv: []string{"kubelet_provider0=p1", "kubelet_provider2=p2"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, got, err := getLoggingCmd(&tt.args, []string{})
+			_, got, gotCmdEnv, err := getLoggingCmd(&tt.args, tt.services)
 			switch os := runtime.GOOS; os {
 			case "linux":
 				if !reflect.DeepEqual(got, tt.wantLinux) {
 					t.Errorf("getLoggingCmd() = %v, want %v", got, tt.wantLinux)
 				}
+				if !reflect.DeepEqual(gotCmdEnv, tt.wantLinuxCmdEnv) {
+					t.Errorf("gotCmdEnv %v, wantLinuxCmdEnv %v", gotCmdEnv, tt.wantLinuxCmdEnv)
+				}
 			case "windows":
 				if !reflect.DeepEqual(got, tt.wantWindows) {
 					t.Errorf("getLoggingCmd() = %v, want %v", got, tt.wantWindows)
+				}
+				if !reflect.DeepEqual(gotCmdEnv, tt.wantWindowsCmdEnv) {
+					t.Errorf("gotCmdEnv %v, wantWindowsCmdEnv %v", gotCmdEnv, tt.wantWindowsCmdEnv)
 				}
 			default:
 				if err == nil {
