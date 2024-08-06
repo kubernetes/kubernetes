@@ -75,6 +75,8 @@ type Manager interface {
 type DiskInfoProvider interface {
 	// HasDedicatedImageFs returns true if the imagefs is on a separate device from the rootfs.
 	HasDedicatedImageFs(ctx context.Context) (bool, error)
+	// HasDedicatedContainerFs returns true if the container fs is on a separate device from the rootfs.
+	HasDedicatedContainerFs(ctx context.Context) (bool, error)
 }
 
 // ImageGC is responsible for performing garbage collection of unused images.
@@ -87,8 +89,6 @@ type ImageGC interface {
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
 	DeleteAllUnusedContainers(ctx context.Context) error
-	// IsContainerFsSeparateFromImageFs checks if container filesystem is split from image filesystem.
-	IsContainerFsSeparateFromImageFs(ctx context.Context) bool
 }
 
 // KillPodFunc kills a pod.
