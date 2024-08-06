@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -68,4 +69,39 @@ func ValidatePathNoBacksteps(targetPath string) error {
 	}
 
 	return nil
+}
+
+// ValidateVolumeSubPathExist will check sub path when the type is one of ConfigMap Secret DownwardAPI
+func ValidateVolumeSubPathExist(volumes []v1.Volume, mountName string, subPath string) bool {
+	f := func(items []v1.KeyToPath) bool {
+		for _, item := range items {
+			if item.Path == subPath {
+				return true
+			}
+		}
+		return false
+	}
+	for _, volume := range volumes {
+		if volume.Name == mountName {
+			if volume.ConfigMap != nil {
+				return f(volume.ConfigMap.Items)
+			}
+
+			if volume.Secret != nil {
+				return f(volume.Secret.Items)
+			}
+
+			if volume.DownwardAPI != nil {
+				for _, item := range volume.DownwardAPI.Items {
+					if item.Path == subPath {
+						return true
+					}
+				}
+			} else {
+				return true
+			}
+		}
+
+	}
+	return false
 }

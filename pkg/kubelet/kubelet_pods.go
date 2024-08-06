@@ -256,7 +256,7 @@ func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar, supportsRRO bool, imageVolumes kubecontainer.ImageVolumes) ([]kubecontainer.Mount, func(), error) {
+func (kl *Kubelet) makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar, supportsRRO bool, imageVolumes kubecontainer.ImageVolumes) ([]kubecontainer.Mount, func(), error) {
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)
 	klog.V(3).InfoS("Creating hosts mount for container", "pod", klog.KObj(pod), "containerName", container.Name, "podIPs", podIPs, "path", mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
@@ -313,6 +313,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			err = volumevalidation.ValidatePathNoBacksteps(subPath)
 			if err != nil {
 				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", subPath, err)
+			}
+
+			if volumevalidation.ValidateVolumeSubPathExist(pod.Spec.Volumes, mount.Name, subPath) {
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToFindMatchingSubPath", "Unable to find matching subPath (%s) in volume %(s)", subPath, mount.Name)
+				klog.V(5).InfoS("SubPath does not exsit in volume", "containerName", container.Name, "subPathName", subPath, "volumeName", mount.Name)
 			}
 
 			volumePath := hostPath
@@ -618,7 +623,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	opts.Envs = append(opts.Envs, envs...)
 
 	// only podIPs is sent to makeMounts, as podIPs is populated even if dual-stack feature flag is not enabled.
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, volumes, kl.hostutil, kl.subpather, opts.Envs, supportsRRO, imageVolumes)
+	mounts, cleanupAction, err := kl.makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, volumes, kl.hostutil, kl.subpather, opts.Envs, supportsRRO, imageVolumes)
 	if err != nil {
 		return nil, cleanupAction, err
 	}

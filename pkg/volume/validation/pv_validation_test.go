@@ -19,6 +19,7 @@ package validation
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -108,6 +109,119 @@ func TestValidatePathNoBacksteps(t *testing.T) {
 
 		if err != nil && !tc.expectedErr {
 			t.Fatalf("expected test `%s` to return no error but got `%v`", name, err)
+		}
+	}
+}
+
+func TestValidateVolumeSubPathExist(t *testing.T) {
+	volumes := []v1.Volume{
+		{
+			Name: "configMap",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					Items: []v1.KeyToPath{
+						{
+							Key:  "foo",
+							Path: "foo",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "localPath",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/test/host/path",
+				},
+			},
+		},
+		{
+
+			Name: "secret",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					Items: []v1.KeyToPath{
+						{
+							Key:  "secret",
+							Path: "secret",
+						},
+					},
+				},
+			},
+		},
+
+		{
+			Name: "downwardAPI",
+			VolumeSource: v1.VolumeSource{
+				DownwardAPI: &v1.DownwardAPIVolumeSource{
+					Items: []v1.DownwardAPIVolumeFile{
+						{
+							Path: "downward",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	type containerMounts struct {
+		mountName string
+		subPath   string
+	}
+
+	testCases := map[string]struct {
+		mounts containerMounts
+		result bool
+	}{
+		"case1": {
+			mounts: containerMounts{
+				mountName: "downwardAPI",
+				subPath:   "downward",
+			},
+			result: true,
+		},
+		"case2": {
+			mounts: containerMounts{
+				mountName: "downwardAPI",
+				subPath:   "configMap",
+			},
+			result: false,
+		},
+		"case3": {
+			mounts: containerMounts{
+				mountName: "configMap",
+				subPath:   "foo",
+			},
+			result: true,
+		},
+		"case4": {
+			mounts: containerMounts{
+				mountName: "configMap",
+				subPath:   "bar",
+			},
+			result: false,
+		},
+		"case5": {
+			mounts: containerMounts{
+				mountName: "localPath",
+				subPath:   "/tmp/",
+			},
+			result: true,
+		},
+		"case6": {
+			mounts: containerMounts{
+				mountName: "secret",
+				subPath:   "secret",
+			},
+			result: true,
+		},
+	}
+
+	for name, testCase := range testCases {
+		result := ValidateVolumeSubPathExist(volumes, testCase.mounts.mountName, testCase.mounts.subPath)
+		if result != testCase.result {
+			t.Errorf("Unexpected test: %s result for volume type", name)
 		}
 	}
 }
