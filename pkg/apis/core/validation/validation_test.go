@@ -23155,13 +23155,23 @@ func TestValidateHostUsers(t *testing.T) {
 	trueVar := true
 
 	cases := []struct {
-		name    string
-		success bool
-		spec    *core.PodSpec
+		name            string
+		success         bool
+		spec            *core.PodSpec
+		featureDisabled bool
 	}{{
 		name:    "empty",
 		success: true,
 		spec:    &core.PodSpec{},
+	}, {
+		name:    "UserNamespacesSupport disabled",
+		success: false,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+		},
+		featureDisabled: true,
 	}, {
 		name:    "hostUsers unset",
 		success: true,
@@ -23282,6 +23292,7 @@ func TestValidateHostUsers(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, !tc.featureDisabled)
 			fPath := field.NewPath("spec")
 
 			allErrs := validateHostUsers(tc.spec, fPath)

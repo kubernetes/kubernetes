@@ -3600,6 +3600,13 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 		return allErrs
 	}
 
+	// Fail validation if the kubelet doesn't have the feature on.
+	// This branches from the behavior of other fields because it tightens the security of a pod,
+	// and the kube-apiserver may relax validation for a pod assuming it is being confined by a user namespace when it is not.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUsers"), "when UserNamespacesSupport feature gate is off"))
+	}
+
 	// We decided to restrict the usage of userns with other host namespaces:
 	// 	https://github.com/kubernetes/kubernetes/pull/111090#discussion_r935994282
 	// The tl;dr is: you can easily run into permission issues that seem unexpected, we don't
