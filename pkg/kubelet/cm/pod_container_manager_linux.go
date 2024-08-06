@@ -64,7 +64,7 @@ var _ PodContainerManager = &podContainerManagerImpl{}
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
 	if err := m.cgroupManager.Validate(podContainerName); err != nil {
-		klog.V(4).InfoS("Validate cgroup error", "podContainerName", podContainerName, "err", err)
+		klog.V(4).InfoS("Validate cgroup error", "cgroupName", podContainerName, "err", err)
 		return false
 	}
 	return true
