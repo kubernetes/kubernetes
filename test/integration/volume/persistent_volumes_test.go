@@ -1058,6 +1058,25 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
+	// Watch all events in the namespace, and save them to artifacts for debugging.
+	// TODO: This is a temporary solution to debug flaky tests `panic: test timed out after 10m0s`.
+	// We should remove this once https://github.com/kubernetes/kubernetes/issues/124136 is fixed.
+	go func() {
+		w, err := testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return
+		}
+		for {
+			select {
+			case event := <-w.ResultChan():
+				reportToArtifacts(t.Name()+"-events.text", event.Object)
+			case <-tCtx.Done():
+				w.Stop()
+				return
+			}
+		}
+	}()
+
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -1090,7 +1109,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Wait until the controller provisions and binds all of them
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhaseAndReportIt(t, watchPVC, v1.ClaimBound)
 		klog.V(1).Infof("%d claims bound", i+1)
 	}
 	klog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
@@ -1463,6 +1482,21 @@ func waitForAnyPersistentVolumePhase(w watch.Interface, phase v1.PersistentVolum
 func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
 	for {
 		event := <-w.ResultChan()
+		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
+		if !ok {
+			continue
+		}
+		if claim.Status.Phase == phase {
+			klog.V(2).Infof("claim %q is %s", claim.Name, phase)
+			break
+		}
+	}
+}
+
+func waitForAnyPersistentVolumeClaimPhaseAndReportIt(t *testing.T, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
+	for {
+		event := <-w.ResultChan()
+		reportToArtifacts(t.Name()+"-watched-pvcs.text", event)
 		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
