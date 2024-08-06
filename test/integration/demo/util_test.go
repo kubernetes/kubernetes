@@ -1,18 +1,18 @@
-/*
-Copyright 2024 The Kubernetes Authors.
+// /*
+// Copyright 2024 The Kubernetes Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// */
 
 package demo
 
@@ -235,8 +235,21 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	defer func() {
-		dumpAll(t, testClient, ns.Name)
+
+	go func() {
+		w, err := testClient.EventsV1().Events(metav1.NamespaceAll).Watch(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return
+		}
+		for {
+			select {
+			case event := <-w.ResultChan():
+				writeToArtifacts(t.Name()+"-events.text", event.Object)
+			case <-tCtx.Done():
+				w.Stop()
+				return
+			}
+		}
 	}()
 
 	storageClass := storage.StorageClass{
@@ -271,7 +284,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Wait until the controller provisions and binds all of them
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhase1(t, watchPVC, v1.ClaimBound)
 		klog.V(1).Infof("%d claims bound", i+1)
 	}
 	klog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
@@ -314,9 +327,10 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: volumes are deleted")
 }
 
-func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
+func waitForAnyPersistentVolumeClaimPhase1(t *testing.T, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
 	for {
 		event := <-w.ResultChan()
+		writeToArtifacts(t.Name()+"watch-pvcs.text", event.Object)
 		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
