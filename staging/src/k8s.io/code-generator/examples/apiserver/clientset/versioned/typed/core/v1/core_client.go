@@ -28,12 +28,17 @@ import (
 
 type CoreV1Interface interface {
 	RESTClient() rest.Interface
+	MetaLessTestTypesGetter
 	TestTypesGetter
 }
 
 // CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *CoreV1Client) MetaLessTestTypes(namespace string) MetaLessTestTypeInterface {
+	return newMetaLessTestTypes(c, namespace)
 }
 
 func (c *CoreV1Client) TestTypes(namespace string) TestTypeInterface {

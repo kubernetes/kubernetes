@@ -30,6 +30,15 @@ type TestType struct {
 	Status TestTypeStatus `json:"status,omitempty"`
 }
 
+// +genclient
+// +genclient:skipVerbs=list,deleteCollection
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MetaLessTestType is a top-level type without ObjectMeta. A client is created for it.
+type MetaLessTestType struct {
+	metav1.TypeMeta `json:",inline"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TestTypeList is a top-level list type. The client methods for lists are automatically created.

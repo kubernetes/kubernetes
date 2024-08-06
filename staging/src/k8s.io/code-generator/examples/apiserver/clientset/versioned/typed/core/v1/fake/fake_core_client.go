@@ -28,6 +28,10 @@ type FakeCoreV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeCoreV1) MetaLessTestTypes(namespace string) v1.MetaLessTestTypeInterface {
+	return &FakeMetaLessTestTypes{c, namespace}
+}
+
 func (c *FakeCoreV1) TestTypes(namespace string) v1.TestTypeInterface {
 	return &FakeTestTypes{c, namespace}
 }
