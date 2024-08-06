@@ -19,6 +19,7 @@ package validation
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -108,6 +109,41 @@ func TestValidatePathNoBacksteps(t *testing.T) {
 
 		if err != nil && !tc.expectedErr {
 			t.Fatalf("expected test `%s` to return no error but got `%v`", name, err)
+		}
+	}
+}
+
+func TestValidateVolumeIsConfigMap(t *testing.T) {
+	volumes := []v1.Volume{
+		{
+			Name: "configMapTest1",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "config-test1",
+					},
+				},
+			},
+		},
+		{
+			Name: "hostPathTest2",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/test/host/path",
+				},
+			},
+		},
+	}
+
+	testCases := map[string]bool{
+		"configMapTest1": true,
+		"hostPathTest2":  false,
+	}
+
+	for name, expectResult := range testCases {
+		result := ValidateVolumeIsConfigMap(volumes, name)
+		if result != expectResult {
+			t.Errorf("Unexpected test: %s result for volume type", name)
 		}
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -68,4 +69,14 @@ func ValidatePathNoBacksteps(targetPath string) error {
 	}
 
 	return nil
+}
+
+// ValidateVolumeIsConfigMap will check volume is a configMap
+func ValidateVolumeIsConfigMap(volumes []v1.Volume, mountName string) bool {
+	for _, volume := range volumes {
+		if volume.Name == mountName && volume.ConfigMap != nil {
+			return true
+		}
+	}
+	return false
 }
