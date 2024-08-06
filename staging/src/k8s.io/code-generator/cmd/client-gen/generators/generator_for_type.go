@@ -78,6 +78,15 @@ func genStatus(t *types.Type) bool {
 	return hasStatus && !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).NoStatus
 }
 
+func hasMetaObject(t *types.Type) bool {
+	for _, m := range t.Members {
+		if m.Type.Name.Name == "ObjectMeta" && m.Type.Name.Package == "k8s.io/apimachinery/pkg/apis/meta/v1" {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	generateApply := len(g.applyConfigurationPackage) > 0
@@ -200,6 +209,10 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		if !genStatus(t) {
 			tags.SkipVerbs = append(tags.SkipVerbs, "updateStatus")
 			tags.SkipVerbs = append(tags.SkipVerbs, "applyStatus")
+		}
+		if !hasMetaObject(t) {
+			tags.SkipVerbs = append(tags.SkipVerbs, "update")
+			tags.SkipVerbs = append(tags.SkipVerbs, "updateStatus")
 		}
 		interfaceSuffix := ""
 		if len(extendedMethods) > 0 {

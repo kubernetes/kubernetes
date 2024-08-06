@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -32,12 +33,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// objectWithMeta matches objects implementing both runtime.Object and metav1.Object.
-type objectWithMeta interface {
-	runtime.Object
-	metav1.Object
-}
-
 // namedObject matches comparable objects implementing GetName(); it is intended for use with apply declarative configurations.
 type namedObject interface {
 	comparable
@@ -45,7 +40,7 @@ type namedObject interface {
 }
 
 // Client represents a client, optionally namespaced, with no support for lists or apply declarative configurations.
-type Client[T objectWithMeta] struct {
+type Client[T runtime.Object] struct {
 	resource       string
 	client         rest.Interface
 	namespace      string // "" for non-namespaced clients
@@ -54,37 +49,37 @@ type Client[T objectWithMeta] struct {
 }
 
 // ClientWithList represents a client with support for lists.
-type ClientWithList[T objectWithMeta, L runtime.Object] struct {
+type ClientWithList[T runtime.Object, L runtime.Object] struct {
 	*Client[T]
 	alsoLister[T, L]
 }
 
 // ClientWithApply represents a client with support for apply declarative configurations.
-type ClientWithApply[T objectWithMeta, C namedObject] struct {
+type ClientWithApply[T runtime.Object, C namedObject] struct {
 	*Client[T]
 	alsoApplier[T, C]
 }
 
 // ClientWithListAndApply represents a client with support for lists and apply declarative configurations.
-type ClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject] struct {
+type ClientWithListAndApply[T runtime.Object, L runtime.Object, C namedObject] struct {
 	*Client[T]
 	alsoLister[T, L]
 	alsoApplier[T, C]
 }
 
 // Helper types for composition
-type alsoLister[T objectWithMeta, L runtime.Object] struct {
+type alsoLister[T runtime.Object, L runtime.Object] struct {
 	client  *Client[T]
 	newList func() L
 }
 
-type alsoApplier[T objectWithMeta, C namedObject] struct {
+type alsoApplier[T runtime.Object, C namedObject] struct {
 	client *Client[T]
 }
 
 // NewClient constructs a client, namespaced or not, with no support for lists or apply.
 // Non-namespaced clients are constructed by passing an empty namespace ("").
-func NewClient[T objectWithMeta](
+func NewClient[T runtime.Object](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
 ) *Client[T] {
 	return &Client[T]{
@@ -97,7 +92,7 @@ func NewClient[T objectWithMeta](
 }
 
 // NewClientWithList constructs a namespaced client with support for lists.
-func NewClientWithList[T objectWithMeta, L runtime.Object](
+func NewClientWithList[T runtime.Object, L runtime.Object](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
 	emptyListCreator func() L,
 ) *ClientWithList[T, L] {
@@ -109,7 +104,7 @@ func NewClientWithList[T objectWithMeta, L runtime.Object](
 }
 
 // NewClientWithApply constructs a namespaced client with support for apply declarative configurations.
-func NewClientWithApply[T objectWithMeta, C namedObject](
+func NewClientWithApply[T runtime.Object, C namedObject](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
 ) *ClientWithApply[T, C] {
 	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator)
@@ -120,7 +115,7 @@ func NewClientWithApply[T objectWithMeta, C namedObject](
 }
 
 // NewClientWithListAndApply constructs a client with support for lists and applying declarative configurations.
-func NewClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject](
+func NewClientWithListAndApply[T runtime.Object, L runtime.Object, C namedObject](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
 	emptyListCreator func() L,
 ) *ClientWithListAndApply[T, L, C] {
@@ -238,10 +233,15 @@ func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions
 // Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	result := c.newObject()
-	err := c.client.Put().
+	// Update requires objects implementing metav1.Object
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return result, err
+	}
+	err = c.client.Put().
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
-		Name(obj.GetName()).
+		Name(objMeta.GetName()).
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
 		Do(ctx).
@@ -252,10 +252,15 @@ func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions
 // UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	result := c.newObject()
-	err := c.client.Put().
+	// UpdateStatus requires objects implementing metav1.Object
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return result, err
+	}
+	err = c.client.Put().
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
-		Name(obj.GetName()).
+		Name(objMeta.GetName()).
 		SubResource("status").
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
