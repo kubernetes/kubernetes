@@ -58,10 +58,11 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 	if !found {
 		return false, nil
 	}
+	conditionNames := strings.Split(w.conditionName, ",")
 	for _, conditionUncast := range conditions {
 		condition := conditionUncast.(map[string]interface{})
 		name, found, err := unstructured.NestedString(condition, "type")
-		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
+		if !found || err != nil || !containsEqualFold(conditionNames, name) {
 			continue
 		}
 		status, found, err := unstructured.NestedString(condition, "status")
@@ -79,6 +80,15 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 	}
 
 	return false, nil
+}
+
+func containsEqualFold(slice []string, s string) bool {
+	for _, item := range slice {
+		if strings.EqualFold(item, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {

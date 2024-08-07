@@ -64,6 +64,9 @@ var (
 		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity)
 		kubectl wait --for=condition=Ready=false pod/busybox1
 
+		# Wait for any one of multiple conditions by separating them with a comma
+		kubectl wait --for=condition=Complete,Failed job/somejob
+
 		# Wait for the pod "busybox1" to contain the status phase to be "Running"
 		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
 
