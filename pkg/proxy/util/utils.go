@@ -17,19 +17,25 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	netutils "k8s.io/utils/net"
 )
 
@@ -240,4 +246,35 @@ func IsVIPMode(ing v1.LoadBalancerIngress) bool {
 		return true
 	}
 	return *ing.IPMode == v1.LoadBalancerIPModeVIP
+}
+
+// GetNodeIPs returns IPs for the node with the provided name.  If
+// required, it will wait for the node to be created.
+func GetNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
+	logger := klog.FromContext(ctx)
+	var nodeIPs []net.IP
+	backoff := wait.Backoff{
+		Steps:    6,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			logger.Error(err, "Failed to retrieve node info")
+			return false, nil
+		}
+		nodeIPs, err = utilnode.GetNodeHostIPs(node)
+		if err != nil {
+			logger.Error(err, "Failed to retrieve node IPs")
+			return false, nil
+		}
+		return true, nil
+	})
+	if err == nil {
+		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
+	}
+	return nodeIPs
 }

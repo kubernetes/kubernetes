@@ -72,7 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	netutils "k8s.io/utils/net"
 )
@@ -196,7 +195,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, err
 	}
 
-	rawNodeIPs := getNodeIPs(ctx, s.Client, s.Hostname)
+	rawNodeIPs := proxyutil.GetNodeIPs(ctx, s.Client, s.Hostname)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
@@ -646,35 +645,4 @@ func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string)
 		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
 	}
 	return primaryFamily, nodeIPs
-}
-
-// getNodeIP returns IPs for the node with the provided name.  If
-// required, it will wait for the node to be created.
-func getNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
-	logger := klog.FromContext(ctx)
-	var nodeIPs []net.IP
-	backoff := wait.Backoff{
-		Steps:    6,
-		Duration: 1 * time.Second,
-		Factor:   2.0,
-		Jitter:   0.2,
-	}
-
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node info")
-			return false, nil
-		}
-		nodeIPs, err = utilnode.GetNodeHostIPs(node)
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node IPs")
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == nil {
-		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
-	}
-	return nodeIPs
 }

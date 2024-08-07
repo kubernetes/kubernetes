@@ -17,13 +17,18 @@ limitations under the License.
 package util
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -701,5 +706,82 @@ func TestIsZeroCIDR(t *testing.T) {
 				t.Errorf("IsZeroCIDR() = %t, want %t", got, tc.expected)
 			}
 		})
+	}
+}
+
+func makeNodeWithAddress(name, primaryIP string) *v1.Node {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{},
+		},
+	}
+
+	if primaryIP != "" {
+		node.Status.Addresses = append(node.Status.Addresses,
+			v1.NodeAddress{Type: v1.NodeInternalIP, Address: primaryIP},
+		)
+	}
+
+	return node
+}
+
+// Test that getNodeIPs retries on failure
+func Test_GetNodeIPs(t *testing.T) {
+	var chans [3]chan error
+
+	client := clientsetfake.NewSimpleClientset(
+		// node1 initially has no IP address.
+		makeNodeWithAddress("node1", ""),
+
+		// node2 initially has an invalid IP address.
+		makeNodeWithAddress("node2", "invalid-ip"),
+
+		// node3 initially does not exist.
+	)
+
+	for i := range chans {
+		chans[i] = make(chan error)
+		ch := chans[i]
+		nodeName := fmt.Sprintf("node%d", i+1)
+		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
+		go func() {
+			_, ctx := ktesting.NewTestContext(t)
+			ips := GetNodeIPs(ctx, client, nodeName)
+			if len(ips) == 0 {
+				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
+			} else if ips[0].String() != expectIP {
+				ch <- fmt.Errorf("expected IP %s for %s but got %s", expectIP, nodeName, ips[0].String())
+			} else if len(ips) != 1 {
+				ch <- fmt.Errorf("expected IP %s for %s but got multiple IPs", expectIP, nodeName)
+			}
+			close(ch)
+		}()
+	}
+
+	// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
+	time.Sleep(1200 * time.Millisecond)
+
+	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
+		makeNodeWithAddress("node1", "192.168.0.1"),
+		metav1.UpdateOptions{},
+	)
+	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
+		makeNodeWithAddress("node2", "192.168.0.2"),
+		metav1.UpdateOptions{},
+	)
+	_, _ = client.CoreV1().Nodes().Create(context.TODO(),
+		makeNodeWithAddress("node3", "192.168.0.3"),
+		metav1.CreateOptions{},
+	)
+
+	// Ensure each GetNodeIP completed as expected
+	for i := range chans {
+		err := <-chans[i]
+		if err != nil {
+			t.Error(err.Error())
+		}
 	}
 }
