@@ -103,20 +103,11 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	return nodeIPs, nil
 }
 
-// GetNodeHostIP returns the provided node's "primary" IP; see GetNodeHostIPs for more details
-func GetNodeHostIP(node *v1.Node) (net.IP, error) {
-	ips, err := GetNodeHostIPs(node)
-	if err != nil {
-		return nil, err
-	}
-	// GetNodeHostIPs always returns at least one IP if it didn't return an error
-	return ips[0], nil
-}
-
-// GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
-// If required, it will wait for the node to be created.
-func GetNodeIP(client clientset.Interface, name string) net.IP {
-	var nodeIP net.IP
+// GetNodeIPs returns IPs for the node with the provided name.  If
+// required, it will wait for the node to be created.
+func GetNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
+	logger := klog.FromContext(ctx)
+	var nodeIPs []net.IP
 	backoff := wait.Backoff{
 		Steps:    6,
 		Duration: 1 * time.Second,
@@ -125,22 +116,22 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf("Failed to retrieve node info: %v", err)
+			logger.Error(err, "Failed to retrieve node info")
 			return false, nil
 		}
-		nodeIP, err = GetNodeHostIP(node)
+		nodeIPs, err = GetNodeHostIPs(node)
 		if err != nil {
-			klog.Errorf("Failed to retrieve node IP: %v", err)
-			return false, err
+			logger.Error(err, "Failed to retrieve node IPs")
+			return false, nil
 		}
 		return true, nil
 	})
 	if err == nil {
-		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
+		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
 	}
-	return nodeIP
+	return nodeIPs
 }
 
 // IsNodeReady returns true if a node is ready; false otherwise.
