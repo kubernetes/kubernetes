@@ -22,6 +22,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v1.5.0'
@@ -544,6 +545,7 @@ function install-containerd-ubuntu {
 
 # If we are on cos we can try to install containerd
 function install-containerd-cos {
+  echo ">>> install-containerd-cos"
   # bailout if we are not on COS
   if [ -e /etc/os-release ] && ! grep -q "ID=cos" /etc/os-release; then
     echo "Unable to automatically install containerd in non-cos image. Bailing out..."
@@ -556,6 +558,7 @@ function install-containerd-cos {
   mount --bind /home/containerd /home/containerd
   mount -o remount,exec /home/containerd
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" ]]; then
+    echo "install containerd version : $COS_INSTALL_CONTAINERD_VERSION"
     # containerd versions have slightly different url(s), so try both
     # shellcheck disable=SC2086
     ( curl ${CURL_FLAGS} \
@@ -570,6 +573,7 @@ function install-containerd-cos {
     sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
   fi
   if [[ -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then
+    echo "install runc version : $COS_INSTALL_RUNC_VERSION"
     # shellcheck disable=SC2086
     curl ${CURL_FLAGS} \
       --location \
@@ -578,8 +582,13 @@ function install-containerd-cos {
     # ensure runc gets picked up from the correct location
     sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
   fi
+  systemctl is-active --quiet containerd && { echo "Stopping containerd..."; systemctl stop containerd; } || echo "containerd is not running."
   systemctl daemon-reload
-  sudo systemctl start containerd
+  systemctl start containerd
+  systemctl status containerd
+  cat <<EOF > /etc/profile.d/containerd_env.sh
+export PATH=/home/containerd/bin:$PATH
+EOF
 }
 
 function install-auth-provider-gcp {
