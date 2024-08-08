@@ -377,10 +377,15 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 
 func waitForContainerRestart(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []TestContainerInfo) error {
 	ginkgo.GinkgoHelper()
-	var restartContainersExpected []string
+	type restartExpectation struct {
+		cName        string
+		restartCount int32
+	}
+	var restartContainersExpected []restartExpectation
+
 	for _, ci := range expectedContainers {
 		if ci.RestartCount > 0 {
-			restartContainersExpected = append(restartContainersExpected, ci.Name)
+			restartContainersExpected = append(restartContainersExpected, restartExpectation{ci.Name, ci.RestartCount})
 		}
 	}
 	if len(restartContainersExpected) == 0 {
@@ -391,9 +396,9 @@ func waitForContainerRestart(ctx context.Context, f *framework.Framework, podCli
 		return err
 	}
 	restartedContainersCount := 0
-	for _, cName := range restartContainersExpected {
-		cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, cName)
-		if cs.RestartCount < 1 {
+	for _, expect := range restartContainersExpected {
+		cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, expect.cName)
+		if cs.RestartCount < expect.restartCount {
 			break
 		}
 		restartedContainersCount++
@@ -2244,6 +2249,570 @@ func doPodResizeDeferredAndInfeasibleTests() {
 	}
 }
 
+func doConsecutivePodResizeTests() {
+	f := framework.NewDefaultFramework("pod-resize-consecutive")
+	var podClient *e2epod.PodClient
+	ginkgo.BeforeEach(func() {
+		podClient = e2epod.NewPodClient(f)
+	})
+
+	type testCase struct {
+		isSynchronous    bool
+		name             string
+		containers       []TestContainerInfo
+		containerPatches [][]v1.Container
+		intervals        []time.Duration
+		expected         [][]TestContainerInfo
+	}
+
+	noRestart := v1.NotRequired
+	doRestart := v1.RestartContainer
+
+	tests := []testCase{
+		{
+			isSynchronous: false,
+			name:          "Resize with restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: true,
+			name:          "Resize with restarting twice synchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{0},
+			expected: [][]TestContainerInfo{
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "300Mi", MemLim: "300Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				}},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize without restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize with restarting, then resize without restarting asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize without restarting, then resize with restarting asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &doRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &doRestart,
+					RestartCount: 1,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only limits with restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: resource.MustParse("350Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("300m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only requests with restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("250Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "300Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only limits without restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: resource.MustParse("350Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("300m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only requests without restarting twice asynchronously",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("250Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]TestContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "300Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+	}
+
+	timeouts := framework.NewTimeoutContext()
+
+	for idx := range tests {
+		tc := tests[idx]
+		ginkgo.It(tc.name, func(ctx context.Context) {
+			var testPod, patchedPod *v1.Pod
+			var pErr error
+
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			initDefaultResizePolicy(tc.containers)
+			for _, e := range tc.expected {
+				if len(e) > 0 {
+					initDefaultResizePolicy(e)
+				}
+			}
+			testPod = makeTestPod(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			ginkgo.By("creating pod")
+			newPod := podClient.CreateSync(ctx, testPod)
+
+			ginkgo.By("verifying initial pod resources, allocations are as expected")
+			verifyPodResources(newPod, tc.containers)
+			ginkgo.By("verifying initial pod resize policy is as expected")
+			verifyPodResizePolicy(newPod, tc.containers)
+
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, newPod.Namespace, newPod.Name, "Ready", timeouts.PodStartShort, testutils.PodRunningReady)
+			framework.ExpectNoError(err, "pod %s/%s did not go running", newPod.Namespace, newPod.Name)
+			framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
+
+			ginkgo.By("verifying initial pod status resources")
+			verifyPodStatusResources(newPod, tc.containers)
+
+			for i, p := range tc.containerPatches {
+				ginkgo.By("patching pod for resize")
+				patch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: p}})
+				framework.ExpectNoError(err, "failed to marshal patch")
+				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+					types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+				last := i == len(tc.containerPatches)-1
+				if !tc.isSynchronous && !last {
+					time.Sleep(tc.intervals[i])
+					continue
+				}
+
+				ginkgo.By("verifying pod patched for resize")
+				verifyPodResources(patchedPod, tc.expected[i])
+				if i == 0 {
+					err = verifyPodAllocations(patchedPod, tc.containers)
+				} else if tc.isSynchronous {
+					err = verifyPodAllocations(patchedPod, tc.expected[i-1])
+				}
+				framework.ExpectNoError(err, "failed to verify Pod allocations for patchedPod")
+
+				ginkgo.By("waiting for resize to be actuated")
+				resizedPod := waitForPodResizeActuation(ctx, f, f.ClientSet, podClient, newPod, patchedPod, tc.expected[i])
+
+				ginkgo.By("verifying pod resources after resize")
+				verifyPodResources(resizedPod, tc.expected[i])
+
+				ginkgo.By("verifying pod allocations after resize")
+				err = verifyPodAllocations(resizedPod, tc.expected[i])
+				framework.ExpectNoError(err, "failed to verify Pod allocations for resizedPod")
+
+				if !last {
+					time.Sleep(tc.intervals[i])
+				}
+			}
+
+			ginkgo.By("deleting pod")
+			deletePodSyncByName(ctx, f, newPod.Name)
+			// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+			// this is in turn needed because we will have an unavoidable (in the current framework) race with the
+			// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+			waitForAllContainerRemoval(ctx, newPod.Name, newPod.Namespace)
+		})
+	}
+}
+
 // NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
 //       because in e2e_node tests
 //          a) scheduler and controller manager is not running by the Node e2e
@@ -2261,4 +2830,5 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feat
 	doPodResizeTests()
 	doPodResizeErrorTests()
 	doPodResizeDeferredAndInfeasibleTests()
+	doConsecutivePodResizeTests()
 })
