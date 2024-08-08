@@ -54,3 +54,8 @@ const TmpfsNoswapSupportKernelVersion = "6.4"
 // nftables mode with by default. This is not directly related to any specific kernel
 // commit; see https://issues.k8s.io/122743#issuecomment-1893922424
 const NFTablesKubeProxyKernelVersion = "5.13"
+
+// CgroupV2KernelVersion is the minimal kernel version required for cgroup v2 support.
+// `cpu.stat` file was added to root cgroup.
+// (ref: https://github.com/torvalds/linux/commit/936f2a70f2077f64fab1dcb3eca71879e82ecd3f)
+const CgroupV2KernelVersion = "5.8"

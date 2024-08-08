@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -120,6 +121,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -1645,7 +1647,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		os.Exit(1)
 	}
 
-	kl.warnCgroupV1Usage()
+	kl.cgroupVersionCheck()
 
 	// Start volume manager
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
@@ -3067,11 +3069,21 @@ func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(pod)
 }
 
-func (kl *Kubelet) warnCgroupV1Usage() {
+func (kl *Kubelet) cgroupVersionCheck() {
 	cgroupVersion := kl.containerManager.GetNodeConfig().CgroupVersion
 	if cgroupVersion == 1 {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.CgroupV1, cm.CgroupV1MaintenanceModeWarning)
 		klog.V(2).InfoS("Warning: cgroup v1", "message", cm.CgroupV1MaintenanceModeWarning)
+	} else {
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			klog.V(2).ErrorS(err, "Warning: cannot determine kernel version, unable to determine if cgroup v2 is supported", "message", cm.CgroupV1MaintenanceModeWarning)
+		}
+
+		if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.CgroupV2KernelVersion)) {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.CgroupV2, cm.CgroupV2KernelWarning)
+			klog.V(2).InfoS("Warning: cgroup v2", "message", cm.CgroupV2KernelWarning)
+		}
 	}
 	metrics.CgroupVersion.Set(float64(cgroupVersion))
 }

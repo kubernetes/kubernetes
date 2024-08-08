@@ -46,6 +46,9 @@ import (
 const (
 	// Warning message for the users still using cgroup v1
 	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+
+	// Warning message for the users using cgroup v2 on kernel older than 5.8
+	CgroupV2KernelWarning = "Cgroup v2 is being used on a kernel older than 5.8, which may have limited functionality."
 )
 
 type ActivePodsFunc func() []*v1.Pod
