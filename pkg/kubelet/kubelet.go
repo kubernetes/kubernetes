@@ -205,6 +205,9 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	// deferredResizeAdmissionPeriod is the period for running admission check to deferred resized pods
+	deferredResizeAdmissionPeriod = time.Second * 10
 )
 
 var (
@@ -576,6 +579,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
+		deferredResizePods:             map[types.UID]*v1.Pod{},
 	}
 
 	if klet.cloud != nil {
@@ -1335,8 +1339,8 @@ type Kubelet struct {
 	// Manage user namespaces
 	usernsManager *userns.UsernsManager
 
-	// Mutex to serialize new pod admission and existing pod resizing
-	podResizeMutex sync.Mutex
+	// Pods for admission due to deferred resize
+	deferredResizePods map[types.UID]*v1.Pod
 
 	// OpenTelemetry Tracer
 	tracer trace.Tracer
@@ -1941,12 +1945,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	kl.probeManager.AddPod(pod)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Handle pod resize here instead of doing it in HandlePodUpdates because
-		// this conveniently retries any Deferred resize requests
-		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
-		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
-		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
-			pod = kl.handlePodResourcesResize(pod)
+		// set allocatedResources and Reisze status to the pod
+		if isPodResizeInProgress(pod, &apiPodStatus) {
+			// original pod should not be modified (#116694).
+			pod = pod.DeepCopy()
+			pod.Status = apiPodStatus
 		}
 	}
 
@@ -2326,6 +2329,8 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 	defer syncTicker.Stop()
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
 	defer housekeepingTicker.Stop()
+	resizeTicker := time.NewTicker(deferredResizeAdmissionPeriod)
+	defer resizeTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	const (
 		base   = 100 * time.Millisecond
@@ -2352,7 +2357,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 		duration = base
 
 		kl.syncLoopMonitor.Store(kl.clock.Now())
-		if !kl.syncLoopIteration(ctx, updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) {
+		if !kl.syncLoopIteration(ctx, updates, handler, syncTicker.C, housekeepingTicker.C, plegCh, resizeTicker.C) {
 			break
 		}
 		kl.syncLoopMonitor.Store(kl.clock.Now())
@@ -2368,6 +2373,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 // 3.  syncCh:         a channel to read periodic sync events from
 // 4.  housekeepingCh: a channel to read housekeeping events from
 // 5.  plegCh:         a channel to read PLEG updates from
+// 6.  resizeCh:       a channel to read deferred reisze admission events from
 //
 // Events are also read from the kubelet liveness manager's update channel.
 //
@@ -2391,8 +2397,9 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 //   - housekeepingCh: trigger cleanup of pods
 //   - health manager: sync pods that have failed or in which one or more
 //     containers have failed health checks
+//   - resizeCh: do admission check to deferred resized pods
 func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
-	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
+	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent, resizeCh <-chan time.Time) bool {
 	select {
 	case u, open := <-configCh:
 		// Update from a config source; dispatch it to the right handler
@@ -2513,6 +2520,40 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			}
 			klog.V(4).InfoS("SyncLoop (housekeeping) end", "duration", duration.Round(time.Millisecond))
 		}
+
+	case <-resizeCh:
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			start := kl.clock.Now()
+			for id, pod := range kl.deferredResizePods {
+				klog.V(4).InfoS("SyncLoop (deferred resize admission check)", "pod", klog.KObj(pod))
+				existingPod, found := kl.podManager.GetPodByUID(id)
+				if !found {
+					klog.V(2).InfoS("Unable to find pod in deferred resize, maybe deleted", "pod", klog.KObj(pod))
+					continue
+				}
+				if previousResizeStatus, found := kl.statusManager.GetPodResizeStatus(string(id)); found {
+					if previousResizeStatus == v1.PodResizeStatusInfeasible {
+						// No need to recheck
+						continue
+					}
+				}
+				resizeStatus := kl.handlePodResourcesResize(pod)
+				switch resizeStatus {
+				case v1.PodResizeStatusInfeasible, v1.PodResizeStatusDeferred:
+					pod = existingPod
+				case v1.PodResizeStatusInProgress:
+					delete(kl.deferredResizePods, id)
+					kl.podManager.UpdatePod(pod)
+				default:
+					continue
+				}
+				kl.podWorkers.UpdatePod(UpdatePodOptions{
+					Pod:        pod,
+					UpdateType: kubetypes.SyncPodUpdate,
+					StartTime:  start,
+				})
+			}
+		}
 	}
 	return true
 }
@@ -2534,10 +2575,6 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		kl.podResizeMutex.Lock()
-		defer kl.podResizeMutex.Unlock()
-	}
 	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -2626,7 +2663,52 @@ func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
-		kl.podManager.UpdatePod(pod)
+
+		needsUpdate := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !kubetypes.IsStaticPod(pod) {
+			existingPod, found := kl.podManager.GetPodByUID(pod.UID)
+			if found {
+				resizeRequested := false
+				for i, c := range pod.Spec.Containers {
+					if !cmp.Equal(c.Resources.Requests, existingPod.Spec.Containers[i].Resources.Requests) {
+						resizeRequested = true
+						break
+					}
+				}
+				if resizeRequested && pod.DeletionTimestamp == nil {
+					resizeStatus := kl.handlePodResourcesResize(pod)
+					switch resizeStatus {
+					case v1.PodResizeStatusDeferred, v1.PodResizeStatusInfeasible:
+						// Recheck later
+						// Infeasible resize is also remembered in order to reject this pod at HandlePodReconcile()
+						kl.deferredResizePods[pod.UID] = pod
+						// Call UpdatePod() bellow in order to wake up pod worker with existing pod
+						// so that the new resize status is set to the pod status.
+						pod = existingPod
+						needsUpdate = false
+					case v1.PodResizeStatusInProgress:
+						// Resize admitted
+						delete(kl.deferredResizePods, pod.UID)
+					default:
+						// Error, recheck later
+						kl.deferredResizePods[pod.UID] = pod
+						continue
+					}
+				} else {
+					// No resize or resize is rollbacked or pod is being deleted
+					// Clear last resize state from checkpoint
+					if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
+						klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
+					}
+					// Cancel deferred resize
+					delete(kl.deferredResizePods, pod.UID)
+				}
+			}
+		}
+
+		if needsUpdate {
+			kl.podManager.UpdatePod(pod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2651,6 +2733,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
+		delete(kl.deferredResizePods, pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2681,9 +2764,25 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+
+		needsUpdate := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !kubetypes.IsStaticPod(pod) {
+			// Do not pass the pod to the pod worker if its resize is not admitted.
+			if _, found := kl.deferredResizePods[pod.UID]; found {
+				needsUpdate = false
+				if existingPod, found := kl.podManager.GetPodByUID(pod.UID); found {
+					pod = existingPod
+				} else {
+					continue
+				}
+			}
+		}
+
 		// Update the pod in pod manager, status manager will do periodically reconcile according
 		// to the pod manager.
-		kl.podManager.UpdatePod(pod)
+		if needsUpdate {
+			kl.podManager.UpdatePod(pod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2808,45 +2907,15 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
-	if pod.Status.Phase != v1.PodRunning {
-		return pod
-	}
-	podResized := false
-	for _, container := range pod.Spec.Containers {
-		if len(container.Resources.Requests) == 0 {
-			continue
-		}
-		containerStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
-		if !found {
-			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
-			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
-			podResized = true
-			break
-		}
-	}
-	if !podResized {
-		return pod
-	}
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) v1.PodResizeStatus {
 
-	kl.podResizeMutex.Lock()
-	defer kl.podResizeMutex.Unlock()
 	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
-	if updatedPod == nil {
-		return pod
-	}
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(updatedPod))
-			return pod
+			return ""
 		}
 	}
 	if resizeStatus != "" {
@@ -2854,13 +2923,10 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
-			return pod
+			return ""
 		}
-		updatedPod.Status.Resize = resizeStatus
 	}
-	kl.podManager.UpdatePod(updatedPod)
-	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
-	return updatedPod
+	return resizeStatus
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
