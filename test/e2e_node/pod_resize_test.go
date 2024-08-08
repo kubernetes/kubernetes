@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -79,12 +80,13 @@ type ContainerAllocations struct {
 }
 
 type TestContainerInfo struct {
-	Name         string
-	Resources    *ContainerResources
-	Allocations  *ContainerAllocations
-	CPUPolicy    *v1.ResourceResizeRestartPolicy
-	MemPolicy    *v1.ResourceResizeRestartPolicy
-	RestartCount int32
+	Name            string
+	Resources       *ContainerResources
+	Allocations     *ContainerAllocations
+	StatusResources *ContainerResources
+	CPUPolicy       *v1.ResourceResizeRestartPolicy
+	MemPolicy       *v1.ResourceResizeRestartPolicy
+	RestartCount    int32
 }
 
 func supportsInPlacePodVerticalScaling(ctx context.Context, f *framework.Framework) bool {
@@ -101,38 +103,46 @@ func supportsInPlacePodVerticalScaling(ctx context.Context, f *framework.Framewo
 	return false
 }
 
-func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.ResourceList, []v1.ContainerResizePolicy) {
-	var res v1.ResourceRequirements
+func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.ResourceRequirements, v1.ResourceList, []v1.ContainerResizePolicy) {
+	var res, statRes v1.ResourceRequirements
 	var alloc v1.ResourceList
 	var resizePol []v1.ContainerResizePolicy
 
-	if tcInfo.Resources != nil {
+	createResourceRequirements := func(resources *ContainerResources) v1.ResourceRequirements {
 		var lim, req v1.ResourceList
-		if tcInfo.Resources.CPULim != "" || tcInfo.Resources.MemLim != "" || tcInfo.Resources.EphStorLim != "" {
+		if resources.CPULim != "" || resources.MemLim != "" || resources.EphStorLim != "" {
 			lim = make(v1.ResourceList)
 		}
-		if tcInfo.Resources.CPUReq != "" || tcInfo.Resources.MemReq != "" || tcInfo.Resources.EphStorReq != "" {
+		if resources.CPUReq != "" || resources.MemReq != "" || resources.EphStorReq != "" {
 			req = make(v1.ResourceList)
 		}
-		if tcInfo.Resources.CPULim != "" {
-			lim[v1.ResourceCPU] = resource.MustParse(tcInfo.Resources.CPULim)
+		if resources.CPULim != "" {
+			lim[v1.ResourceCPU] = resource.MustParse(resources.CPULim)
 		}
-		if tcInfo.Resources.MemLim != "" {
-			lim[v1.ResourceMemory] = resource.MustParse(tcInfo.Resources.MemLim)
+		if resources.MemLim != "" {
+			lim[v1.ResourceMemory] = resource.MustParse(resources.MemLim)
 		}
-		if tcInfo.Resources.EphStorLim != "" {
-			lim[v1.ResourceEphemeralStorage] = resource.MustParse(tcInfo.Resources.EphStorLim)
+		if resources.EphStorLim != "" {
+			lim[v1.ResourceEphemeralStorage] = resource.MustParse(resources.EphStorLim)
 		}
-		if tcInfo.Resources.CPUReq != "" {
-			req[v1.ResourceCPU] = resource.MustParse(tcInfo.Resources.CPUReq)
+		if resources.CPUReq != "" {
+			req[v1.ResourceCPU] = resource.MustParse(resources.CPUReq)
 		}
-		if tcInfo.Resources.MemReq != "" {
-			req[v1.ResourceMemory] = resource.MustParse(tcInfo.Resources.MemReq)
+		if resources.MemReq != "" {
+			req[v1.ResourceMemory] = resource.MustParse(resources.MemReq)
 		}
-		if tcInfo.Resources.EphStorReq != "" {
-			req[v1.ResourceEphemeralStorage] = resource.MustParse(tcInfo.Resources.EphStorReq)
+		if resources.EphStorReq != "" {
+			req[v1.ResourceEphemeralStorage] = resource.MustParse(resources.EphStorReq)
 		}
-		res = v1.ResourceRequirements{Limits: lim, Requests: req}
+		return v1.ResourceRequirements{Limits: lim, Requests: req}
+
+	}
+
+	if tcInfo.Resources != nil {
+		res = createResourceRequirements(tcInfo.Resources)
+	}
+	if tcInfo.StatusResources != nil {
+		statRes = createResourceRequirements(tcInfo.StatusResources)
 	}
 	if tcInfo.Allocations != nil {
 		alloc = make(v1.ResourceList)
@@ -155,7 +165,7 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 		memPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: *tcInfo.MemPolicy}
 		resizePol = append(resizePol, memPol)
 	}
-	return res, alloc, resizePol
+	return res, statRes, alloc, resizePol
 }
 
 func initDefaultResizePolicy(containers []TestContainerInfo) {
@@ -175,7 +185,7 @@ func initDefaultResizePolicy(containers []TestContainerInfo) {
 
 func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStatus) {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
-	res, alloc, resizePol := getTestResourceInfo(tcInfo)
+	res, statRes, alloc, resizePol := getTestResourceInfo(tcInfo)
 
 	tc := v1.Container{
 		Name:         tcInfo.Name,
@@ -189,6 +199,11 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 	tcStatus := v1.ContainerStatus{
 		Name:               tcInfo.Name,
 		AllocatedResources: alloc,
+	}
+	if tcInfo.StatusResources == nil {
+		tcStatus.Resources = &res
+	} else {
+		tcStatus.Resources = &statRes
 	}
 	return tc, tcStatus
 }
@@ -271,7 +286,7 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo) error {
 
 		_, tcStatus := makeTestContainer(ci)
 		if !cmp.Equal(cStatus.AllocatedResources, tcStatus.AllocatedResources) {
-			return fmt.Errorf("failed to verify Pod allocations, allocated resources not equal to expected")
+			return fmt.Errorf("failed to verify Pod allocations, allocated resources %v not equal to expected %v", cStatus.AllocatedResources, tcStatus.AllocatedResources)
 		}
 	}
 	return nil
@@ -286,8 +301,8 @@ func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 	for _, ci := range tcInfo {
 		gomega.Expect(csMap).Should(gomega.HaveKey(ci.Name))
 		cs := csMap[ci.Name]
-		tc, _ := makeTestContainer(ci)
-		gomega.Expect(tc.Resources).To(gomega.Equal(*cs.Resources))
+		_, tcs := makeTestContainer(ci)
+		gomega.Expect(*tcs.Resources).To(gomega.Equal(*cs.Resources))
 	}
 }
 
@@ -311,13 +326,13 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 		if ci.Resources == nil {
 			continue
 		}
-		tc, _ := makeTestContainer(ci)
-		if tc.Resources.Limits != nil || tc.Resources.Requests != nil {
+		_, tcs := makeTestContainer(ci)
+		if tcs.Resources.Limits != nil || tcs.Resources.Requests != nil {
 			var expectedCPUShares int64
 			var expectedCPULimitString, expectedMemLimitString string
-			expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
-			cpuRequest := tc.Resources.Requests.Cpu()
-			cpuLimit := tc.Resources.Limits.Cpu()
+			expectedMemLimitInBytes := tcs.Resources.Limits.Memory().Value()
+			cpuRequest := tcs.Resources.Requests.Cpu()
+			cpuLimit := tcs.Resources.Limits.Cpu()
 			if cpuRequest.IsZero() && !cpuLimit.IsZero() {
 				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
 			} else {
@@ -416,6 +431,26 @@ func waitForPodResizeActuation(ctx context.Context, f *framework.Framework, c cl
 	}, timeouts.PodStartShort, timeouts.Poll).
 		ShouldNot(gomega.HaveOccurred(), "timed out waiting for pod resource allocation values to match expected")
 	return resizedPod
+}
+
+func waitForResizeStatusTransition(ctx context.Context, podClient *e2epod.PodClient, pod *v1.Pod, expectedStatus v1.PodResizeStatus) *v1.Pod {
+	ginkgo.GinkgoHelper()
+
+	var updatedPod *v1.Pod
+	timeouts := framework.NewTimeoutContext()
+	// Wait for container restart
+	gomega.Eventually(ctx, func() error {
+		var err error
+		if updatedPod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{}); err != nil {
+			return err
+		}
+		if updatedPod.Status.Resize != expectedStatus {
+			return fmt.Errorf("resize status %v have not been expected %v", updatedPod.Status.Resize, expectedStatus)
+		}
+		return nil
+	}, timeouts.PodStartShort, timeouts.Poll).
+		ShouldNot(gomega.HaveOccurred(), "failed waiting for expected container resize status")
+	return updatedPod
 }
 
 func doPodResizeTests() {
@@ -1295,6 +1330,920 @@ func doPodResizeErrorTests() {
 	}
 }
 
+func doPodResizeDeferredAndInfeasibleTests() {
+	f := framework.NewDefaultFramework("pod-resize-deferred-and-infeasible")
+	var podClient *e2epod.PodClient
+	var deferredCPU, deferredCPUBurstable, deferredMem, deferredMemBurstable string
+	var infeasibleCPU, infeasibleCPUBurstable, infeasibleMem, infeasibleMemBurstable string
+
+	ginkgo.BeforeEach(func() {
+		podClient = e2epod.NewPodClient(f)
+
+		node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), getNodeName(context.TODO(), f), metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get node information")
+		nodeCPU := node.Status.Allocatable[v1.ResourceCPU]
+		nodeMemory := node.Status.Allocatable[v1.ResourceMemory]
+		deferredCPU = fmt.Sprintf("%dm", int64(float64(nodeCPU.MilliValue())*0.6))
+		deferredCPUBurstable = fmt.Sprintf("%dm", int64(float64(nodeCPU.MilliValue())*0.7))
+		infeasibleCPU = fmt.Sprintf("%dm", int64(float64(nodeCPU.MilliValue())*1.1))
+		infeasibleCPUBurstable = fmt.Sprintf("%dm", int64(float64(nodeCPU.MilliValue())*1.2))
+		deferredMem = fmt.Sprintf("%d", int64(float64(nodeMemory.Value())*0.6))
+		deferredMemBurstable = fmt.Sprintf("%d", int64(float64(nodeMemory.Value())*0.7))
+		infeasibleMem = fmt.Sprintf("%d", int64(float64(nodeMemory.Value())*1.1))
+		infeasibleMemBurstable = fmt.Sprintf("%d", int64(float64(nodeMemory.Value())*1.2))
+	})
+
+	type recoveryActionType int
+	const (
+		noAction recoveryActionType = iota
+		removeBlocker
+		anotherRequest
+	)
+
+	type testCase struct {
+		name                 string
+		containers           []TestContainerInfo
+		containerPatches     []v1.Container
+		initDelay            bool
+		killedContainerName  string
+		expected             []TestContainerInfo
+		expectedResizeStatus v1.PodResizeStatus
+		recoveryAction       recoveryActionType
+		recoveryPatches      []v1.Container
+		expectedRecovery     []TestContainerInfo
+	}
+
+	dummyDefCPU := "101"
+	dummyDefCPUB := "102"
+	dummyInfCPU := "103"
+	dummyInfCPUB := "104"
+	dummyDefMem := "105Gi"
+	dummyDefMemB := "106Gi"
+	dummyInfMem := "107Gi"
+	dummyInfMemB := "108Gi"
+	qDummyDefCPU := resource.MustParse(dummyDefCPU)
+	qDummyDefCPUB := resource.MustParse(dummyDefCPUB)
+	qDummyInfCPU := resource.MustParse(dummyInfCPU)
+	qDummyInfCPUB := resource.MustParse(dummyInfCPUB)
+	qDummyDefMem := resource.MustParse(dummyDefMem)
+	qDummyDefMemB := resource.MustParse(dummyDefMemB)
+	qDummyInfMem := resource.MustParse(dummyInfMem)
+	qDummyInfMemB := resource.MustParse(dummyInfMemB)
+
+	convertResourceQuota := func(dummy resource.Quantity) resource.Quantity {
+		switch dummy {
+		case qDummyDefCPU:
+			return resource.MustParse(deferredCPU)
+		case qDummyDefCPUB:
+			return resource.MustParse(deferredCPUBurstable)
+		case qDummyInfCPU:
+			return resource.MustParse(infeasibleCPU)
+		case qDummyInfCPUB:
+			return resource.MustParse(infeasibleCPUBurstable)
+		case qDummyDefMem:
+			return resource.MustParse(deferredMem)
+		case qDummyDefMemB:
+			return resource.MustParse(deferredMemBurstable)
+		case qDummyInfMem:
+			return resource.MustParse(infeasibleMem)
+		case qDummyInfMemB:
+			return resource.MustParse(infeasibleMemBurstable)
+		default:
+			return dummy
+		}
+	}
+
+	convertResourceString := func(dummy string) string {
+		switch dummy {
+		case dummyDefCPU:
+			return deferredCPU
+		case dummyDefCPUB:
+			return deferredCPUBurstable
+		case dummyInfCPU:
+			return infeasibleCPU
+		case dummyInfCPUB:
+			return infeasibleCPUBurstable
+		case dummyDefMem:
+			return deferredMem
+		case dummyDefMemB:
+			return deferredMemBurstable
+		case dummyInfMem:
+			return infeasibleMem
+		case dummyInfMemB:
+			return infeasibleMemBurstable
+		default:
+			return dummy
+		}
+	}
+
+	convertTestContainerInfo := func(info *TestContainerInfo) {
+		r := info.Resources
+		if r != nil {
+			r.CPUReq = convertResourceString(r.CPUReq)
+			r.MemReq = convertResourceString(r.MemReq)
+			r.CPULim = convertResourceString(r.CPULim)
+			r.MemLim = convertResourceString(r.MemLim)
+		}
+		a := info.Allocations
+		if a != nil {
+			a.CPUAlloc = convertResourceString(a.CPUAlloc)
+			a.MemAlloc = convertResourceString(a.MemAlloc)
+		}
+		s := info.StatusResources
+		if s != nil {
+			s.CPUReq = convertResourceString(s.CPUReq)
+			s.MemReq = convertResourceString(s.MemReq)
+			s.CPULim = convertResourceString(s.CPULim)
+			s.MemLim = convertResourceString(s.MemLim)
+		}
+	}
+
+	updateTestcase := func(tc *testCase) {
+		for i, p := range tc.containerPatches {
+			if p.Resources.Requests != nil {
+				if q, found := p.Resources.Requests[v1.ResourceCPU]; found {
+					tc.containerPatches[i].Resources.Requests[v1.ResourceCPU] = convertResourceQuota(q)
+				}
+				if q, found := p.Resources.Requests[v1.ResourceMemory]; found {
+					tc.containerPatches[i].Resources.Requests[v1.ResourceMemory] = convertResourceQuota(q)
+				}
+			}
+			if p.Resources.Limits != nil {
+				if q, found := p.Resources.Limits[v1.ResourceCPU]; found {
+					tc.containerPatches[i].Resources.Limits[v1.ResourceCPU] = convertResourceQuota(q)
+				}
+				if q, found := p.Resources.Limits[v1.ResourceMemory]; found {
+					tc.containerPatches[i].Resources.Limits[v1.ResourceMemory] = convertResourceQuota(q)
+				}
+			}
+		}
+		for _, c := range tc.expected {
+			convertTestContainerInfo(&c)
+		}
+		for _, c := range tc.expectedRecovery {
+			convertTestContainerInfo(&c)
+		}
+	}
+
+	tests := []testCase{
+		{
+			name: "Guaranteed QoS pod - try deferred memory resize, expect Deferred, rollback",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod - two containers - try Deferred memory reseize(c1) and acceptable resize(c2), expect Deferred, only c1 rollback",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:            "c2",
+					Resources:       &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations:     &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "200Mi"},
+					StatusResources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+				},
+				{
+					Name:        "c2",
+					Resources:   &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "250Mi"},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod - try infeasible memory resize, expect Infeasible, rollback",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyInfMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyInfMem,
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyInfMem, MemLim: dummyInfMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusInfeasible,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod - two containers - try infeasible memory reseize(c1) and acceptable resize(c2), expect Infeasible, only c1 rollback",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyInfMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyInfMem,
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyInfMem, MemLim: dummyInfMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:            "c2",
+					Resources:       &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations:     &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "200Mi"},
+					StatusResources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusInfeasible,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+				},
+				{
+					Name:        "c2",
+					Resources:   &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "250Mi"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod - try deferred cpu resize, expect Deferred, recover by acceptable resize",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: qDummyDefCPU,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: qDummyDefCPU,
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: dummyDefCPU, CPULim: dummyDefCPU},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "200m"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("150m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("250m"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "150m", CPULim: "250m"},
+					Allocations: &ContainerAllocations{CPUAlloc: "150m"},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod - two containers - try deferred cpu resize(c2) and acceptable resize(c1) at starting the pod, expect Deferred, remove blocker",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m"},
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("150m"),
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: qDummyDefCPU,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: qDummyDefCPU,
+						},
+					},
+				},
+			},
+			initDelay: true,
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "150m", CPULim: "200m"},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "200m"},
+				},
+				{
+					Name:            "c2",
+					Resources:       &ContainerResources{CPUReq: dummyDefCPU, CPULim: dummyDefCPU},
+					Allocations:     &ContainerAllocations{CPUAlloc: "200m"},
+					StatusResources: &ContainerResources{CPUReq: "200m"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       removeBlocker,
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "150m", CPULim: "200m"},
+					Allocations: &ContainerAllocations{CPUAlloc: "150m"},
+				},
+				{
+					Name:        "c2",
+					Resources:   &ContainerResources{CPUReq: dummyDefCPU, CPULim: dummyDefCPU},
+					Allocations: &ContainerAllocations{CPUAlloc: dummyDefCPU},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod - two containers - try infeasible cpu reseize(c1) and deferred memory resize(c2), expect Infeasible, recover by acceptable resize",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "150m", CPULim: "300m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: qDummyInfCPU,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: qDummyInfCPUB,
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMemB,
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: dummyInfCPU, CPULim: dummyInfCPUB, MemReq: "200Mi", MemLim: "300Mi"},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "200Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+				},
+				{
+					Name:            "c2",
+					Resources:       &ContainerResources{CPUReq: "150m", CPULim: "300m", MemReq: dummyDefMem, MemLim: dummyDefMemB},
+					Allocations:     &ContainerAllocations{CPUAlloc: "150m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "150m", CPULim: "300m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusInfeasible,
+			recoveryAction:       anotherRequest,
+			recoveryPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("150m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("250m"),
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("150Mi"),
+						},
+					},
+				},
+			},
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "150m", CPULim: "250m", MemReq: "200Mi", MemLim: "300Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "150m", MemAlloc: "200Mi"},
+				},
+				{
+					Name:        "c2",
+					Resources:   &ContainerResources{CPUReq: "150m", CPULim: "300m", MemReq: "50Mi", MemLim: "150Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "150m", MemAlloc: "50Mi"},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod - try deferred memory resize at starting the pod, expect Deferred, remove blocker",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+					},
+				},
+			},
+			initDelay: true,
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       removeBlocker,
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: dummyDefMem},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod - two containers - try Deferred memory reseize(c1) and acceptable resize(c2), expect Deferred, remove blocker",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			containerPatches: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: qDummyDefMem,
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("250Mi"),
+						},
+					},
+				},
+			},
+			killedContainerName: "c1",
+			expected: []TestContainerInfo{
+				{
+					Name:            "c1",
+					Resources:       &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations:     &ContainerAllocations{CPUAlloc: "100m", MemAlloc: "100Mi"},
+					StatusResources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+				},
+				{
+					Name:            "c2",
+					Resources:       &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations:     &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "200Mi"},
+					StatusResources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			},
+			expectedResizeStatus: v1.PodResizeStatusDeferred,
+			recoveryAction:       removeBlocker,
+			expectedRecovery: []TestContainerInfo{
+				{
+					Name:        "c1",
+					Resources:   &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: dummyDefMem, MemLim: dummyDefMem},
+					Allocations: &ContainerAllocations{CPUAlloc: "100m", MemAlloc: dummyDefMem},
+				},
+				{
+					Name:        "c2",
+					Resources:   &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "250Mi", MemLim: "250Mi"},
+					Allocations: &ContainerAllocations{CPUAlloc: "200m", MemAlloc: "250Mi"},
+				},
+			},
+		},
+	}
+
+	timeouts := framework.NewTimeoutContext()
+
+	for idx := range tests {
+		tc := tests[idx]
+		ginkgo.It(tc.name, func(ctx context.Context) {
+			ginkgo.By("waiting for the node to be ready", func() {
+				if !supportsInPlacePodVerticalScaling(ctx, f) || framework.NodeOSDistroIs("windows") || isRunningOnArm64() {
+					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+				}
+			})
+			updateTestcase(&tc)
+
+			var blockerPod *v1.Pod
+			if tc.expectedResizeStatus == v1.PodResizeStatusDeferred {
+				// Create another pod that requets resources in order to cause Deferred.
+				ginkgo.By("creating blocker pod for testing deferred resize")
+				tStamp := strconv.Itoa(time.Now().Nanosecond())
+				blockerPod = makeTestPod(f.Namespace.Name, "blocker-pod", tStamp,
+					[]TestContainerInfo{
+						{
+							Name:      "blocker1",
+							Resources: &ContainerResources{CPUReq: deferredCPU, MemReq: deferredMem},
+						},
+					})
+				blockerPod = e2epod.MustMixinRestrictedPodSecurity(blockerPod)
+				blockerPod = podClient.CreateSync(ctx, blockerPod)
+				defer func() {
+					deletePodSyncByName(ctx, f, blockerPod.Name)
+				}()
+			}
+
+			var testPod, patchedPod *v1.Pod
+			var pErr error
+
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			initDefaultResizePolicy(tc.containers)
+			initDefaultResizePolicy(tc.expected)
+			testPod = makeTestPod(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			if tc.initDelay {
+				testPod.Spec.InitContainers = []v1.Container{
+					{
+						Name:    "init-container",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						// Set resources not to affect QoS class
+						Args: []string{"-c", "sleep 5"},
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				}
+			}
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			if tc.killedContainerName != "" {
+				for i, c := range testPod.Spec.Containers {
+					if c.Name != tc.killedContainerName {
+						continue
+					}
+					testPod.Spec.Containers[i].Command = []string{"/bin/sh", "-c", e2epod.InfiniteSleepCommand}
+				}
+				testPod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			}
+
+			ginkgo.By("creating pod")
+			var newPod *v1.Pod
+			if tc.initDelay {
+				newPod = podClient.Create(ctx, testPod)
+				// With InitDelay, resize will be requested while init container is running for #126527
+			} else {
+				newPod = podClient.CreateSync(ctx, testPod)
+				perr := e2epod.WaitForPodCondition(ctx, f.ClientSet, newPod.Namespace, newPod.Name, "Ready", timeouts.PodStartSlow, testutils.PodRunningReady)
+				framework.ExpectNoError(perr, "pod %s/%s did not go running", newPod.Namespace, newPod.Name)
+				framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
+			}
+
+			defer func() {
+				deletePodSyncByName(ctx, f, newPod.Name)
+				// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+				// this is in turn needed because we will have an unavoidable (in the current framework) race with the
+				// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+				waitForAllContainerRemoval(ctx, newPod.Name, newPod.Namespace)
+			}()
+
+			if !tc.initDelay {
+				ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
+				verifyPodResources(newPod, tc.containers)
+				verifyPodResizePolicy(newPod, tc.containers)
+
+				ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
+				verifyPodStatusResources(newPod, tc.containers)
+			}
+
+			ginkgo.By("patching pod for resize")
+			patch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: tc.containerPatches}})
+			framework.ExpectNoError(err, "failed to marshal patch")
+			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+				types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+			framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+			ginkgo.By("verifying pod resources after patch")
+			verifyPodResources(patchedPod, tc.expected)
+
+			if tc.initDelay {
+				ginkgo.By("wating for pod to be ready")
+				perr := e2epod.WaitForPodCondition(ctx, f.ClientSet, patchedPod.Namespace, patchedPod.Name, "Ready", timeouts.PodStartSlow, testutils.PodRunningReady)
+				framework.ExpectNoError(perr, "pod %s/%s did not go ready", patchedPod.Namespace, patchedPod.Name)
+				framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
+				patchedPod, perr = f.ClientSet.CoreV1().Pods(patchedPod.Namespace).Get(ctx, patchedPod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(perr, "failed to get pod %s/%s", patchedPod.Namespace, patchedPod.Name)
+			}
+
+			ginkgo.By("verifying pod allocations after patch")
+			err = verifyPodAllocations(patchedPod, tc.expected)
+			framework.ExpectNoError(err, "failed to verify Pod allocations for patchedPod")
+
+			verify := func(phase string, expectedStatus v1.PodResizeStatus, expected, expectedResources []TestContainerInfo) {
+				ginkgo.By(fmt.Sprintf("waiting for pod resize state to transit %s", phase))
+				updatedPod := waitForResizeStatusTransition(ctx, podClient, patchedPod, expectedStatus)
+
+				ginkgo.By(fmt.Sprintf("verifying pod resources %s", phase))
+				verifyPodResources(updatedPod, expected)
+				ginkgo.By(fmt.Sprintf("verifying pod allocations %s", phase))
+				err = verifyPodAllocations(updatedPod, expected)
+				framework.ExpectNoError(err, "fail")
+
+				ginkgo.By(fmt.Sprintf("verifying pod status resources and cgroup config are as expected %s", phase))
+				verifyPodStatusResources(updatedPod, expectedResources)
+				err = verifyPodContainersCgroupValues(ctx, f, updatedPod, expectedResources)
+			}
+			verify("after resize state transtion", tc.expectedResizeStatus, tc.expected, tc.containers)
+
+			if tc.killedContainerName != "" {
+				ginkgo.By("killing container")
+				// Restart container in order to verify that issue #126033 is fixed.
+				_ = e2epod.ExecShellInContainer(f, patchedPod.Name, tc.killedContainerName, "kill 1")
+
+				ginkgo.By("waiting for container to be restarted and verifying pod resources after restart")
+				for i, c := range tc.expected {
+					if c.Name == tc.killedContainerName {
+						tc.expected[i].RestartCount++
+					}
+				}
+				gomega.Eventually(ctx, waitForContainerRestart, timeouts.PodStartShort, timeouts.Poll).
+					WithArguments(f, podClient, patchedPod, tc.expected).
+					ShouldNot(gomega.HaveOccurred(), "failed waiting for expected container restart")
+				verify("after restarting container", tc.expectedResizeStatus, tc.expected, tc.containers)
+			}
+
+			if tc.recoveryAction == noAction {
+				return
+			}
+
+			if tc.recoveryAction == removeBlocker {
+				ginkgo.By("delete blocker pod to resume deferred resize")
+				deletePodSyncByName(ctx, f, blockerPod.Name)
+			} else {
+				ginkgo.By("patching pod for recovery")
+				patch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: tc.recoveryPatches}})
+				framework.ExpectNoError(err, "failed to marshal recovery patch")
+				patchedPod, pErr = f.ClientSet.CoreV1().Pods(patchedPod.Namespace).Patch(ctx, patchedPod.Name,
+					types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+				ginkgo.By("verifying pod resources after recovery patch")
+				verifyPodResources(patchedPod, tc.expectedRecovery)
+			}
+
+			verify("after recovery", "", tc.expectedRecovery, tc.expectedRecovery)
+		})
+	}
+}
+
 // NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
 //       because in e2e_node tests
 //          a) scheduler and controller manager is not running by the Node e2e
@@ -1311,4 +2260,5 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feat
 	}
 	doPodResizeTests()
 	doPodResizeErrorTests()
+	doPodResizeDeferredAndInfeasibleTests()
 })
