@@ -3631,10 +3631,11 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		return "", err
 	}
 
-	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
-	if err != nil {
-		return "", err
-	}
+	fieldSelector := fields.AndSelectors(
+		fields.OneTermEqualSelector("spec.nodeName", name),
+		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
+		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
+	)
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
