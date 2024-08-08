@@ -693,8 +693,9 @@ func TestCelCompilation(t *testing.T) {
 				},
 			},
 			expectedResults: []validationMatcher{
-				invalidError("undefined field 'namespace'"),
-				invalidError("undefined field 'if'"),
+				// starting 1.32, the preserved keyword as field name would be supported.
+				noError(),
+				noError(),
 				invalidError("found no matching overload"),
 			},
 		},

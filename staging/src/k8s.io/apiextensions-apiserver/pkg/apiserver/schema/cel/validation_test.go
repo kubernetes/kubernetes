@@ -2104,6 +2104,26 @@ func TestValidationExpressions(t *testing.T) {
 				`cidr('::1/128').ip().family() == 6`,
 			},
 		},
+		{name: "format",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				`format.dns1123Label().validate("my-label-name") == optional.none()`,
+				`format.dns1123Subdomain().validate("apiextensions.k8s.io") == optional.none()`,
+				`format.qualifiedName().validate("apiextensions.k8s.io/v1beta1") == optional.none()`,
+				`format.dns1123LabelPrefix().validate("my-label-prefix-") == optional.none()`,
+				`format.dns1123SubdomainPrefix().validate("mysubdomain.prefix.-") == optional.none()`,
+				`format.dns1035LabelPrefix().validate("my-label-prefix-") == optional.none()`,
+				`format.uri().validate("http://example.com") == optional.none()`,
+				`format.uuid().validate("123e4567-e89b-12d3-a456-426614174000") == optional.none()`,
+				`format.byte().validate("aGVsbG8=") == optional.none()`,
+				`format.date().validate("2021-01-01") == optional.none()`,
+				`format.datetime().validate("2021-01-01T00:00:00Z") == optional.none()`,
+				`format.named("dns1123Label").value().validate("my-name") == optional.none()`,
+				`format.dns1123Label().validate("contains a space").value()[0] == "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or \'-\', and must start and end with an alphanumeric character (e.g. \'my-name\',  or \'123-abc\', regex used for validation is \'[a-z0-9]([-a-z0-9]*[a-z0-9])?\')"`,
+				`!format.named("unknown").hasValue()`,
+			},
+		},
 	}
 
 	for i := range tests {

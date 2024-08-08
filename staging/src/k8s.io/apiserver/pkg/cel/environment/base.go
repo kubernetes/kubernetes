@@ -167,6 +167,7 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 		EnvOptions: []cel.EnvOption{
 			library.AuthzSelectors(),
 		},
+		// RecognizeKeywordAsFieldName support has been introduced in 1.31 in https://github.com/kubernetes/kubernetes/blob/v1.31.0/staging/src/k8s.io/apiserver/pkg/cel/environment/environment.go#L270-L272
 	},
 }
 

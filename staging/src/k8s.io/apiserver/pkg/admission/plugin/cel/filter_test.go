@@ -913,8 +913,8 @@ func TestFilter(t *testing.T) {
 			}
 			require.Equal(t, len(evalResults), len(tc.results))
 			for i, result := range tc.results {
-				if result.Error != nil && !strings.Contains(evalResults[i].Error.Error(), result.Error.Error()) {
-					t.Errorf("Expected result '%v' but got '%v'", result.Error, evalResults[i].Error)
+				if result.Error != nil && evalResults[i].Error != nil && !strings.Contains(evalResults[i].Error.Error(), result.Error.Error()) {
+					t.Errorf("Expected result error: '%v' but got error: '%v'", result.Error, evalResults[i].Error)
 				}
 				if result.Error == nil && evalResults[i].Error != nil {
 					t.Errorf("Expected result '%v' but got error '%v'", result.EvalResult, evalResults[i].Error)
