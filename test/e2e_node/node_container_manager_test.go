@@ -120,8 +120,9 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 }
 
 const (
-	kubeReservedCgroup   = "kube-reserved"
-	systemReservedCgroup = "system-reserved"
+	kubeReservedCgroup    = "kube-reserved"
+	systemReservedCgroup  = "system-reserved"
+	nodeAllocatableCgroup = "kubepods"
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
@@ -219,6 +220,18 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, time.Minute, time.Second).Should(gomega.BeFalse())
 
+	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
+
+	// Cleanup from the previous kubelet, to verify the new one creates it correctly
+	if err := cgroupManager.Destroy(&cm.CgroupConfig{
+		Name: cm.NewCgroupName(expectedNAPodCgroup),
+	}); err != nil {
+		return err
+	}
+	if cgroupManager.Exists(expectedNAPodCgroup) {
+		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
+	}
+
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 	ginkgo.By("Starting the kubelet")
@@ -235,10 +248,8 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Set new config and current config.
 	currentConfig := newCfg
 
-	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
-	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
 	if !cgroupManager.Exists(expectedNAPodCgroup) {
-		return fmt.Errorf("Expected Node Allocatable Cgroup %q does not exist", expectedNAPodCgroup)
+		return fmt.Errorf("Expected Node Allocatable Cgroup %q to exist", expectedNAPodCgroup)
 	}
 
 	memoryLimitFile := "memory.limit_in_bytes"
@@ -256,9 +267,9 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		if len(nodeList.Items) != 1 {
 			return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
 		}
-		cgroupName := "kubepods"
+		cgroupName := nodeAllocatableCgroup
 		if currentConfig.CgroupDriver == "systemd" {
-			cgroupName = "kubepods.slice"
+			cgroupName = nodeAllocatableCgroup + ".slice"
 		}
 
 		node := nodeList.Items[0]
