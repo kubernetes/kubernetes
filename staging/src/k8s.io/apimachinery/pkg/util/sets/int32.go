@@ -18,10 +18,10 @@ package sets
 
 // Int32 is a set of int32s, implemented via map[int32]struct{} for minimal memory consumption.
 //
-// Deprecated: use generic Set instead.
+// Deprecated: use generic OrderedSet instead.
 // new ways:
-// s1 := Set[int32]{}
-// s2 := New[int32]()
+// s1 := OrderedSet[int32]{}
+// s2 := NewOrdered[int32]()
 type Int32 map[int32]Empty
 
 // NewInt32 creates a Int32 from a list of values.

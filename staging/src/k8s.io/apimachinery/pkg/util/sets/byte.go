@@ -18,10 +18,10 @@ package sets
 
 // Byte is a set of bytes, implemented via map[byte]struct{} for minimal memory consumption.
 //
-// Deprecated: use generic Set instead.
+// Deprecated: use generic OrderedSet instead.
 // new ways:
-// s1 := Set[byte]{}
-// s2 := New[byte]()
+// s1 := OrderedSet[byte]{}
+// s2 := NewOrdered[byte]()
 type Byte map[byte]Empty
 
 // NewByte creates a Byte from a list of values.

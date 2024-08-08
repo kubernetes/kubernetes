@@ -18,10 +18,10 @@ package sets
 
 // Int64 is a set of int64s, implemented via map[int64]struct{} for minimal memory consumption.
 //
-// Deprecated: use generic Set instead.
+// Deprecated: use generic OrderedSet instead.
 // new ways:
-// s1 := Set[int64]{}
-// s2 := New[int64]()
+// s1 := OrderedSet[int64]{}
+// s2 := NewOrdered[int64]()
 type Int64 map[int64]Empty
 
 // NewInt64 creates a Int64 from a list of values.

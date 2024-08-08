@@ -18,10 +18,10 @@ package sets
 
 // Int is a set of ints, implemented via map[int]struct{} for minimal memory consumption.
 //
-// Deprecated: use generic Set instead.
+// Deprecated: use generic OrderedSet instead.
 // new ways:
-// s1 := Set[int]{}
-// s2 := New[int]()
+// s1 := OrderedSet[int]{}
+// s2 := NewOrdered[int]()
 type Int map[int]Empty
 
 // NewInt creates a Int from a list of values.

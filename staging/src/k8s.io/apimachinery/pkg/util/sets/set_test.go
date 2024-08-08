@@ -99,6 +99,13 @@ func TestStringSetList(t *testing.T) {
 	if !reflect.DeepEqual(s.List(), []string{"a", "x", "y", "z"}) {
 		t.Errorf("List gave unexpected result: %#v", s.List())
 	}
+
+	styped := NewOrdered("z", "y", "x", "a")
+
+	if !reflect.DeepEqual(styped.List(), []string{"a", "x", "y", "z"}) {
+		t.Errorf("List gave unexpected result: %#v", styped.List())
+	}
+
 }
 
 func TestStringSetDifference(t *testing.T) {

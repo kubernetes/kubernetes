@@ -24,6 +24,11 @@ import (
 // Set is a set of the same type elements, implemented via map[comparable]struct{} for minimal memory consumption.
 type Set[T comparable] map[T]Empty
 
+// OrderedSet is the ordered set type
+type OrderedSet[T cmp.Ordered] struct {
+	Set[T]
+}
+
 // cast transforms specified set to generic Set[T].
 func cast[T comparable](s map[T]Empty) Set[T] { return s }
 
@@ -33,6 +38,14 @@ func New[T comparable](items ...T) Set[T] {
 	ss := make(Set[T], len(items))
 	ss.Insert(items...)
 	return ss
+}
+
+// NewOrdered creates a Set from a list of values.
+// NOTE: type param must be explicitly instantiated if given items are empty.
+func NewOrdered[T cmp.Ordered](items ...T) OrderedSet[T] {
+	ss := make(Set[T], len(items))
+	ss.Insert(items...)
+	return OrderedSet[T]{ss}
 }
 
 // KeySet creates a Set from a keys of a map[comparable](? extends interface{}).
@@ -205,6 +218,10 @@ func List[T cmp.Ordered](s Set[T]) []T {
 	}
 	sort.Sort(res)
 	return res
+}
+
+func (s OrderedSet[T]) List() []T {
+	return List((s.Set))
 }
 
 // UnsortedList returns the slice with contents in random order.

@@ -18,10 +18,10 @@ package sets
 
 // String is a set of strings, implemented via map[string]struct{} for minimal memory consumption.
 //
-// Deprecated: use generic Set instead.
+// Deprecated: use generic OrderedSet instead.
 // new ways:
-// s1 := Set[string]{}
-// s2 := New[string]()
+// s1 := OrderedSet[string]{}
+// s2 := NewOrdered[string]()
 type String map[string]Empty
 
 // NewString creates a String from a list of values.
