@@ -189,20 +189,20 @@ const defaultUnfinishedWorkUpdatePeriod = 500 * time.Millisecond
 // Deprecated: Use Typed instead.
 type Type = Typed[any]
 
-type Typed[t comparable] struct {
+type Typed[T comparable] struct {
 	// queue defines the order in which we will work on items. Every
 	// element of queue should be in the dirty set and not in the
 	// processing set.
-	queue Queue[t]
+	queue Queue[T]
 
 	// dirty defines all of the items that need to be processed.
-	dirty set[t]
+	dirty set[T]
 
 	// Things that are currently being processed are in the processing set.
 	// These things may be simultaneously in the dirty set. When we finish
 	// processing something and remove it from this set, we'll check if
 	// it's in the dirty set, and if so, add it to the queue.
-	processing set[t]
+	processing set[T]
 
 	cond *sync.Cond
 
