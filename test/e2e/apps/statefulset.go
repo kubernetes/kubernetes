@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -1338,6 +1340,85 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
+		ginkgo.It("should not delete PVC with OnScaledown policy if another controller owns the PVC", func(ctx context.Context) {
+			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirm PVC has been created")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Create configmap to use as dummy controller")
+			dummyConfigMap, err := c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "dummy-controller",
+					Namespace:    ns,
+				},
+			}, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer func() {
+				// Will be cleaned up with the namespace if this fails.
+				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, dummyConfigMap.Name, metav1.DeleteOptions{})
+			}()
+
+			ginkgo.By("Update PVC 1 owner ref")
+			pvc1Name := fmt.Sprintf("datadir-%s-1", ss.Name)
+			trueVal := true
+			_, err = updatePVCWithRetries(ctx, c, ns, pvc1Name, func(update *v1.PersistentVolumeClaim) {
+				update.OwnerReferences = []metav1.OwnerReference{
+					{
+						Name:       dummyConfigMap.GetName(),
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+						UID:        dummyConfigMap.GetUID(),
+						Controller: &trueVal,
+					},
+				}
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Update StatefulSet retention policy")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scale StatefulSet down to 0")
+			_, err = e2estatefulset.Scale(ctx, c, ss, 0)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verify PVC 1 still exists")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{1})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Remove PVC 1 owner ref")
+			_, err = updatePVCWithRetries(ctx, c, ns, pvc1Name, func(update *v1.PersistentVolumeClaim) {
+				update.OwnerReferences = nil
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scale set back up to 2")
+			_, err = e2estatefulset.Scale(ctx, c, ss, 2)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirm PVCs scaled up as well")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scale set down to 1")
+			_, err = e2estatefulset.Scale(ctx, c, ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirm PVC 1 deleted this time")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
+
 		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
@@ -1397,6 +1478,193 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Verifying all but one PVC deleted")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should not delete PVCs when there is another controller", func(ctx context.Context) {
+			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
+			ginkgo.By("Creating statefulset " + ssName + " with no retention policy in namespace " + ns)
+
+			*(ss.Spec.Replicas) = 4
+			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 4 PVCs exist")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2, 3})
+			framework.ExpectNoError(err)
+
+			claimNames := make([]string, 4)
+			for i := 0; i < 4; i++ {
+				claimNames[i] = fmt.Sprintf("%s-%s-%d", statefulPodMounts[0].Name, ssName, i)
+			}
+
+			ginkgo.By("Create configmap to use as random owner")
+			randomConfigMap, err := c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "random-owner",
+					Namespace:    ns,
+				},
+			}, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer func() {
+				// Will be cleaned up by the namespace delete if this fails
+				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, randomConfigMap.Name, metav1.DeleteOptions{})
+			}()
+
+			ginkgo.By("Add external owner to PVC 1")
+			expectedExternalRef := []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Name:       randomConfigMap.GetName(),
+					UID:        randomConfigMap.GetUID(),
+				},
+			}
+			_, err = updatePVCWithRetries(ctx, c, ns, claimNames[1], func(update *v1.PersistentVolumeClaim) {
+				update.SetOwnerReferences(expectedExternalRef)
+			})
+			framework.ExpectNoError(err)
+
+			trueVal := true
+			ginkgo.By("Add stale statefulset controller to PVC 3, with finalizer to prevent garbage collection")
+			expectedStaleRef := []metav1.OwnerReference{
+				{
+					APIVersion:         "apps/v1",
+					Kind:               "StatefulSet",
+					Name:               "unknown",
+					UID:                "9d86d6ae-4e06-4ff1-bc55-f77f52e272e9",
+					Controller:         &trueVal,
+					BlockOwnerDeletion: &trueVal,
+				},
+			}
+			_, err = updatePVCWithRetries(ctx, c, ns, claimNames[3], func(update *v1.PersistentVolumeClaim) {
+				update.SetOwnerReferences(expectedStaleRef)
+				update.SetFinalizers([]string{"keep-with/stale-ref"})
+			})
+			framework.ExpectNoError(err)
+
+			defer func() {
+				if _, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[3], metav1.GetOptions{}); apierrors.IsNotFound(err) {
+					return
+				}
+				_, err := updatePVCWithRetries(ctx, c, ns, claimNames[3], func(update *v1.PersistentVolumeClaim) {
+					update.SetFinalizers([]string{})
+				})
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("Check references updated")
+			err = wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+				claim, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[1], metav1.GetOptions{})
+				if err != nil {
+					return false, nil // retry
+				}
+				if !reflect.DeepEqual(claim.GetOwnerReferences(), expectedExternalRef) {
+					return false, nil // retry
+				}
+				claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[3], metav1.GetOptions{})
+				if err != nil {
+					return false, nil // retry
+				}
+				if !reflect.DeepEqual(claim.GetOwnerReferences(), expectedStaleRef) {
+					return false, nil // retry
+				}
+				return true, nil // found them all!
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Update retention policy to delete to force claims to resync")
+			var ssUID types.UID
+			_, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
+				update.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				ssUID = update.GetUID()
+			})
+			framework.ExpectNoError(err)
+
+			expectedOwnerRef := []metav1.OwnerReference{
+				{
+					APIVersion:         "apps/v1",
+					Kind:               "StatefulSet",
+					Name:               ssName,
+					UID:                ssUID,
+					Controller:         &trueVal,
+					BlockOwnerDeletion: &trueVal,
+				},
+			}
+			ginkgo.By("Expect claims 0, 1 and 2 to have ownerRefs to the statefulset, and 3 to have a stale reference")
+			err = wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+				for _, i := range []int{0, 2} {
+					claim, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[i], metav1.GetOptions{})
+					if err != nil {
+						return false, nil // retry
+					}
+					if !reflect.DeepEqual(claim.GetOwnerReferences(), expectedOwnerRef) {
+						return false, nil // retry
+					}
+				}
+				claim, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[1], metav1.GetOptions{})
+				if err != nil {
+					return false, nil // retry
+				}
+				// Claim 1's external owner is neither its pod nor its set, so it should get updated with a controller.
+				if !reflect.DeepEqual(claim.GetOwnerReferences(), slices.Concat(expectedExternalRef, expectedOwnerRef)) {
+					return false, nil // retry
+				}
+				claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[3], metav1.GetOptions{})
+				if err != nil {
+					return false, nil // retry
+				}
+				if !reflect.DeepEqual(claim.GetOwnerReferences(), expectedStaleRef) {
+					return false, nil // retry
+				}
+				return true, nil // found them all!
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Remove controller flag from claim 0")
+			falseVal := false
+			_, err = updatePVCWithRetries(ctx, c, ns, claimNames[0], func(update *v1.PersistentVolumeClaim) {
+				update.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "apps/v1",
+						Kind:               "StatefulSet",
+						Name:               ssName,
+						UID:                ssUID,
+						Controller:         &falseVal,
+						BlockOwnerDeletion: &trueVal,
+					},
+				})
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Update statefulset to provoke a reconcile")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
+				update.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+			})
+			framework.ExpectNoError(err)
+			ginkgo.By("Expect controller flag for claim 0 to reconcile back to true")
+			err = wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+				claim, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[0], metav1.GetOptions{})
+				if err != nil {
+					return false, nil // retry
+				}
+				if reflect.DeepEqual(claim.GetOwnerReferences(), expectedOwnerRef) {
+					return true, nil // success!
+				}
+				return false, nil // retry
+			})
+			framework.ExpectNoError(err)
+
+			// Claim 1 has an external owner, and 3 has a finalizer still, so they will not be deleted.
+			ginkgo.By("Delete the stateful set and wait for claims 0 and 2 but not 1 and 3 to disappear")
+			err = c.AppsV1().StatefulSets(ns).Delete(ctx, ssName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{1, 3})
 			framework.ExpectNoError(err)
 		})
 	})
@@ -1586,7 +1854,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Increasing .spec.ordinals.start = 4")
-			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
 				update.Spec.Ordinals = &appsv1.StatefulSetOrdinals{
 					Start: 4,
 				}
@@ -1620,7 +1888,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Decreasing .spec.ordinals.start = 2")
-			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
 				update.Spec.Ordinals = &appsv1.StatefulSetOrdinals{
 					Start: 2,
 				}
@@ -1653,14 +1921,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Removing .spec.ordinals")
-			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
 				update.Spec.Ordinals = nil
 			})
 			framework.ExpectNoError(err)
 
 			// since we are replacing 2 pods for 2, we need to ensure we wait
 			// for the new ones to show up, not just for any random 2
-			framework.Logf("Confirming 2 replicas, with start ordinal 0")
+			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
 			waitForStatus(ctx, c, ss)
 			waitForPodNames(ctx, c, ss, []string{"ss-0", "ss-1"})
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
@@ -2230,7 +2498,7 @@ type updateStatefulSetFunc func(*appsv1.StatefulSet)
 func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1.StatefulSet, err error) {
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
-	pollErr := wait.PollWithContext(ctx, 10*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		if statefulSet, err = statefulSets.Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -2247,6 +2515,29 @@ func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, na
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr
+}
+
+// updatePVCWithRetries updates PVCs with retries.
+func updatePVCWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate func(*v1.PersistentVolumeClaim)) (pvc *v1.PersistentVolumeClaim, err error) {
+	pvcs := c.CoreV1().PersistentVolumeClaims(namespace)
+	var updateErr error
+	pollErr := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+		if pvc, err = pvcs.Get(ctx, name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(pvc)
+		if pvc, err = pvcs.Update(ctx, pvc, metav1.UpdateOptions{}); err == nil {
+			framework.Logf("Updating pvc %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if wait.Interrupted(pollErr) {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %w", name, updateErr)
+	}
+	return pvc, pollErr
 }
 
 // getStatefulSet gets the StatefulSet named name in namespace.
