@@ -49,6 +49,9 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
+// podKind contains the schema.GroupVersionKind for pods.
+var podKind = v1.SchemeGroupVersion.WithKind("Pod")
+
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
 	// client interface
