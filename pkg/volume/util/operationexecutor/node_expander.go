@@ -36,7 +36,6 @@ type NodeExpander struct {
 
 	// computed via precheck
 	pvcStatusCap resource.Quantity
-	pvCap        resource.Quantity
 	resizeStatus v1.ClaimResourceStatus
 
 	// indicates that if volume expansion failed on the node, then current expansion should be marked
@@ -76,7 +75,6 @@ type testResponseData struct {
 // it returns false.
 func (ne *NodeExpander) runPreCheck() bool {
 	ne.pvcStatusCap = ne.pvc.Status.Capacity[v1.ResourceStorage]
-	ne.pvCap = ne.pv.Spec.Capacity[v1.ResourceStorage]
 
 	allocatedResourceStatus := ne.pvc.Status.AllocatedResourceStatuses
 	if currentStatus, ok := allocatedResourceStatus[v1.ResourceStorage]; ok {
@@ -120,6 +118,7 @@ func (ne *NodeExpander) runPreCheck() bool {
 func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 	allowExpansion := ne.runPreCheck()
 	if !allowExpansion {
+		klog.V(3).Infof("NodeExpandVolume is not allowed to proceed for volume %s with resizeStatus %s", ne.vmt.VolumeName, ne.resizeStatus)
 		return false, nil, testResponseData{false, true}
 	}
 

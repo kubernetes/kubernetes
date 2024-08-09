@@ -349,6 +349,7 @@ type mockCSIDriver struct {
 	embeddedCSIDriver             *mockdriver.CSIDriver
 	enableSELinuxMount            *bool
 	enableRecoverExpansionFailure bool
+	disableControllerExpansion    bool
 	enableHonorPVReclaimPolicy    bool
 
 	// Additional values set during PrepareTest
@@ -391,6 +392,7 @@ type CSIMockDriverOpts struct {
 	EnableTopology                bool
 	EnableResizing                bool
 	EnableNodeExpansion           bool
+	DisableControllerExpansion    bool
 	EnableSnapshot                bool
 	EnableVolumeMountGroup        bool
 	TokenRequests                 []storagev1.TokenRequest
@@ -547,6 +549,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		attachable:                    !driverOpts.DisableAttach,
 		attachLimit:                   driverOpts.AttachLimit,
 		enableNodeExpansion:           driverOpts.EnableNodeExpansion,
+		disableControllerExpansion:    driverOpts.DisableControllerExpansion,
 		tokenRequests:                 driverOpts.TokenRequests,
 		requiresRepublish:             driverOpts.RequiresRepublish,
 		fsGroupPolicy:                 driverOpts.FSGroupPolicy,
@@ -621,12 +624,13 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 		// for cleanup callbacks.
 		ctx, cancel := context.WithCancel(context.Background())
 		serviceConfig := mockservice.Config{
-			DisableAttach:            !m.attachable,
-			DriverName:               "csi-mock-" + f.UniqueName,
-			AttachLimit:              int64(m.attachLimit),
-			NodeExpansionRequired:    m.enableNodeExpansion,
-			VolumeMountGroupRequired: m.enableVolumeMountGroup,
-			EnableTopology:           m.enableTopology,
+			DisableAttach:              !m.attachable,
+			DriverName:                 "csi-mock-" + f.UniqueName,
+			AttachLimit:                int64(m.attachLimit),
+			NodeExpansionRequired:      m.enableNodeExpansion,
+			DisableControllerExpansion: m.disableControllerExpansion,
+			VolumeMountGroupRequired:   m.enableVolumeMountGroup,
+			EnableTopology:             m.enableTopology,
 			IO: proxy.PodDirIO{
 				F:             f,
 				Namespace:     m.driverNamespace.Name,
