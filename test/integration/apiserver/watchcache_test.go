@@ -61,7 +61,7 @@ func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, fra
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Switch off endpoints reconciler to avoid unnecessary operations.
-			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+			config.Extra.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 		},
 	})
 
@@ -170,7 +170,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	c, _, tearDownFn := framework.StartTestServer(tCtx, b, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Switch off endpoints reconciler to avoid unnecessary operations.
-			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+			config.Extra.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 		},
 	})
 	defer tearDownFn()

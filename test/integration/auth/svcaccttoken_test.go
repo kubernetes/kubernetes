@@ -104,10 +104,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// extract token generator
-			tokenGenerator = config.ExtraConfig.ServiceAccountIssuer
+			tokenGenerator = config.ControlPlane.Extra.ServiceAccountIssuer
 
-			config.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
-			config.ExtraConfig.ExtendExpiration = true
+			config.ControlPlane.Extra.ServiceAccountMaxExpiration = maxExpirationDuration
+			config.ControlPlane.Extra.ExtendExpiration = true
 		},
 	})
 	defer tearDownFn()

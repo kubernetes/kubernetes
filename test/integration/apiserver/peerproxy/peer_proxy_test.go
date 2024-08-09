@@ -39,7 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
-	"k8s.io/kubernetes/pkg/controlplane"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
@@ -131,9 +131,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	// set lease duration to 1s for serverA to ensure that storageversions for serverA are updated
 	// once it is shutdown
-	controlplane.IdentityLeaseDurationSeconds = 10
-	controlplane.IdentityLeaseGCPeriod = time.Second
-	controlplane.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 10
+	controlplaneapiserver.IdentityLeaseGCPeriod = time.Second
+	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 
 	// start serverA with all APIs enabled
 	// override hostname to ensure unique ips
@@ -146,7 +146,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	setupStorageVersionGC(ctx, kubeClientSetA, informersA)
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
-	controlplane.IdentityLeaseDurationSeconds = 3600
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
 
 	// start serverB with some api disabled
 	// override hostname to ensure unique ips

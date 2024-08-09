@@ -128,7 +128,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 					opts.Authorization.Modes = []string{"AlwaysAllow"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.Authentication.Authenticator = authenticator
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator
 				},
 			})
 			defer tearDownFn()
