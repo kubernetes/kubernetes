@@ -569,7 +569,7 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest, expectedAllocatedSize string) {
 	var err error
 	ginkgo.By(fmt.Sprintf("Waiting for PV %s to be expanded to %s", pvc.Spec.VolumeName, test.recoverySize.String()))
-	err = testsuites.WaitForRecoveryPVSize(pvc, m.cs, csiResizeWaitPeriod)
+	err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 	framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 	ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be expanded to %s", pvc.Name, test.recoverySize.String()))
