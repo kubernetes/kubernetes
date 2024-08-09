@@ -21,7 +21,9 @@ package winstats
 
 import (
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,4 +189,14 @@ func testGetPhysicallyInstalledSystemMemoryBytes(t *testing.T) {
 	totalMemory, err := getPhysicallyInstalledSystemMemoryBytes()
 	assert.NoError(t, err)
 	assert.NotZero(t, totalMemory)
+}
+
+func TestGetSystemUUID(t *testing.T) {
+	uuidFromRegistry, err := getSystemUUID()
+	assert.NoError(t, err)
+
+	uuidFromWmi, err := exec.Command("powershell.exe", "Get-WmiObject", "Win32_ComputerSystemProduct", "|", "Select-Object", "-ExpandProperty UUID").Output()
+	assert.NoError(t, err)
+	uuidFromWmiString := strings.Trim(string(uuidFromWmi), "\r\n")
+	assert.Equal(t, uuidFromWmiString, uuidFromRegistry)
 }
