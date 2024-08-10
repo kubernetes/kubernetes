@@ -454,7 +454,7 @@ func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.
 func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
-	// Check that validaing fresh object fails is called once and fails.
+	// Check that validating fresh object fails is called once and fails.
 	validationCalls := 0
 	validationError := fmt.Errorf("validation error")
 	validateNothing := func(_ context.Context, _ runtime.Object) error {
@@ -511,7 +511,7 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 func RunTestValidateDeletionWithOnlySuggestionValid(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns", Labels: map[string]string{"foo": "bar"}}})
 
-	// Check that validaing fresh object fails is called once and fails.
+	// Check that validating fresh object fails is called once and fails.
 	validationCalls := 0
 	validationError := fmt.Errorf("validation error")
 	validateNothing := func(_ context.Context, _ runtime.Object) error {
