@@ -464,7 +464,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	return false, nil
 }
 
-func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set *apps.StatefulSet, firstUnhealthyPod *v1.Pod, monotonic bool, condemned []*v1.Pod, i int) (bool, error) {
+func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set *apps.StatefulSet, firstUnhealthyOrdinal int, monotonic bool, condemned []*v1.Pod, i int) (bool, error) {
 	logger := klog.FromContext(ctx)
 	if isTerminating(condemned[i]) {
 		// if we are in monotonic mode, block and wait for terminating pods to expire
@@ -475,17 +475,18 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 		}
 		return false, nil
 	}
-	// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
-	if !isRunningAndReady(condemned[i]) && monotonic && condemned[i] != firstUnhealthyPod {
-		logger.V(4).Info("StatefulSet is waiting for Pod to be Running and Ready prior to scale down",
-			"statefulSet", klog.KObj(set), "pod", klog.KObj(firstUnhealthyPod))
-		return true, nil
-	}
-	// if we are in monotonic mode and the condemned target is not the first unhealthy Pod, block.
-	if !isRunningAndAvailable(condemned[i], set.Spec.MinReadySeconds) && monotonic && condemned[i] != firstUnhealthyPod {
-		logger.V(4).Info("StatefulSet is waiting for Pod to be Available prior to scale down",
-			"statefulSet", klog.KObj(set), "pod", klog.KObj(firstUnhealthyPod))
-		return true, nil
+	// if we are in monotonic mode and the condemned target is not the first unhealthy Pod, block
+	if monotonic && getOrdinal(condemned[i]) != firstUnhealthyOrdinal {
+		if !isRunningAndReady(condemned[i]) {
+			logger.V(4).Info("StatefulSet is waiting for Pod to be Running and Ready prior to scale down",
+				"statefulSet", klog.KObj(set), "ordinal", firstUnhealthyOrdinal)
+			return true, nil
+		}
+		if !isRunningAndAvailable(condemned[i], set.Spec.MinReadySeconds) {
+			logger.V(4).Info("StatefulSet is waiting for Pod to be Available prior to scale down",
+				"statefulSet", klog.KObj(set), "ordinal", firstUnhealthyOrdinal)
+			return true, nil
+		}
 	}
 
 	logger.V(2).Info("Pod of StatefulSet is terminating for scale down",
@@ -578,7 +579,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// slice that will contain all Pods such that getOrdinal(pod) < getStartOrdinal(set) OR getOrdinal(pod) > getEndOrdinal(set)
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unhealthy := 0
-	var firstUnhealthyPod *v1.Pod
+	firstUnhealthyOrdinal := -1
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for _, pod := range pods {
@@ -606,11 +607,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	sort.Sort(descendingOrdinal(condemned))
 
 	// find the first unhealthy Pod
-	for i := range replicas {
-		if !isHealthy(replicas[i]) {
+	for i, pod := range replicas {
+		if pod == nil || !isHealthy(pod) {
 			unhealthy++
-			if firstUnhealthyPod == nil {
-				firstUnhealthyPod = replicas[i]
+			if firstUnhealthyOrdinal < 0 {
+				firstUnhealthyOrdinal = getStartOrdinal(set) + i
 			}
 		}
 	}
@@ -619,14 +620,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := len(condemned) - 1; i >= 0; i-- {
 		if !isHealthy(condemned[i]) {
 			unhealthy++
-			if firstUnhealthyPod == nil {
-				firstUnhealthyPod = condemned[i]
+			if firstUnhealthyOrdinal < 0 {
+				firstUnhealthyOrdinal = getOrdinal(condemned[i])
 			}
 		}
 	}
 
 	if unhealthy > 0 {
-		logger.V(4).Info("StatefulSet has unhealthy Pods", "statefulSet", klog.KObj(set), "unhealthyReplicas", unhealthy, "pod", klog.KObj(firstUnhealthyPod))
+		logger.V(4).Info("StatefulSet has unhealthy Pods", "statefulSet", klog.KObj(set), "unhealthyReplicas", unhealthy, "ordinal", firstUnhealthyOrdinal)
 	}
 
 	// If the StatefulSet is being deleted, don't do anything other than updating
@@ -656,7 +657,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
 	// updates.
 	processCondemnedFn := func(ctx context.Context, updateCtx *updateContext, condemned []*v1.Pod, i int) (bool, error) {
-		return ssc.processCondemned(ctx, updateCtx.updateSet, firstUnhealthyPod, updateCtx.monotonic, condemned, i)
+		return ssc.processCondemned(ctx, updateCtx.updateSet, firstUnhealthyOrdinal, updateCtx.monotonic, condemned, i)
 	}
 	if shouldExit, err := updateCtx.runForAll(ctx, condemned, processCondemnedFn); shouldExit || err != nil {
 		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
