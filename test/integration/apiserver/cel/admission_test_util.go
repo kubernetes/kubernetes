@@ -564,7 +564,7 @@ func testResourcePatch(c *testContext) {
 }
 
 func testResourceDelete(c *testContext) {
-	// Verify that an immediate delete triggers the webhook and populates the admisssionRequest.oldObject.
+	// Verify that an immediate delete triggers the webhook and populates the admissionRequest.oldObject.
 	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
@@ -597,7 +597,7 @@ func testResourceDelete(c *testContext) {
 		return
 	}
 
-	// Verify that an update-on-delete triggers the webhook and populates the admisssionRequest.oldObject.
+	// Verify that an update-on-delete triggers the webhook and populates the admissionRequest.oldObject.
 	obj, err = createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
@@ -1084,7 +1084,7 @@ func testPruningRandomNumbers(c *testContext) {
 }
 
 // DIFF: Commented out for policy test. To be added back for mutating policy tests.
-// This test deoends on "foo" being set to test by admission webhook/policy.
+// This test depends on "foo" being set to test by admission webhook/policy.
 // func testNoPruningCustomFancy(c *testContext) {
 // 	testResourceCreate(c)
 
