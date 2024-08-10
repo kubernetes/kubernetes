@@ -981,7 +981,7 @@ func ensurePodsStatsOnNode(ctx context.Context, c clientset.Interface, namespace
 	return true, nil
 }
 
-// getCurrentHostProcessMetrics returns a HostPRocessContainersMetrics object. Any metrics that do not have any
+// getCurrentHostProcessMetrics returns a HostProcessContainersMetrics object. Any metrics that do not have any
 // values reported will be set to 0.
 func getCurrentHostProcessMetrics(ctx context.Context, f *framework.Framework, nodeName string) (HostProcessContainersMetrics, error) {
 	var result HostProcessContainersMetrics

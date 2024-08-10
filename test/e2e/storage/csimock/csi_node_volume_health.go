@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
-				// the mocked csidriver register doesn't regist itself to normal csidriver.
+				// the mocked csidriver register doesn't register itself to normal csidriver.
 				if test.nodeVolumeConditionRequired {
 					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "get running pod")

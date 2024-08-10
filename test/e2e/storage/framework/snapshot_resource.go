@@ -113,7 +113,7 @@ func CreateSnapshotResource(ctx context.Context, sDriver SnapshottableTestDriver
 		framework.Logf("Recording snapshot driver: %s", csiDriverName)
 		snapshotClassName := r.Vsclass.GetName()
 
-		// If the deletion policy is retain on vscontent:
+		// If the deletion policy is retained on vscontent:
 		// when vs is deleted vscontent will not be deleted
 		// when the vscontent is manually deleted then the underlying snapshot resource will not be deleted.
 		// We exploit this to create a snapshot resource from which we can create a preprovisioned snapshot

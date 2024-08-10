@@ -873,7 +873,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
-				// environment variable is specified), device plugin registration needs to be triggerred
+				// environment variable is specified), device plugin registration needs to be triggered
 				// manually.
 				// This is done by deleting the control file at the following path:
 				// `/var/lib/kubelet/device-plugins/sample/registration`.

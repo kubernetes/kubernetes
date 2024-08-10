@@ -25,7 +25,7 @@ spec:
             - "--timeout=1m"
             # Needed for fsGroup support.
             - "--default-fstype=ext4"
-            # We don't need much concurrency and having many gouroutines
+            # We don't need much concurrency and having many goroutines
             # makes klog.Fatal during shutdown very long.
             - "--worker-threads=5"
           env:

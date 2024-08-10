@@ -216,7 +216,7 @@ func getHostExternalAddress(ctx context.Context, client clientset.Interface, p *
 // If expectClean is true then we expect the node to be cleaned up and thus commands like
 // `ls <uid-dir>` should fail (since that dir was removed). If expectClean is false then we expect
 // the node is not cleaned up, and thus cmds like `ls <uid-dir>` should succeed. We wait for the
-// kubelet to be cleaned up, afterwhich an error is reported.
+// kubelet to be cleaned up, after which an error is reported.
 func checkPodCleanup(ctx context.Context, c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	timeout := 5 * time.Minute
 	poll := 20 * time.Second

@@ -1081,7 +1081,7 @@ func generateDriverCleanupFunc(
 	cleanupFunc := func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", testns))
 		// Delete the primary namespace but it's okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
+		// also be deleted by framework.AfterEach hook
 		_ = tryFunc(func() { f.DeleteNamespace(ctx, testns) })
 
 		ginkgo.By(fmt.Sprintf("uninstalling csi %s driver", driverName))

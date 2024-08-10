@@ -70,7 +70,7 @@ type LogSizeGatherer struct {
 type LogsSizeVerifier struct {
 	client      clientset.Interface
 	stopChannel chan bool
-	// data stores LogSizeData groupped per IP and log_path
+	// data stores LogSizeData grouped per IP and log_path
 	data          *LogsSizeData
 	masterAddress string
 	nodeAddresses []string
@@ -205,7 +205,7 @@ func (s *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
 	return &result
 }
 
-// Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
+// Run starts log size gathering. It starts a goroutine for every worker and then blocks until stopChannel is closed
 func (s *LogsSizeVerifier) Run(ctx context.Context) {
 	s.workChannel <- WorkItem{
 		ip:                s.masterAddress,
@@ -242,7 +242,7 @@ func (g *LogSizeGatherer) pushWorkItem(workItem WorkItem) {
 }
 
 // Work does a single unit of work: tries to take out a WorkItem from the queue, ssh-es into a given machine,
-// gathers data, writes it to the shared <data> map, and creates a gorouting which reinserts work item into
+// gathers data, writes it to the shared <data> map, and creates a goroutine which reinserts work item into
 // the queue with a <pollingPeriod> delay. Returns false if worker should exit.
 func (g *LogSizeGatherer) Work(ctx context.Context) bool {
 	var workItem WorkItem

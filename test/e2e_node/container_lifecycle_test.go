@@ -3648,7 +3648,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 					// container termination seconds(1s) to account for the time it
 					// takes to delete the pod.
 					time.Duration(containerTerminationSeconds+60)*time.Second)
-				framework.ExpectNoError(err, "the pod should be deleted before its terminationGracePeriodSeconds if the restartalbe init containers get termination signal correctly")
+				framework.ExpectNoError(err, "the pod should be deleted before its terminationGracePeriodSeconds if the restartable init containers get termination signal correctly")
 			})
 		})
 

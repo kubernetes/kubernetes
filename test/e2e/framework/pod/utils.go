@@ -87,7 +87,7 @@ func GetTestImageID(id imageutils.ImageID) imageutils.ImageID {
 }
 
 // GetDefaultNonRootUser returns default non root user
-// If the Node OS is windows, we return nill due to issue with invalid permissions set on projected volumes
+// If the Node OS is windows, we return nil due to issue with invalid permissions set on projected volumes
 // https://github.com/kubernetes/kubernetes/issues/102849
 func GetDefaultNonRootUser() *int64 {
 	if NodeOSDistroIs("windows") {

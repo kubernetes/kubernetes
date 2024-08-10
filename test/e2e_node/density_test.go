@@ -72,7 +72,7 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 		// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns
 		e2epod.NewPodClient(f).CreateSync(ctx, getCadvisorPod())
 		// Resource collector monitors fine-grain CPU/memory usage by a standalone Cadvisor with
-		// 1s housingkeeping interval
+		// 1s housekeeping interval
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
@@ -281,7 +281,7 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark][NodeSpeicalFeature:Benchmark]", itArg.podsNr, itArg.bgPodsNr)
+			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark][NodeSpecialFeature:Benchmark]", itArg.podsNr, itArg.bgPodsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
@@ -634,7 +634,7 @@ func logAndVerifyLatency(ctx context.Context, batchLag time.Duration, e2eLags []
 		// check whether e2e pod startup time is acceptable.
 		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
-		// check bactch pod creation latency
+		// check batch pod creation latency
 		if podBatchStartupLimit > 0 {
 			if batchLag > podBatchStartupLimit {
 				framework.Failf("Batch creation startup time %v exceed limit %v", batchLag, podBatchStartupLimit)

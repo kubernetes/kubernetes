@@ -168,11 +168,11 @@ const (
 	tib    int64 = gib * 1024
 )
 
-func (s *service) newVolume(name string, capcity int64) csi.Volume {
+func (s *service) newVolume(name string, capacity int64) csi.Volume {
 	vol := csi.Volume{
 		VolumeId:      fmt.Sprintf("%d", atomic.AddUint64(&s.volsNID, 1)),
 		VolumeContext: map[string]string{"name": name},
-		CapacityBytes: capcity,
+		CapacityBytes: capacity,
 	}
 	s.setTopology(&vol)
 	return vol

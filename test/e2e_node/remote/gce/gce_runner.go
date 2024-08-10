@@ -470,7 +470,7 @@ func (g *GCERunner) testGCEImage(suite remote.TestSuite, archivePath string, ima
 	}
 
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
-	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
+	// TODO(random-liu): Extract out and unify log collection logic with cluster e2e.
 	contents, err := g.getSerialOutput(host)
 	if err != nil {
 		klog.Errorf("Failed to get serial Output from node %q : %v", host, err)

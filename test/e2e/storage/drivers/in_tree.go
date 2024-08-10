@@ -1146,7 +1146,7 @@ var (
 		storageframework.CapSingleNodeVolume:  true,
 		storageframework.CapMultiplePVsSameID: true,
 	}
-	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
+	localVolumeCapabilities = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
 		utils.LocalVolumeBlock: {
 			storageframework.CapPersistence:       true,
 			storageframework.CapFsGroup:           true,
@@ -1186,7 +1186,7 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() stor
 		supportedFsTypes = supportedFsTypesByType
 	}
 	capabilities := defaultLocalVolumeCapabilities
-	if capabilitiesByType, ok := localVolumeCapabitilies[volumeType]; ok {
+	if capabilitiesByType, ok := localVolumeCapabilities[volumeType]; ok {
 		capabilities = capabilitiesByType
 	}
 	return func() storageframework.TestDriver {

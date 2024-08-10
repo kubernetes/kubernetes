@@ -407,7 +407,7 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	VolumeSourceXFS = framework.WithFeature(framework.ValidFeatures.Add("VolumeSourceXFS"))
 
-	// Ownerd by SIG Storage
+	// Owned by SIG Storage
 	// kep: https://kep.k8s.io/1432
 	// test-infra jobs:
 	// - pull-kubernetes-e2e-storage-kind-alpha-features (need manual trigger)

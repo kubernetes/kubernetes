@@ -37,7 +37,7 @@ type TestDriver interface {
 	// information.
 	GetDriverInfo() *DriverInfo
 
-	// SkipUnsupportedTest skips test if Testpattern is not
+	// SkipUnsupportedTest skips test if TestPattern is not
 	// suitable to test with the TestDriver. It gets called after
 	// parsing parameters of the test suite and before the
 	// framework is initialized. Cheap tests that just check

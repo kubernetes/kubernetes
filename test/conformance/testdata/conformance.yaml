@@ -129,7 +129,7 @@
 - testname: Admission webhook, discovery document
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     include webhook resources in discovery documents [Conformance]'
-  description: The admissionregistration.k8s.io API group MUST exists in the /apis
+  description: The admissionregistration.k8s.io API group MUST exist in the /apis
     discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
     exists in the /apis discovery document. The mutatingwebhookconfigurations and
     validatingwebhookconfigurations resources MUST exist in the /apis/admissionregistration.k8s.io/v1
@@ -179,7 +179,7 @@
   description: Create a mutating webhook configuration with matchConditions field
     that will reject all resources except ones with a specific name 'skip-me'. Create
     a configMap with the name 'skip-me' and verify that it's mutated. Create a configMap
-    with a different name than 'skip-me' and verify that it's mustated.
+    with a different name than 'skip-me' and verify that it's mutated.
   release: v1.28
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutation with defaulting
@@ -208,8 +208,8 @@
     request with a "compilation failed" error message.
   release: v1.28
   file: test/e2e/apimachinery/webhook.go
-- testname: Validing Admission webhook, reject validating webhook configurations with
-    invalid matchConditions
+- testname: Validating Admission webhook, reject validating webhook configurations
+    with invalid matchConditions
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     reject validating webhook configurations with invalid match conditions [Conformance]'
   description: Creates a validating webhook configuration with an invalid CEL expression
@@ -414,7 +414,7 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
-- testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+- testname: Discovery, confirm the groupVersion and a resource from each apiGroup
   codename: '[sig-api-machinery] Discovery should locate the groupVersion and a resource
     within each APIGroup [Conformance]'
   description: A resourceList MUST be found for each apiGroup that is retrieved. For
@@ -632,7 +632,7 @@
     fail as the request exceeds ResourceQuota limits. Update the successfully created
     pod's resource requests. Updation MUST fail as a Pod can not dynamically update
     its resource requirements. Delete the successfully created Pod. Pod Deletion MUST
-    be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus
+    be successful and it MUST release the allocated resource counts from ResourceQuotaStatus
     of the ResourceQuota.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
@@ -795,14 +795,14 @@
     get, list, watch, update, patch, delete, and deletecollection.'
   release: v1.30
   file: test/e2e/apimachinery/validatingadmissionpolicy.go
-- testname: ValidatingadmissionPolicyBinding API
+- testname: ValidatingAdmissionPolicyBinding API
   codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
     should support ValidatingAdmissionPolicyBinding API operations [Conformance]'
   description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
     discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
-    exist in the /apis/admissionregistration.k8s.io discovery document. The ValidatingadmissionPolicyBinding
+    exist in the /apis/admissionregistration.k8s.io discovery document. The ValidatingAdmissionPolicyBinding
     resources MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
-    The ValidatingadmissionPolicyBinding resource must support create, get, list,
+    The ValidatingAdmissionPolicyBinding resource must support create, get, list,
     watch, update, patch, delete, and deletecollection.'
   release: v1.30
   file: test/e2e/apimachinery/validatingadmissionpolicy.go
@@ -1288,7 +1288,7 @@
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
     CSR API operations [Conformance]'
-  description: ' The certificates.k8s.io API group MUST exists in the /apis discovery
+  description: ' The certificates.k8s.io API group MUST exist in the /apis discovery
     document. The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io
     discovery document. The certificatesigningrequests, certificatesigningrequests/approval,
     and certificatesigningrequests/status resources MUST exist in the /apis/certificates.k8s.io/v1
@@ -1627,7 +1627,7 @@
     The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
     discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
     discovery document. The endpointslice controller must create EndpointSlices for
-    Pods mataching a Service.
+    Pods matching a Service.
   release: v1.21
   file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
@@ -1667,7 +1667,7 @@
   description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
     The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
     discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslices mirrorowing must mirror endpoint create,
+    discovery document. The endpointslices mirroring must mirror endpoint create,
     update, and delete actions.
   release: v1.21
   file: test/e2e/network/endpointslicemirroring.go
@@ -1707,7 +1707,7 @@
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
     of nodes. The kubectl exec on the webserver container MUST reach a http port on
-    the each of service proxy endpoints in the cluster and the request MUST be successful.
+    each of the service proxy endpoints in the cluster and the request MUST be successful.
     Container will execute curl command to reach the service port within specified
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
@@ -1719,7 +1719,7 @@
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
     of nodes. The kubectl exec on the webserver container MUST reach a udp port on
-    the each of service proxy endpoints in the cluster and the request MUST be successful.
+    each of the service proxy endpoints in the cluster and the request MUST be successful.
     Container will execute curl command to reach the service port within specified
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
@@ -1731,7 +1731,7 @@
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
     of nodes. The kubectl exec on the webserver container MUST reach a http port on
-    the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and
+    each of the service proxy endpoints in the cluster using a http post(protocol=tcp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
     hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
@@ -1745,7 +1745,7 @@
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
     of nodes. The kubectl exec on the webserver container MUST reach a http port on
-    the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and
+    each of the service proxy endpoints in the cluster using a http post(protocol=udp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
     hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
@@ -1849,7 +1849,7 @@
     Create another pod to make requests to the service. Update the service''s sessionAffinity
     to "None". Service update MUST be successful. When a requests are made to the
     service on node''s IP and NodePort, service MUST be able serve the hostname from
-    any pod of the replica. When service''s sessionAffinily is updated back to "ClientIP",
+    any pod of the replica. When service''s sessionAffinity is updated back to "ClientIP",
     service MUST serve the hostname from the same pod of the replica for all consecutive
     requests. Service MUST be reachable over serviceName and the ClusterIP on servicePort.
     Service MUST also be reachable over node''s IP on NodePort. [LinuxOnly]: Windows
@@ -1866,7 +1866,7 @@
     sent to the service. Create another pod to make requests to the service. Update
     the service''s sessionAffinity to "None". Service update MUST be successful. When
     a requests are made to the service, it MUST be able serve the hostname from any
-    pod of the replica. When service''s sessionAffinily is updated back to "ClientIP",
+    pod of the replica. When service''s sessionAffinity is updated back to "ClientIP",
     service MUST serve the hostname from the same pod of the replica for all consecutive
     requests. Service MUST be reachable over serviceName and the ClusterIP on servicePort.
     [LinuxOnly]: Windows does not support session affinity.'
@@ -2158,8 +2158,8 @@
   codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
     containers in an existing pod [Conformance]'
   description: Adding an ephemeral container to pod.spec MUST result in the container
-    running. There MUST now be only one ephermal container found. Updating the pod
-    with another ephemeral container MUST succeed. There MUST now be two ephermal
+    running. There MUST now be only one ephemeral container found. Updating the pod
+    with another ephemeral container MUST succeed. There MUST now be two ephemeral
     containers found.
   release: v1.28
   file: test/e2e/common/node/ephemeral_containers.go
@@ -2472,7 +2472,7 @@
     http handler on the /healthz will return a http error after 10 seconds since the
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
     killed and restarted incrementing restart count to 1. The liveness probe must
-    fail again after restart once the http handler for /healthz enpoind on the Pod
+    fail again after restart once the http handler for /healthz endpoint on the Pod
     returns an http error after 10 seconds from the start. Restart counts MUST increment
     every time health check fails, measure up to 5 restart.
   release: v1.9
@@ -2569,7 +2569,7 @@
   codename: '[sig-node] Security Context When creating a container with runAsUser
     should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]'
   description: 'Container is created with runAsUser option by passing uid 65534 to
-    run as unpriviledged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
+    run as unprivileged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
     is marked as LinuxOnly since Windows does not support running as UID / GID.'
   release: v1.15
   file: test/e2e/common/node/security_context.go
@@ -2593,7 +2593,7 @@
   codename: '[sig-node] Security Context should support container.SecurityContext.RunAsUser
     And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]'
   description: 'Container is created with runAsUser and runAsGroup option by passing
-    uid 1001 and gid 2002 at containr level. Pod MUST be in Succeeded phase. [LinuxOnly]:
+    uid 1001 and gid 2002 at container level. Pod MUST be in Succeeded phase. [LinuxOnly]:
     This test is marked as LinuxOnly since Windows does not support running as UID
     / GID.'
   release: v1.21
@@ -3037,9 +3037,9 @@
   codename: '[sig-storage] EmptyDir volumes pod should support shared volumes between
     containers [Conformance]'
   description: A Pod created with an 'emptyDir' Volume, should share volumes between
-    the containeres in the pod. The two busybox image containers should share the
-    volumes mounted to the pod. The main container should wait until the sub container
-    drops a file, and main container access the shared data.
+    the containers in the pod. The two busybox image containers should share the volumes
+    mounted to the pod. The main container should wait until the sub container drops
+    a file, and main container access the shared data.
   release: v1.15
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
@@ -3182,7 +3182,7 @@
 - testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
   codename: '[sig-storage] EmptyDir wrapper volumes should not cause race condition
     when used for configmaps [Serial] [Conformance]'
-  description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes
+  description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapVolumes
     mounted. Pod MUST NOT fail waiting for Volumes.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
@@ -3308,7 +3308,7 @@
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap and performs a create and update to new value. Pod MUST be able to
     create the configMap with value-1. Pod MUST be able to update the value in the
-    confgiMap to value-2.
+    configMap to value-2.
   release: v1.9
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, DownwardAPI, CPU limits
@@ -3635,8 +3635,8 @@
     succeed with its new label found. Listing VolumeAttachment with a labelSelector
     MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
     and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
-    the second VolumentAttachment with a new label MUST succeed with its new label
-    found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
+    the second VolumeAttachment with a new label MUST succeed with its new label found.
+    Creating a third VolumeAttachment MUST succeed. Updating the third VolumeAttachment
     with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
     via deleteCollection MUST succeed and it MUST be confirmed.
   release: v1.30

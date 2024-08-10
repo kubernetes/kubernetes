@@ -307,7 +307,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				return extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, name, metav1.DeleteOptions{})
 			}, crd.Name)
 		})
-		ginkgo.By("creating a vaild policy for crontabs", func() {
+		ginkgo.By("creating a valid policy for crontabs", func() {
 			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-crd-policy.example.com").
 				MatchUniqueNamespace(f.UniqueName).
 				StartResourceRule().
@@ -659,15 +659,15 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 
 	/*
 	   Release: v1.30
-	   Testname: ValidatingadmissionPolicyBinding API
+	   Testname: ValidatingAdmissionPolicyBinding API
 	   Description:
 	   The admissionregistration.k8s.io API group MUST exist in the
 	     /apis discovery document.
 	   The admissionregistration.k8s.io/v1 API group/version MUST exist
 	     in the /apis/admissionregistration.k8s.io discovery document.
-	   The ValidatingadmissionPolicyBinding resources MUST exist in the
+	   The ValidatingAdmissionPolicyBinding resources MUST exist in the
 	     /apis/admissionregistration.k8s.io/v1 discovery document.
-	   The ValidatingadmissionPolicyBinding resource must support create, get,
+	   The ValidatingAdmissionPolicyBinding resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
 	framework.ConformanceIt("should support ValidatingAdmissionPolicyBinding API operations", func(ctx context.Context) {

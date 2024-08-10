@@ -197,7 +197,7 @@ type NetworkingTestConfig struct {
 	// or an InternalIP if not, for use in nodePort testing.
 	NodeIP string
 	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
-	// or an InternalIP if not, for usein nodePort testing.
+	// or an InternalIP if not, for use in nodePort testing.
 	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
@@ -267,11 +267,11 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 		if config.EndpointsHostNetwork {
 			// Hostname behavior for hostNetwork pods is not well defined and when
 			// using the flag hostname-override in the kubelet, the node reported
-			// hostname on host network pods will not match the node's hostanme.
+			// hostname on host network pods will not match the node's hostname.
 			// It seems that the node.status.addresses hostname value is the only
 			// one that matches the value returned by os.Hostname
 			// used by the agnhost web handler, so we'll use that value.
-			// If by any circumstances the node does not provide that hostnae address
+			// If by any circumstances the node does not provide that hostname address
 			// we use the value of the node name.
 			// xref: https://issues.k8s.io/126087
 			hostname := p.Spec.NodeSelector["kubernetes.io/hostname"]
@@ -466,7 +466,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(ctx context.Con
 // in a test container running with host networking.
 //   - minTries is the minimum number of curl/nc attempts required before declaring
 //     success. If 0, then we return as soon as all endpoints succeed.
-//   - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
+//   - There is no logical change to test results if failures happen AFTER endpoints have succeeded,
 //     hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
 //     (See the TODO about checking probability, which isn't implemented yet).
 //   - maxTries is the maximum number of curl/echo attempts before an error is returned.  The

@@ -437,7 +437,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		dimensions := []string{"state", "plugin_name"}
 		waitForADControllerStatesMetrics(ctx, metricsGrabber, totalVolumesKey, dimensions, states)
 
-		// Total number of volumes in both ActualStateofWorld and DesiredStateOfWorld
+		// Total number of volumes in both ActualStateOfWorld and DesiredStateOfWorld
 		// states should be higher or equal than it used to be
 		oldStates := getStatesMetrics(totalVolumesKey, testutil.Metrics(controllerMetrics))
 		updatedStates := getStatesMetrics(totalVolumesKey, testutil.Metrics(updatedControllerMetrics))

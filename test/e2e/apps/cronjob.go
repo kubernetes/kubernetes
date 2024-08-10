@@ -151,7 +151,7 @@ var _ = SIGDescribe("CronJob", func() {
 					return nil, nil
 				}
 				return func() string {
-					return fmt.Sprintf("unexpect active job number: %d\n", len(cj.Status.Active))
+					return fmt.Sprintf("unexpected active job number: %d\n", len(cj.Status.Active))
 				}, nil
 			}))
 

@@ -194,7 +194,7 @@ var _ = SIGDescribe("Probing container", func() {
 	/*
 		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
-		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment every time health check fails, measure up to 5 restart.
+		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz endpoint on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment every time health check fails, measure up to 5 restart.
 	*/
 	framework.ConformanceIt("should have monotonically increasing restart count", f.WithNodeConformance(), func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
@@ -892,7 +892,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 		10 seconds since the Pod is started. This MUST result in liveness check
 		failure. The Pod MUST now be killed and restarted incrementing restart
 		count to 1. The liveness probe must fail again after restart once the http
-		handler for /healthz enpoind on the Pod returns an http error after 10
+		handler for /healthz endpoint on the Pod returns an http error after 10
 		seconds from the start. Restart counts MUST increment every time health
 		check fails, measure up to 5 restart.
 	*/
@@ -965,7 +965,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 
 	/*
 		Release: v1.28
-		Testname: Pod restartalbe init container liveness probe, container exec timeout, restart
+		Testname: Pod restartable init container liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the
 		Pod. If the liveness probe call does not return within the timeout
 		specified, liveness probe MUST restart the Pod. When ExecProbeTimeout

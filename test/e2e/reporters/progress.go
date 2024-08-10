@@ -79,7 +79,7 @@ func NewProgressReporter(progressReportURL string) *ProgressReporter {
 }
 
 // SendUpdates serializes the current progress and posts it to the configured endpoint if set.
-// It does not print to stdout because that interferes with progress reporting by Ginko
+// It does not print to stdout because that interferes with progress reporting by Ginkgo
 // and (when Ginkgo does output redirection) doesn't actually appear on the screen anyway.
 func (reporter *ProgressReporter) SendUpdates() {
 	// If a progressURL and client is set/available then POST to it. Noop otherwise.

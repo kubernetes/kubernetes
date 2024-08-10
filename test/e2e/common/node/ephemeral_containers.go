@@ -91,8 +91,8 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 		Release: v1.28
 		Testname: Ephemeral Container, update ephemeral containers
 		Description: Adding an ephemeral container to pod.spec MUST result in the container
-		running. There MUST now be only one ephermal container found. Updating the pod with
-		another ephemeral container MUST succeed. There MUST now be two ephermal containers
+		running. There MUST now be only one ephemeral container found. Updating the pod with
+		another ephemeral container MUST succeed. There MUST now be two ephemeral containers
 		found.
 	*/
 	framework.ConformanceIt("should update the ephemeral containers in an existing pod", func(ctx context.Context) {
@@ -136,7 +136,7 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 		ginkgo.By(fmt.Sprintf("checking pod %q has only one ephemeralcontainer", pod.Name))
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		unstruct, err := f.DynamicClient.Resource(podResource).Namespace(f.Namespace.Name).Get(ctx, "ephemeral-containers-target-pod", metav1.GetOptions{}, "ephemeralcontainers")
-		framework.ExpectNoError(err, "can't get ephermalcontainers")
+		framework.ExpectNoError(err, "can't get ephemeralcontainers")
 		verifyPod, err := unstructuredToPod(unstruct)
 		framework.ExpectNoError(err, "Getting the %q pod's ephemeralcontainers", verifyPod.Name)
 		gomega.Expect(verifyPod.Spec.EphemeralContainers).To(gomega.HaveLen(1), "checking ephemeralContainer count")
@@ -162,7 +162,7 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 
 		ginkgo.By(fmt.Sprintf("checking pod %q has only two ephemeralcontainers", pod.Name))
 		unstruct, err = f.DynamicClient.Resource(podResource).Namespace(f.Namespace.Name).Get(ctx, "ephemeral-containers-target-pod", metav1.GetOptions{}, "ephemeralcontainers")
-		framework.ExpectNoError(err, "can't get ephermalcontainers")
+		framework.ExpectNoError(err, "can't get ephemeralcontainers")
 		verifyPod, err = unstructuredToPod(unstruct)
 		framework.ExpectNoError(err, "Getting the %q pod's ephemeralcontainers", verifyPod.Name)
 		gomega.Expect(verifyPod.Spec.EphemeralContainers).To(gomega.HaveLen(2), "checking ephemeralContainer count")

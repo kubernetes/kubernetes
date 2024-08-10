@@ -75,7 +75,7 @@ var sshKeyOverrides = struct {
 	m map[string]string
 }{m: make(map[string]string)}
 
-// AddSSHKey adds a <hosrtname,path to SSH private key> pair into the sshKeyOverrides map
+// AddSSHKey adds a <hostname,path to SSH private key> pair into the sshKeyOverrides map
 func AddSSHKey(hostname, keyFilePath string) {
 	sshKeyOverrides.Lock()
 	defer sshKeyOverrides.Unlock()

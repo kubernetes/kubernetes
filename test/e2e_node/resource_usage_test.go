@@ -68,7 +68,7 @@ var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow
 
 	// This test measures and verifies the steady resource usage of node is within limit
 	// It collects data from a standalone Cadvisor with housekeeping interval 1s.
-	// It verifies CPU percentiles and the lastest memory usage.
+	// It verifies CPU percentiles and the latest memory usage.
 	ginkgo.Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
@@ -152,7 +152,7 @@ func runResourceUsageTest(ctx context.Context, f *framework.Framework, rc *Resou
 	pods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageName(), "test_pod")
 
 	rc.Start()
-	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	// Explicitly delete pods to prevent namespace controller cleaning up timeout
 	ginkgo.DeferCleanup(deletePodsSync, f, append(pods, getCadvisorPod()))
 	ginkgo.DeferCleanup(rc.Stop)
 

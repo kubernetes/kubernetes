@@ -344,7 +344,7 @@ var _ = SIGDescribe("Security Context", func() {
 		/*
 			Release: v1.15
 			Testname: Security Context, runAsUser=65534
-			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
+			Description: Container is created with runAsUser option by passing uid 65534 to run as unprivileged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
 		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {

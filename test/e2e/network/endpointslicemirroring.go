@@ -50,7 +50,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
 		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslices mirrorowing must mirror endpoint create, update, and delete actions.
+		The endpointslices mirroring must mirror endpoint create, update, and delete actions.
 	*/
 	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func(ctx context.Context) {
 		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{

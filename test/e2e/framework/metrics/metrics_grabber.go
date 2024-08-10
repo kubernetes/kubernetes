@@ -188,7 +188,7 @@ func (g *Grabber) GrabFromKubelet(ctx context.Context, nodeName string) (Kubelet
 	return g.grabFromKubeletInternal(ctx, nodeName, int(kubeletPort), "metrics")
 }
 
-// GrabresourceMetricsFromKubelet returns resource metrics from kubelet
+// GrabResourceMetricsFromKubelet returns resource metrics from kubelet
 func (g *Grabber) GrabResourceMetricsFromKubelet(ctx context.Context, nodeName string) (KubeletMetrics, error) {
 	nodes, err := g.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": nodeName}.AsSelector().String()})
 	if err != nil {

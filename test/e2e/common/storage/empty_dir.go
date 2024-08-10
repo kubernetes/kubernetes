@@ -224,7 +224,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 	/*
 		Release: v1.15
 		Testname: EmptyDir, Shared volumes between containers
-		Description: A Pod created with an 'emptyDir' Volume, should share volumes between the containeres in the pod. The two busybox image containers should share the volumes mounted to the pod.
+		Description: A Pod created with an 'emptyDir' Volume, should share volumes between the containers in the pod. The two busybox image containers should share the volumes mounted to the pod.
 		The main container should wait until the sub container drops a file, and main container access the shared data.
 	*/
 	framework.ConformanceIt("pod should support shared volumes between containers", func(ctx context.Context) {

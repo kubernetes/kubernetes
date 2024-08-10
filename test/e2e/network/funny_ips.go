@@ -158,7 +158,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 })
 
 // Try to get a free IP that has different decimal and binary interpretation with leading zeros.
-// Return both IPs, the one interpretad as binary and the one interpreted as decimal.
+// Return both IPs, the one interpreted as binary and the one interpreted as decimal.
 // Return empty if not IPs are found.
 func getServiceIPWithLeadingZeros(ctx context.Context, cs clientset.Interface) (string, string) {
 	clusterIPMap := map[string]struct{}{}
