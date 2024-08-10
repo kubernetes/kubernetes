@@ -530,16 +530,16 @@ func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 // current revision. updateSet is the representation of the set at the updateRevision. currentRevision is the name of
 // the current revision. updateRevision is the name of the update revision. ordinal is the ordinal of the Pod. If the
 // returned error is nil, the returned Pod is valid.
-func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, currentRevision, updateRevision string, ordinal int) *v1.Pod {
-	if currentSet.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(currentSet)+int(currentSet.Status.CurrentReplicas))) ||
-		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(currentSet)+int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition))) {
-		pod := newStatefulSetPod(currentSet, ordinal)
-		setPodRevision(pod, currentRevision)
-		return pod
+func newVersionedStatefulSetPod(c *updateContext, ordinal int) *v1.Pod {
+	set, revision := c.updateSet, c.updateRevision
+	curr := c.currentSet
+	if curr.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		(curr.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(curr)+int(curr.Status.CurrentReplicas))) ||
+		(curr.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(curr)+int(*curr.Spec.UpdateStrategy.RollingUpdate.Partition))) {
+		set, revision = curr, c.currentRevision
 	}
-	pod := newStatefulSetPod(updateSet, ordinal)
-	setPodRevision(pod, updateRevision)
+	pod := newStatefulSetPod(set, ordinal)
+	setPodRevision(pod, revision)
 	return pod
 }
 
