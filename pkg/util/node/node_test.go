@@ -178,11 +178,7 @@ func TestGetNodeHostIPs(t *testing.T) {
 				Status: v1.NodeStatus{Addresses: tc.addresses},
 			}
 			nodeIPs, err := GetNodeHostIPs(node)
-			nodeIP, err2 := GetNodeHostIP(node)
 
-			if (err == nil && err2 != nil) || (err != nil && err2 == nil) {
-				t.Errorf("GetNodeHostIPs() returned error=%q but GetNodeHostIP() returned error=%q", err, err2)
-			}
 			if err != nil {
 				if tc.expectIPs != nil {
 					t.Errorf("expected %v, got error (%v)", tc.expectIPs, err)
@@ -191,8 +187,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 				t.Errorf("expected error, got %v", nodeIPs)
 			} else if !reflect.DeepEqual(nodeIPs, tc.expectIPs) {
 				t.Errorf("expected %v, got %v", tc.expectIPs, nodeIPs)
-			} else if !nodeIP.Equal(nodeIPs[0]) {
-				t.Errorf("GetNodeHostIP did not return same primary (%s) as GetNodeHostIPs (%s)", nodeIP.String(), nodeIPs[0].String())
 			}
 		})
 	}
