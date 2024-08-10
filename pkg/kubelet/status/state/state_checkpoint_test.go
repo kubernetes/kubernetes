@@ -28,17 +28,19 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
+const testCheckpoint = "pod_status_manager_state"
+
 func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "pod_resource_allocation_state_test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
+	t.Cleanup(func() {
 		if err := os.RemoveAll(testingDir); err != nil {
 			t.Fatal(err)
 		}
-	}()
+	})
 	cache := NewStateMemory()
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoError(t, err, "failed to create checkpoint manager")
@@ -51,8 +53,31 @@ func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
 	return sc
 }
 
+func getTestDir(t *testing.T) string {
+	testingDir, err := os.MkdirTemp("", "pod_resource_allocation_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(testingDir); err != nil {
+			t.Fatal(err)
+		}
+	})
+	return testingDir
+}
+
+func verifyPodResourceAllocation(t *testing.T, expected, actual *PodResourceAllocation, msgAndArgs string) {
+	for podUID, containerResourceList := range *expected {
+		require.Equal(t, len(containerResourceList), len((*actual)[podUID]), msgAndArgs)
+		for containerName, resourceList := range containerResourceList {
+			for name, quantity := range resourceList.Requests {
+				require.True(t, quantity.Equal((*actual)[podUID][containerName].Requests[name]), msgAndArgs)
+			}
+		}
+	}
+}
+
 func Test_stateCheckpoint_storeState(t *testing.T) {
-	sc := newTestStateCheckpoint(t)
 	type args struct {
 		podResourceAllocation PodResourceAllocation
 	}
@@ -92,44 +117,21 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := sc.cache.ClearState()
-			require.NoError(t, err, "failed to clear state")
+			testDir := getTestDir(t)
+			originalSC, err := NewStateCheckpoint(testDir, testCheckpoint)
+			require.NoError(t, err)
 
-			defer func() {
-				err = sc.checkpointManager.RemoveCheckpoint(sc.checkpointName)
-				require.NoError(t, err, "failed to remove checkpoint")
-			}()
+			err = originalSC.SetPodResourceAllocation(tt.args.podResourceAllocation)
+			require.NoError(t, err)
 
-			err = sc.cache.SetPodResourceAllocation(tt.args.podResourceAllocation)
-			require.NoError(t, err, "failed to set pod resource allocation")
+			actual := originalSC.GetPodResourceAllocation()
+			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
 
-			err = sc.storeState()
-			require.NoError(t, err, "failed to store state")
+			newSC, err := NewStateCheckpoint(testDir, testCheckpoint)
+			require.NoError(t, err)
 
-			// deep copy cache
-			originCache := NewStateMemory()
-			podAllocation := sc.cache.GetPodResourceAllocation()
-			err = originCache.SetPodResourceAllocation(podAllocation)
-			require.NoError(t, err, "failed to set pod resource allocation")
-
-			err = sc.cache.ClearState()
-			require.NoError(t, err, "failed to clear state")
-
-			err = sc.restoreState()
-			require.NoError(t, err, "failed to restore state")
-
-			restoredCache := sc.cache
-			require.Equal(t, len(originCache.GetPodResourceAllocation()), len(restoredCache.GetPodResourceAllocation()), "restored pod resource allocation is not equal to original pod resource allocation")
-			for podUID, containerResourceList := range originCache.GetPodResourceAllocation() {
-				require.Equal(t, len(containerResourceList), len(restoredCache.GetPodResourceAllocation()[podUID]), "restored pod resource allocation is not equal to original pod resource allocation")
-				for containerName, resourceList := range containerResourceList {
-					for name, quantity := range resourceList.Requests {
-						if !quantity.Equal(restoredCache.GetPodResourceAllocation()[podUID][containerName].Requests[name]) {
-							t.Errorf("restored pod resource allocation is not equal to original pod resource allocation")
-						}
-					}
-				}
-			}
+			actual = newSC.GetPodResourceAllocation()
+			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
 		})
 	}
 }

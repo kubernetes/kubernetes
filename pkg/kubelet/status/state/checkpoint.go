@@ -18,6 +18,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
@@ -32,7 +33,7 @@ type PodResourceAllocationInfo struct {
 
 // Checkpoint represents a structure to store pod resource allocation checkpoint data
 type Checkpoint struct {
-	// Data is a JSON serialized checkpoint data
+	// Data is a serialized PodResourceAllocationInfo
 	Data string `json:"data"`
 	// Checksum is a checksum of Data
 	Checksum checksum.Checksum `json:"checksum"`
@@ -47,7 +48,7 @@ func NewCheckpoint(allocations *PodResourceAllocationInfo) (*Checkpoint, error) 
 	}
 
 	cp := &Checkpoint{
-		Data: string(praData),
+		Data: string(serializedAllocations),
 	}
 	cp.Checksum = checksum.New(cp.Data)
 	return cp, nil
