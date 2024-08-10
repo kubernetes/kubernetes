@@ -179,7 +179,7 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		{Name: "secure-port", Value: fmt.Sprintf("%d", localAPIEndpoint.BindPort)},
 		{Name: "allow-privileged", Value: "true"},
 		{Name: "kubelet-preferred-address-types", Value: "InternalIP,ExternalIP,Hostname"},
-		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
+		// add options to configure the front proxy.  Without the generated client cert, this will never be usable
 		// so add it unconditionally with recommended values
 		{Name: "requestheader-username-headers", Value: "X-Remote-User"},
 		{Name: "requestheader-group-headers", Value: "X-Remote-Group"},

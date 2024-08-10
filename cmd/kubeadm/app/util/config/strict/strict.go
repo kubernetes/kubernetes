@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-// VerifyUnmarshalStrict takes a slice of schems, a JSON/YAML byte slice and a GroupVersionKind
+// VerifyUnmarshalStrict takes a slice of schemes, a JSON/YAML byte slice and a GroupVersionKind
 // and verifies if the schema is known and if the byte slice unmarshals with strict mode.
 func VerifyUnmarshalStrict(schemes []*runtime.Scheme, gvk schema.GroupVersionKind, bytes []byte) error {
 	var scheme *runtime.Scheme
