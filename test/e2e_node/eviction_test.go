@@ -626,7 +626,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			prePullImagesIfNeccecary := func() {
+			prePullImagesIfNecessary := func() {
 				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 					// The disk eviction test may cause the prepulled images to be evicted,
 					// prepull those images again to ensure this test not affect following tests.
@@ -634,7 +634,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				}
 			}
 			// Run prePull using a defer to make sure it is executed even when the assertions below fails
-			defer prePullImagesIfNeccecary()
+			defer prePullImagesIfNecessary()
 
 			ginkgo.By("deleting pods")
 			for _, spec := range testSpecs {
@@ -654,7 +654,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 			reduceAllocatableMemoryUsageIfCgroupv1()
 			ginkgo.By("making sure we have all the required images for testing")
-			prePullImagesIfNeccecary()
+			prePullImagesIfNecessary()
 
 			// Ensure that the NodeCondition hasn't returned after pulling images
 			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s doesn't exist again after pulling images", expectedNodeCondition))

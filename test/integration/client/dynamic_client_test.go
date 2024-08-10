@@ -262,7 +262,7 @@ func TestUnstructuredExtract(t *testing.T) {
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(result.ClientConfig)
 	extractor, err := metav1ac.NewUnstructuredExtractor(discoveryClient)
 	if err != nil {
-		t.Fatalf("unexpected error when constructing extrator: %v", err)
+		t.Fatalf("unexpected error when constructing extractor: %v", err)
 	}
 	extracted, err := extractor.Extract(actual, mgr)
 	if err != nil {

@@ -516,13 +516,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		})
 
-		ginkgo.It("should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 without failing container", func(ctx context.Context) {
+		ginkgo.It("should perform canary updates and phased rolling updates of template modifications for partition1 and delete pod-0 without failing container", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet without failing container")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			deletingPodForRollingUpdatePartitionTest(ctx, f, c, ns, ss)
 		})
 
-		ginkgo.It("should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 with failing container", func(ctx context.Context) {
+		ginkgo.It("should perform canary updates and phased rolling updates of template modifications for partition1 and delete pod-0 with failing container", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet with failing container")
 			ss := e2estatefulset.NewStatefulSet("ss3", ns, headlessSvcName, 3, nil, nil, labels)
 			ss.Spec.Template.Spec.Containers = append(ss.Spec.Template.Spec.Containers, v1.Container{
@@ -2259,7 +2259,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	}
 }
 
-// This function is used canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0
+// This function is used canary updates and phased rolling updates of template modifications for partition1 and delete pod-0
 func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.Framework, c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	setHTTPProbe(ss)
 	ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
@@ -2589,9 +2589,9 @@ func verifyStatefulSetPVCsExist(ctx context.Context, c clientset.Interface, ss *
 }
 
 // verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
-func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, claimIndicies []int, wantSetRef, wantPodRef bool) error {
+func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, claimIndices []int, wantSetRef, wantPodRef bool) error {
 	indexSet := map[int]struct{}{}
-	for _, id := range claimIndicies {
+	for _, id := range claimIndices {
 		indexSet[id] = struct{}{}
 	}
 	set := getStatefulSet(ctx, c, ss.Namespace, ss.Name)

@@ -75,8 +75,8 @@ func TestDynamicClientBuilder(t *testing.T) {
 	defer tearDownFn()
 
 	// We want to test if the token rotation works fine here.
-	// To minimize the time this test would consume, we use the minimial token expiration.
-	// The minimial token expiration is defined in:
+	// To minimize the time this test would consume, we use the minimal token expiration.
+	// The minimal token expiration is defined in:
 	// pkg/apis/authentication/validation/validation.go
 	exp := int64(600)
 	leeway := 99
@@ -94,7 +94,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	}
 
 	if err = testClientBuilder(dymClient, ns, saName); err != nil {
-		t.Fatalf("dynamic client get resources failed befroe deleting sa: %v", err)
+		t.Fatalf("dynamic client get resources failed before deleting sa: %v", err)
 	}
 
 	// We want to trigger token rotation here by deleting service account

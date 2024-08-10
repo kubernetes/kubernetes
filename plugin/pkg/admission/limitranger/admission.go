@@ -584,7 +584,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 		addResourceList(reqs, containerReqs)
 	}
 
-	restartableInitCotnainerReqs := api.ResourceList{}
+	restartableInitContainerReqs := api.ResourceList{}
 	initContainerReqs := api.ResourceList{}
 	// init containers define the minimum of any resource
 	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
@@ -596,12 +596,12 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 			addResourceList(reqs, containerReqs)
 
 			// track our cumulative restartable init container resources
-			addResourceList(restartableInitCotnainerReqs, containerReqs)
-			containerReqs = restartableInitCotnainerReqs
+			addResourceList(restartableInitContainerReqs, containerReqs)
+			containerReqs = restartableInitContainerReqs
 		} else {
 			tmp := api.ResourceList{}
 			addResourceList(tmp, containerReqs)
-			addResourceList(tmp, restartableInitCotnainerReqs)
+			addResourceList(tmp, restartableInitContainerReqs)
 			containerReqs = tmp
 		}
 

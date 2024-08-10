@@ -208,7 +208,7 @@
     request with a "compilation failed" error message.
   release: v1.28
   file: test/e2e/apimachinery/webhook.go
-- testname: Validing Admission webhook, reject validating webhook configurations with
+- testname: Validating Admission webhook, reject validating webhook configurations with
     invalid matchConditions
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     reject validating webhook configurations with invalid match conditions [Conformance]'
@@ -414,7 +414,7 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
-- testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+- testname: Discovery, confirm the groupVersion and a resourcefrom each apiGroup
   codename: '[sig-api-machinery] Discovery should locate the groupVersion and a resource
     within each APIGroup [Conformance]'
   description: A resourceList MUST be found for each apiGroup that is retrieved. For
@@ -632,7 +632,7 @@
     fail as the request exceeds ResourceQuota limits. Update the successfully created
     pod's resource requests. Updation MUST fail as a Pod can not dynamically update
     its resource requirements. Delete the successfully created Pod. Pod Deletion MUST
-    be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus
+    be successful and it MUST release the allocated resource counts from ResourceQuotaStatus
     of the ResourceQuota.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
@@ -2146,8 +2146,8 @@
   codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
     containers in an existing pod [Conformance]'
   description: Adding an ephemeral container to pod.spec MUST result in the container
-    running. There MUST now be only one ephermal container found. Updating the pod
-    with another ephemeral container MUST succeed. There MUST now be two ephermal
+    running. There MUST now be only one ephemeral container found. Updating the pod
+    with another ephemeral container MUST succeed. There MUST now be two ephemeral
     containers found.
   release: v1.28
   file: test/e2e/common/node/ephemeral_containers.go
@@ -2549,7 +2549,7 @@
   codename: '[sig-node] Security Context When creating a container with runAsUser
     should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]'
   description: 'Container is created with runAsUser option by passing uid 65534 to
-    run as unpriviledged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
+    run as unprivileged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
     is marked as LinuxOnly since Windows does not support running as UID / GID.'
   release: v1.15
   file: test/e2e/common/node/security_context.go
@@ -2573,7 +2573,7 @@
   codename: '[sig-node] Security Context should support container.SecurityContext.RunAsUser
     And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]'
   description: 'Container is created with runAsUser and runAsGroup option by passing
-    uid 1001 and gid 2002 at containr level. Pod MUST be in Succeeded phase. [LinuxOnly]:
+    uid 1001 and gid 2002 at container level. Pod MUST be in Succeeded phase. [LinuxOnly]:
     This test is marked as LinuxOnly since Windows does not support running as UID
     / GID.'
   release: v1.21

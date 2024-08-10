@@ -842,7 +842,7 @@ func TestSuccessPolicy_ReEnabling(t *testing.T) {
 
 	// First pod from index 0 succeeded
 	if err = setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 0); err != nil {
-		t.Fatalf("Failed tring to succeess pod with index 0")
+		t.Fatalf("Failed tring to success pod with index 0")
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active:      4,
@@ -857,7 +857,7 @@ func TestSuccessPolicy_ReEnabling(t *testing.T) {
 
 	// First pod from index 1 succeeded
 	if err = setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
-		t.Fatalf("Failed trying to succeess pod with index 1")
+		t.Fatalf("Failed trying to success pod with index 1")
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active:      3,

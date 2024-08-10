@@ -59,7 +59,7 @@ const (
 	ServiceCIDRProtectionFinalizer = "networking.k8s.io/service-cidr-finalizer"
 
 	// deletionGracePeriod is the time in seconds to wait to remove the finalizer from a ServiceCIDR to ensure the
-	// deletion informations has been propagated to the apiserver allocators to avoid allocating any IP address
+	// deletion information has been propagated to the apiserver allocators to avoid allocating any IP address
 	// before we complete delete the ServiceCIDR
 	deletionGracePeriod = 10 * time.Second
 )

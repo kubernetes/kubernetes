@@ -169,7 +169,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		// the PDB can be ignored, so delete the pod
 		deleteOptions := originalDeleteOptions
 
-		// We should check if resourceVersion is already set by the requestor
+		// We should check if resourceVersion is already set by the requester
 		// as it might be older than the pod we just fetched and should be
 		// honored.
 		if shouldEnforceResourceVersion(pod) && resourceVersionIsUnset(originalDeleteOptions) {

@@ -692,7 +692,7 @@ func TestBroadcastAddress(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "emty subnet",
+			name:    "empty subnet",
 			wantErr: true,
 		},
 		{

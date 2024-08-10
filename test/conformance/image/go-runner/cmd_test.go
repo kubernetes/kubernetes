@@ -105,7 +105,7 @@ func TestGetCmd(t *testing.T) {
 					testBinEnvKey:            "testbin",
 					extraArgsEnvKey:          "--extra=value with spaces:--extra=value with % anything!$$",
 					extraGinkgoArgsEnvKey:    `--ginkgo='with "quotes" and ':--ginkgo2=true$(foo)`,
-					extraArgsSeparaterEnvKey: ":",
+					extraArgsSeparatorEnvKey: ":",
 				},
 			},
 			expectArgs: []string{

@@ -1401,7 +1401,7 @@ keys if they already exist in the directory specified in the `--cert-dir` option
 [fluentd-gcp addon] Bumped fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
 [fluentd-gcp addon] Bumped event-exporter to v0.2.4 to pick up security fixes.
 [fluentd-gcp addon] Bumped prometheus-to-sd to v0.5.0 to pick up security fixes.
-[metatada-proxy addon] Bumped prometheus-to-sd v0.5.0 to pick up security fixes. ([#75362](https://github.com/kubernetes/kubernetes/pull/75362), [@serathius](https://github.com/serathius))
+[metadata-proxy addon] Bumped prometheus-to-sd v0.5.0 to pick up security fixes. ([#75362](https://github.com/kubernetes/kubernetes/pull/75362), [@serathius](https://github.com/serathius))
 - [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.2 to pick up security fixes. ([#76762](https://github.com/kubernetes/kubernetes/pull/76762), [@serathius](https://github.com/serathius))
 - The GCERegionalPersistentDisk feature gate (GA in 1.13) can no longer be disabled. The feature gate will be removed in v1.17. ([#77412](https://github.com/kubernetes/kubernetes/pull/77412), [@liggitt](https://github.com/liggitt))
 - GCE/Windows: When the service cannot be stopped Stackdriver logging processes are now force killed ([#77378](https://github.com/kubernetes/kubernetes/pull/77378), [@yujuhong](https://github.com/yujuhong))
@@ -1709,7 +1709,7 @@ filename | sha512 hash
 * This change enables a user to specify a DataSource/Kind of type "PersistentVolumeClaim" in their PVC spec.  This can then be detected by the external csi-provisioner and plugins if capable. ([#76913](https://github.com/kubernetes/kubernetes/pull/76913), [@j-griffith](https://github.com/j-griffith))
 * proxy/transport: Support Content-Encoding: deflate ([#76551](https://github.com/kubernetes/kubernetes/pull/76551), [@JieJhih](https://github.com/JieJhih))
 * Add --sort-by option to kubectl top command ([#75920](https://github.com/kubernetes/kubernetes/pull/75920), [@artmello](https://github.com/artmello))
-* Introduce Topolgy into the runtimeClass API ([#75744](https://github.com/kubernetes/kubernetes/pull/75744), [@yastij](https://github.com/yastij))
+* Introduce Topology into the runtimeClass API ([#75744](https://github.com/kubernetes/kubernetes/pull/75744), [@yastij](https://github.com/yastij))
 * Kubelet plugin registration now has retry and exponential backoff logic for when registration of plugins (like CSI or device plugin) fail. ([#73891](https://github.com/kubernetes/kubernetes/pull/73891), [@taragu](https://github.com/taragu))
 * Windows support for preserving the destination IP as the VIP when loadbalancing with DSR. ([#74825](https://github.com/kubernetes/kubernetes/pull/74825), [@ksubrmnn](https://github.com/ksubrmnn))
 * Add  NonPrempting field to the PriorityClass. ([#74614](https://github.com/kubernetes/kubernetes/pull/74614), [@denkensk](https://github.com/denkensk))
@@ -1847,7 +1847,7 @@ filename | sha512 hash
 * kubeadm: expose the kubeadm reset command as phases ([#77847](https://github.com/kubernetes/kubernetes/pull/77847), [@yagonobre](https://github.com/yagonobre))
 * kubeadm: kubeadm alpha certs renew  --csr-only now reads the current certificates as the authoritative source for certificates attributes (same as kubeadm alpha certs renew) ([#77780](https://github.com/kubernetes/kubernetes/pull/77780), [@fabriziopandini](https://github.com/fabriziopandini))
 * Support "queue-sort" extension point for scheduling framework ([#77529](https://github.com/kubernetes/kubernetes/pull/77529), [@draveness](https://github.com/draveness))
-* Allow init container to get its own field value as environment variable values(downwardAPI spport) ([#75109](https://github.com/kubernetes/kubernetes/pull/75109), [@yuchengwu](https://github.com/yuchengwu))
+* Allow init container to get its own field value as environment variable values(downwardAPI support) ([#75109](https://github.com/kubernetes/kubernetes/pull/75109), [@yuchengwu](https://github.com/yuchengwu))
 * The metric `kube_proxy_sync_proxy_rules_last_timestamp_seconds` is now available, indicating the last time that kube-proxy successfully applied proxying rules. ([#74027](https://github.com/kubernetes/kubernetes/pull/74027), [@squeed](https://github.com/squeed))
 * Fix panic logspam when running kubelet in standalone mode. ([#77888](https://github.com/kubernetes/kubernetes/pull/77888), [@tallclair](https://github.com/tallclair))
 * consume the AWS region list from the AWS SDK instead of a hard-coded list in the cloud provider ([#75990](https://github.com/kubernetes/kubernetes/pull/75990), [@mcrute](https://github.com/mcrute))
@@ -2196,7 +2196,7 @@ filename | sha512 hash
     * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
     * [fluentd-gcp addon] Bump event-exporter to v0.2.4 to pick up security fixes.
     * [fluentd-gcp addon] Bump prometheus-to-sd to v0.5.0 to pick up security fixes.
-    * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
+    * [metadata-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * Support describe pod with inline csi volumes ([#75513](https://github.com/kubernetes/kubernetes/pull/75513), [@cwdsuzhou](https://github.com/cwdsuzhou))
 * Object count quota is now supported for namespaced custom resources using the count/<resource>.<group> syntax. ([#72384](https://github.com/kubernetes/kubernetes/pull/72384), [@zhouhaibing089](https://github.com/zhouhaibing089))
 * In case kubeadm can't access the current Kubernetes version remotely and fails to parse the git-based version it falls back to a static predefined value of k8s.io/kubernetes/cmd/kubeadm/app/constants.CurrentKubernetesVersion. ([#72454](https://github.com/kubernetes/kubernetes/pull/72454), [@rojkov](https://github.com/rojkov))

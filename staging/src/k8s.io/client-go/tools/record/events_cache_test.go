@@ -48,7 +48,7 @@ func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Eve
 		InvolvedObject: involvedObject,
 		Source: v1.EventSource{
 			Component: "kubelet",
-			Host:      "kublet.node1",
+			Host:      "kubelet.node1",
 		},
 		Count:          1,
 		FirstTimestamp: eventTime,

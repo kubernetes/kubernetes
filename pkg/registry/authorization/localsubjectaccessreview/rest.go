@@ -64,7 +64,7 @@ func (r *REST) GetSingularName() string {
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocalSubjectAccessReview: %#v", obj))
 	}
 	// clear fields if the featuregate is disabled
 	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {

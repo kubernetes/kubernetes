@@ -660,7 +660,7 @@ var _ = metrics.NewSummary(
 	)
 `},
 		{
-			testName: "error stable historgram with unknown bucket variable from unknown library",
+			testName: "error stable histogram with unknown bucket variable from unknown library",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
 			src: `
 package test

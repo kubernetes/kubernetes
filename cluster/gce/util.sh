@@ -244,7 +244,7 @@ function copy-to-staging() {
   local -r hash=$4
   local -r basename_tar=$(basename "${tar}")
 
-  #check whether this tar alread exists and has the same hash
+  #check whether this tar already exists and has the same hash
   #if it matches, then don't bother uploading it again
 
   #remote_tar_md5 checks the remote location for the existing tarball and its md5

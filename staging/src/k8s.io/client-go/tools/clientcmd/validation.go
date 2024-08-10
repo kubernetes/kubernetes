@@ -177,7 +177,7 @@ func Validate(config clientcmdapi.Config) error {
 	return newErrConfigurationInvalid(validationErrors)
 }
 
-// ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
+// ConfirmUsable looks a particular context and determines if that particular part of the config is usable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
 func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 	validationErrors := make([]error, 0)

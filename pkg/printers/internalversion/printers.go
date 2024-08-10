@@ -410,7 +410,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["signerName"]},
-		{Name: "Requestor", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
+		{Name: "Requester", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
 		{Name: "RequestedDuration", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["expirationSeconds"]},
 		{Name: "Condition", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
 	}
@@ -590,7 +590,7 @@ func AddHandlers(h printers.PrintHandler) {
 	validatingAdmissionPolicyBinding := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "PolicyName", Type: "string", Description: "PolicyName indicates the policy definition which the policy binding binded to"},
-		{Name: "ParamRef", Type: "string", Description: "ParamRef indicates the param resource which sets the configration param"},
+		{Name: "ParamRef", Type: "string", Description: "ParamRef indicates the param resource which sets the configuration param"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(validatingAdmissionPolicyBinding, printValidatingAdmissionPolicyBinding)

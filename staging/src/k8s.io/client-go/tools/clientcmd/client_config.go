@@ -432,7 +432,7 @@ func (config *DirectClientConfig) ConfigAccess() ConfigAccess {
 	return config.configAccess
 }
 
-// ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
+// ConfirmUsable looks a particular context and determines if that particular part of the config is usable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
 func (config *DirectClientConfig) ConfirmUsable() error {
 	validationErrors := make([]error, 0)

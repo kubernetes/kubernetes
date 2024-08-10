@@ -113,7 +113,7 @@ func (info *BaseEndpointInfo) IsServing() bool {
 	return info.serving
 }
 
-// IsTerminating retruns true if an endpoint is terminating. For pods,
+// IsTerminating returns true if an endpoint is terminating. For pods,
 // that is any pod with a deletion timestamp.
 func (info *BaseEndpointInfo) IsTerminating() bool {
 	return info.terminating

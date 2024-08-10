@@ -734,7 +734,7 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: false,
 		},
 		{
-			name: "Verify that PodAntiAffinity from existing pod is respected when pod statisfies PodAntiAffinity symmetry with the existing pod",
+			name: "Verify that PodAntiAffinity from existing pod is respected when pod satisfies PodAntiAffinity symmetry with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fake-name",

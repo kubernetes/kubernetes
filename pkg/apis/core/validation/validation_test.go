@@ -693,7 +693,7 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 			},
 		},
-		"inline-pvspec-with-missing-acess-modes": {
+		"inline-pvspec-with-missing-access-modes": {
 			isExpectedFailure: true,
 			isInlineSpec:      true,
 			pvSpec: &core.PersistentVolumeSpec{
@@ -969,17 +969,17 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 			oldPv:                nil,
 			expectValidationOpts: PersistentVolumeSpecValidationOptions{},
 		},
-		"nil old pv and feature-gate VolumeAttrributesClass is on": {
+		"nil old pv and feature-gate VolumeAttributesClass is on": {
 			oldPv:                       nil,
 			enableVolumeAttributesClass: true,
 			expectValidationOpts:        PersistentVolumeSpecValidationOptions{EnableVolumeAttributesClass: true},
 		},
-		"nil old pv and feature-gate VolumeAttrributesClass is off": {
+		"nil old pv and feature-gate VolumeAttributesClass is off": {
 			oldPv:                       nil,
 			enableVolumeAttributesClass: false,
 			expectValidationOpts:        PersistentVolumeSpecValidationOptions{EnableVolumeAttributesClass: false},
 		},
-		"old pv has volumeAttributesClass and feature-gate VolumeAttrributesClass is on": {
+		"old pv has volumeAttributesClass and feature-gate VolumeAttributesClass is on": {
 			oldPv: &core.PersistentVolume{
 				Spec: core.PersistentVolumeSpec{
 					VolumeAttributesClassName: ptr.To("foo"),
@@ -988,7 +988,7 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 			enableVolumeAttributesClass: true,
 			expectValidationOpts:        PersistentVolumeSpecValidationOptions{EnableVolumeAttributesClass: true},
 		},
-		"old pv has volumeAttributesClass and feature-gate VolumeAttrributesClass is off": {
+		"old pv has volumeAttributesClass and feature-gate VolumeAttributesClass is off": {
 			oldPv: &core.PersistentVolume{
 				Spec: core.PersistentVolumeSpec{
 					VolumeAttributesClassName: ptr.To("foo"),
@@ -1485,7 +1485,7 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 }
 
-func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
+func TestValidatePersistentVolumeAttributesClassUpdate(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure           bool
 		enableVolumeAttributesClass bool
@@ -2112,7 +2112,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source": {
+		"invalid-apigroup-in-data-source": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2130,7 +2130,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source-ref": {
+		"invalid-apigroup-in-data-source-ref": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2293,7 +2293,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2676,7 +2676,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2694,7 +2694,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSourceRef: &core.TypedObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -3055,7 +3055,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	tests := map[string]struct {
 		oldPvc                      *core.PersistentVolumeClaim
@@ -3069,14 +3069,14 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				EnableVolumeAttributesClass:       false,
 			},
 		},
-		"invaild apiGroup in dataSource allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
-		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
@@ -4784,7 +4784,7 @@ func TestValidateVolumes(t *testing.T) {
 				field: "downwardAPI.mode",
 			}},
 		}, {
-			name: "downapi empty metatada path",
+			name: "downapi empty metadata path",
 			vol: core.Volume{
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
@@ -19242,37 +19242,37 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			newClaim:                   noStoraegeClaimStatus,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-controller-resize-failed": {
+		"status-update-with-controller-resize-failed": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validResizeStatusControllerResizeFailed,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-pending": {
+		"status-update-with-node-resize-pending": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizePending,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-inprogress": {
+		"status-update-with-node-resize-inprogress": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizeInProgress,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-failed": {
+		"status-update-with-node-resize-failed": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizeFailed,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-invalid-native-resource-status-key": {
+		"status-update-with-invalid-native-resource-status-key": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidNativeResizeStatusPVC,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-valid-external-resource-status-key": {
+		"status-update-with-valid-external-resource-status-key": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validExternalResizeStatusPVC,
@@ -21988,15 +21988,15 @@ func TestCrossNamespaceSource(t *testing.T) {
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(nil, "UnsupportedKind", &goodNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with invalid namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with invalid namespace specified",
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &badNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with nil namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with nil namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, nil, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with empty namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with empty namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &emptyNS, goodName, false),
 	}, {
@@ -23511,7 +23511,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 			}},
 		},
 	}, {
-		name:            "Spec with feature enabled, pod-wide HostProcess=false, some contaienrs setting HostProccess=true should not validate",
+		name:            "Spec with feature enabled, pod-wide HostProcess=false, some containers setting HostProcess=true should not validate",
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
@@ -24266,10 +24266,10 @@ func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T)
 		"nil SecurityContext is valid": {
 			securityContext: nil,
 		},
-		"nil SupplementalGroupdPolicy is valid": {
+		"nil SupplementalGroupedPolicy is valid": {
 			securityContext: &core.PodSecurityContext{},
 		},
-		"non-empty SupplementalGroupdPolicy is invalid": {
+		"non-empty SupplementalGroupedPolicy is invalid": {
 			securityContext: &core.PodSecurityContext{
 				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
 			},

@@ -400,11 +400,11 @@ func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
 
 func expectNoSwap(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By("expecting no swap")
-	const offest = 1
+	const offset = 1
 
 	swapLimit, err := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
-	gomega.ExpectWithOffset(offest, err).ToNot(gomega.HaveOccurred())
-	gomega.ExpectWithOffset(offest, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
+	gomega.ExpectWithOffset(offset, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(offset, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
 }
 
 // supports v2 only as v1 shouldn't support LimitedSwap

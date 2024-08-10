@@ -180,7 +180,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			expectedHint: framework.Queue,
 		},
 		{
-			name:         "update node lable but not topologyKey",
+			name:         "update node label but not topologyKey",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("aaa", "a").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("aaa", "b").Obj(),

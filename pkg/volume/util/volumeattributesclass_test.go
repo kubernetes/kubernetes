@@ -32,7 +32,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		t2 = time.Now().Add(1 * time.Hour)
 	)
 
-	dirverName1 := "my-driver1"
+	driverName1 := "my-driver1"
 	vac1 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac1",
@@ -40,7 +40,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 				"a": "b",
 			},
 		},
-		DriverName: dirverName1,
+		DriverName: driverName1,
 	}
 	vac2 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -49,7 +49,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 				"a": "b",
 			},
 		},
-		DriverName: dirverName1,
+		DriverName: driverName1,
 	}
 	vac3 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +59,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 			},
 			CreationTimestamp: metav1.Time{Time: t1},
 		},
-		DriverName: dirverName1,
+		DriverName: driverName1,
 	}
 	vac4 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -69,7 +69,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 			},
 			CreationTimestamp: metav1.Time{Time: t2},
 		},
-		DriverName: dirverName1,
+		DriverName: driverName1,
 	}
 	vac5 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -79,10 +79,10 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 			},
 			CreationTimestamp: metav1.Time{Time: t2},
 		},
-		DriverName: dirverName1,
+		DriverName: driverName1,
 	}
 
-	dirverName2 := "my-driver2"
+	driverName2 := "my-driver2"
 	vac6 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac6",
@@ -90,7 +90,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 				"a": "b",
 			},
 		},
-		DriverName: dirverName2,
+		DriverName: driverName2,
 	}
 	vac7 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,7 +99,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 				AlphaIsDefaultVolumeAttributesClassAnnotation: "true",
 			},
 		},
-		DriverName: dirverName2,
+		DriverName: driverName2,
 	}
 
 	testCases := []struct {
@@ -110,35 +110,35 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 	}{
 		{
 			name:       "no volume attributes class",
-			driverName: dirverName1,
+			driverName: driverName1,
 		},
 		{
 			name:       "no default volume attributes class",
-			driverName: dirverName1,
+			driverName: driverName1,
 			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac6},
 			expect:     nil,
 		},
 		{
 			name:       "no default volume attributes class for the driverName1",
-			driverName: dirverName1,
+			driverName: driverName1,
 			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac6, vac7},
 			expect:     nil,
 		},
 		{
 			name:       "one default volume attributes class for the driverName1",
-			driverName: dirverName1,
+			driverName: driverName1,
 			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac3, vac6, vac7},
 			expect:     vac3,
 		},
 		{
 			name:       "two default volume attributes class with different creation timestamp for the driverName1",
-			driverName: dirverName1,
+			driverName: driverName1,
 			classes:    []*storagev1beta1.VolumeAttributesClass{vac3, vac4, vac6, vac7},
 			expect:     vac4,
 		},
 		{
 			name:       "two default volume attributes class with same creation timestamp for the driverName1",
-			driverName: dirverName1,
+			driverName: driverName1,
 			classes:    []*storagev1beta1.VolumeAttributesClass{vac4, vac5, vac6, vac7},
 			expect:     vac4,
 		},

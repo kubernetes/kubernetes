@@ -42,7 +42,7 @@ func NewPrivateKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
 
-// EncodeCertPEM returns PEM-endcoded certificate data
+// EncodeCertPEM returns PEM-encoded certificate data
 func EncodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
 		Type:  certificateBlockType,

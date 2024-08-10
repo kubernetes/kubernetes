@@ -365,7 +365,7 @@ filename | sha512 hash
     * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
     * [fluentd-gcp addon] Bump event-exporter to v0.2.4 to pick up security fixes.
     * [fluentd-gcp addon] Bump prometheus-to-sd to v0.5.0 to pick up security fixes.
-    * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
+    * [metadata-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * Fixed parsing of fsType in AWS StorageClass parameters ([#75944](https://github.com/kubernetes/kubernetes/pull/75944), [@jsafrane](https://github.com/jsafrane))
 * Node-Problem-Detector configuration is now decoupled from the Kubernetes release on GKE/GCE. ([#73288](https://github.com/kubernetes/kubernetes/pull/73288), [@wangzhen127](https://github.com/wangzhen127))
 * [IPVS] Allow for transparent kube-proxy restarts ([#75283](https://github.com/kubernetes/kubernetes/pull/75283), [@lbernail](https://github.com/lbernail))
@@ -1266,7 +1266,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 
 - \API calls for Azure instance metadata have been reduced to help avoid "too many requests" errors.. ([#67478](https://github.com/kubernetes/kubernetes/pull/67478), [@feiskyer](https://github.com/feiskyer))
 - Azure Go SDK has been upgraded to v19.0.0 and VirtualMachineScaleSetVM now supports availability zones. ([#66648](https://github.com/kubernetes/kubernetes/pull/66648), [@feiskyer](https://github.com/feiskyer))
-- User Assigned MSI (https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/overview), which provides for managed identities, is now suppored for Kubernetes clusters on Azure. ([#66180](https://github.com/kubernetes/kubernetes/pull/66180), [@kkmsft](https://github.com/kkmsft))
+- User Assigned MSI (https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/overview), which provides for managed identities, is now supported for Kubernetes clusters on Azure. ([#66180](https://github.com/kubernetes/kubernetes/pull/66180), [@kkmsft](https://github.com/kkmsft))
 - The Azure load balancer idle connection timeout for services is now configurable.([#66045](https://github.com/kubernetes/kubernetes/pull/6605), [@cpuguy83](https://github.com/cpuguy83))
 - When provisioning workloads, Kubernetes will now skip nodes that have a primary NIC in a 'Failed' provisioningState. ([#65412](https://github.com/kubernetes/kubernetes/pull/65412), [@yastij](https://github.com/yastij))
 - The NodeShutdown taint is now supported for Azure. ([#68033](https://github.com/kubernetes/kubernetes/pull/68033), [@yastij](https://github.com/yastij))
@@ -1689,7 +1689,7 @@ filename | sha256 hash
              name: azure-cloud-provider
              namespace: kube-system
     ```
-    * If the clusterrole with same has already been provisioned (e.g. for accessing azurefile secrets), then the above yaml should be merged togather, e.g.
+    * If the clusterrole with same has already been provisioned (e.g. for accessing azurefile secrets), then the above yaml should be merged together, e.g.
     ```
          kind: List
          apiVersion: v1
@@ -2262,7 +2262,7 @@ filename | sha256 hash
 * Reload systemd config files before starting kubelet. ([#65702](https://github.com/kubernetes/kubernetes/pull/65702), [@mborsz](https://github.com/mborsz))
 * Unix: support ZFS as a valid graph driver for Docker ([#65635](https://github.com/kubernetes/kubernetes/pull/65635), [@neolit123](https://github.com/neolit123))
 * Fix controller-manager crashes when flex plugin is removed from flex plugin directory ([#65536](https://github.com/kubernetes/kubernetes/pull/65536), [@gnufied](https://github.com/gnufied))
-* Enable etcdv3 client prometheus metics ([#64741](https://github.com/kubernetes/kubernetes/pull/64741), [@wgliang](https://github.com/wgliang))
+* Enable etcdv3 client prometheus metrics ([#64741](https://github.com/kubernetes/kubernetes/pull/64741), [@wgliang](https://github.com/wgliang))
 * skip nodes that have a primary NIC in a 'Failed' provisioningState ([#65412](https://github.com/kubernetes/kubernetes/pull/65412), [@yastij](https://github.com/yastij))
 * kubeadm: remove redundant flags settings for kubelet ([#64682](https://github.com/kubernetes/kubernetes/pull/64682), [@dixudx](https://github.com/dixudx))
 * Fixes the wrong elasticsearch node counter ([#65627](https://github.com/kubernetes/kubernetes/pull/65627), [@IvanovOleg](https://github.com/IvanovOleg))
@@ -2312,7 +2312,7 @@ filename | sha256 hash
 * Pass cluster_location argument to Heapster ([#65176](https://github.com/kubernetes/kubernetes/pull/65176), [@kawych](https://github.com/kawych))
 * Fix a scalability issue where high rates of event writes degraded etcd performance. ([#64539](https://github.com/kubernetes/kubernetes/pull/64539), [@ccding](https://github.com/ccding))
 * Corrected a mistake in the documentation for wait.PollImmediate(...) ([#65026](https://github.com/kubernetes/kubernetes/pull/65026), [@spew](https://github.com/spew))
-* Split 'scheduling_latency_seconds' metric into finer steps (predicate, priority, premption) ([#65306](https://github.com/kubernetes/kubernetes/pull/65306), [@shyamjvs](https://github.com/shyamjvs))
+* Split 'scheduling_latency_seconds' metric into finer steps (predicate, priority, preemption) ([#65306](https://github.com/kubernetes/kubernetes/pull/65306), [@shyamjvs](https://github.com/shyamjvs))
 * Etcd health checks by the apiserver now ensure the apiserver can connect to and exercise the etcd API ([#65027](https://github.com/kubernetes/kubernetes/pull/65027), [@liggitt](https://github.com/liggitt))
 * Add e2e regression tests for the kubelet being secure ([#64140](https://github.com/kubernetes/kubernetes/pull/64140), [@dixudx](https://github.com/dixudx))
 * set EnableHTTPSTrafficOnly in azure storage account creation ([#64957](https://github.com/kubernetes/kubernetes/pull/64957), [@andyzhangx](https://github.com/andyzhangx))

@@ -72,7 +72,7 @@ of nodes being simulated as the id, or 'all' in case running the full suite.
 It's also possible to run a custom test configuration by passing the -c option. With this option, it then
 possible to specify the number of nodes to simulate and the API server qps values for creation,
 IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the
-qps parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
+qps parameters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
 default allocator is the RangeAllocator.
 
 Code Organization

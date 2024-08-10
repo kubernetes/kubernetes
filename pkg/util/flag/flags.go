@@ -200,7 +200,7 @@ func (v *ReservedMemoryVar) Set(s string) error {
 		}
 		numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
 		if err != nil {
-			return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
+			return fmt.Errorf("failed to convert the NUMA node ID, expected integer, got %s", numaNodeReservation[0])
 		}
 
 		memoryReservation := kubeletconfig.MemoryReservation{

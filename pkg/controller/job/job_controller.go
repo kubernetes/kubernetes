@@ -1299,10 +1299,10 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 	}
 	var rmErr error
 	if len(podsToRemoveFinalizer) > 0 {
-		var rmSucceded []bool
-		rmSucceded, rmErr = jm.removeTrackingFinalizerFromPods(ctx, jobKey, podsToRemoveFinalizer)
+		var rmSucceeded []bool
+		rmSucceeded, rmErr = jm.removeTrackingFinalizerFromPods(ctx, jobKey, podsToRemoveFinalizer)
 		for i, p := range podsToRemoveFinalizer {
-			if rmSucceded[i] {
+			if rmSucceeded[i] {
 				uidsWithFinalizer.Delete(string(p.UID))
 			}
 		}

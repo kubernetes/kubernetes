@@ -242,7 +242,7 @@ func (m *manager) GetContainerResourceAllocation(podUID string, containerName st
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
-// GetPodResizeStatus returns the last checkpointed ResizeStaus value
+// GetPodResizeStatus returns the last checkpointed ResizeStatus value
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
 	m.podStatusesLock.RLock()

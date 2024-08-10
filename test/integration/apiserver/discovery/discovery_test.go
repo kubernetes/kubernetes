@@ -237,7 +237,7 @@ func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
 	require.NoError(t, WaitForGroups(ctx, client, basicTestGroupStale))
 	require.NoError(t, WaitForRootPaths(t, ctx, client, sets.New("/apis/"+basicTestGroup.Name), nil))
 
-	// Allow the APIService to start responding and ensure that Freshness is updated when the APIService is reacheable.
+	// Allow the APIService to start responding and ensure that Freshness is updated when the APIService is reachable.
 	close(apiServiceWaitCh)
 	require.NoError(t, WaitForGroups(ctx, client, basicTestGroupWithFixup))
 }
@@ -416,7 +416,7 @@ func TestCRD(t *testing.T) {
 			// Show that if CRD and APIService share a groupversion, and the
 			// APIService is deleted, and CRD updated, the APIService remains in
 			// discovery.
-			// This test simulates a resync of CRD controler to show that eventually
+			// This test simulates a resync of CRD controller to show that eventually
 			// APIService is recreated
 			Name: "CRDAPIServiceOverlap",
 			Actions: []testAction{
@@ -517,7 +517,7 @@ func TestCRD(t *testing.T) {
 		{
 			// Show that if CRD and a builtin share a group version,
 			// the builtin takes precedence in both versions of discovery
-			Name: "CRDBuiltinOverlapPrecence",
+			Name: "CRDBuiltinOverlapPrecedence",
 			Actions: []testAction{
 				// Create CRD that overrides a builtin
 				applyCRD(makeCRDSpec("apiextensions.k8s.io", "Bar", true, []string{"v1", "v2", "vfake"})),

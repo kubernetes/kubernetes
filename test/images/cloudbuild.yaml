@@ -21,7 +21,7 @@ steps:
     # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
     # We need to set the HOME to /root explicitly since we're using docker buildx
     - HOME=/root
-    # NOTE(claudiub): we need to call register.sh before creating and bootstraping a docker buildx instance.
+    # NOTE(claudiub): we need to call register.sh before creating and bootstrapping a docker buildx instance.
     args:
     - '-c'
     - |

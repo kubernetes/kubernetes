@@ -822,7 +822,7 @@ filename | sha512 hash
     * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
     * [fluentd-gcp addon] Bump event-exporter to v0.2.4 to pick up security fixes.
     * [fluentd-gcp addon] Bump prometheus-to-sd to v0.5.0 to pick up security fixes.
-    * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
+    * [metadata-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * kube-proxy no longer automatically cleans up network rules created by running kube-proxy in other modes. If you are switching the mode that kube-proxy is in running in (EG: iptables to IPVS), you will need to run `kube-proxy --cleanup`, or restart the worker node (recommended) before restarting kube-proxy. ([#76109](https://github.com/kubernetes/kubernetes/pull/76109), [@vllry](https://github.com/vllry))
     * If you are not switching kube-proxy between different modes, this change should not require any action.
     * This fixes a bug where restarting the iptables proxier can cause connections to fail (https://github.com/kubernetes/kubernetes/issues/75360).

@@ -1061,7 +1061,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 
 	upgradedAgain.Spec.IPFamilyPolicy = &singleStack
 	// api-server automatically  removes the secondary ClusterIP and IPFamily
-	// when a servie is downgraded.
+	// when a service is downgraded.
 	downgradedAgain, err := client.CoreV1().Services(metav1.NamespaceDefault).Update(tCtx, upgradedAgain, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error downgrading service to single stack. %v", err)
@@ -1226,7 +1226,7 @@ func TestPreferDualStack(t *testing.T) {
 }
 
 type labelsForMergePatch struct {
-	Labels map[string]string `json:"lables,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // tests an update service while dualstack flag is off
@@ -1544,7 +1544,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	if err := validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
 	}
-	// reconfigure the apiserver to be sinlge stack
+	// reconfigure the apiserver to be single stack
 	tearDownFn()
 
 	// reset secondary

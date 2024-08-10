@@ -7407,7 +7407,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref common.ReferenceCallbac
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -10135,7 +10135,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref common.ReferenceCa
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -10927,7 +10927,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
+							Description: "Audiences are the intended audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -13109,7 +13109,7 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.Re
 					},
 					"container": {
 						SchemaProps: spec.SchemaProps{
-							Description: "container is the name of the container in the pods of the scaling taget",
+							Description: "container is the name of the container in the pods of the scaling target",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -35719,7 +35719,7 @@ func schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref common.Refer
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -46377,7 +46377,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
+							Description: "Config defines configuration parameters that apply to each device that is claimed via this class. Some classes may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46508,7 +46508,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 					},
 					"allocationMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+							Description: "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -48352,7 +48352,7 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 					},
 					"volumeBindingMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is only honored by servers that enable the VolumeScheduling feature.\n\nPossible enum values:\n - `\"Immediate\"` indicates that PersistentVolumeClaims should be immediately provisioned and bound. This is the default mode.\n - `\"WaitForFirstConsumer\"` indicates that PersistentVolumeClaims should not be provisioned and bound until the first Pod is created that references the PeristentVolumeClaim. The volume provisioning and binding will occur during Pod scheduing.",
+							Description: "volumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is only honored by servers that enable the VolumeScheduling feature.\n\nPossible enum values:\n - `\"Immediate\"` indicates that PersistentVolumeClaims should be immediately provisioned and bound. This is the default mode.\n - `\"WaitForFirstConsumer\"` indicates that PersistentVolumeClaims should not be provisioned and bound until the first Pod is created that references the PersistentVolumeClaim. The volume provisioning and binding will occur during Pod scheduling.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Immediate", "WaitForFirstConsumer"},
@@ -48572,7 +48572,7 @@ func schema_k8sio_api_storage_v1_VolumeAttachmentSource(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistenVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
+				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistentVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"persistentVolumeName": {
@@ -48955,7 +48955,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistenVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
+				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistentVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"persistentVolumeName": {
@@ -50016,7 +50016,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistenVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
+				Description: "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistentVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"persistentVolumeName": {
@@ -51850,7 +51850,7 @@ func schema_pkg_apis_apiextensions_v1_SelectableField(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"jsonPath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "jsonPath is a simple JSON path which is evaluated against each custom resource to produce a field selector value. Only JSON paths without the array notation are allowed. Must point to a field of type string, boolean or integer. Types with enum values and strings with formats are allowed. If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string. Must not point to metdata fields. Required.",
+							Description: "jsonPath is a simple JSON path which is evaluated against each custom resource to produce a field selector value. Only JSON paths without the array notation are allowed. Must point to a field of type string, boolean or integer. Types with enum values and strings with formats are allowed. If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string. Must not point to metadata fields. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -53405,7 +53405,7 @@ func schema_pkg_apis_apiextensions_v1beta1_SelectableField(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"jsonPath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "jsonPath is a simple JSON path which is evaluated against each custom resource to produce a field selector value. Only JSON paths without the array notation are allowed. Must point to a field of type string, boolean or integer. Types with enum values and strings with formats are allowed. If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string. Must not point to metdata fields. Required.",
+							Description: "jsonPath is a simple JSON path which is evaluated against each custom resource to produce a field selector value. Only JSON paths without the array notation are allowed. Must point to a field of type string, boolean or integer. Types with enum values and strings with formats are allowed. If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string. Must not point to metadata fields. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -56666,7 +56666,7 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 					},
 					"omitManagedFields": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. This is used as a global default - a value of 'true' will omit the managed fileds, otherwise the managed fields will be included in the API audit log. Note that this can also be specified per rule in which case the value specified in a rule will override the global default.",
+							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. This is used as a global default - a value of 'true' will omit the managed fields, otherwise the managed fields will be included in the API audit log. Note that this can also be specified per rule in which case the value specified in a rule will override the global default.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -56885,7 +56885,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"omitManagedFields": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. - a value of 'true' will drop the managed fields from the API audit log - a value of 'false' indicates that the managed fileds should be included\n  in the API audit log\nNote that the value, if specified, in this rule will override the global default If a value is not specified then the global default specified in Policy.OmitManagedFields will stand.",
+							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. - a value of 'true' will drop the managed fields from the API audit log - a value of 'false' indicates that the managed fields should be included\n  in the API audit log\nNote that the value, if specified, in this rule will override the global default If a value is not specified then the global default specified in Policy.OmitManagedFields will stand.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -62033,7 +62033,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"eventBurst": {
 						SchemaProps: spec.SchemaProps{
-							Description: "eventBurst is the maximum size of a burst of event creations, temporarily allows event creations to burst to this number, while still not exceeding eventRecordQPS. This field canot be a negative number and it is only used when eventRecordQPS > 0. Default: 100",
+							Description: "eventBurst is the maximum size of a burst of event creations, temporarily allows event creations to burst to this number, while still not exceeding eventRecordQPS. This field cannot be a negative number and it is only used when eventRecordQPS > 0. Default: 100",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

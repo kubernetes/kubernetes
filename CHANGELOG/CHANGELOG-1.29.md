@@ -1313,7 +1313,7 @@ name | architectures
 - Added container filesystem to the `ImageFsInfoResponse`. ([#120914](https://github.com/kubernetes/kubernetes/pull/120914), [@kannon92](https://github.com/kannon92))
 - Added multiplication functionality to `Quantity`. ([#117411](https://github.com/kubernetes/kubernetes/pull/117411), [@tenzen-y](https://github.com/tenzen-y))
 - Added new feature gate called `RuntimeClassInImageCriApi` to address `kubelet` changes needed for KEP 4216.
-  Noteable changes:
+  Notable changes:
   1. Populate new `RuntimeHandler` field in CRI's `ImageSpec` struct during image pulls from container runtimes.
   2. Pass `runtimeHandler` field in `RemoveImage()` call to container runtime in `kubelet`'s image garbage collection. ([#121456](https://github.com/kubernetes/kubernetes/pull/121456), [@kiashok](https://github.com/kiashok))
 - Added support for split image filesystem in kubelet. ([#120616](https://github.com/kubernetes/kubernetes/pull/120616), [@kannon92](https://github.com/kannon92))
@@ -2248,7 +2248,7 @@ name | architectures
 - Add multiplication functionality to Quantity. ([#117411](https://github.com/kubernetes/kubernetes/pull/117411), [@tenzen-y](https://github.com/tenzen-y)) [SIG API Machinery]
 - Added a new `--init-only` command line flag to `kube-proxy`. Setting the flag makes `kube-proxy` perform its initial configuration that requires privileged mode, and then exit. The `--init-only` mode is intended to be executed in a privileged init container, so that the main container may run with a stricter `securityContext`. ([#120864](https://github.com/kubernetes/kubernetes/pull/120864), [@uablrek](https://github.com/uablrek)) [SIG Network and Scalability]
 - Added new feature gate called "RuntimeClassInImageCriApi" to address kubelet changes needed for KEP 4216.
-  Noteable changes:
+  Notable changes:
   1. Populate new RuntimeHandler field in CRI's ImageSpec struct during image pulls from container runtimes.
   2. Pass runtimeHandler field in RemoveImage() call to container runtime in kubelet's image garbage collection ([#121456](https://github.com/kubernetes/kubernetes/pull/121456), [@kiashok](https://github.com/kiashok)) [SIG Node and Windows]
 - Adds `apiextensions_apiserver_update_ratcheting_time` metric for tracking time taken during requests by feature `CRDValidationRatcheting` ([#121462](https://github.com/kubernetes/kubernetes/pull/121462), [@alexzielenski](https://github.com/alexzielenski)) [SIG API Machinery]

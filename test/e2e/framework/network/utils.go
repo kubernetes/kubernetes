@@ -267,7 +267,7 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 		if config.EndpointsHostNetwork {
 			// Hostname behavior for hostNetwork pods is not well defined and when
 			// using the flag hostname-override in the kubelet, the node reported
-			// hostname on host network pods will not match the node's hostanme.
+			// hostname on host network pods will not match the node's hostname.
 			// It seems that the node.status.addresses hostname value is the only
 			// one that matches the value returned by os.Hostname
 			// used by the agnhost web handler, so we'll use that value.

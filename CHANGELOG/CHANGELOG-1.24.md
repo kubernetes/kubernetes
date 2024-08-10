@@ -2586,10 +2586,10 @@ Service `ClusterIP` are unique, hence, trying to create a Service with a `Cluste
 - An alpha flag `--subresource` is added to get, patch, edit replace kubectl commands to fetch and update status and scale subresources. ([#99556](https://github.com/kubernetes/kubernetes/pull/99556), [@nikhita](https://github.com/nikhita))
 - Apiextensions_openapi_v3_regeneration_count metric (alpha) will be emitted for OpenAPI V3. ([#109128](https://github.com/kubernetes/kubernetes/pull/109128), [@Jefftree](https://github.com/Jefftree))
 - Apply ProxyTerminatingEndpoints to all traffic policies (external, internal, cluster, local). ([#108691](https://github.com/kubernetes/kubernetes/pull/108691), [@andrewsykim](https://github.com/andrewsykim))
-- CEL regex patterns in x-kubernetes-valiation rules are compiled when CRDs are created/updated if the pattern is provided as a string constant in the expression. Any regex compile errors are reported as a CRD create/update validation error. ([#108617](https://github.com/kubernetes/kubernetes/pull/108617), [@jpbetz](https://github.com/jpbetz))
+- CEL regex patterns in x-kubernetes-validation rules are compiled when CRDs are created/updated if the pattern is provided as a string constant in the expression. Any regex compile errors are reported as a CRD create/update validation error. ([#108617](https://github.com/kubernetes/kubernetes/pull/108617), [@jpbetz](https://github.com/jpbetz))
 - CRD `x-kubernetes-validations` rules now support the CEL functions: `isSorted`, `sum`, `min`, `max`, `indexOf`, `lastIndexOf`, `find` and `findAll`. ([#108312](https://github.com/kubernetes/kubernetes/pull/108312), [@jpbetz](https://github.com/jpbetz))
 - Changes the kubectl `--validate` flag from a bool to a string that accepts the values {true, strict, warn, false, ignore}
-  - true/strict - perform validation and error the request on any invalid fields in the ojbect. It will attempt to perform server-side validation if it is enabled on the apiserver, otherwise it will fall back to client-side validation.
+  - true/strict - perform validation and error the request on any invalid fields in the object. It will attempt to perform server-side validation if it is enabled on the apiserver, otherwise it will fall back to client-side validation.
   - warn - perform server-side validation and warn on any invalid fields (but ultimately let the request succeed by dropping any invalid fields from the object). If validation is not available on the server, perform no validation.
   - false/ignore - perform no validation, silently dropping invalid fields from the object. ([#108350](https://github.com/kubernetes/kubernetes/pull/108350), [@kevindelgado](https://github.com/kevindelgado))
 - Client-go metrics: change bucket distribution for `rest_client_request_duration_seconds` and `rest_client_rate_limiter_duration_seconds` from [0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512] to [0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0}] ([#106911](https://github.com/kubernetes/kubernetes/pull/106911), [@aojea](https://github.com/aojea))
@@ -2658,14 +2658,14 @@ Service `ClusterIP` are unique, hence, trying to create a Service with a `Cluste
 
 ### Bug or Regression
 
-- A node IP provided to kublet via `--node-ip` will now be preferred for when determining the node's primary IP and using the external cloud provider (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin))
+- A node IP provided to kubelet via `--node-ip` will now be preferred for when determining the node's primary IP and using the external cloud provider (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin))
 - A static pod that is rapidly updated was failing to start until the Kubelet was restarted. ([#107900](https://github.com/kubernetes/kubernetes/pull/107900), [@smarterclayton](https://github.com/smarterclayton))
 - Add one metrics(`kubelet_volume_stats_health_abnormal`) of volume health state to kubelet ([#108758](https://github.com/kubernetes/kubernetes/pull/108758), [@fengzixu](https://github.com/fengzixu))
 - Added a new label `type` to `apiserver_flowcontrol_request_execution_seconds` metric - it has the following values: - 'regular': indicates that it is a non long running request - 'watch': indicates that it is a watch request. ([#105517](https://github.com/kubernetes/kubernetes/pull/105517), [@tkashem](https://github.com/tkashem))
 - Added a test to guarantee that conformance clusters require at least 2 untainted nodes. ([#106313](https://github.com/kubernetes/kubernetes/pull/106313), [@aojea](https://github.com/aojea))
 - Adds PV deletion protection finalizer only when PV reclaimPolicy is Delete for dynamically provisioned volumes. ([#109205](https://github.com/kubernetes/kubernetes/pull/109205), [@deepakkinni](https://github.com/deepakkinni))
 - Allowed attached volumes to be mounted quicker by skipping exponential backoff when checking for reported-in-use volumes. ([#106853](https://github.com/kubernetes/kubernetes/pull/106853), [@gnufied](https://github.com/gnufied))
-- Alowed useful inclusion of `-args $prog_args` in KUBE_TEST_ARGS, when doing `make test-integration`. ([#107516](https://github.com/kubernetes/kubernetes/pull/107516), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
+- Allowed useful inclusion of `-args $prog_args` in KUBE_TEST_ARGS, when doing `make test-integration`. ([#107516](https://github.com/kubernetes/kubernetes/pull/107516), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
 - An inefficient lock in EndpointSlice controller metrics cache has been reworked. Network programming latency may be significantly reduced in certain scenarios, especially in clusters with a large number of Services. ([#107091](https://github.com/kubernetes/kubernetes/pull/107091), [@robscott](https://github.com/robscott))
 - Apiserver will now reject connection attempts to `0.0.0.0/::` when handling a proxy subresource request. ([#107402](https://github.com/kubernetes/kubernetes/pull/107402), [@anguslees](https://github.com/anguslees))
 - Bug: client-go clientset was not defaulting to the user agent, and was using the default golang agent for all the requests. ([#108772](https://github.com/kubernetes/kubernetes/pull/108772), [@aojea](https://github.com/aojea))
@@ -3262,9 +3262,9 @@ name | architectures
 - An alpha flag --subresource is added to get, patch, edit replace kubectl commands to fetch and update status and scale subresources. ([#99556](https://github.com/kubernetes/kubernetes/pull/99556), [@nikhita](https://github.com/nikhita)) [SIG API Machinery, CLI and Testing]
 - Apiextensions_openapi_v3_regeneration_count metric (alpha) will be emitted for OpenAPI V3. ([#109128](https://github.com/kubernetes/kubernetes/pull/109128), [@Jefftree](https://github.com/Jefftree)) [SIG API Machinery and Instrumentation]
 - Apply ProxyTerminatingEndpoints to all traffic policies (external, internal, cluster, local). ([#108691](https://github.com/kubernetes/kubernetes/pull/108691), [@andrewsykim](https://github.com/andrewsykim)) [SIG Network and Testing]
-- CEL regex patterns in x-kubernetes-valiation rules are compiled when CRDs are created/updated if the pattern is provided as a string constant in the expression. Any regex compile errors are reported as a CRD create/update validation error. ([#108617](https://github.com/kubernetes/kubernetes/pull/108617), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node and Storage]
+- CEL regex patterns in x-kubernetes-validation rules are compiled when CRDs are created/updated if the pattern is provided as a string constant in the expression. Any regex compile errors are reported as a CRD create/update validation error. ([#108617](https://github.com/kubernetes/kubernetes/pull/108617), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node and Storage]
 - Changes the kubectl --validate flag from a bool to a string that accepts the values {true, strict, warn, false, ignore}
-  - true/strict - perform validation and error the request on any invalid fields in the ojbect. It will attempt to perform server-side validation if it is enabled on the apiserver, otherwise it will fall back to client-side validation.
+  - true/strict - perform validation and error the request on any invalid fields in the object. It will attempt to perform server-side validation if it is enabled on the apiserver, otherwise it will fall back to client-side validation.
   - warn - perform server-side validation and warn on any invalid fields (but ultimately let the request succeed by dropping any invalid fields from the object). If validation is not available on the server, perform no validation.
   - false/ignore - perform no validation, silently dropping invalid fields from the object. ([#108350](https://github.com/kubernetes/kubernetes/pull/108350), [@kevindelgado](https://github.com/kevindelgado)) [SIG API Machinery, CLI, Node and Testing]
 - CycleState is now optimized for "write once and read many times". ([#108724](https://github.com/kubernetes/kubernetes/pull/108724), [@sanposhiho](https://github.com/sanposhiho)) [SIG Scheduling]
@@ -3295,7 +3295,7 @@ name | architectures
 
 ### Bug or Regression
 
-- A node IP provided to kublet via `--node-ip` will now be preferred for
+- A node IP provided to kubelet via `--node-ip` will now be preferred for
   when determining the node's primary IP and using the external cloud provider
   (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin)) [SIG Cloud Provider and Node]
 - Add one metrics(`kubelet_volume_stats_health_abnormal`) of volume health state to kubelet ([#108758](https://github.com/kubernetes/kubernetes/pull/108758), [@fengzixu](https://github.com/fengzixu)) [SIG Instrumentation, Node, Storage and Testing]

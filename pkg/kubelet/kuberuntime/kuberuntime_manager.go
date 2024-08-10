@@ -574,7 +574,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	currentMemoryLimit := apiContainerStatus.Resources.Limits.Memory().Value()
 	currentCPULimit := apiContainerStatus.Resources.Limits.Cpu().MilliValue()
 	currentCPURequest := apiContainerStatus.Resources.Requests.Cpu().MilliValue()
-	// Runtime container status resources (from CRI), if set, supercedes v1(api) container status resrouces.
+	// Runtime container status resources (from CRI), if set, supersedes v1(api) container status resources.
 	if kubeContainerStatus.Resources != nil {
 		if kubeContainerStatus.Resources.MemoryLimit != nil {
 			currentMemoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()

@@ -679,7 +679,7 @@ func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, mi
 	if numaNodesPerSocket == 0 {
 		return false
 	}
-	// minSockets refers to minimum number of socket required to satify allocation.
+	// minSockets refers to minimum number of socket required to satisfy allocation.
 	// A hint is considered socket aligned if sockets across which numa nodes span is equal to minSockets
 	minSockets := (minAffinitySize + numaNodesPerSocket - 1) / numaNodesPerSocket
 	return p.topology.CPUDetails.SocketsInNUMANodes(numaNodesBitMask...).Size() == minSockets

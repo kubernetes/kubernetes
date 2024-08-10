@@ -220,7 +220,7 @@ func assertStorageVersionEntries(t *testing.T, client kubernetes.Interface,
 		}
 		return true, nil
 	}); err != nil {
-		t.Fatalf("failed to get expected storage verion entries: %v, last error: %v", err, lastErr)
+		t.Fatalf("failed to get expected storage version entries: %v, last error: %v", err, lastErr)
 	}
 }
 

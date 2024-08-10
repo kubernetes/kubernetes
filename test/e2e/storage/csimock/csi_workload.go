@@ -157,5 +157,5 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 		return err == nil
 	})
 
-	framework.ExpectNoError(err, "failed: verifing PodInfo: %s", err)
+	framework.ExpectNoError(err, "failed: verifying PodInfo: %s", err)
 }

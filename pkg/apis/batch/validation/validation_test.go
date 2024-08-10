@@ -1479,7 +1479,7 @@ func TestValidateJobUpdate(t *testing.T) {
 	}
 	// This is to test immutability of the selector, both the new and old
 	// selector should match the labels in the template, which is immutable
-	// on its own; therfore, the only way to test selector immutability is
+	// on its own; therefore, the only way to test selector immutability is
 	// when the new selector is changed but still matches the existing labels.
 	newSelector := getValidGeneratedSelector()
 	newSelector.MatchLabels["foo"] = "bar"

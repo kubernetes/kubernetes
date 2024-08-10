@@ -261,7 +261,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	return s, nil
 }
 
-// checkBadConfig checks for bad/deprecated configuation
+// checkBadConfig checks for bad/deprecated configuration
 func checkBadConfig(s *ProxyServer) error {
 	var errors []error
 

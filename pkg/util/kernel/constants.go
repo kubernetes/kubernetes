@@ -20,7 +20,7 @@ package kernel
 // (ref: https://github.com/torvalds/linux/commit/122ff243f5f104194750ecbc76d5946dd1eec934)
 const IPLocalReservedPortsNamespacedKernelVersion = "3.16"
 
-// IPVSConnReuseModeMinSupportedKernelVersion is the minium kernel version supporting net.ipv4.vs.conn_reuse_mode.
+// IPVSConnReuseModeMinSupportedKernelVersion is the minimum kernel version supporting net.ipv4.vs.conn_reuse_mode.
 // (ref: https://github.com/torvalds/linux/commit/d752c364571743d696c2a54a449ce77550c35ac5)
 const IPVSConnReuseModeMinSupportedKernelVersion = "4.1"
 

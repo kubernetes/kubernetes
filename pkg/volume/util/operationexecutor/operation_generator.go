@@ -2148,7 +2148,7 @@ func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOp
 		// expansion operation should not block mounting
 		if volumetypes.IsFailedPreconditionError(resizeErr) {
 			actualStateOfWorld.MarkForInUseExpansionError(volumeToMount.VolumeName)
-			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.NodeExapndVolume failed", resizeErr).Error())
+			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.NodeExpandVolume failed", resizeErr).Error())
 			return true, nil
 		}
 		return false, resizeErr

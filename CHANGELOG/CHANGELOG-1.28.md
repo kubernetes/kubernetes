@@ -3495,7 +3495,7 @@ name | architectures
   generate http.Transports for the clients.
   
   - rest_client_transport_cache_entries is a gauge metric
-  with the number of existin entries in the internal cache
+  with the number of existing entries in the internal cache
   
   - rest_client_transport_create_calls_total is a counter
   that increments each time a new transport is created, storing

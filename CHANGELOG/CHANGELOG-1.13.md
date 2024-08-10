@@ -641,7 +641,7 @@ filename | sha512 hash
     * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
     * [fluentd-gcp addon] Bump event-exporter to v0.2.4 to pick up security fixes.
     * [fluentd-gcp addon] Bump prometheus-to-sd to v0.5.0 to pick up security fixes.
-    * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
+    * [metadata-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * Node-Problem-Detector configuration is now decoupled from the Kubernetes release on GKE/GCE. ([#73288](https://github.com/kubernetes/kubernetes/pull/73288), [@wangzhen127](https://github.com/wangzhen127))
 * [IPVS] Allow for transparent kube-proxy restarts ([#75283](https://github.com/kubernetes/kubernetes/pull/75283), [@lbernail](https://github.com/lbernail))
 * [IPVS] Introduces flag ipvs-strict-arp to configure stricter ARP sysctls, defaulting to false to preserve existing behaviors. This was enabled by default in 1.13.0, which impacted a few CNI plugins. ([#75295](https://github.com/kubernetes/kubernetes/pull/75295), [@lbernail](https://github.com/lbernail))

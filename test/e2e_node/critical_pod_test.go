@@ -49,7 +49,7 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {
 		ginkgo.It("should be able to create and delete a critical pod", func(ctx context.Context) {
-			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
+			// because admission Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(ctx, f)
 			// Define test pods
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
@@ -92,7 +92,7 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 		})
 
 		f.It("should add DisruptionTarget condition to the preempted pod", func(ctx context.Context) {
-			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
+			// because admission Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(ctx, f)
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
 				Requests: v1.ResourceList{

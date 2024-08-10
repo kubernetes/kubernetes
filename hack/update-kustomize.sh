@@ -65,7 +65,7 @@ git add .
 git commit -a -m "Update kubectl kustomize to kyaml/$LATEST_KYAML, cmd/config/$LATEST_CONFIG, api/$LATEST_API, kustomize/$LATEST_KUSTOMIZE"
 
 echo -e "\n${color_blue:?}Verifying kubectl kustomize version${color_norm:?}"
-# We use `make` here intead of `go install` to ensure that all of the
+# We use `make` here instead of `go install` to ensure that all of the
 # linker-defined values are set.
 make -C "${KUBE_ROOT}" WHAT=./cmd/kubectl
 

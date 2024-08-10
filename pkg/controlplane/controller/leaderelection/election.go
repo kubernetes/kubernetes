@@ -58,7 +58,7 @@ func topologicalSortWithOneRoot(graph map[v1.CoordinatedLeaseStrategy][]v1.Coord
 		}
 	}
 
-	// If multiple nodes have indegree of 0, multiple strategies are non-superceding and is a conflict.
+	// If multiple nodes have indegree of 0, multiple strategies are non-superseding and is a conflict.
 	if len(queue) > 1 {
 		return nil
 	}

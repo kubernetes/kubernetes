@@ -193,7 +193,7 @@ type TestContextType struct {
 	// The Default IP Family of the cluster ("ipv4" or "ipv6")
 	IPFamily string
 
-	// NonblockingTaints is the comma-delimeted string given by the user to specify taints which should not stop the test framework from running tests.
+	// NonblockingTaints is the comma-delimited string given by the user to specify taints which should not stop the test framework from running tests.
 	NonblockingTaints string
 
 	// ProgressReportURL is the URL which progress updates will be posted to as tests complete. If empty, no updates are sent.

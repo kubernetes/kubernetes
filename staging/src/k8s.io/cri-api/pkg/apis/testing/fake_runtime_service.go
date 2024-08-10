@@ -57,7 +57,7 @@ type FakeContainer struct {
 	SandboxID string
 }
 
-// FakeRuntimeService is a fake runetime service.
+// FakeRuntimeService is a fake runtime service.
 type FakeRuntimeService struct {
 	sync.Mutex
 

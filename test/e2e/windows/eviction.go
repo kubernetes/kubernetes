@@ -93,7 +93,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 				podList, err := f.ClientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
 				framework.ExpectNoError(err)
 				for _, pod := range podList.Items {
-					framework.Logf("  Deleteing pod %s", pod.Name)
+					framework.Logf("  Deleting pod %s", pod.Name)
 					err = f.ClientSet.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err)
 				}

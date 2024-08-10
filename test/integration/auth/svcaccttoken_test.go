@@ -193,7 +193,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
+			t.Fatalf("expected err creating token for nonexistent svcacct but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		sa, delSvcAcct := createDeleteSvcAcct(t, cs, sa)
@@ -263,7 +263,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
+			t.Fatalf("expected err creating token for nonexistent svcacct but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		sa, del := createDeleteSvcAcct(t, cs, sa)
@@ -271,7 +271,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token bound to nonexistant pod but got: %#v", resp)
+			t.Fatalf("expected err creating token bound to nonexistent pod but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		pod, delPod := createDeletePod(t, cs, pod)
@@ -339,7 +339,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 			warningHandler.clear()
 			if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-				t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
+				t.Fatalf("expected err creating token for nonexistent svcacct but got: %#v", resp)
 			}
 			warningHandler.assertEqual(t, nil)
 			sa, del := createDeleteSvcAcct(t, cs, sa)
@@ -347,7 +347,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 			warningHandler.clear()
 			if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-				t.Fatalf("expected err creating token bound to nonexistant pod but got: %#v", resp)
+				t.Fatalf("expected err creating token bound to nonexistent pod but got: %#v", resp)
 			}
 			warningHandler.assertEqual(t, nil)
 			pod, delPod := createDeletePod(t, cs, scheduledpod)
@@ -467,7 +467,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
+			t.Fatalf("expected err creating token for nonexistent svcacct but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		sa, del := createDeleteSvcAcct(t, cs, sa)
@@ -475,7 +475,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token bound to nonexistant node but got: %#v", resp)
+			t.Fatalf("expected err creating token bound to nonexistent node but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		node, delNode := createDeleteNode(t, cs, node)
@@ -531,7 +531,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
+			t.Fatalf("expected err creating token for nonexistent svcacct but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		sa, del := createDeleteSvcAcct(t, cs, sa)
@@ -539,7 +539,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		warningHandler.clear()
 		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token bound to nonexistant secret but got: %#v", resp)
+			t.Fatalf("expected err creating token bound to nonexistent secret but got: %#v", resp)
 		}
 		warningHandler.assertEqual(t, nil)
 		secret, delSecret := createDeleteSecret(t, cs, secret)

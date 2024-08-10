@@ -714,7 +714,7 @@ func TestVolumeProvision(t *testing.T) {
 			pod:             makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
 			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
 		},
-		"topolgy unsatisfied": {
+		"topology unsatisfied": {
 			pod:         makePod("pod-pvc-topomismatch", config.ns, []string{"pvc-topomismatch"}),
 			unboundPvcs: []*testPVC{{"pvc-topomismatch", classTopoMismatch, ""}},
 			shouldFail:  true,

@@ -245,7 +245,7 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 // PingTime + electionDuration < time.Now: Candidate has not responded within the appropriate PingTime. Continue the election.
 // RenewTime + 5 seconds > time.Now: All candidates acked in the last 5 seconds, continue the election.
 func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.NamespacedName) (requeue time.Duration, err error) {
-	candidates, err := c.listAdmissableCandidates(leaseNN)
+	candidates, err := c.listAdmissibleCandidates(leaseNN)
 	if err != nil {
 		return defaultRequeueInterval, err
 	} else if len(candidates) == 0 {
@@ -415,7 +415,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	return defaultRequeueInterval, nil
 }
 
-func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1alpha1.LeaseCandidate, error) {
+func (c *Controller) listAdmissibleCandidates(leaseNN types.NamespacedName) ([]*v1alpha1.LeaseCandidate, error) {
 	leases, err := c.leaseCandidateInformer.Lister().LeaseCandidates(leaseNN.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err

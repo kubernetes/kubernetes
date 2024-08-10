@@ -495,7 +495,7 @@ filename | sha512 hash
 
 ### Bug or Regression
 
-- Fix detach from non-existant nodes and support dangling volumes (#104912, @gnufied) [SIG Cloud Provider and Storage]
+- Fix detach from non-existent nodes and support dangling volumes (#104912, @gnufied) [SIG Cloud Provider and Storage]
 - Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation (#105526, @harisund) [SIG Scheduling]
 
 ## Dependencies
@@ -926,7 +926,7 @@ filename | sha512 hash
 - Fixed a bug where startupProbe stopped working after a container's first restart ([#101093](https://github.com/kubernetes/kubernetes/pull/101093), [@wzshiming](https://github.com/wzshiming)) [SIG Node]
 - Fixed port-forward memory leak for long-running and heavily used connections. ([#99839](https://github.com/kubernetes/kubernetes/pull/99839), [@saschagrunert](https://github.com/saschagrunert)) [SIG API Machinery and Node]
 - Kubelet: improve the performance when waiting for a synchronization of the node list with the kube-apiserver ([#99336](https://github.com/kubernetes/kubernetes/pull/99336), [@neolit123](https://github.com/neolit123)) [SIG Node]
-- No support endpointslice in linux userpace mode ([#101502](https://github.com/kubernetes/kubernetes/pull/101502), [@JornShen](https://github.com/JornShen)) [SIG Network]
+- No support endpointslice in linux userspace mode ([#101502](https://github.com/kubernetes/kubernetes/pull/101502), [@JornShen](https://github.com/JornShen)) [SIG Network]
 
 ## Dependencies
 
@@ -1990,7 +1990,7 @@ You can find more information about how to restrict container system calls with 
 
 ### Production images moved to community control
 
-As of Kuberenetes v1.19, Kubernetes container images are stored on a community-controlled storage bucket, 
+As of Kubernetes v1.19, Kubernetes container images are stored on a community-controlled storage bucket, 
 located at `{asia,eu,us}.gcr.io/k8s-artifacts-prod`. The `k8s.gcr.io` vanity domain has been updated 
 to this new bucket. This brings production artifacts under community control.
 
@@ -2455,7 +2455,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 - For external storage e2e test suite, update external driver, to pick snapshot provisioner from VolumeSnapshotClass, when a VolumeSnapshotClass is explicitly provided as an input. ([#90878](https://github.com/kubernetes/kubernetes/pull/90878), [@saikat-royc](https://github.com/saikat-royc)) [SIG Storage and Testing]
 - Get-kube.sh: fix order to get the binaries from the right bucket ([#91635](https://github.com/kubernetes/kubernetes/pull/91635), [@cpanato](https://github.com/cpanato)) [SIG Release]
 - If firstTimestamp is not set use eventTime when printing event ([#89999](https://github.com/kubernetes/kubernetes/pull/89999), [@soltysh](https://github.com/soltysh)) [SIG CLI]
-- If we set parameter cgroupPerQos=false and cgroupRoot=/docker，this function will retrun  nodeAllocatableRoot=/docker/kubepods, it is not right, the correct return should be /docker.
+- If we set parameter cgroupPerQos=false and cgroupRoot=/docker，this function will return  nodeAllocatableRoot=/docker/kubepods, it is not right, the correct return should be /docker.
   cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver)
   
   kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
@@ -4194,7 +4194,7 @@ filename | sha512 hash
 - Fixes kubectl to apply all validly built objects, instead of stopping on error. ([#89848](https://github.com/kubernetes/kubernetes/pull/89848), [@seans3](https://github.com/seans3)) [SIG CLI and Testing]
 - For GCE cluster provider, fix bug of not being able to create internal type load balancer for clusters with more than 1000 nodes in a single zone. ([#89902](https://github.com/kubernetes/kubernetes/pull/89902), [@wojtek-t](https://github.com/wojtek-t)) [SIG Cloud Provider, Network and Scalability]
 - If firstTimestamp is not set use eventTime when printing event ([#89999](https://github.com/kubernetes/kubernetes/pull/89999), [@soltysh](https://github.com/soltysh)) [SIG CLI]
-- If we set parameter cgroupPerQos=false and cgroupRoot=/docker，this function will retrun  nodeAllocatableRoot=/docker/kubepods, it is not right, the correct return should be /docker.
+- If we set parameter cgroupPerQos=false and cgroupRoot=/docker，this function will return  nodeAllocatableRoot=/docker/kubepods, it is not right, the correct return should be /docker.
   cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver)
   
   kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))

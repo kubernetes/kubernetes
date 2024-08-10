@@ -113,7 +113,7 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Logf("Create namesapces resource: configmap %q", "config")
+	t.Logf("Create namespaces resource: configmap %q", "config")
 	if _, err := client.CoreV1().ConfigMaps("test").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "config"},
 		Data:       map[string]string{"foo": "bar"},

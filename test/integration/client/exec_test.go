@@ -764,7 +764,7 @@ func TestExecPluginRotationViaInformer(t *testing.T) {
 		return transport.NewDebuggingRoundTripper(rt, transport.DebugCurlCommand, transport.DebugURLTiming)
 	})
 
-	// Initialize informer spy wth invalid token.
+	// Initialize informer spy with invalid token.
 	// Make sure informer never syncs because it can't authenticate.
 	execPlugin.rotateToken(clientUnauthorizedToken, tokenLifetime)
 	informer, informerSpy := startConfigMapInformer(ctx, t, clientset.NewForConfigOrDie(clientConfig), ns.Name)

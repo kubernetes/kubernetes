@@ -1374,7 +1374,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			expectedReturnVal:      false,
 			expectedCurrentChange:  nil,
 		},
-		// ensure that only valide address types are processed
+		// ensure that only valid address types are processed
 		"add an FQDN slice (invalid address type)": {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),

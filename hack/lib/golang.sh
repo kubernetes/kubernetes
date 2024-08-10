@@ -159,7 +159,7 @@ kube::golang::dedup() {
 
 # Depends on values of user-facing KUBE_BUILD_PLATFORMS, KUBE_FASTBUILD,
 # and KUBE_BUILDER_OS.
-# Configures KUBE_SERVER_PLATFORMS, KUBE_NODE_PLATFOMRS,
+# Configures KUBE_SERVER_PLATFORMS, KUBE_NODE_PLATFORMS,
 # KUBE_TEST_PLATFORMS, and KUBE_CLIENT_PLATFORMS, then sets them
 # to readonly.
 # The configured vars will only contain platforms allowed by the

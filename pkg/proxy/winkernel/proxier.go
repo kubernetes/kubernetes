@@ -1768,7 +1768,7 @@ func (proxier *Proxier) deleteExistingLoadBalancer(hns HostNetworkService, winPr
 func (proxier *Proxier) deleteLoadBalancer(hns HostNetworkService, lbHnsID *string) bool {
 	klog.V(3).InfoS("Hns LoadBalancer delete triggered for loadBalancer resources", "lbHnsID", *lbHnsID)
 	if err := hns.deleteLoadBalancer(*lbHnsID); err != nil {
-		// This will be cleanup by cleanupStaleLoadbalancer fnction.
+		// This will be cleanup by cleanupStaleLoadbalancer function.
 		proxier.mapStaleLoadbalancers[*lbHnsID] = true
 	}
 	*lbHnsID = ""

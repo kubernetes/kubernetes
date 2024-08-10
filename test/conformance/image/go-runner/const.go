@@ -49,9 +49,9 @@ const (
 	// These are passed after the `--` and include things like `--provider`.
 	extraArgsEnvKey = "E2E_EXTRA_ARGS"
 
-	// extraArgsSeparaterEnvKey specifies how to split the extra args values. If unset,
+	// extraArgsSeparatorEnvKey specifies how to split the extra args values. If unset,
 	// it will default to splitting by spaces.
-	extraArgsSeparaterEnvKey = "E2E_EXTRA_ARGS_SEP"
+	extraArgsSeparatorEnvKey = "E2E_EXTRA_ARGS_SEP"
 
 	defaultSkip         = ""
 	defaultFocus        = "\\[Conformance\\]"

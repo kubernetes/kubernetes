@@ -31,7 +31,7 @@ import (
 )
 
 // fakeOGCounter is a simple OperationGenerator which counts number of times a function
-// has been caled
+// has been called
 type fakeOGCounter struct {
 	// calledFuncs stores name and count of functions
 	calledFuncs map[string]int

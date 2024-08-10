@@ -1074,7 +1074,7 @@ func verifyVolumeExistsWithSpecNameInVolumeDsw(
 	if podExistsInVolume := dsw.VolumeExistsWithSpecName(
 		expectedPodName, expectedVolumeSpecName); !podExistsInVolume {
 		t.Fatalf(
-			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
+			"DSW VolumeExistsWithSpecName returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
 	}
 }
@@ -1087,7 +1087,7 @@ func verifyVolumeDoesntExistWithSpecNameInVolumeDsw(
 	if podExistsInVolume := dsw.VolumeExistsWithSpecName(
 		expectedPodName, expectedVolumeSpecName); podExistsInVolume {
 		t.Fatalf(
-			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
+			"DSW VolumeExistsWithSpecName returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
 	}
 }

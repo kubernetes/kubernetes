@@ -338,7 +338,7 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 			case destPortDispatchRegexp.MatchString(rule):
 				// `^meta l4proto \. th dport vmap @(\S+)$`
 				// Looks up "protocol . destPort" in the indicated verdict map,
-				// and if found, runs the assocated verdict.
+				// and if found, runs the associated verdict.
 				match := destPortDispatchRegexp.FindStringSubmatch(rule)
 				mapName := match[1]
 				element := tracer.matchDestPort(tracer.nft.Table.Maps[mapName].Elements, protocol, destPort)

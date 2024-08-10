@@ -42,7 +42,7 @@ run_wait_tests() {
     # Post-Condition: deployments exists
     kube::test::get_object_assert "deployments" "{{range .items}}{{.metadata.name}},{{end}}" 'test-1,test-2,'
 
-    # wait with jsonpath will timout for busybox deployment
+    # wait with jsonpath will timeout for busybox deployment
     set +o errexit
     # Command: Wait with jsonpath support fields not exist in the first place
     output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1 2>&1)

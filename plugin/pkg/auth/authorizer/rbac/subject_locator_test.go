@@ -113,7 +113,7 @@ func TestSubjectLocator(t *testing.T) {
 					},
 				},
 				{
-					// verb matchies correctly
+					// verb matches correctly
 					&defaultAttributes{"", "", "create", "Pods", "", "ns1", ""},
 					[]rbacv1.Subject{
 						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},

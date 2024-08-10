@@ -317,7 +317,7 @@ func validatePodAlignment(ctx context.Context, f *framework.Framework, pod *v1.P
 	}
 }
 
-// validatePodAligmentWithPodScope validates whether all pod's CPUs are affined to the same NUMA node.
+// validatePodAlignmentWithPodScope validates whether all pod's CPUs are affined to the same NUMA node.
 func validatePodAlignmentWithPodScope(ctx context.Context, f *framework.Framework, pod *v1.Pod, envInfo *testEnvInfo) error {
 	// Mapping between CPU IDs and NUMA node IDs.
 	podsNUMA := make(map[int]int)

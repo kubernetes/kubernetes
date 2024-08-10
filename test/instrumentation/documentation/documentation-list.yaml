@@ -531,12 +531,12 @@
   - state
 - name: create_failures_total
   subsystem: ephemeral_volume_controller
-  help: Number of PersistenVolumeClaims creation requests
+  help: Number of PersistentVolumeClaims creation requests
   type: Counter
   stabilityLevel: ALPHA
 - name: create_total
   subsystem: ephemeral_volume_controller
-  help: Number of PersistenVolumeClaims creation requests
+  help: Number of PersistentVolumeClaims creation requests
   type: Counter
   stabilityLevel: ALPHA
 - name: client_expiration_renew_errors

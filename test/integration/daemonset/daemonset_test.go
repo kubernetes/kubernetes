@@ -756,7 +756,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	})
 }
 
-// TestInsufficientCapacityNodeDaemonSetCreateButNotLaunchPod tests thaat the DaemonSet should create
+// TestInsufficientCapacityNodeDaemonSetCreateButNotLaunchPod tests that the DaemonSet should create
 // Pods for all the nodes regardless of available resource on the nodes, and kube-scheduler should
 // not schedule Pods onto the nodes with insufficient resource.
 func TestInsufficientCapacityNode(t *testing.T) {
@@ -1029,7 +1029,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 			return false, fmt.Errorf("failed to list controllerrevision: %v", err)
 		}
 		if revs.Size() == 0 {
-			return false, fmt.Errorf("no avaialable controllerrevision")
+			return false, fmt.Errorf("no available controllerrevision")
 		}
 
 		for _, rev := range revs.Items {

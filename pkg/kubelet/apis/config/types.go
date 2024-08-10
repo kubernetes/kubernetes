@@ -533,7 +533,7 @@ type KubeletWebhookAuthorization struct {
 	CacheUnauthorizedTTL metav1.Duration
 }
 
-// KubeletAuthentication holds the Kubetlet Authentication setttings.
+// KubeletAuthentication holds the Kubetlet Authentication settings.
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication

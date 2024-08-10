@@ -2239,7 +2239,7 @@ Data corruption issue was found in etcd v3.5.0 release that was shipped with 1.2
   - `--address`
   The insecure port flags `--port` may only be set to 0 now.
   
-  In addtion, please be careful that:
+  In addition, please be careful that:
   - controller-manager MUST start with `--authorization-kubeconfig` and `--authentication-kubeconfig` correctly set to get authentication/authorization working.
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
@@ -2431,7 +2431,7 @@ Data corruption issue was found in etcd v3.5.0 release that was shipped with 1.2
 - The `BoundServiceAccountTokenVolume` graduates to GA and thus will be unconditionally enabled. The feature gate is going to be removed in 1.23. ([#101992](https://github.com/kubernetes/kubernetes/pull/101992), [@zshihang](https://github.com/zshihang))
 - The `EmptyDir` memory backed volumes are sized as the minimum of pod allocatable memory on a host and an optional explicit user provided value. ([#101048](https://github.com/kubernetes/kubernetes/pull/101048), [@dims](https://github.com/dims))
 - The `HugePageStorageMediumSize` feature graduates to GA and unconditionally enabled. Allowing unconditional usage of multiple sizes huge page resources on a container level. ([#99144](https://github.com/kubernetes/kubernetes/pull/99144), [@bart0sh](https://github.com/bart0sh))
-- The `IngressClassNamespacedParams` feature gate has graduated to beta and is enabled by default. This means IngressClass resource will now have two new fields - `spec.paramters.namespace` and `spec.parameters.scope`. ([#101711](https://github.com/kubernetes/kubernetes/pull/101711), [@hbagdi](https://github.com/hbagdi))
+- The `IngressClassNamespacedParams` feature gate has graduated to beta and is enabled by default. This means IngressClass resource will now have two new fields - `spec.parameters.namespace` and `spec.parameters.scope`. ([#101711](https://github.com/kubernetes/kubernetes/pull/101711), [@hbagdi](https://github.com/hbagdi))
 - The `LogarithmicScaleDown` feature graduates to Beta and enabled by default. ([#101767](https://github.com/kubernetes/kubernetes/pull/101767), [@damemi](https://github.com/damemi))
 - The `NamespaceDefaultLabelName` is promoted to GA in this release. All Namespace API objects have a `kubernetes.io/metadata.name` label matching their `metadata.name` field to allow selecting any `namespace` by its name using a label selector. ([#101342](https://github.com/kubernetes/kubernetes/pull/101342), [@rosenhouse](https://github.com/rosenhouse))
 - The `ServiceInternalTrafficPolicy` feature graduates to Beta and enable by default, which enables the `internalTrafficPolicy` field of Service by default. ([#103462](https://github.com/kubernetes/kubernetes/pull/103462), [@andrewsykim](https://github.com/andrewsykim))
@@ -3160,7 +3160,7 @@ filename | sha512 hash
 - Expose container start time as container_start_time_seconds in kubelet /metrics/resource endpoint ([#102444](https://github.com/kubernetes/kubernetes/pull/102444), [@sanwishe](https://github.com/sanwishe)) [SIG Instrumentation, Node and Testing]
 - Extended resources defined in LeastAllocated, MostAllocated and RequestedToCapacityRatio plugin argument are bypassed by the scheduler if the incoming Pod doesn't request them in the pod spec. ([#103169](https://github.com/kubernetes/kubernetes/pull/103169), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling]
 - Features gates `EndpointSliceProxying` & `WindowsEndpointSliceProxying` are now GA and cannot be disabled. Kube-proxy will use EndpointSlices for endpoint information. ([#103451](https://github.com/kubernetes/kubernetes/pull/103451), [@swetharepakula](https://github.com/swetharepakula)) [SIG Network]
-- IngressClassNamespacedParams feature gate has graduated to beta and is enabled by default. This means IngressClass resource will now have two new fields - `spec.paramters.namespace` and `spec.parameters.scope`. ([#101711](https://github.com/kubernetes/kubernetes/pull/101711), [@hbagdi](https://github.com/hbagdi)) [SIG Network]
+- IngressClassNamespacedParams feature gate has graduated to beta and is enabled by default. This means IngressClass resource will now have two new fields - `spec.parameters.namespace` and `spec.parameters.scope`. ([#101711](https://github.com/kubernetes/kubernetes/pull/101711), [@hbagdi](https://github.com/hbagdi)) [SIG Network]
 - JSON logging format is no longer available by default in non-core Kubernetes Components and require owners to opt in. ([#102869](https://github.com/kubernetes/kubernetes/pull/102869), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
 - Kube-apiserver: the alpha PodSecurity feature can be enabled by passing `--feature-gates=PodSecurity=true`, and enables controlling allowed pods using namespace labels. See https://git.k8s.io/enhancements/keps/sig-auth/2579-psp-replacement for more details. ([#103099](https://github.com/kubernetes/kubernetes/pull/103099), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Auth, Instrumentation, Release, Security and Testing]
 - Kube-proxy uses V1 EndpointSlices. ([#103306](https://github.com/kubernetes/kubernetes/pull/103306), [@swetharepakula](https://github.com/swetharepakula)) [SIG Network]
@@ -3772,7 +3772,7 @@ filename | sha512 hash
   - `--address`
   The insecure port flags `--port` may only be set to 0 now.
   
-  In addtion, please be careful that:
+  In addition, please be careful that:
   - controller-manager MUST start with `--authorization-kubeconfig` and `--authentication-kubeconfig` correctly set to get authentication/authorization working.
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
@@ -4016,7 +4016,7 @@ filename | sha512 hash
 - Kubeadm: enable `--experimental-patches` flag for 'kubeadm join phase control-plane-join all' command ([#101110](https://github.com/kubernetes/kubernetes/pull/101110), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 - Kubelet: improve the performance when waiting for a synchronization of the node list with the kube-apiserver ([#99336](https://github.com/kubernetes/kubernetes/pull/99336), [@neolit123](https://github.com/neolit123)) [SIG Node]
 - Logging for GCE Windows clusters will be more accurate and complete when using Fluent-bit. ([#101271](https://github.com/kubernetes/kubernetes/pull/101271), [@jeremyje](https://github.com/jeremyje)) [SIG Cloud Provider and Windows]
-- No support endpointslice in linux userpace mode ([#100913](https://github.com/kubernetes/kubernetes/pull/100913), [@JornShen](https://github.com/JornShen)) [SIG Network]
+- No support endpointslice in linux userspace mode ([#100913](https://github.com/kubernetes/kubernetes/pull/100913), [@JornShen](https://github.com/JornShen)) [SIG Network]
 - Prevent Kubelet stuck in DiskPressure when imagefs minReclaim is set ([#99095](https://github.com/kubernetes/kubernetes/pull/99095), [@maxlaverse](https://github.com/maxlaverse)) [SIG Node]
 - Reduce vSphere volume name to 63 characters ([#100404](https://github.com/kubernetes/kubernetes/pull/100404), [@gnufied](https://github.com/gnufied)) [SIG Storage]
 - Reduces delay initializing on non-AWS platforms docker runtime. ([#93260](https://github.com/kubernetes/kubernetes/pull/93260), [@nckturner](https://github.com/nckturner)) [SIG Cloud Provider]

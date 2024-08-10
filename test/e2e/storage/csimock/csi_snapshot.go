@@ -187,7 +187,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 			// CSISnapshotterSecretNamespaceAnnotation is the annotation key for the CSI snapshotter secret namespace in VolumeSnapshotClass.parameters
 			CSISnapshotterSecretNamespaceAnnotation string = "csi.storage.k8s.io/snapshotter-secret-namespace"
 
-			// anotations holds the annotations object
+			// annotations holds the annotations object
 			annotations interface{}
 		)
 

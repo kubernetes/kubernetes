@@ -18,7 +18,7 @@ limitations under the License.
 // take RuntimeClass into account. For RuntimeClass definitions which describe an overhead associated
 // with running a pod, this admission controller will set the pod.Spec.Overhead field accordingly. This
 // field should only be set through this controller, so validation will be carried out to ensure the pod's
-// value matches what is defined in the coresponding RuntimeClass.
+// value matches what is defined in the corresponding RuntimeClass.
 package runtimeclass
 
 import (

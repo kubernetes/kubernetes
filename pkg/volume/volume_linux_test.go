@@ -64,48 +64,48 @@ func TestSkipPermissionChange(t *testing.T) {
 		gidOwnerMatch       bool
 		permissionMatch     bool
 		sgidMatch           bool
-		skipPermssion       bool
+		skipPermission       bool
 	}{
 		{
 			description:   "skippermission=false, policy=nil",
-			skipPermssion: false,
+			skipPermission: false,
 		},
 		{
 			description:         "skippermission=false, policy=always",
 			fsGroupChangePolicy: &always,
-			skipPermssion:       false,
+			skipPermission:       false,
 		},
 		{
 			description:         "skippermission=false, policy=always, gidmatch=true",
 			fsGroupChangePolicy: &always,
-			skipPermssion:       false,
+			skipPermission:       false,
 			gidOwnerMatch:       true,
 		},
 		{
 			description:         "skippermission=false, policy=nil, gidmatch=true",
 			fsGroupChangePolicy: nil,
-			skipPermssion:       false,
+			skipPermission:       false,
 			gidOwnerMatch:       true,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=false",
 			fsGroupChangePolicy: &onrootMismatch,
 			gidOwnerMatch:       false,
-			skipPermssion:       false,
+			skipPermission:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=false",
 			fsGroupChangePolicy: &onrootMismatch,
 			gidOwnerMatch:       true,
 			permissionMatch:     false,
-			skipPermssion:       false,
+			skipPermission:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true",
 			fsGroupChangePolicy: &onrootMismatch,
 			gidOwnerMatch:       true,
 			permissionMatch:     true,
-			skipPermssion:       false,
+			skipPermission:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true, sgidmatch=true",
@@ -113,7 +113,7 @@ func TestSkipPermissionChange(t *testing.T) {
 			gidOwnerMatch:       true,
 			permissionMatch:     true,
 			sgidMatch:           true,
-			skipPermssion:       true,
+			skipPermission:       true,
 		},
 	}
 
@@ -167,8 +167,8 @@ func TestSkipPermissionChange(t *testing.T) {
 
 			mounter := &localFakeMounter{path: tmpDir}
 			ok = skipPermissionChange(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy)
-			if ok != test.skipPermssion {
-				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
+			if ok != test.skipPermission {
+				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermission, ok)
 			}
 
 		})

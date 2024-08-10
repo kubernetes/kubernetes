@@ -215,8 +215,8 @@ const (
 
 	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
 	// should not be provisioned and bound until the first Pod is created that
-	// references the PeristentVolumeClaim.  The volume provisioning and
-	// binding will occur during Pod scheduing.
+	// references the PersistentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduling.
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 

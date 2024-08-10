@@ -1573,7 +1573,7 @@ The main themes of this release are:
 - Systems running `iptables` 1.8.0 or newer should start it in legacy mode. Please note that this affects all versions of Kubernetes and not only v1.16.0. For more detailed information about the issue and how to apply a workaround, please refer to the official documentation
 - Generating informers for packages in directories containing dots in their name is broken. This will be fixed in v1.16.1. ([#82860](https://github.com/kubernetes/kubernetes/issues/82860))
 - kube-scheduler won't be able to report scheduling Events if `events.k8s.io/v1beta1` API is disabled. We are targeting the fix for v1.16.2 ([#83203](https://github.com/kubernetes/kubernetes/issues/83203))
-- The etcd client library vendored in v1.16 (github.com/coreos/etcd/clientv3) has a bug where IPv6 IP addresses get incorrectly trimmed to the first occurance of the `:` character. This affects all users of the client library including the kube-apiserver and kubeadm. We are targeting the fix for this bug in v1.16.3. ([#83550](https://github.com/kubernetes/kubernetes/issues/83550))
+- The etcd client library vendored in v1.16 (github.com/coreos/etcd/clientv3) has a bug where IPv6 IP addresses get incorrectly trimmed to the first occurrence of the `:` character. This affects all users of the client library including the kube-apiserver and kubeadm. We are targeting the fix for this bug in v1.16.3. ([#83550](https://github.com/kubernetes/kubernetes/issues/83550))
 
 ## Urgent Upgrade Notes
 
@@ -2441,7 +2441,7 @@ filename | sha512 hash
 * Adds EndpointSlice integration to kube-proxy, can be enabled with EndpointSlice feature gate. ([#81430](https://github.com/kubernetes/kubernetes/pull/81430), [@robscott](https://github.com/robscott))
 * Azure supports IPv6 only on ELB not ILB. The cloud provider will return an error if the service is internal and is IPv6. ([#80485](https://github.com/kubernetes/kubernetes/pull/80485), [@khenidak](https://github.com/khenidak))
     * Notes on LB name:
-    * to ensure backword and forward compat:
+    * to ensure backward and forward compat:
     * - SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
     * - SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
     * DualStack:
@@ -2935,7 +2935,7 @@ filename | sha512 hash
 * Promote WatchBookmark feature to beta and enable it by default. ([#79786](https://github.com/kubernetes/kubernetes/pull/79786), [@wojtek-t](https://github.com/wojtek-t))
     * With WatchBookmark feature, clients are able to request watch events with BOOKMARK type. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session.
 * update to use go 1.12.7 ([#79966](https://github.com/kubernetes/kubernetes/pull/79966), [@tao12345666333](https://github.com/tao12345666333))
-* Add --shutdown-delay-duration to kube-apiserver in order to delay a graceful shutdown. `/healthz` will keep returning success during this time and requests are normally served, but `/readyz` will return faillure immediately. This delay can be used to allow the SDN to update iptables on all nodes and stop sending traffic. ([#74416](https://github.com/kubernetes/kubernetes/pull/74416), [@sttts](https://github.com/sttts))
+* Add --shutdown-delay-duration to kube-apiserver in order to delay a graceful shutdown. `/healthz` will keep returning success during this time and requests are normally served, but `/readyz` will return failure immediately. This delay can be used to allow the SDN to update iptables on all nodes and stop sending traffic. ([#74416](https://github.com/kubernetes/kubernetes/pull/74416), [@sttts](https://github.com/sttts))
 * The `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` APIs have been promoted to `admissionregistration.k8s.io/v1`: ([#79549](https://github.com/kubernetes/kubernetes/pull/79549), [@liggitt](https://github.com/liggitt))
         * `failurePolicy` default changed from `Ignore` to `Fail` for v1
         * `matchPolicy` default changed from `Exact` to `Equivalent` for v1
@@ -2959,7 +2959,7 @@ filename | sha512 hash
 * updated fluentd to 1.5.1, elasticsearchs & kibana to 7.1.1 ([#79014](https://github.com/kubernetes/kubernetes/pull/79014), [@monotek](https://github.com/monotek))
 * kubeadm: implement support for concurrent add/remove of stacked etcd members ([#79677](https://github.com/kubernetes/kubernetes/pull/79677), [@neolit123](https://github.com/neolit123))
 * Added a metric 'apiserver_watch_events_total' that can be used to understand the number of watch events in the system. ([#78732](https://github.com/kubernetes/kubernetes/pull/78732), [@mborsz](https://github.com/mborsz))
-* KMS Providers will install a healthz check for the status of kms-pluign in kube-apiservers' encryption config.  ([#78540](https://github.com/kubernetes/kubernetes/pull/78540), [@immutableT](https://github.com/immutableT))
+* KMS Providers will install a healthz check for the status of kms-plugin in kube-apiservers' encryption config.  ([#78540](https://github.com/kubernetes/kubernetes/pull/78540), [@immutableT](https://github.com/immutableT))
 * Fixes a bug in openapi published for custom resources using x-kubernetes-preserve-unknown-fields extensions, so that kubectl will allow sending unknown fields for that portion of the object. ([#79636](https://github.com/kubernetes/kubernetes/pull/79636), [@liggitt](https://github.com/liggitt))
 * A new client `k8s.io/client-go/metadata.Client` has been added for accessing objects generically. This client makes it easier to retrieve only the metadata (the `metadata` sub-section) from resources on the cluster in an efficient manner for use cases that deal with objects generically, like the garbage collector, quota, or the namespace controller. The client asks the server to return a `meta.k8s.io/v1 PartialObjectMetadata` object for list, get, delete, watch, and patch operations on both normal APIs and custom resources which can be encoded in protobuf for additional work. If the server does not yet support this API the client will gracefully fall back to JSON and transform the response objects into PartialObjectMetadata. ([#77819](https://github.com/kubernetes/kubernetes/pull/77819), [@smarterclayton](https://github.com/smarterclayton))
 * changes timeout value in csi plugin from 15s to 2min which fixes the timeout issue ([#79529](https://github.com/kubernetes/kubernetes/pull/79529), [@andyzhangx](https://github.com/andyzhangx))

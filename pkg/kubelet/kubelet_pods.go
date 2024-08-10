@@ -975,7 +975,7 @@ func (kl *Kubelet) killPod(ctx context.Context, pod *v1.Pod, p kubecontainer.Pod
 	return nil
 }
 
-// makePodDataDirs creates the dirs for the pod datas.
+// makePodDataDirs creates the dirs for the pod data.
 func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	uid := pod.UID
 	if err := os.MkdirAll(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
@@ -2063,7 +2063,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// oldStatus should always exist if container is running
 		oldStatus, oldStatusFound := oldStatuses[cName]
 		// Initialize limits/requests from container's spec upon transition to Running state
-		// For cpu & memory, values queried from runtime via CRI always supercedes spec values
+		// For cpu & memory, values queried from runtime via CRI always supersedes spec values
 		// For ephemeral-storage, a running container's status.limit/request equals spec.limit/request
 		determineResource := func(rName v1.ResourceName, v1ContainerResource, oldStatusResource, resource v1.ResourceList) {
 			if oldStatusFound {

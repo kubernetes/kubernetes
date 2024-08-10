@@ -572,9 +572,9 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	t.Log("volumes released")
 }
 
-// TestPersistentVolumeClaimVolumeAttirbutesClassName test binding using volume attributes
+// TestPersistentVolumeClaimVolumeAttributesClassName test binding using volume attributes
 // class name.
-func TestPersistentVolumeClaimVolumeAttirbutesClassName(t *testing.T) {
+func TestPersistentVolumeClaimVolumeAttributesClassName(t *testing.T) {
 	var (
 		err           error
 		modes         = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}

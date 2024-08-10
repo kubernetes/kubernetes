@@ -70,7 +70,7 @@ type LogSizeGatherer struct {
 type LogsSizeVerifier struct {
 	client      clientset.Interface
 	stopChannel chan bool
-	// data stores LogSizeData groupped per IP and log_path
+	// data stores LogSizeData grouped per IP and log_path
 	data          *LogsSizeData
 	masterAddress string
 	nodeAddresses []string

@@ -1038,7 +1038,7 @@ filename | sha256 hash
 * vSphere: Fix attach volume failing on the first try. ([#51217](https://github.com/kubernetes/kubernetes/pull/51217), [@BaluDontu](https://github.com/BaluDontu))
 * azure: support retrieving access tokens via managed identity extension ([#48854](https://github.com/kubernetes/kubernetes/pull/48854), [@colemickens](https://github.com/colemickens))
 * Fixed a bug in strategic merge patch that caused kubectl apply to error out under some conditions ([#50862](https://github.com/kubernetes/kubernetes/pull/50862), [@guoshimin](https://github.com/guoshimin))
-* It is now posible to use flexVolumes to bind mount directories and files. ([#50596](https://github.com/kubernetes/kubernetes/pull/50596), [@adelton](https://github.com/adelton))
+* It is now possible to use flexVolumes to bind mount directories and files. ([#50596](https://github.com/kubernetes/kubernetes/pull/50596), [@adelton](https://github.com/adelton))
 * StatefulSet: Fix "forbidden pod updates" error on Pods created prior to upgrading to 1.7. ([#48327](https://github.com/kubernetes/kubernetes/pull/48327)) ([#51149](https://github.com/kubernetes/kubernetes/pull/51149), [@kow3ns](https://github.com/kow3ns))
 * Fixed regression in initial kubectl exec terminal dimensions ([#51127](https://github.com/kubernetes/kubernetes/pull/51127), [@chen-anders](https://github.com/chen-anders))
 * Enforcement of fsGroup; enable ScaleIO multiple-instance volume mapping; default PVC capacity; alignment of PVC, PV, and volume names for dynamic provisioning ([#48999](https://github.com/kubernetes/kubernetes/pull/48999), [@vladimirvivien](https://github.com/vladimirvivien))
@@ -1105,7 +1105,7 @@ filename | sha256 hash
     * fixed bugs and improved performance in Stackdriver Sink
 * fluentd-gcp addon: Fix a bug in the event-exporter, when repeated events were not sent to Stackdriver. ([#50511](https://github.com/kubernetes/kubernetes/pull/50511), [@crassirostris](https://github.com/crassirostris))
 * Collect metrics from Heapster in Stackdriver mode. ([#50517](https://github.com/kubernetes/kubernetes/pull/50517), [@piosz](https://github.com/piosz))
-* fixes a bug around using the Global config ElbSecurityGroup where Kuberentes would modify the passed in Security Group. ([#49805](https://github.com/kubernetes/kubernetes/pull/49805), [@nbutton23](https://github.com/nbutton23))
+* fixes a bug around using the Global config ElbSecurityGroup where Kubernetes would modify the passed in Security Group. ([#49805](https://github.com/kubernetes/kubernetes/pull/49805), [@nbutton23](https://github.com/nbutton23))
 * Updates Cinder AttachDisk operation to be more reliable by delegating Detaches to volume manager. ([#50042](https://github.com/kubernetes/kubernetes/pull/50042), [@jingxu97](https://github.com/jingxu97))
 * fixes kubefed's ability to create RBAC roles in version-skewed clusters ([#50537](https://github.com/kubernetes/kubernetes/pull/50537), [@liggitt](https://github.com/liggitt))
 * Fix data race during addition of new CRD ([#50098](https://github.com/kubernetes/kubernetes/pull/50098), [@nikhita](https://github.com/nikhita))
@@ -1639,7 +1639,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 
     * `kubectl auth can-i` now supports non-resource URLs ([#46432](https://github.com/kubernetes/kubernetes/pull/46432), [@CaoShuFeng](https://github.com/CaoShuFeng))
 
-    * `kubectl set selector` and `kubectl set subject` no longer print "running in local/dry-run mode..." at the top.  The output can now be piped and interpretted as yaml or json ([#46507](https://github.com/kubernetes/kubernetes/pull/46507), [@bboreham](https://github.com/bboreham))
+    * `kubectl set selector` and `kubectl set subject` no longer print "running in local/dry-run mode..." at the top.  The output can now be piped and interpreted as yaml or json ([#46507](https://github.com/kubernetes/kubernetes/pull/46507), [@bboreham](https://github.com/bboreham))
 
     * When using an in-cluster client with an empty configuration, the `--namespace` flag is now honored ([#46299](https://github.com/kubernetes/kubernetes/pull/46299), [@ncdc](https://github.com/ncdc))
 

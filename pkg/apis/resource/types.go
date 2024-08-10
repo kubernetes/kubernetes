@@ -428,7 +428,7 @@ type DeviceRequest struct {
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
-	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
@@ -955,7 +955,7 @@ type DeviceClassSpec struct {
 	Selectors []DeviceSelector
 
 	// Config defines configuration parameters that apply to each device that is claimed via this class.
-	// Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor
+	// Some classes may potentially be satisfied by multiple drivers, so each instance of a vendor
 	// configuration applies to exactly one driver.
 	//
 	// They are passed to the driver, but are not considered while allocating the claim.

@@ -237,7 +237,7 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 	}
 }
 
-// Regresion test for https://issues.k8s.io/115316
+// Regression test for https://issues.k8s.io/115316
 func TestServiceCIDR28bits(t *testing.T) {
 	serviceCIDR := "10.0.0.0/28"
 

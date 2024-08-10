@@ -19,5 +19,5 @@ package routes
 import "golang.org/x/sys/windows"
 
 const (
-	fileNameTooLong = windows.ERROR_FILENAME_EXCED_RANGE
+	fileNameTooLong = windows.ERROR_FILENAME_EXCEED_RANGE
 )

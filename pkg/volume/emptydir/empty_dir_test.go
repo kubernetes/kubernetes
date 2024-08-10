@@ -1079,7 +1079,7 @@ func TestTmpfsMountOptions(t *testing.T) {
 		tmpfsNoswapSupported bool
 		sizeLimit            resource.Quantity
 	}{
-		"default bahavior": {},
+		"default behavior": {},
 		"tmpfs noswap is supported": {
 			tmpfsNoswapSupported: true,
 		},

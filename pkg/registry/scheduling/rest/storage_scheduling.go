@@ -95,7 +95,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 							klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 							continue
 						}
-						// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+						// ServiceUnavailable error is returned when the API server is blocked by storage version updates
 						if apierrors.IsServiceUnavailable(err) {
 							klog.Infof("going to retry, unable to create PriorityClass %s: %v", pc.Name, err)
 							return false, nil

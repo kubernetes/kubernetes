@@ -1565,7 +1565,7 @@ func TestPreferNominatedNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
+			testCtx := initTestPreferNominatedNode(t, "prefer-nominated-node")
 			cs := testCtx.ClientSet
 			nsName := testCtx.NS.Name
 			var err error

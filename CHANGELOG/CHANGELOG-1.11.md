@@ -235,7 +235,7 @@ filename | sha512 hash
     * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.1 to pick up security fixes.
     * [fluentd-gcp addon] Bump event-exporter to v0.2.4 to pick up security fixes.
     * [fluentd-gcp addon] Bump prometheus-to-sd to v0.5.0 to pick up security fixes.
-    * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
+    * [metadata-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * Ensure the backend pools are set correctly for Azure SLB with multiple backend pools (e.g. outbound rules) ([#76691](https://github.com/kubernetes/kubernetes/pull/76691), [@feiskyer](https://github.com/feiskyer))
 * Increase Azure default maximumLoadBalancerRuleCount to 250. ([#72621](https://github.com/kubernetes/kubernetes/pull/72621), [@feiskyer](https://github.com/feiskyer))
 * Fixes a NPD bug on GCI, so that it disables glog writing to files for log-counter ([#76211](https://github.com/kubernetes/kubernetes/pull/76211), [@wangzhen127](https://github.com/wangzhen127))
@@ -1325,7 +1325,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * `kubectl cp` now supports completion.
 ([#60371](https://github.com/kubernetes/kubernetes/pull/60371), [@superbrothers](https://github.com/superbrothers))
 * The shortcuts that were moved server-side in at least 1.9 have been removed from being hardcoded in kubectl. This means that the client-based restmappers have been moved to client-go, where everyone who needs them can have access. ([#63507](https://github.com/kubernetes/kubernetes/pull/63507), [@deads2k](https://github.com/deads2k))
-* When using `kubectl delete` with selection criteria, the defaults to is now to ignore "not found" errors. Note that this does not apply when deleting a speciic resource. ([#63490](https://github.com/kubernetes/kubernetes/pull/63490), [@deads2k](https://github.com/deads2k))
+* When using `kubectl delete` with selection criteria, the defaults to is now to ignore "not found" errors. Note that this does not apply when deleting a specific resource. ([#63490](https://github.com/kubernetes/kubernetes/pull/63490), [@deads2k](https://github.com/deads2k))
 * `kubectl create [secret | configmap] --from-file` now works on Windows with fully-qualified paths ([#63439](https://github.com/kubernetes/kubernetes/pull/63439), [@liggitt](https://github.com/liggitt))
 * Portability across systems has been increased by the use of `/usr/bin/env` in all script shebangs. ([#62657](https://github.com/kubernetes/kubernetes/pull/62657), [@matthyx](https://github.com/matthyx))
 * You can now use `kubectl api-resources` to discover resources.
@@ -1429,7 +1429,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * `nodeSelector.matchFields` (node's `metadata.node`) is now supported in scheduler. ([#62453](https://github.com/kubernetes/kubernetes/pull/62453), [@k82cn](https://github.com/k82cn))
 * Added a parametrizable priority function mapping requested/capacity ratio to priority. This function is disabled by default and can be enabled via the scheduler policy config file.
 ([#63929](https://github.com/kubernetes/kubernetes/pull/63929), [@losipiuk](https://github.com/losipiuk))
-* System critical priority classes are now automatically added at cluster boostrapping. ([#60519](https://github.com/kubernetes/kubernetes/pull/60519), [@bsalamat](https://github.com/bsalamat))
+* System critical priority classes are now automatically added at cluster bootstrapping. ([#60519](https://github.com/kubernetes/kubernetes/pull/60519), [@bsalamat](https://github.com/bsalamat))
 
 ### SIG Storage
 
@@ -1793,7 +1793,7 @@ filename | sha256 hash
 * Prevents a `kubectl delete` hang when deleting controller managed lists ([#65367](https://github.com/kubernetes/kubernetes/pull/65367), [@deads2k](https://github.com/deads2k))
 * fixes a memory leak in the kube-controller-manager observed when large numbers of pods with tolerations are created/deleted ([#65339](https://github.com/kubernetes/kubernetes/pull/65339), [@liggitt](https://github.com/liggitt))
 * The "kubectl cp" command now supports path shortcuts (../) in remote paths. ([#65189](https://github.com/kubernetes/kubernetes/pull/65189), [@juanvallejo](https://github.com/juanvallejo))
-* Split 'scheduling_latency_seconds' metric into finer steps (predicate, priority, premption) ([#65306](https://github.com/kubernetes/kubernetes/pull/65306), [@shyamjvs](https://github.com/shyamjvs))
+* Split 'scheduling_latency_seconds' metric into finer steps (predicate, priority, preemption) ([#65306](https://github.com/kubernetes/kubernetes/pull/65306), [@shyamjvs](https://github.com/shyamjvs))
 * fixed incorrect OpenAPI schema for CustomResourceDefinition objects ([#65256](https://github.com/kubernetes/kubernetes/pull/65256), [@liggitt](https://github.com/liggitt))
 
 
@@ -2533,7 +2533,7 @@ filename | sha256 hash
 * [fluentd-gcp addon] Update event-exporter image to have the latest base image. ([#61727](https://github.com/kubernetes/kubernetes/pull/61727), [@crassirostris](https://github.com/crassirostris))
 * Use inline func to ensure unlock is executed ([#61644](https://github.com/kubernetes/kubernetes/pull/61644), [@resouer](https://github.com/resouer))
 * `kubectl apply` view/edit-last-applied support completion. ([#60499](https://github.com/kubernetes/kubernetes/pull/60499), [@superbrothers](https://github.com/superbrothers))
-* Automatically add system critical priority classes at cluster boostrapping. ([#60519](https://github.com/kubernetes/kubernetes/pull/60519), [@bsalamat](https://github.com/bsalamat))
+* Automatically add system critical priority classes at cluster bootstrapping. ([#60519](https://github.com/kubernetes/kubernetes/pull/60519), [@bsalamat](https://github.com/bsalamat))
 * Ensure cloudprovider.InstanceNotFound is reported when the VM is not found on Azure ([#61531](https://github.com/kubernetes/kubernetes/pull/61531), [@feiskyer](https://github.com/feiskyer))
 * Azure cloud provider now supports specifying allowed service tags by annotation `service.beta.kubernetes.io/azure-allowed-service-tags` ([#61467](https://github.com/kubernetes/kubernetes/pull/61467), [@feiskyer](https://github.com/feiskyer))
 * Add all kinds of resource objects' statuses in HPA description. ([#59609](https://github.com/kubernetes/kubernetes/pull/59609), [@zhangxiaoyu-zidif](https://github.com/zhangxiaoyu-zidif))

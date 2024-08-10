@@ -230,7 +230,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a Pod with resource request count for CPU, Memory, EphemeralStorage and ExtendedResourceName. Pod creation MUST be successful and respective resource usage count MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Create another Pod with resource request exceeding remaining quota. Pod creation MUST fail as the request exceeds ResourceQuota limits.
 		Update the successfully created pod's resource requests. Updation MUST fail as a Pod can not dynamically update its resource requirements.
-		Delete the successfully created Pod. Pod Deletion MUST be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
+		Delete the successfully created Pod. Pod Deletion MUST be successful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
 	*/
 	framework.ConformanceIt("should create a ResourceQuota and capture the life of a pod.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")

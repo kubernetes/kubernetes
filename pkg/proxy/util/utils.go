@@ -140,7 +140,7 @@ func MapCIDRsByIPFamily(cidrsStrings []string) map[v1.IPFamily][]*net.IPNet {
 			}
 			continue
 		}
-		// since we just succefully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
+		// since we just successfully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
 		ipFamily := convertToV1IPFamily(netutils.IPFamilyOfCIDR(cidr))
 		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 	}

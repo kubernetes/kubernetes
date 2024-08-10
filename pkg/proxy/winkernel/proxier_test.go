@@ -832,7 +832,7 @@ func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
 		t.Error()
 	}
 
-	// By default the value is false, for the readibility of the test case setting it to false again
+	// By default the value is false, for the readability of the test case setting it to false again
 	proxier.supportedFeatures.ModifyLoadbalancer = false
 
 	svcIP := "10.20.30.41"

@@ -55,8 +55,8 @@ func getCmd(env Getenver, w io.Writer) *exec.Cmd {
 
 	// Extra args handling
 	sep := " "
-	if len(env.Getenv(extraArgsSeparaterEnvKey)) > 0 {
-		sep = env.Getenv(extraArgsSeparaterEnvKey)
+	if len(env.Getenv(extraArgsSeparatorEnvKey)) > 0 {
+		sep = env.Getenv(extraArgsSeparatorEnvKey)
 	}
 
 	if len(env.Getenv(extraGinkgoArgsEnvKey)) > 0 {

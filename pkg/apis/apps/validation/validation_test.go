@@ -436,7 +436,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate"), nil, ""),
 		},
 	}, {
-		name: "negative parition",
+		name: "negative partition",
 		set: mkStatefulSet(&validPodTemplate,
 			tweakReplicas(3),
 			tweakRollingUpdatePartition(-1),

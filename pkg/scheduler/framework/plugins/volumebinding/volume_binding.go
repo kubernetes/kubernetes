@@ -120,7 +120,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 
 		// We rely on CSI node to translate in-tree PV to CSI.
-		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
+		// TODO: kube-scheduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
 
 		// When CSIStorageCapacity is enabled, pods may become schedulable

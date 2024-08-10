@@ -93,7 +93,7 @@ type stateData struct {
 	// protected by the mutex. Used by PostFilter.
 	unavailableClaims sets.Set[int]
 
-	informationsForClaim []informationForClaim
+	informationForClaim []informationForClaim
 
 	// nodeAllocations caches the result of Filter for the nodes.
 	nodeAllocations map[string][]*resourceapi.AllocationResult
@@ -740,7 +740,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	// All claims which the scheduler needs to allocate itself.
 	allocateClaims := make([]*resourceapi.ResourceClaim, 0, len(claims))
 
-	s.informationsForClaim = make([]informationForClaim, len(claims))
+	s.informationForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
 		if claim.Spec.Controller != "" &&
 			!pl.controlPlaneControllerEnabled {
@@ -764,17 +764,17 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		}
 
 		if claim.Status.Allocation != nil {
-			s.informationsForClaim[index].structuredParameters = claim.Status.Allocation.Controller == ""
+			s.informationForClaim[index].structuredParameters = claim.Status.Allocation.Controller == ""
 			if claim.Status.Allocation.NodeSelector != nil {
 				nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.NodeSelector)
 				if err != nil {
 					return nil, statusError(logger, err)
 				}
-				s.informationsForClaim[index].availableOnNodes = map[string]*nodeaffinity.NodeSelector{"": nodeSelector}
+				s.informationForClaim[index].availableOnNodes = map[string]*nodeaffinity.NodeSelector{"": nodeSelector}
 			}
 		} else {
 			structuredParameters := claim.Spec.Controller == ""
-			s.informationsForClaim[index].structuredParameters = structuredParameters
+			s.informationForClaim[index].structuredParameters = structuredParameters
 			if structuredParameters {
 				allocateClaims = append(allocateClaims, claim)
 
@@ -785,7 +785,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 					return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s is in the process of being allocated", klog.KObj(claim)))
 				}
 			} else {
-				s.informationsForClaim[index].status = statusForClaim(s.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name)
+				s.informationForClaim[index].status = statusForClaim(s.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name)
 			}
 
 			// Check all requests and device classes. If a class
@@ -817,10 +817,10 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 					if err != nil {
 						return nil, statusError(logger, err)
 					}
-					if s.informationsForClaim[index].availableOnNodes == nil {
-						s.informationsForClaim[index].availableOnNodes = make(map[string]*nodeaffinity.NodeSelector)
+					if s.informationForClaim[index].availableOnNodes == nil {
+						s.informationForClaim[index].availableOnNodes = make(map[string]*nodeaffinity.NodeSelector)
 					}
-					s.informationsForClaim[index].availableOnNodes[class.Name] = selector
+					s.informationForClaim[index].availableOnNodes[class.Name] = selector
 				}
 			}
 		}
@@ -919,7 +919,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 
 		if claim.Status.Allocation != nil {
-			for _, nodeSelector := range state.informationsForClaim[index].availableOnNodes {
+			for _, nodeSelector := range state.informationForClaim[index].availableOnNodes {
 				if !nodeSelector.Match(node) {
 					logger.V(5).Info("AvailableOnNodes does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 					unavailableClaims = append(unavailableClaims, index)
@@ -934,14 +934,14 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			return statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 		}
 
-		for className, nodeSelector := range state.informationsForClaim[index].availableOnNodes {
+		for className, nodeSelector := range state.informationForClaim[index].availableOnNodes {
 			if !nodeSelector.Match(node) {
 				return statusUnschedulable(logger, "excluded by device class node filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "deviceclass", klog.KRef("", className))
 			}
 		}
 
 		// Use information from control plane controller?
-		if status := state.informationsForClaim[index].status; status != nil {
+		if status := state.informationForClaim[index].status; status != nil {
 			for _, unsuitableNode := range status.UnsuitableNodes {
 				if node.Name == unsuitableNode {
 					return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
@@ -1034,7 +1034,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			// Then we can simply clear the allocation. Once the
 			// claim informer catches up, the controllers will
 			// be notified about this change.
-			clearAllocation := state.informationsForClaim[index].structuredParameters
+			clearAllocation := state.informationForClaim[index].structuredParameters
 
 			// Before we tell a driver to deallocate a claim, we
 			// have to stop telling it to allocate. Otherwise,
@@ -1089,7 +1089,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	pending := false
 	for index, claim := range state.claims {
 		if claim.Status.Allocation == nil &&
-			!state.informationsForClaim[index].structuredParameters {
+			!state.informationForClaim[index].structuredParameters {
 			pending = true
 			break
 		}
@@ -1181,7 +1181,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		}
 
 		// Do we use the allocator for it?
-		if state.informationsForClaim[index].structuredParameters {
+		if state.informationForClaim[index].structuredParameters {
 			numClaimsWithAllocator++
 			continue
 		}
@@ -1239,7 +1239,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 				return statusError(logger, fmt.Errorf("internal error, claim %s with allocation not found", claim.Name))
 			}
 			allocation := allocations[i]
-			state.informationsForClaim[index].allocation = allocation
+			state.informationForClaim[index].allocation = allocation
 
 			// Strictly speaking, we don't need to store the full modified object.
 			// The allocation would be enough. The full object is useful for
@@ -1331,7 +1331,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 	for index, claim := range state.claims {
 		// If allocation was in-flight, then it's not anymore and we need to revert the
 		// claim object in the assume cache to what it was before.
-		if state.informationsForClaim[index].structuredParameters {
+		if state.informationForClaim[index].structuredParameters {
 			if _, found := pl.inFlightAllocations.LoadAndDelete(state.claims[index].UID); found {
 				pl.claimAssumeCache.Restore(claim.Namespace + "/" + claim.Name)
 			}
@@ -1407,7 +1407,7 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims[index].DeepCopy()
-	allocation := state.informationsForClaim[index].allocation
+	allocation := state.informationForClaim[index].allocation
 	defer func() {
 		if allocation != nil {
 			// The scheduler was handling allocation. Now that has

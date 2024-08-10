@@ -89,7 +89,7 @@ var knownMorphs = sets.NewString("kubelet", "proxy")
 func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
 	fs.StringVar(&c.BootstrapKubeconfigPath, "bootstrap-kubeconfig", "", "Path to bootstrap kubeconfig file.")
-	fs.StringVar(&c.CertDirectory, "cert-dir", "/etc/srv/", "Path to cert directory for bootstraping.")
+	fs.StringVar(&c.CertDirectory, "cert-dir", "/etc/srv/", "Path to cert directory for bootstrapping.")
 	fs.IntVar(&c.KubeletPort, "kubelet-port", ports.KubeletPort, "Port on which HollowKubelet should be listening.")
 	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", ports.KubeletReadOnlyPort, "Read-only port on which Kubelet is listening.")
 	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")

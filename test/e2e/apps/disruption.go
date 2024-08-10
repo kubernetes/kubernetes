@@ -421,43 +421,43 @@ var _ = SIGDescribe("DisruptionController", func() {
 		name                          string
 		unhealthyPodEvictionPolicy    *policyv1.UnhealthyPodEvictionPolicyType
 		podsShouldBecomeReadyFirst    bool
-		expectedSuccesfulPodEvictions int
+		expectedSuccessfulPodEvictions int
 	}{
 		{
 			name:                          "should evict ready pods with Default UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    nil,
 			podsShouldBecomeReadyFirst:    true,
-			expectedSuccesfulPodEvictions: 1,
+			expectedSuccessfulPodEvictions: 1,
 		},
 		{
 			name:                          "should evict ready pods with IfHealthyBudget UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    ptr.To(policyv1.IfHealthyBudget),
 			podsShouldBecomeReadyFirst:    true,
-			expectedSuccesfulPodEvictions: 1,
+			expectedSuccessfulPodEvictions: 1,
 		},
 		{
 			name:                          "should evict ready pods with AlwaysAllow UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    ptr.To(policyv1.AlwaysAllow),
 			podsShouldBecomeReadyFirst:    true,
-			expectedSuccesfulPodEvictions: 1,
+			expectedSuccessfulPodEvictions: 1,
 		},
 		{
 			name:                          "should not evict unready pods with Default UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    nil,
 			podsShouldBecomeReadyFirst:    false,
-			expectedSuccesfulPodEvictions: 0,
+			expectedSuccessfulPodEvictions: 0,
 		},
 		{
 			name:                          "should not evict unready pods with IfHealthyBudget UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    ptr.To(policyv1.IfHealthyBudget),
 			podsShouldBecomeReadyFirst:    false,
-			expectedSuccesfulPodEvictions: 0,
+			expectedSuccessfulPodEvictions: 0,
 		},
 		{
 			name:                          "should evict unready pods with AlwaysAllow UnhealthyPodEvictionPolicy",
 			unhealthyPodEvictionPolicy:    ptr.To(policyv1.AlwaysAllow),
 			podsShouldBecomeReadyFirst:    false,
-			expectedSuccesfulPodEvictions: 3,
+			expectedSuccessfulPodEvictions: 3,
 		},
 	}
 	for i := range unhealthyPodEvictionPolicyCases {
@@ -519,7 +519,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					evictedPods.Insert(pod.Name)
 				}
 			}
-			gomega.Expect(evictedPods).Should(gomega.HaveLen(tc.expectedSuccesfulPodEvictions))
+			gomega.Expect(evictedPods).Should(gomega.HaveLen(tc.expectedSuccessfulPodEvictions))
 			_, err = e2epod.WaitForPods(ctx, cs, ns, metav1.ListOptions{}, e2epod.Range{NoneMatching: true}, framework.PodDeleteTimeout, "evicted pods should be deleted", func(pod *v1.Pod) bool {
 				return evictedPods.Has(pod.Name) && pod.DeletionTimestamp == nil
 			})

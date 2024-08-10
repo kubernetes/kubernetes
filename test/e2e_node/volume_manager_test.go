@@ -82,7 +82,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 					var err error
 					for i := 0; i < 10; i++ {
 						// need to create a new verification pod on each pass since updates
-						//to the HostPath volume aren't propogated to the pod
+						//to the HostPath volume aren't propagated to the pod
 						pod := e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "pod" + string(uuid.NewUUID()),

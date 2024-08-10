@@ -860,7 +860,7 @@ filename | sha512 hash
 - Fix: ignore not a VMSS error for VMAS nodes in reconcileBackendPools ([#103997](https://github.com/kubernetes/kubernetes/pull/103997), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Fix: return empty VMAS name if using standalone VM ([#103470](https://github.com/kubernetes/kubernetes/pull/103470), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Fixed a bug that scheduler extenders are not called on preemptions ([#103019](https://github.com/kubernetes/kubernetes/pull/103019), [@ordovicia](https://github.com/ordovicia)) [SIG Scheduling]
-- Fixes an issue cleaning up CertificateSigningRequest objects with an unparseable `status.certificate` field ([#103949](https://github.com/kubernetes/kubernetes/pull/103949), [@liggitt](https://github.com/liggitt)) [SIG Apps and Auth]
+- Fixes an issue cleaning up CertificateSigningRequest objects with an unparsable `status.certificate` field ([#103949](https://github.com/kubernetes/kubernetes/pull/103949), [@liggitt](https://github.com/liggitt)) [SIG Apps and Auth]
 - Fixes issue with websocket-based watches of Service objects not closing correctly on timeout ([#102542](https://github.com/kubernetes/kubernetes/pull/102542), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Testing]
 
 ## Dependencies
@@ -1128,7 +1128,7 @@ filename | sha512 hash
 - Fixed port-forward memory leak for long-running and heavily used connections. ([#99839](https://github.com/kubernetes/kubernetes/pull/99839), [@saschagrunert](https://github.com/saschagrunert)) [SIG API Machinery and Node]
 - Kubectl create service now respects namespace flag ([#101005](https://github.com/kubernetes/kubernetes/pull/101005), [@zxh326](https://github.com/zxh326)) [SIG CLI]
 - Kubelet: improve the performance when waiting for a synchronization of the node list with the kube-apiserver ([#99336](https://github.com/kubernetes/kubernetes/pull/99336), [@neolit123](https://github.com/neolit123)) [SIG Node]
-- No support endpointslice in linux userpace mode ([#101503](https://github.com/kubernetes/kubernetes/pull/101503), [@JornShen](https://github.com/JornShen)) [SIG Network]
+- No support endpointslice in linux userspace mode ([#101503](https://github.com/kubernetes/kubernetes/pull/101503), [@JornShen](https://github.com/JornShen)) [SIG Network]
 - Renames the timeout field for the DelegatingAuthenticationOptions to TokenRequestTimeout and set the timeout only for the token review client. Previously the timeout was also applied to watches making them reconnecting every 10 seconds. ([#101103](https://github.com/kubernetes/kubernetes/pull/101103), [@p0lyn0mial](https://github.com/p0lyn0mial)) [SIG API Machinery, Auth and Cloud Provider]
 - Respect ExecProbeTimeout=false for dockershim ([#101126](https://github.com/kubernetes/kubernetes/pull/101126), [@jackfrancis](https://github.com/jackfrancis)) [SIG Node and Testing]
 

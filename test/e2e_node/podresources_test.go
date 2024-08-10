@@ -1315,7 +1315,7 @@ func teardownSampleDevicePluginOrFail(ctx context.Context, f *framework.Framewor
 	ginkgo.By(fmt.Sprintf("Delete sample device plugin pod %s/%s", pod.Namespace, pod.Name))
 	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, deleteOptions)
 
-	framework.ExpectNoError(err, "Failed to delete Pod %v in Namspace %v", pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "Failed to delete Pod %v in Namespace %v", pod.Name, pod.Namespace)
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 

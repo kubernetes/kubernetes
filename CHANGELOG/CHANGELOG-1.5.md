@@ -255,7 +255,7 @@ filename | sha256 hash
     * - gcr.io/google-containers/kube-addon-manager
     * - gcr.io/google-containers/kube-dnsmasq-amd64
 * - Disable thin_ls due to excessive iops ([#43113](https://github.com/kubernetes/kubernetes/pull/43113), [@dashpole](https://github.com/dashpole))
-    * - Ignore .mount cgroups, fixing dissappearing stats
+    * - Ignore .mount cgroups, fixing disappearing stats
     * - Fix wc goroutine leak
     * - Update aws-sdk-go dependency to 1.6.10
 * PodSecurityPolicy authorization is correctly enforced by the PodSecurityPolicy admission plugin. ([#43489](https://github.com/kubernetes/kubernetes/pull/43489), [@liggitt](https://github.com/liggitt))
@@ -957,7 +957,7 @@ filename | sha256 hash
     * Changelog (vs 55-8872-18-0)
             * Updated kubernetes to v1.4.5
             * Fixed a bug in e2fsprogs that caused mke2fs to take a very long time. Upstream fix: http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/commit/?h=next&id=d33e690fe7a6cbeb51349d9f2c7fb16a6ebec9c2
-* Fix strategic patch for list of primitive type with merge sementic ([#35647](https://github.com/kubernetes/kubernetes/pull/35647), [@ymqytw](https://github.com/ymqytw))
+* Fix strategic patch for list of primitive type with merge semantic ([#35647](https://github.com/kubernetes/kubernetes/pull/35647), [@ymqytw](https://github.com/ymqytw))
 * Fix issue in reconstruct volume data when kubelet restarts ([#36616](https://github.com/kubernetes/kubernetes/pull/36616), [@jingxu97](https://github.com/jingxu97))
 * Ensure proper serialization of updates and creates in federation test watcher ([#36613](https://github.com/kubernetes/kubernetes/pull/36613), [@mwielgus](https://github.com/mwielgus))
 * Add support for SourceIP preservation in Azure LBs ([#36557](https://github.com/kubernetes/kubernetes/pull/36557), [@brendandburns](https://github.com/brendandburns))
@@ -1019,7 +1019,7 @@ filename | sha256 hash
 * Correct the article in generated documents ([#32557](https://github.com/kubernetes/kubernetes/pull/32557), [@asalkeld](https://github.com/asalkeld))
 * Update PodAntiAffinity to ignore calls to subresources ([#35608](https://github.com/kubernetes/kubernetes/pull/35608), [@soltysh](https://github.com/soltysh))
 * The apiserver can now select which type of kubelet-reported address to use for apiserver->node communications, using the --kubelet-preferred-address-types flag. ([#35497](https://github.com/kubernetes/kubernetes/pull/35497), [@liggitt](https://github.com/liggitt))
-* update list of vailable resources ([#32687](https://github.com/kubernetes/kubernetes/pull/32687), [@jouve](https://github.com/jouve))
+* update list of available resources ([#32687](https://github.com/kubernetes/kubernetes/pull/32687), [@jouve](https://github.com/jouve))
 * Remove stale volumes if endpoint/svc creation fails. ([#35285](https://github.com/kubernetes/kubernetes/pull/35285), [@humblec](https://github.com/humblec))
 * add kubectl cp ([#34914](https://github.com/kubernetes/kubernetes/pull/34914), [@brendandburns](https://github.com/brendandburns))
 * Remove Job also from .status.active for Replace strategy ([#35420](https://github.com/kubernetes/kubernetes/pull/35420), [@soltysh](https://github.com/soltysh))
@@ -1193,7 +1193,7 @@ binary | sha256 hash
   * OpenSSL CVE fixes
 * ContainerVm/GCI image: try to use ifdown/ifup if available ([#33595](https://github.com/kubernetes/kubernetes/pull/33595), [@freehan](https://github.com/freehan))
 * Use manifest digest (as `docker-pullable://`) as ImageID when available (exposes a canonical, pullable image ID for containers). ([#33014](https://github.com/kubernetes/kubernetes/pull/33014), [@DirectXMan12](https://github.com/DirectXMan12))
-* Add kubelet awareness to taint tolerant match caculator. ([#26501](https://github.com/kubernetes/kubernetes/pull/26501), [@resouer](https://github.com/resouer))
+* Add kubelet awareness to taint tolerant match calculator. ([#26501](https://github.com/kubernetes/kubernetes/pull/26501), [@resouer](https://github.com/resouer))
 * Fix nil pointer issue when getting metrics from volume mounter ([#34251](https://github.com/kubernetes/kubernetes/pull/34251), [@jingxu97](https://github.com/jingxu97))
 * Enforce Disk based pod eviction with GCI base image in Kubelet ([#33520](https://github.com/kubernetes/kubernetes/pull/33520), [@vishh](https://github.com/vishh))
 * Remove headers that are unnecessary for proxy target ([#34076](https://github.com/kubernetes/kubernetes/pull/34076), [@mbohlool](https://github.com/mbohlool))

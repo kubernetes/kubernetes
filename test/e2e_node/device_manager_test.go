@@ -76,7 +76,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 		variable: REGISTER_CONTROL_FILE. By default this environment variable is not present
 		and the device plugin autoregisters to kubelet. For this e2e test, we use sample device
 		plugin spec with REGISTER_CONTROL_FILE=/var/lib/kubelet/device-plugins/sample/registration
-		to allow manual registeration of the plugin to allow an application pod (requesting devices)
+		to allow manual registration of the plugin to allow an application pod (requesting devices)
 		to successfully run on the node followed by kubelet restart where device plugin doesn't
 		register and the application pod fails with admission error.
 
@@ -85,7 +85,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 		   2. Create sample device plugin with an environment variable with
 		      `REGISTER_CONTROL_FILE=/var/lib/kubelet/device-plugins/sample/registration` that
 			  waits for a client to delete the control file.
-		   3. Trigger plugin registeration by deleting the abovementioned directory.
+		   3. Trigger plugin registration by deleting the abovementioned directory.
 		   4. Create a test pod requesting devices exposed by the device plugin.
 		   5. Stop kubelet.
 		   6. Remove pods using CRI to ensure new pods are created after kubelet restart.
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
-				// environment variable is specified), device plugin registration needs to be triggerred
+				// environment variable is specified), device plugin registration needs to be triggered
 				// manually.
 				// This is done by deleting the control file at the following path:
 				// `/var/lib/kubelet/device-plugins/sample/registration`.

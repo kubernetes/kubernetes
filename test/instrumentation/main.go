@@ -231,7 +231,7 @@ func findPkgDir(pkg string) (string, error) {
 		return result.Dir, nil
 	}
 
-	return "", fmt.Errorf("empty respose from `go list`")
+	return "", fmt.Errorf("empty response from `go list`")
 }
 
 func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {

@@ -35,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -118,7 +117,7 @@ func (tc *LegacySATokenCleaner) evaluateSATokens(ctx context.Context) {
 	now := tc.clock.Now().UTC()
 	trackedSince, err := tc.latestPossibleTrackedSinceTime(ctx)
 	if err != nil {
-		logger.Error(err, "Getting lastest possible tracked_since time")
+		logger.Error(err, "Getting latest possible tracked_since time")
 		return
 	}
 

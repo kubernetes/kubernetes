@@ -11391,7 +11391,7 @@ func TestFeatureExternalTrafficPolicy(t *testing.T) {
 			expectError: true,
 		},
 	}, {
-		name: "LoadBalancer_policy:Local_hcnp:none_policy:Inalid",
+		name: "LoadBalancer_policy:Local_hcnp:none_policy:Invalid",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo",
 				svctest.SetTypeLoadBalancer,

@@ -1028,7 +1028,7 @@ func TestAnnotationUtils(t *testing.T) {
 	tRS := generateRS(tDeployment)
 	tDeployment.Annotations[RevisionAnnotation] = "1"
 
-	//Test Case 1: Check if anotations are copied properly from deployment to RS
+	//Test Case 1: Check if annotations are copied properly from deployment to RS
 	t.Run("SetNewReplicaSetAnnotations", func(t *testing.T) {
 		_, ctx := ktesting.NewTestContext(t)
 

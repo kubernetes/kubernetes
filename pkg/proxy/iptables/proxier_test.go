@@ -2460,7 +2460,7 @@ func TestNodePorts(t *testing.T) {
 			}
 
 			// NodePort on altNodeIP should be allowed, unless
-			// nodePortAddressess excludes altNodeIP
+			// nodePortAddresses excludes altNodeIP
 			if tc.allowAltNodeIP {
 				runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 					{

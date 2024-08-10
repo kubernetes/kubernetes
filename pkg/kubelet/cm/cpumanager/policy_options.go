@@ -69,7 +69,7 @@ func CheckPolicyOptionAvailable(option string) error {
 type StaticPolicyOptions struct {
 	// flag to enable extra allocation restrictions to avoid
 	// different containers to possibly end up on the same core.
-	// we consider "core" and "physical CPU" synonim here, leaning
+	// we consider "core" and "physical CPU" synonym here, leaning
 	// towards the terminoloy k8s hints. We acknowledge this is confusing.
 	//
 	// looking at https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/,

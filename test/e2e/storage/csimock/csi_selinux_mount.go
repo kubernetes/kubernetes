@@ -265,7 +265,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 						// Wait for the second pod to get stuck because of RWOP.
 						msg = "volume uses the ReadWriteOncePod access mode and is already in use by another pod"
 					} else {
-						// There is nothing blocking the second pod from starting, wait for the second pod to fullly start.
+						// There is nothing blocking the second pod from starting, wait for the second pod to fully start.
 						reason = string(events.StartedContainer)
 						msg = "Started container"
 					}

@@ -710,7 +710,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		retrieved object must contain the newly update matchConditions fields.
 	*/
 	framework.ConformanceIt("should be able to create and update validating webhook configurations with match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
+		initialMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "expression-1",
 				Expression: "object.metadata.namespace == 'production'",
@@ -718,7 +718,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}
 
 		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
+		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initialMatchConditions)
 
 		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
 		framework.ExpectNoError(err)
@@ -726,7 +726,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the validating webhook match conditions")
 		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(validatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initalMatchConditions), "verifying that match conditions are created")
+		gomega.Expect(validatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initialMatchConditions), "verifying that match conditions are created")
 		defer func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, validatingWebhookConfiguration.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "deleting mutating webhook configuration")
@@ -761,7 +761,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		retrieved object must contain the newly update matchConditions fields.
 	*/
 	framework.ConformanceIt("should be able to create and update mutating webhook configurations with match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
+		initialMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "expression-1",
 				Expression: "object.metadata.namespace == 'production'",
@@ -769,7 +769,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}
 
 		ginkgo.By("creating a mutating webhook with match conditions")
-		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
+		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initialMatchConditions)
 
 		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
 		framework.ExpectNoError(err)
@@ -777,7 +777,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the mutating webhook match conditions")
 		mutatingWebhookConfiguration, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(mutatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initalMatchConditions), "verifying that match conditions are created")
+		gomega.Expect(mutatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initialMatchConditions), "verifying that match conditions are created")
 		defer func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, mutatingWebhookConfiguration.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "deleting mutating webhook configuration")
@@ -806,13 +806,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Validing Admission webhook, reject validating webhook configurations with invalid matchConditions
+		Testname: Validating Admission webhook, reject validating webhook configurations with invalid matchConditions
 		Description: Creates a validating webhook configuration with an invalid CEL expression in it's
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
 	*/
 	framework.ConformanceIt("should reject validating webhook configurations with invalid match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
+		initialMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "invalid-expression-1",
 				Expression: "... [] bad expression",
@@ -820,7 +820,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}
 
 		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
+		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initialMatchConditions)
 
 		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "create validatingwebhookconfiguration should have been denied by the api-server")
@@ -836,7 +836,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		failed" error message.
 	*/
 	framework.ConformanceIt("should reject mutating webhook configurations with invalid match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
+		initialMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "invalid-expression-1",
 				Expression: "... [] bad expression",
@@ -844,7 +844,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}
 
 		ginkgo.By("creating a mutating webhook with match conditions")
-		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
+		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initialMatchConditions)
 
 		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "create mutatingwebhookconfiguration should have been denied by the api-server")

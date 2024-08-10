@@ -645,7 +645,7 @@ binary | sha1 hash | md5 hash
 * Add garbage collector into kube-controller-manager ([#26341](https://github.com/kubernetes/kubernetes/pull/26341), [@caesarxuchao](https://github.com/caesarxuchao))
 * Add orphaning finalizer logic to GC ([#25599](https://github.com/kubernetes/kubernetes/pull/25599), [@caesarxuchao](https://github.com/caesarxuchao))
 * GCI-backed masters mount srv/kubernetes and srv/sshproxy in the right place ([#26238](https://github.com/kubernetes/kubernetes/pull/26238), [@ihmccreery](https://github.com/ihmccreery))
-* Updaing QoS policy to be at the pod level ([#14943](https://github.com/kubernetes/kubernetes/pull/14943), [@vishh](https://github.com/vishh))
+* Updating QoS policy to be at the pod level ([#14943](https://github.com/kubernetes/kubernetes/pull/14943), [@vishh](https://github.com/vishh))
 * add CIDR allocator for NodeController ([#19242](https://github.com/kubernetes/kubernetes/pull/19242), [@mqliang](https://github.com/mqliang))
 * Adding garbage collector controller ([#24509](https://github.com/kubernetes/kubernetes/pull/24509), [@caesarxuchao](https://github.com/caesarxuchao))
 
@@ -945,7 +945,7 @@ binary | sha1 hash | md5 hash
 * Add a rate limiter to the GCE cloudprovider ([#23019](https://github.com/kubernetes/kubernetes/pull/23019), [@alex-mohr](https://github.com/alex-mohr))
 * Add a Deployment example for kubectl expose. ([#23222](https://github.com/kubernetes/kubernetes/pull/23222), [@madhusudancs](https://github.com/madhusudancs))
 * Use versioned object when computing patch ([#23145](https://github.com/kubernetes/kubernetes/pull/23145), [@liggitt](https://github.com/liggitt))
-* kubelet: send all recevied pods in one update ([#23141](https://github.com/kubernetes/kubernetes/pull/23141), [@yujuhong](https://github.com/yujuhong))
+* kubelet: send all received pods in one update ([#23141](https://github.com/kubernetes/kubernetes/pull/23141), [@yujuhong](https://github.com/yujuhong))
 * Add a SSHKey sync check to the master's healthz (when using SSHTunnels). ([#23167](https://github.com/kubernetes/kubernetes/pull/23167), [@cjcullen](https://github.com/cjcullen))
 * Validate minimum CPU limits to be >= 10m ([#23143](https://github.com/kubernetes/kubernetes/pull/23143), [@vishh](https://github.com/vishh))
 * Fix controller-manager race condition issue which cause endpoints flush during restart ([#23035](https://github.com/kubernetes/kubernetes/pull/23035), [@xinxiaogang](https://github.com/xinxiaogang))

@@ -549,7 +549,7 @@ func TestRBAC(t *testing.T) {
 			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 					// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-					// Also disable namespace lifecycle to workaroung the test limitation that first creates
+					// Also disable namespace lifecycle to workaround the test limitation that first creates
 					// roles/rolebindings and only then creates corresponding namespaces.
 					opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
 					// Disable built-in authorizers
@@ -741,7 +741,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		},
 	})
 
-	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
+	// Modify the default RBAC discovery ClusterRoleBindings to look more like the defaults that
 	// existed prior to v1.14, but with user modifications.
 	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
 	discRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(tCtx, "system:discovery", metav1.GetOptions{})

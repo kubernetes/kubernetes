@@ -46,6 +46,6 @@ RUN powershell \
           $ProgressPreference = 'SilentlyContinue' ; \
           while(!(Test-Path -Path $env:PSModuleAnalysisCachePath)) {  \
             Write-Host "'Waiting for $env:PSModuleAnalysisCachePath'" ; \
-            if((get-date) -gt $stopTime) { throw 'timout expired'} \
+            if((get-date) -gt $stopTime) { throw 'timeout expired'} \
             Start-Sleep -Seconds 6 ; \
           }"

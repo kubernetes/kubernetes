@@ -182,7 +182,7 @@ func TestUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	pvStartTimestamp, err := getPhaseTranstitionTime(ctx, pvStart.Name, storage)
+	pvStartTimestamp, err := getPhaseTransitionTime(ctx, pvStart.Name, storage)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 }
 
-func getPhaseTranstitionTime(ctx context.Context, pvName string, storage *REST) (*metav1.Time, error) {
+func getPhaseTransitionTime(ctx context.Context, pvName string, storage *REST) (*metav1.Time, error) {
 	obj, err := storage.Get(ctx, pvName, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
