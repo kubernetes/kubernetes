@@ -65,7 +65,7 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	}
 
 	// x/*
-	resourcesWithWildcardSubresoures := sets.String{}
+	resourcesWithWildcardSubresources := sets.String{}
 	// */x
 	subResourcesWithWildcardResource := sets.String{}
 	// */*
@@ -92,14 +92,14 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 			continue
 		}
 		res, sub := parts[0], parts[1]
-		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
+		if _, ok := resourcesWithWildcardSubresources[res]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resSub)))
 		}
 		if _, ok := subResourcesWithWildcardResource[sub]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
 		}
 		if sub == "*" {
-			resourcesWithWildcardSubresoures[res] = struct{}{}
+			resourcesWithWildcardSubresources[res] = struct{}{}
 		}
 		if res == "*" {
 			subResourcesWithWildcardResource[sub] = struct{}{}
