@@ -465,11 +465,6 @@ func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-// isCreated returns true if pod has been created and is maintained by the API server
-func isCreated(pod *v1.Pod) bool {
-	return pod.Status.Phase != ""
-}
-
 // isPending returns true if pod has a Phase of PodPending
 func isPending(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodPending
@@ -526,21 +521,16 @@ func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	return pod
 }
 
-// newVersionedStatefulSetPod creates a new Pod for a StatefulSet. currentSet is the representation of the set at the
-// current revision. updateSet is the representation of the set at the updateRevision. currentRevision is the name of
-// the current revision. updateRevision is the name of the update revision. ordinal is the ordinal of the Pod. If the
-// returned error is nil, the returned Pod is valid.
-func newVersionedStatefulSetPod(c *updateContext, ordinal int) *v1.Pod {
-	set, revision := c.updateSet, c.updateRevision
+// chooseRevision choose the correct revison from c for creating the Pod and PVCs for
+// the i-th valid replica (at oridnal getStartOrdinal(set) + i).
+func chooseRevision(c *updateContext, i int) (*apps.StatefulSet, string) {
 	curr := c.currentSet
 	if curr.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(curr.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(curr)+int(curr.Status.CurrentReplicas))) ||
-		(curr.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(curr)+int(*curr.Spec.UpdateStrategy.RollingUpdate.Partition))) {
-		set, revision = curr, c.currentRevision
+		(curr.Spec.UpdateStrategy.RollingUpdate == nil && i < int(curr.Status.CurrentReplicas)) ||
+		(curr.Spec.UpdateStrategy.RollingUpdate != nil && i < int(*curr.Spec.UpdateStrategy.RollingUpdate.Partition)) {
+		return curr, c.currentRevision
 	}
-	pod := newStatefulSetPod(set, ordinal)
-	setPodRevision(pod, revision)
-	return pod
+	return c.updateSet, c.updateRevision
 }
 
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a

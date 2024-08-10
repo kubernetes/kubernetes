@@ -317,9 +317,10 @@ type replicaStatus struct {
 func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision) replicaStatus {
 	status := replicaStatus{}
 	for _, pod := range pods {
-		if isCreated(pod) {
-			status.replicas++
+		if pod == nil {
+			continue
 		}
+		status.replicas++
 
 		// count the number of running and ready replicas
 		if isRunningAndReady(pod) {
@@ -332,7 +333,7 @@ func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision
 		}
 
 		// count the number of current and update replicas
-		if isCreated(pod) && !isTerminating(pod) {
+		if !isTerminating(pod) {
 			revision := getPodRevision(pod)
 			if revision == currentRevision.Name {
 				status.currentReplicas++
@@ -367,14 +368,14 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	replicas []*v1.Pod,
 	i int) (bool, error) {
 	logger := klog.FromContext(ctx)
-	set := updateCtx.updateSet
+	set, revision := chooseRevision(updateCtx, i)
 
 	// Note that pods with phase Succeeded will also trigger this event. This is
 	// because final pod phase of evicted or otherwise forcibly stopped pods
 	// (e.g. terminated on node reboot) is determined by the exit code of the
 	// container, not by the reason for pod termination. We should restart the pod
 	// regardless of the exit code.
-	if isFailed(replicas[i]) || isSucceeded(replicas[i]) {
+	if replicas[i] != nil && (isFailed(replicas[i]) || isSucceeded(replicas[i])) {
 		if replicas[i].DeletionTimestamp == nil {
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
 				return true, err
@@ -384,18 +385,21 @@ func (ssc *defaultStatefulSetControl) processReplica(
 		return true, nil
 	}
 	// If we find a Pod that has not been created we create the Pod
-	if !isCreated(replicas[i]) {
+	if replicas[i] == nil {
+		newReplica := newStatefulSetPod(set, getStartOrdinal(set)+i)
+		setPodRevision(newReplica, revision)
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
+			if isStale, err := ssc.podControl.PodClaimIsStale(set, newReplica); err != nil {
 				return true, err
 			} else if isStale {
 				// If a pod has a stale PVC, no more work can be done this round.
 				return true, err
 			}
 		}
-		if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
+		if err := ssc.podControl.CreateStatefulPod(ctx, set, newReplica); err != nil {
 			return true, err
 		}
+		replicas[i] = newReplica
 		if updateCtx.monotonic {
 			// if the set does not allow bursting, return immediately
 			return true, nil
@@ -404,10 +408,14 @@ func (ssc *defaultStatefulSetControl) processReplica(
 
 	// If the Pod is in pending state then trigger PVC creation to create missing PVCs
 	if isPending(replicas[i]) {
+		claimSet := updateCtx.updateSet
+		if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+			claimSet = set // create the PVCs using the same revision as Pod.
+		}
 		logger.V(4).Info(
 			"StatefulSet is triggering PVC creation for pending Pod",
-			"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
-		if err := ssc.podControl.createMissingPersistentVolumeClaims(ctx, set, replicas[i]); err != nil {
+			"statefulSet", klog.KObj(claimSet), "pod", klog.KObj(replicas[i]))
+		if err := ssc.podControl.createMissingPersistentVolumeClaims(ctx, claimSet, replicas[i]); err != nil {
 			return true, err
 		}
 	}
@@ -592,15 +600,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			condemned = append(condemned, pod)
 		}
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
-	}
-
-	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
-	start, end := getStartOrdinal(set), getEndOrdinal(set)
-	for ord := start; ord <= end; ord++ {
-		replicaIdx := ord - start
-		if replicas[replicaIdx] == nil {
-			replicas[replicaIdx] = newVersionedStatefulSetPod(updateCtx, ord)
-		}
 	}
 
 	// sort the condemned Pods by their ordinals

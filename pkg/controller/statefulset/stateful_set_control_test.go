@@ -512,7 +512,7 @@ func recreatesPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc,
 	}
 	recreatedPod := findPodByOrdinal(pods, terminalPodOrdinal)
 	// new recreated pod should have empty phase
-	if recreatedPod == nil || isCreated(recreatedPod) {
+	if recreatedPod == nil || recreatedPod.Status.Phase != "" {
 		t.Error("StatefulSet did not recreate failed Pod")
 	}
 	expectedNumberOfCreateRequests := 2
