@@ -520,7 +520,11 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 	}
 
 	// understandable output by default
-	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
+	if info.Namespaced() {
+		fmt.Fprintf(o.Out, "%s %s \"%s\" %s\n", info.Namespace, kindString, info.Name, operation)
+	} else {
+		fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
+	}
 }
 
 func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
