@@ -186,7 +186,7 @@ func (m *managerImpl) Start() error {
 				<-stop
 			}
 
-			time.Sleep(dbusReconnectPeriod)
+			<-time.After(dbusReconnectPeriod)
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
 			stop, err = m.start()
 			if err != nil {
