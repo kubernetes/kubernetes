@@ -80,7 +80,7 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 				err := apierrors.FromObject(evt.Object)
 				// In Kubernetes 1.17 and earlier, the api server returns both apierrors.StatusReasonExpired and
 				// apierrors.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
-				// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrs.IsGone
+				// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrors.IsGone
 				// check when we fully drop support for Kubernetes 1.17 servers from reflectors.
 				if apierrors.IsGone(err) || apierrors.IsResourceExpired(err) {
 					// this is allowed, since the kubernetes object could be very old

@@ -63,7 +63,7 @@ func init() {
 	})
 
 	// Now install the textlogger as the klog default logger.
-	// Calls like klog.Info then will write to ginkgo.GingoWriter
+	// Calls like klog.Info then will write to ginkgo.GingkoWriter
 	// through the textlogger.
 	//
 	// However, stack unwinding is then still being done by klog and thus

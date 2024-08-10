@@ -217,7 +217,7 @@ func testScriptInPod(
 	} else {
 		content = fmt.Sprintf("ls %s", volPath)
 	}
-	command := generateWriteandExecuteScriptFileCmd(content, fileName, volPath)
+	command := generateWriteAndExecuteScriptFileCmd(content, fileName, volPath)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("exec-volume-test-%s", suffix),
@@ -255,10 +255,10 @@ func testScriptInPod(
 	framework.ExpectNoError(err, "while deleting pod")
 }
 
-// generateWriteandExecuteScriptFileCmd generates the corresponding command lines to write a file with the given file path
+// generateWriteAndExecuteScriptFileCmd generates the corresponding command lines to write a file with the given file path
 // and also execute this file.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []string {
+func generateWriteAndExecuteScriptFileCmd(content, fileName, filePath string) []string {
 	// for windows cluster, modify the Pod spec.
 	if framework.NodeOSDistroIs("windows") {
 		scriptName := fmt.Sprintf("%s.ps1", fileName)
