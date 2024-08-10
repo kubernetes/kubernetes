@@ -189,7 +189,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		Release: v1.19
 		Testname: CertificateSigningRequest API
 		Description:
-		The certificates.k8s.io API group MUST exists in the /apis discovery document.
+		The certificates.k8s.io API group MUST exist in the /apis discovery document.
 		The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io discovery document.
 		The certificatesigningrequests, certificatesigningrequests/approval, and certificatesigningrequests/status
 		  resources MUST exist in the /apis/certificates.k8s.io/v1 discovery document.

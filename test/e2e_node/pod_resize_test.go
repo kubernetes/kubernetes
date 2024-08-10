@@ -1300,7 +1300,7 @@ func doPodResizeErrorTests() {
 //          a) scheduler and controller manager is not running by the Node e2e
 //          b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
 //             and is not possible to start it from TEST_ARGS
-//       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
+//       Above tests are performed by doPodResizeSchedulerTests() and doPodResizeResourceQuotaTests()
 //       in test/node/pod_resize_test.go
 
 var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, "[NodeAlphaFeature:InPlacePodVerticalScaling]", func() {

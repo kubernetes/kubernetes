@@ -217,7 +217,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			err := createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
 			framework.ExpectNoError(err)
-			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running...", staticPodName))
+			ginkgo.By(fmt.Sprintf("Waiting for nfs test pod: %s to start running...", staticPodName))
 			gomega.Eventually(func() error {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
@@ -256,7 +256,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			// Create the static pod again with the same config and expect it to start running
 			err = createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
 			framework.ExpectNoError(err)
-			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running (after being recreated)", staticPodName))
+			ginkgo.By(fmt.Sprintf("Waiting for nfs test pod: %s to start running (after being recreated)", staticPodName))
 			gomega.Eventually(func() error {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
