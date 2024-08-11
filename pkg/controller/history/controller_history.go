@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -103,45 +102,6 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 // SortControllerRevisions sorts revisions by their Revision.
 func SortControllerRevisions(revisions []*apps.ControllerRevision) {
 	sort.Stable(byRevision(revisions))
-}
-
-// EqualRevision returns true if lhs and rhs are either both nil, or both point to non-nil ControllerRevisions that
-// contain semantically equivalent data. Otherwise this method returns false.
-func EqualRevision(lhs *apps.ControllerRevision, rhs *apps.ControllerRevision) bool {
-	var lhsHash, rhsHash *uint32
-	if lhs == nil || rhs == nil {
-		return lhs == rhs
-	}
-	if hs, found := lhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
-		if err == nil {
-			lhsHash = new(uint32)
-			*lhsHash = uint32(hash)
-		}
-	}
-	if hs, found := rhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
-		if err == nil {
-			rhsHash = new(uint32)
-			*rhsHash = uint32(hash)
-		}
-	}
-	if lhsHash != nil && rhsHash != nil && *lhsHash != *rhsHash {
-		return false
-	}
-	return bytes.Equal(lhs.Data.Raw, rhs.Data.Raw) && apiequality.Semantic.DeepEqual(lhs.Data.Object, rhs.Data.Object)
-}
-
-// FindEqualRevisions returns all ControllerRevisions in revisions that are equal to needle using EqualRevision as the
-// equality test. The returned slice preserves the order of revisions.
-func FindEqualRevisions(revisions []*apps.ControllerRevision, needle *apps.ControllerRevision) []*apps.ControllerRevision {
-	var eq []*apps.ControllerRevision
-	for i := range revisions {
-		if EqualRevision(revisions[i], needle) {
-			eq = append(eq, revisions[i])
-		}
-	}
-	return eq
 }
 
 // byRevision implements sort.Interface to allow ControllerRevisions to be sorted by Revision.

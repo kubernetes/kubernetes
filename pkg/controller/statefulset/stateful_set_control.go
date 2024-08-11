@@ -17,7 +17,10 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -25,7 +28,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -85,34 +90,34 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(ctx context.Context, set
 	if err != nil {
 		return nil, err
 	}
+	// get the current, and update revisions
+	updateCtx, err := ssc.getStatefulSetRevisions(set, revisions)
+	if err != nil {
+		return nil, err
+	}
 
-	currentRevision, updateRevision, status, err := ssc.performUpdate(ctx, set, pods, revisions)
+	status, err := ssc.performUpdate(ctx, set, pods, updateCtx)
+	// maintain the set's revision history limit
+	errTrunc := ssc.truncateHistory(set, pods, revisions, updateCtx.currentRevision, updateCtx.updateRevision)
 	if err != nil {
 		errs := []error{err}
 		if agg, ok := err.(utilerrors.Aggregate); ok {
 			errs = agg.Errors()
 		}
-		return nil, utilerrors.NewAggregate(append(errs, ssc.truncateHistory(set, pods, revisions, currentRevision.Name, updateRevision.Name)))
+		return nil, utilerrors.NewAggregate(append(errs, errTrunc))
 	}
 
-	// maintain the set's revision history limit
-	return status, ssc.truncateHistory(set, pods, revisions, currentRevision.Name, updateRevision.Name)
+	return status, errTrunc
 }
 
 func (ssc *defaultStatefulSetControl) performUpdate(
-	ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod, revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, *apps.StatefulSetStatus, error) {
-	var currentStatus *apps.StatefulSetStatus
+	ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod, updateCtx *updateContext) (*apps.StatefulSetStatus, error) {
 	logger := klog.FromContext(ctx)
-	// get the current, and update revisions
-	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
-	}
 
 	// perform the main update function and get the status
-	currentStatus, err = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
+	currentStatus, err := ssc.updateStatefulSet(ctx, updateCtx, pods)
 	if err != nil && currentStatus == nil {
-		return currentRevision, updateRevision, nil, err
+		return nil, err
 	}
 
 	// make sure to update the latest status even if there is an error with non-nil currentStatus
@@ -128,18 +133,18 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	switch {
 	case err != nil && statusErr != nil:
 		logger.Error(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
-		return currentRevision, updateRevision, currentStatus, err
+		return currentStatus, err
 	case err != nil:
-		return currentRevision, updateRevision, currentStatus, err
+		return currentStatus, err
 	case statusErr != nil:
-		return currentRevision, updateRevision, currentStatus, statusErr
+		return currentStatus, statusErr
 	}
 
 	logger.V(4).Info("StatefulSet revisions", "statefulSet", klog.KObj(set),
 		"currentRevision", currentStatus.CurrentRevision,
 		"updateRevision", currentStatus.UpdateRevision)
 
-	return currentRevision, updateRevision, currentStatus, nil
+	return currentStatus, nil
 }
 
 func (ssc *defaultStatefulSetControl) ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error) {
@@ -200,6 +205,19 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	return nil
 }
 
+type revisionCompare struct {
+	Spec struct {
+		Template             runtime.RawExtension `json:"template"`
+		VolumeClaimTemplates runtime.RawExtension `json:"volumeClaimTemplates"`
+	} `json:"spec"`
+}
+
+func equalRevision(lhs *revisionCompare, rhs *revisionCompare) (pod, all bool) {
+	pod = bytes.Equal(lhs.Spec.Template.Raw, rhs.Spec.Template.Raw)
+	all = pod && bytes.Equal(lhs.Spec.VolumeClaimTemplates.Raw, rhs.Spec.VolumeClaimTemplates.Raw)
+	return
+}
+
 // getStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
 // returns a collision count that records the number of name collisions set saw when creating
 // new ControllerRevisions. This count is incremented on every name collision and is used in
@@ -207,7 +225,7 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 // a new revision, or modify the Revision of an existing revision if an update to set is detected.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	set *apps.StatefulSet,
-	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
+	revisions []*apps.ControllerRevision) (*updateContext, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 
 	revisionCount := len(revisions)
@@ -221,41 +239,49 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	}
 
 	// create a new revision from the current set
-	updateRevision, err := newRevision(set, nextRevision(revisions), &collisionCount)
+	nv := nextRevision(revisions)
+	updateRevision, err := newRevision(set, nv, &collisionCount)
 	if err != nil {
-		return nil, nil, collisionCount, err
+		return nil, err
+	}
+	var updateCmp revisionCompare
+	utilruntime.Must(json.Unmarshal(updateRevision.Data.Raw, &updateCmp))
+
+	podUpToDateRevisions := sets.New[string]()
+	var retrievedRevision *apps.ControllerRevision
+	for _, re := range revisions {
+		var reCmp revisionCompare
+		err := json.Unmarshal(re.Data.Raw, &reCmp)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode ControllerRevision %v: %v", klog.KObj(re), err)
+		}
+		pod, all := equalRevision(&reCmp, &updateCmp)
+		if all {
+			retrievedRevision = re
+		}
+		if pod {
+			podUpToDateRevisions.Insert(re.Name)
+		}
+		if re.Name == set.Status.CurrentRevision {
+			currentRevision = re
+		}
 	}
 
-	// find any equivalent revisions
-	equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
-	equalCount := len(equalRevisions)
-
-	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
-		// if the equivalent revision is immediately prior the update revision has not changed
-		updateRevision = revisions[revisionCount-1]
-	} else if equalCount > 0 {
-		// if the equivalent revision is not immediately prior we will roll back by incrementing the
-		// Revision of the equivalent revision
-		updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(
-			equalRevisions[equalCount-1],
-			updateRevision.Revision)
-		if err != nil {
-			return nil, nil, collisionCount, err
-		}
-	} else {
+	if retrievedRevision == nil {
 		//if there is no equivalent revision we create a new one
 		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision, &collisionCount)
 		if err != nil {
-			return nil, nil, collisionCount, err
+			return nil, err
 		}
-	}
-
-	// attempt to find the revision that corresponds to the current revision
-	for i := range revisions {
-		if revisions[i].Name == set.Status.CurrentRevision {
-			currentRevision = revisions[i]
-			break
+	} else if retrievedRevision != revisions[revisionCount-1] {
+		// if the equivalent revision is not immediately prior we will roll back by incrementing the
+		// Revision of the equivalent revision
+		updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(retrievedRevision, nv)
+		if err != nil {
+			return nil, err
 		}
+	} else {
+		updateRevision = retrievedRevision
 	}
 
 	// if the current revision is nil we initialize the history by setting it to the update revision
@@ -263,7 +289,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 		currentRevision = updateRevision
 	}
 
-	return currentRevision, updateRevision, collisionCount, nil
+	return newUpdateContext(set, currentRevision, updateRevision, podUpToDateRevisions, collisionCount)
 }
 
 func slowStartBatch(initialBatchSize int, remaining int, fn func(int) (bool, error)) (int, error) {
@@ -489,14 +515,22 @@ type updateContext struct {
 	currentRevision string
 	updateRevision  string
 
-	monotonic bool
+	monotonic      bool
+	collisionCount int32
+
+	podUpToDateRevisions sets.Set[string]
 }
 
-func newUpdateContext(set *apps.StatefulSet, currentRevision, updateRevision *apps.ControllerRevision) (*updateContext, error) {
+func newUpdateContext(set *apps.StatefulSet, currentRevision, updateRevision *apps.ControllerRevision,
+	podUpToDateRevisions sets.Set[string], collisionCount int32) (*updateContext, error) {
+
 	c := &updateContext{
 		currentRevision: currentRevision.Name,
 		updateRevision:  updateRevision.Name,
 		monotonic:       !allowsBurst(set),
+		collisionCount:  collisionCount,
+
+		podUpToDateRevisions: podUpToDateRevisions,
 	}
 	var err error
 	// get the current and update revisions of the set.
@@ -528,6 +562,10 @@ func (c *updateContext) runForAll(ctx context.Context, pods []*v1.Pod, fn func(c
 	return false, nil
 }
 
+func (c *updateContext) isPodUpToDate(pod *v1.Pod) bool {
+	return c.podUpToDateRevisions.Has(getPodRevision(pod))
+}
+
 // updateStatefulSet performs the update function for a StatefulSet. This method creates, updates, and deletes Pods in
 // the set in order to conform the system to the target state for the set. The target state always contains
 // set.Spec.Replicas Pods with a Ready Condition. If the UpdateStrategy.Type for the set is
@@ -539,25 +577,18 @@ func (c *updateContext) runForAll(ctx context.Context, pods []*v1.Pod, fn func(c
 // update must be recorded. If the error is not nil, the method should be retried until successful.
 func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	ctx context.Context,
-	set *apps.StatefulSet,
-	currentRevision *apps.ControllerRevision,
-	updateRevision *apps.ControllerRevision,
-	collisionCount int32,
+	updateCtx *updateContext,
 	pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
 	logger := klog.FromContext(ctx)
-
-	updateCtx, err := newUpdateContext(set, currentRevision, updateRevision)
-	if err != nil {
-		return nil, err
-	}
+	set := updateCtx.updateSet
 
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
-	status.CurrentRevision = currentRevision.Name
-	status.UpdateRevision = updateRevision.Name
+	status.CurrentRevision = updateCtx.currentRevision
+	status.UpdateRevision = updateCtx.updateRevision
 	status.CollisionCount = new(int32)
-	*status.CollisionCount = collisionCount
+	*status.CollisionCount = updateCtx.collisionCount
 
 	updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, pods)
 
@@ -655,7 +686,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			ssc,
 			set,
 			replicas,
-			updateRevision,
+			updateCtx.updateRevision,
 			status,
 		)
 	}
@@ -669,7 +700,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for target := len(replicas) - 1; target >= updateMin; target-- {
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
-		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
+		if getPodRevision(replicas[target]) != updateCtx.updateRevision && !isTerminating(replicas[target]) {
 			logger.V(2).Info("Pod of StatefulSet is terminating for update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
@@ -678,7 +709,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				}
 			}
 			status.CurrentReplicas--
-			return &status, err
+			return &status, nil
 		}
 
 		if ready, err := ssc.podControl.readyForUpdate(ctx, set, replicas[target]); err != nil || !ready {
@@ -705,7 +736,7 @@ func updateStatefulSetAfterInvariantEstablished(
 	ssc *defaultStatefulSetControl,
 	set *apps.StatefulSet,
 	replicas []*v1.Pod,
-	updateRevision *apps.ControllerRevision,
+	updateRevision string,
 	status apps.StatefulSetStatus,
 ) (*apps.StatefulSetStatus, error) {
 
@@ -755,7 +786,7 @@ func updateStatefulSetAfterInvariantEstablished(
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
 
 		// delete the Pod if it is healthy and the revision doesnt match the target
-		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
+		if getPodRevision(replicas[target]) != updateRevision && !isTerminating(replicas[target]) {
 			// delete the Pod if it is healthy and the revision doesnt match the target
 			logger.V(2).Info("StatefulSet terminating Pod for update",
 				"statefulSet", klog.KObj(set),

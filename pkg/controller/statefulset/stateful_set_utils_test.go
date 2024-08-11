@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/ptr"
 )
 
@@ -1532,7 +1532,7 @@ func TestCreateApplyRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !history.EqualRevision(revision, restoredRevision) {
+	if !bytes.Equal(revision.Data.Raw, restoredRevision.Data.Raw) {
 		t.Errorf("wanted %v got %v", string(revision.Data.Raw), string(restoredRevision.Data.Raw))
 	}
 	value, ok := restoredRevision.Annotations[key]

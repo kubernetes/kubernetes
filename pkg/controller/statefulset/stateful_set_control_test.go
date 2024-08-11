@@ -901,7 +901,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		updateCtx, err := ssc.getStatefulSetRevisions(test.set, revisions)
 		if err != nil {
 			t.Fatalf("error getting statefulset revisions:%v", err)
 		}
@@ -915,17 +915,13 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if test.err && err == nil {
 			t.Errorf("%s: expected error", test.name)
 		}
-		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
+		current := updateCtx.currentRevision
+		update := updateCtx.updateRevision
+		if !test.err && current != test.expectedCurrent.Name {
 			t.Errorf("%s: for current want %v got %v", test.name, test.expectedCurrent, current)
 		}
-		if !test.err && !history.EqualRevision(update, test.expectedUpdate) {
+		if !test.err && update != test.expectedUpdate.Name {
 			t.Errorf("%s: for update want %v got %v", test.name, test.expectedUpdate, update)
-		}
-		if !test.err && test.expectedCurrent != nil && current != nil && test.expectedCurrent.Revision != current.Revision {
-			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedCurrent.Revision, current.Revision)
-		}
-		if !test.err && test.expectedUpdate != nil && update != nil && test.expectedUpdate.Revision != update.Revision {
-			t.Errorf("%s: for update revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
 		}
 	}
 
@@ -1289,7 +1285,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 
 			// try to update the statefulset
 			// this function is only called in main code when feature gate is enabled
-			if _, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, originalPods, updateRevision, status); err != nil {
+			if _, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, originalPods, updateRevision.Name, status); err != nil {
 				t.Fatal(err)
 			}
 			pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
