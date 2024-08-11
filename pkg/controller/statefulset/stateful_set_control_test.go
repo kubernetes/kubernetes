@@ -2610,6 +2610,10 @@ func (om *fakeObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error 
 	return nil
 }
 
+func (om *fakeObjectManager) ApplyClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	return claim, om.claimsIndexer.Update(claim)
+}
+
 func (om *fakeObjectManager) GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error) {
 	return om.claimsLister.PersistentVolumeClaims(namespace).Get(claimName)
 }
