@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -91,11 +92,11 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(ctx context.Context, set
 		if agg, ok := err.(utilerrors.Aggregate); ok {
 			errs = agg.Errors()
 		}
-		return nil, utilerrors.NewAggregate(append(errs, ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)))
+		return nil, utilerrors.NewAggregate(append(errs, ssc.truncateHistory(set, pods, revisions, currentRevision.Name, updateRevision.Name)))
 	}
 
 	// maintain the set's revision history limit
-	return status, ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)
+	return status, ssc.truncateHistory(set, pods, revisions, currentRevision.Name, updateRevision.Name)
 }
 
 func (ssc *defaultStatefulSetControl) performUpdate(
@@ -171,23 +172,16 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	set *apps.StatefulSet,
 	pods []*v1.Pod,
 	revisions []*apps.ControllerRevision,
-	current *apps.ControllerRevision,
-	update *apps.ControllerRevision) error {
+	current, update string) error {
 	history := make([]*apps.ControllerRevision, 0, len(revisions))
 	// mark all live revisions
-	live := map[string]bool{}
-	if current != nil {
-		live[current.Name] = true
-	}
-	if update != nil {
-		live[update.Name] = true
-	}
+	live := sets.New(current, update)
 	for i := range pods {
-		live[getPodRevision(pods[i])] = true
+		live.Insert(getPodRevision(pods[i]))
 	}
 	// collect live revisions and historic revisions
 	for i := range revisions {
-		if !live[revisions[i].Name] {
+		if !live.Has(revisions[i].Name) {
 			history = append(history, revisions[i])
 		}
 	}
