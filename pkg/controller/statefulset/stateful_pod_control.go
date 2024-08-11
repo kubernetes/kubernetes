@@ -376,7 +376,7 @@ func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulS
 // createMissingPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, and updates its retention policy
 func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
-		if err := spc.applyPersistentVolumeClaims(ctx, set, pod); err != nil {
+		if err := spc.applyPersistentVolumeClaims(ctx, set, pod, true); err != nil {
 			return err
 		}
 	} else {
@@ -425,17 +425,19 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 	return errorutils.NewAggregate(errs)
 }
 
-// applyPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
+// applyPersistentVolumeClaims creates/updates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully applied, the returned error is nil. If failed, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
 // set's Spec.
-func (spc *StatefulPodControl) applyPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) applyPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod, create bool) error {
 	var errs []error
 	for _, template := range getPersistentVolumeClaims(set, pod) {
 		claim, err := spc.objectMgr.GetClaim(template.Namespace, template.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			// Do nothing
+			if !create {
+				continue
+			}
 		case err != nil:
 			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", template.Name, err))
 			spc.recordClaimEvent("create", set, pod, &template, err)
@@ -444,7 +446,10 @@ func (spc *StatefulPodControl) applyPersistentVolumeClaims(ctx context.Context, 
 			errs = append(errs, fmt.Errorf("pvc %s is being deleted", template.Name))
 			continue
 		default:
-			continue
+			if create {
+				continue
+			}
+			prepareClaimApplyPatch(claim, &template)
 		}
 		_, err = spc.objectMgr.ApplyClaim(ctx, &template)
 		if err != nil {

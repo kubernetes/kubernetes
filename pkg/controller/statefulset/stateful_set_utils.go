@@ -497,6 +497,21 @@ func isClaimCampatible(claim *v1.PersistentVolumeClaim, template *v1.PersistentV
 	return req.Cmp(cap) <= 0
 }
 
+// prepareClaimApplyPatch modifies template in-place to be a server-side apply patch.
+func prepareClaimApplyPatch(claim *v1.PersistentVolumeClaim, template *v1.PersistentVolumeClaim) {
+	req := template.Spec.Resources.Requests["storage"]
+	minSize := claim.Spec.Resources.Requests["storage"]
+	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		minSize = claim.Status.Capacity["storage"]
+	}
+	if req.Cmp(minSize) <= 0 {
+		// We do not shrink PVCs
+		template.Spec.Resources.Requests["storage"] = minSize
+	}
+	// We depends on the old size to set the new size, so add ResourceVersion to avoid conflict.
+	template.ResourceVersion = claim.ResourceVersion
+}
+
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement

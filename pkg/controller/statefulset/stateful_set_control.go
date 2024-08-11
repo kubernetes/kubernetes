@@ -396,6 +396,13 @@ func (ssc *defaultStatefulSetControl) processReplica(
 				return true, err
 			}
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) &&
+			set.Spec.VolumeClaimUpdatePolicy == apps.InPlaceStatefulSetVolumeClaimUpdatePolicy {
+			// update the PVCs before creating the pod to maintain the invariant.
+			if err := ssc.podControl.applyPersistentVolumeClaims(ctx, set, newReplica, false); err != nil {
+				return true, err
+			}
+		}
 		if err := ssc.podControl.CreateStatefulPod(ctx, set, newReplica); err != nil {
 			return true, err
 		}
