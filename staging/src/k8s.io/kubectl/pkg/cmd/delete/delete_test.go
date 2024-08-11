@@ -921,6 +921,55 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	}
 }
 
+func TestDeleteSetDryRun(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+	tf := cmdtesting.NewTestFactory().WithNamespace("resourceNamespace")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+
+			case p == "/namespaces/resourceNamespace/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+
+			default:
+				// Ensures no other operation is invoked when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	t.Run("server side dry run", func(t *testing.T) {
+		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmd := NewCmdDelete(tf, ioStreams)
+			cmd.Flags().Set("dry-run", "server")
+			cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
+		})
+		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (server dry run)\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	})
+
+	t.Run("client side dry run", func(t *testing.T) {
+		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmd := NewCmdDelete(tf, ioStreams)
+			cmd.Flags().Set("dry-run", "client")
+			cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
+		})
+		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (dry run)\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	})
+}
+
 func TestResourceErrors(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 	testCases := map[string]struct {
