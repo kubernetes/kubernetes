@@ -84,7 +84,6 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(ctx context.Context, set
 	if err != nil {
 		return nil, err
 	}
-	history.SortControllerRevisions(revisions)
 
 	currentRevision, updateRevision, status, err := ssc.performUpdate(ctx, set, pods, revisions)
 	if err != nil {
@@ -212,7 +211,6 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 // new ControllerRevisions. This count is incremented on every name collision and is used in
 // building the ControllerRevision names for name collision avoidance. This method may create
 // a new revision, or modify the Revision of an existing revision if an update to set is detected.
-// This method expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	set *apps.StatefulSet,
 	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
