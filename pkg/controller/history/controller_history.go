@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"sort"
 	"strconv"
 
@@ -69,13 +70,9 @@ func NewControllerRevision(parent metav1.Object,
 	data runtime.RawExtension,
 	revision int64,
 	collisionCount *int32) (*apps.ControllerRevision, error) {
-	labelMap := make(map[string]string)
-	for k, v := range templateLabels {
-		labelMap[k] = v
-	}
 	cr := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          labelMap,
+			Labels:          maps.Clone(templateLabels),
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
 		},
 		Data:     data,
