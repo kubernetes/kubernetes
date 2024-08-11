@@ -298,59 +298,40 @@ func slowStartBatch(initialBatchSize int, remaining int, fn func(int) (bool, err
 	return successes, nil
 }
 
-type replicaStatus struct {
-	replicas          int32
-	readyReplicas     int32
-	availableReplicas int32
-	currentReplicas   int32
-	updatedReplicas   int32
-}
-
-func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision) replicaStatus {
-	status := replicaStatus{}
-	for _, pod := range pods {
-		if pod == nil {
-			continue
-		}
-		status.replicas++
-
-		// count the number of running and ready replicas
-		if isRunningAndReady(pod) {
-			status.readyReplicas++
-			// count the number of running and available replicas
-			if isRunningAndAvailable(pod, minReadySeconds) {
-				status.availableReplicas++
-			}
-
-		}
-
-		// count the number of current and update replicas
-		if !isTerminating(pod) {
-			revision := getPodRevision(pod)
-			if revision == currentRevision.Name {
-				status.currentReplicas++
-			}
-			if revision == updateRevision.Name {
-				status.updatedReplicas++
-			}
-		}
-	}
-	return status
-}
-
-func updateStatus(status *apps.StatefulSetStatus, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision, podLists ...[]*v1.Pod) {
+func updateStatus(status *apps.StatefulSetStatus, minReadySeconds int32, updateCtx *updateContext, podLists ...[]*v1.Pod) {
 	status.Replicas = 0
 	status.ReadyReplicas = 0
 	status.AvailableReplicas = 0
 	status.CurrentReplicas = 0
 	status.UpdatedReplicas = 0
 	for _, list := range podLists {
-		replicaStatus := computeReplicaStatus(list, minReadySeconds, currentRevision, updateRevision)
-		status.Replicas += replicaStatus.replicas
-		status.ReadyReplicas += replicaStatus.readyReplicas
-		status.AvailableReplicas += replicaStatus.availableReplicas
-		status.CurrentReplicas += replicaStatus.currentReplicas
-		status.UpdatedReplicas += replicaStatus.updatedReplicas
+		for _, pod := range list {
+			if pod == nil {
+				continue
+			}
+			status.Replicas++
+
+			// count the number of running and ready replicas
+			if isRunningAndReady(pod) {
+				status.ReadyReplicas++
+				// count the number of running and available replicas
+				if isRunningAndAvailable(pod, minReadySeconds) {
+					status.AvailableReplicas++
+				}
+
+			}
+
+			// count the number of current and update replicas
+			if !isTerminating(pod) {
+				revision := getPodRevision(pod)
+				if revision == updateCtx.currentRevision {
+					status.CurrentReplicas++
+				}
+				if revision == updateCtx.updateRevision {
+					status.UpdatedReplicas++
+				}
+			}
+		}
 	}
 }
 
@@ -578,7 +559,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
 
-	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, pods)
+	updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, pods)
 
 	replicaCount := int(*set.Spec.Replicas)
 	// slice that will contain all Pods such that getStartOrdinal(set) <= getOrdinal(pod) <= getEndOrdinal(set)
@@ -636,14 +617,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// First, process each living replica. Exit if we run into an error or something blocking in monotonic mode.
 	if shouldExit, err := updateCtx.runForAll(ctx, replicas, ssc.processReplica); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
+		updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, replicas, condemned)
 		return &status, err
 	}
 
 	// Fix pod claims for condemned pods, if necessary.
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		if shouldExit, err := updateCtx.runForAll(ctx, condemned, ssc.fixPodClaim); shouldExit || err != nil {
-			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
+			updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, replicas, condemned)
 			return &status, err
 		}
 	}
@@ -658,11 +639,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return ssc.processCondemned(ctx, updateCtx.updateSet, firstUnhealthyOrdinal, updateCtx.monotonic, condemned, i)
 	}
 	if shouldExit, err := updateCtx.runForAll(ctx, condemned, processCondemnedFn); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
+		updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, replicas, condemned)
 		return &status, err
 	}
 
-	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
+	updateStatus(&status, set.Spec.MinReadySeconds, updateCtx, replicas, condemned)
 
 	// for the OnDelete strategy we short circuit. Pods will be updated when they are manually deleted.
 	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
