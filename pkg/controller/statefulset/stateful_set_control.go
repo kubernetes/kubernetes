@@ -701,11 +701,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, err
 		}
 
-		// wait for unhealthy Pods on update
-		if !isHealthy(replicas[target]) {
-			logger.V(4).Info("StatefulSet is waiting for Pod to update",
-				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
-			return &status, nil
+		if ready, err := ssc.podControl.readyForUpdate(ctx, set, replicas[target]); err != nil || !ready {
+			return &status, err
 		}
 
 	}

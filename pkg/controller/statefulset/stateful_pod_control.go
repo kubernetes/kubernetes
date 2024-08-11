@@ -285,6 +285,37 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *apps.StatefulSet, pod *v1.Po
 	return false, nil
 }
 
+// readyForUpdate returns true if the updated pod is ready and the rollout should continue.
+func (spc *StatefulPodControl) readyForUpdate(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) (bool, error) {
+	logger := klog.FromContext(ctx)
+	if !isHealthy(pod) {
+		logger.V(4).Info("StatefulSet is waiting for Pod to update",
+			"statefulSet", klog.KObj(set), "pod", klog.KObj(pod))
+		return false, nil
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		ordinal := getOrdinal(pod)
+		templates := set.Spec.VolumeClaimTemplates
+		for i := range templates {
+			claimName := getPersistentVolumeClaimName(set, &templates[i], ordinal)
+			claim, err := spc.objectMgr.GetClaim(set.Namespace, claimName)
+			switch {
+			case apierrors.IsNotFound(err):
+				return false, nil
+			case err != nil:
+				return false, fmt.Errorf("could not retrieve claim %s for %s when checking PVC compatibility", claimName, pod.Name)
+			default:
+				if !isClaimCampatible(claim, &templates[i]) {
+					logger.V(4).Info("StatefulSet is waiting for PVC to be compatible",
+						"statefulSet", klog.KObj(set), "PVC", klog.KObj(claim))
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
 // recordPodEvent records an event for verb applied to a Pod in a StatefulSet. If err is nil the generated event will
 // have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, err error) {

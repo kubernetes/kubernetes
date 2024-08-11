@@ -490,6 +490,13 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
+// isClaimCampatible returns true if the claim is compatible with the template and should not block rollout.
+func isClaimCampatible(claim *v1.PersistentVolumeClaim, template *v1.PersistentVolumeClaim) bool {
+	req := template.Spec.Resources.Requests["storage"]
+	cap := claim.Status.Capacity["storage"]
+	return req.Cmp(cap) <= 0
+}
+
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
