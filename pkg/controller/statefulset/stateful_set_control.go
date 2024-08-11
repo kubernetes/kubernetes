@@ -696,16 +696,38 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	if set.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 	}
-	// we terminate the Pod with the largest ordinal that does not match the update revision.
+	// we update the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
 
-		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateCtx.updateRevision && !isTerminating(replicas[target]) {
-			logger.V(2).Info("Pod of StatefulSet is terminating for update",
-				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
-			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
-				if !errors.IsNotFound(err) {
-					return &status, err
+			if updateCtx.isPodUpToDate(replicas[target]) {
+				// Pod template unchanged, update PVCs then Pod revision label
+				logger.V(2).Info("Pod of StatefulSet is unchanged",
+					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
+
+				if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) &&
+					set.Spec.VolumeClaimUpdatePolicy == apps.InPlaceStatefulSetVolumeClaimUpdatePolicy {
+
+					err := ssc.podControl.applyPersistentVolumeClaims(ctx, set, replicas[target], false)
+					if err != nil {
+						return &status, err
+					}
+				}
+				setPodRevision(replicas[target], updateCtx.updateRevision)
+				if err := ssc.podControl.objectMgr.UpdatePod(replicas[target]); err != nil {
+					if !errors.IsNotFound(err) {
+						return &status, err
+					}
+				}
+			} else {
+				// delete the Pod if it is not already terminating and does not match the update revision.
+				// PVCs will be updated before creating new Pod.
+				logger.V(2).Info("Pod of StatefulSet is terminating for update",
+					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
+				if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
+					if !errors.IsNotFound(err) {
+						return &status, err
+					}
 				}
 			}
 			status.CurrentReplicas--
