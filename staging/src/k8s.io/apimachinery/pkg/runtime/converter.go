@@ -574,6 +574,9 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
 	var u map[string]interface{}
 	var err error
+	if obj == nil {
+		return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got nil")
+	}
 	if unstr, ok := obj.(Unstructured); ok {
 		u = unstr.UnstructuredContent()
 	} else {
