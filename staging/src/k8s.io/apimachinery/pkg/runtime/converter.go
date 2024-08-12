@@ -578,7 +578,6 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 
 	var u map[string]interface{}
 	var err error
-	
 	if unstr, ok := obj.(Unstructured); ok {
 		u = unstr.UnstructuredContent()
 	} else {
