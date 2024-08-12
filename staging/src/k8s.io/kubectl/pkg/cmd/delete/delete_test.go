@@ -947,11 +947,9 @@ func TestDeleteSetDryRun(t *testing.T) {
 
 	t.Run("server side dry run", func(t *testing.T) {
 		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
-			cmd := NewCmdDelete(tf, ioStreams)
-			cmd.Flags().Set("dry-run", "server")
-			cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
-		})
+		cmd := NewCmdDelete(tf, ioStreams)
+		cmd.Flags().Set("dry-run", "server")
+		cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
 		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (server dry run)\n" {
 			t.Errorf("unexpected output: %s", buf.String())
 		}
@@ -959,11 +957,9 @@ func TestDeleteSetDryRun(t *testing.T) {
 
 	t.Run("client side dry run", func(t *testing.T) {
 		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
-			cmd := NewCmdDelete(tf, ioStreams)
-			cmd.Flags().Set("dry-run", "client")
-			cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
-		})
+		cmd := NewCmdDelete(tf, ioStreams)
+		cmd.Flags().Set("dry-run", "client")
+		cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
 		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (dry run)\n" {
 			t.Errorf("unexpected output: %s", buf.String())
 		}

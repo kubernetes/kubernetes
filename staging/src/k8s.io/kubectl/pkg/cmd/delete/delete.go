@@ -505,11 +505,14 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	switch o.DryRunStrategy {
 	case cmdutil.DryRunClient:
-		kindString = fmt.Sprintf("%s %s", info.Namespace, kindString)
 		operation = fmt.Sprintf("%s (dry run)", operation)
 	case cmdutil.DryRunServer:
-		kindString = fmt.Sprintf("%s %s", info.Namespace, kindString)
 		operation = fmt.Sprintf("%s (server dry run)", operation)
+	}
+
+	deletedName := kindString
+	if o.DryRunStrategy == cmdutil.DryRunClient || o.DryRunStrategy == cmdutil.DryRunServer {
+		deletedName = fmt.Sprintf("%s %s", info.Namespace, kindString)
 	}
 
 	if o.Output == "name" {
@@ -517,9 +520,9 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name)
 		return
 	}
-	
-	// understandable output by default
-	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
+
+	// understandable output by default, with namespace in dry-run
+	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", deletedName, info.Name, operation)
 }
 
 func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
