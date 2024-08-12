@@ -572,11 +572,13 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 // ToUnstructured converts an object into map[string]interface{} representation.
 // It uses encoding/json/Marshaler if object implements it or reflection if not.
 func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
-	var u map[string]interface{}
-	var err error
 	if obj == nil {
 		return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got nil")
 	}
+
+	var u map[string]interface{}
+	var err error
+	
 	if unstr, ok := obj.(Unstructured); ok {
 		u = unstr.UnstructuredContent()
 	} else {
