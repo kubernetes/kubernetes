@@ -4,17 +4,20 @@ filters:
   ".*":
     # Downstream reviewers, don't have to match those in OWNERS
     reviewers:
+    - bertinatto
     - deads2k
-    - sttts
+    - jerpeter1
+    - p0lyn0mial
     - soltysh
-    - mfojtik
+    - tkashem
 
     # Approvers are limited to the team that manages rebases and pays the price for carries that are introduced
     approvers:
+    - bertinatto
     - deads2k
-    - sttts
+    - jerpeter1
+    - p0lyn0mial
     - soltysh
-    - mfojtik
     - tkashem
 
   "^\\.go.(mod|sum)$":
