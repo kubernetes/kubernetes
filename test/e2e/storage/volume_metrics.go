@@ -283,7 +283,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		pod := makePod(f, pvcBlock, isEphemeral)
 		pod.Spec.Containers[0].VolumeDevices = []v1.VolumeDevice{{
 			Name:       pod.Spec.Volumes[0].Name,
-			DevicePath: "/mnt/" + pvcBlock.Name,
+			DevicePath: "/mnt/" + pod.Spec.Volumes[0].Name,
 		}}
 		pod.Spec.Containers[0].VolumeMounts = nil
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
