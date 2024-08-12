@@ -195,8 +195,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	case lowercaseCond == "create":
 		return IsCreated, nil
 
-	case strings.HasPrefix(lowercaseCond, "condition="):
-		conditionName := lowercaseCond[len("condition="):]
+	case strings.HasPrefix(condition, "condition="):
+		conditionName := strings.TrimPrefix(condition, "condition=")
 		conditionValue := "true"
 		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
 			conditionValue = conditionName[equalsIndex+1:]
@@ -209,8 +209,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			errOut:          errOut,
 		}.IsConditionMet, nil
 
-	case strings.HasPrefix(lowercaseCond, "jsonpath="):
-		jsonPathInput := strings.TrimPrefix(lowercaseCond, "jsonpath=")
+	case strings.HasPrefix(condition, "jsonpath="):
+		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
 		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
 		if err != nil {
 			return nil, err

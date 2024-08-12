@@ -51,6 +51,12 @@ run_wait_tests() {
     # Post-Condition: Wait failed
     kube::test::if_has_string "${output_message}" 'timed out'
 
+    # wait with mixed case jsonpath
+    output_message=$(kubectl wait --for=jsonpath=.status.unavailableReplicas=1 deploy/test-1 2>&1)
+
+    # Post-Condition: Wait failed
+    kube::test::if_has_string "${output_message}" 'test-1 condition met'
+
     # Delete all deployments async to kubectl wait
     ( sleep 2 && kubectl delete deployment --all ) &
 
