@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -51,6 +52,22 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
 // podKind contains the schema.GroupVersionKind for pods.
 var podKind = v1.SchemeGroupVersion.WithKind("Pod")
+
+const (
+	ClaimNamePrefixIndex = "claimNamePrefix"
+)
+
+func ClaimNameIndexFunc(obj interface{}) ([]string, error) {
+	set, ok := obj.(*apps.StatefulSet)
+	if !ok {
+		return nil, nil
+	}
+	names := make([]string, 0, len(set.Spec.VolumeClaimTemplates))
+	for _, tmpl := range set.Spec.VolumeClaimTemplates {
+		names = append(names, fmt.Sprintf("%s-%s", tmpl.Name, set.Name))
+	}
+	return names, nil
+}
 
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
@@ -104,7 +121,6 @@ func NewStatefulSetController(
 			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
 			history.NewHistory(kubeClient, revInformer.Lister()),
 		),
-		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		revListerSynced: revInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
@@ -133,6 +149,7 @@ func NewStatefulSetController(
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 	controller.AddPodControllerUIDIndexer(podInformer.Informer())
 	ssc.podIndexer = podInformer.Informer().GetIndexer()
+	setInformer.Informer().AddIndexers(cache.Indexers{ClaimNamePrefixIndex: ClaimNameIndexFunc})
 	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
@@ -150,7 +167,14 @@ func NewStatefulSetController(
 	ssc.setLister = setInformer.Lister()
 	ssc.setListerSynced = setInformer.Informer().HasSynced
 
-	// TODO: Watch volumes
+	setIndexer := setInformer.Informer().GetIndexer()
+	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { ssc.enqueueClaim(setIndexer, obj) },
+		UpdateFunc: func(oldObj, newObj interface{}) { ssc.enqueueClaim(setIndexer, newObj) },
+		DeleteFunc: func(obj interface{}) { ssc.deleteClaim(setIndexer, obj) },
+	})
+	ssc.pvcListerSynced = pvcInformer.Informer().HasSynced
+
 	return ssc
 }
 
@@ -304,6 +328,31 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 	}
 	logger.V(4).Info("Pod deleted.", "pod", klog.KObj(pod), "caller", utilruntime.GetCaller())
 	ssc.enqueueStatefulSet(set)
+}
+
+func (ssc *StatefulSetController) enqueueClaim(setIndexer cache.Indexer, obj interface{}) {
+	claim := obj.(*v1.PersistentVolumeClaim)
+	i := strings.LastIndexByte(claim.Name, '-')
+	if i == -1 {
+		return
+	}
+	indexedValue := claim.Name[:i]
+	sets, err := setIndexer.ByIndex(ClaimNamePrefixIndex, indexedValue)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get sets by indexed value %v: %w", indexedValue, err))
+		return
+	}
+	for _, set := range sets {
+		ssc.enqueueStatefulSet(set)
+	}
+}
+
+func (ssc *StatefulSetController) deleteClaim(setIndexer cache.Indexer, obj interface{}) {
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if ok {
+		obj = tombstone.Obj
+	}
+	ssc.enqueueClaim(setIndexer, obj)
 }
 
 // getPodsForStatefulSet returns the Pods that a given StatefulSet should manage.
