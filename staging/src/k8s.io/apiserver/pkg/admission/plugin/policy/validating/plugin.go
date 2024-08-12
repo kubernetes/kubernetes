@@ -127,7 +127,7 @@ func (a *Plugin) Validate(ctx context.Context, attr admission.Attributes, o admi
 }
 
 func (a *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	a.Plugin.SetEnabled(featureGates.Enabled(features.ValidatingAdmissionPolicy))
+	a.Plugin.SetEnabled(true)
 }
 
 func compilePolicy(policy *Policy) Validator {
