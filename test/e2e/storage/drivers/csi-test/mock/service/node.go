@@ -359,19 +359,22 @@ func (s *service) NodeGetCapabilities(
 				},
 			},
 		},
-		{
-			Type: &csi.NodeServiceCapability_Rpc{
-				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-				},
-			},
-		},
 	}
 	if s.config.NodeExpansionRequired {
 		capabilities = append(capabilities, &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
 					Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+				},
+			},
+		})
+	}
+
+	if s.config.NodeVolumeConditionRequired {
+		capabilities = append(capabilities, &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 				},
 			},
 		})
@@ -417,7 +420,10 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 	req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 
 	resp := &csi.NodeGetVolumeStatsResponse{
-		VolumeCondition: &csi.VolumeCondition{},
+		VolumeCondition: &csi.VolumeCondition{
+			Abnormal: false,
+			Message:  "volume is normal",
+		},
 	}
 
 	if len(req.GetVolumeId()) == 0 {
@@ -437,6 +443,19 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 
 	nodeMntPathKey := path.Join(s.nodeID, req.VolumePath)
 
+	resp.Usage = []*csi.VolumeUsage{
+		{
+			Total: v.GetCapacityBytes(),
+			Unit:  csi.VolumeUsage_BYTES,
+		},
+	}
+
+	if req.GetVolumePath() == "/tmp/csi/health/abnormal" {
+		resp.VolumeCondition.Abnormal = true
+		resp.VolumeCondition.Message = "volume is abnormal"
+		return resp, nil
+	}
+
 	_, exists := v.VolumeContext[nodeMntPathKey]
 	if !exists {
 		msg := fmt.Sprintf("volume %q doest not exist on the specified path %q", req.VolumeId, req.VolumePath)
@@ -447,13 +466,6 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 
 	if hookVal, hookMsg := s.execHook("NodeGetVolumeStatsEnd"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
-	}
-
-	resp.Usage = []*csi.VolumeUsage{
-		{
-			Total: v.GetCapacityBytes(),
-			Unit:  csi.VolumeUsage_BYTES,
-		},
 	}
 
 	return resp, nil

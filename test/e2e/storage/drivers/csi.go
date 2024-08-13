@@ -344,6 +344,7 @@ type mockCSIDriver struct {
 	requiresRepublish             *bool
 	fsGroupPolicy                 *storagev1.FSGroupPolicy
 	enableVolumeMountGroup        bool
+	enableNodeVolumeCondition     bool
 	embedded                      bool
 	calls                         MockCSICalls
 	embeddedCSIDriver             *mockdriver.CSIDriver
@@ -393,6 +394,7 @@ type CSIMockDriverOpts struct {
 	EnableNodeExpansion           bool
 	EnableSnapshot                bool
 	EnableVolumeMountGroup        bool
+	EnableNodeVolumeCondition     bool
 	TokenRequests                 []storagev1.TokenRequest
 	RequiresRepublish             *bool
 	FSGroupPolicy                 *storagev1.FSGroupPolicy
@@ -547,6 +549,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		attachable:                    !driverOpts.DisableAttach,
 		attachLimit:                   driverOpts.AttachLimit,
 		enableNodeExpansion:           driverOpts.EnableNodeExpansion,
+		enableNodeVolumeCondition:     driverOpts.EnableNodeVolumeCondition,
 		tokenRequests:                 driverOpts.TokenRequests,
 		requiresRepublish:             driverOpts.RequiresRepublish,
 		fsGroupPolicy:                 driverOpts.FSGroupPolicy,
@@ -621,12 +624,13 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 		// for cleanup callbacks.
 		ctx, cancel := context.WithCancel(context.Background())
 		serviceConfig := mockservice.Config{
-			DisableAttach:            !m.attachable,
-			DriverName:               "csi-mock-" + f.UniqueName,
-			AttachLimit:              int64(m.attachLimit),
-			NodeExpansionRequired:    m.enableNodeExpansion,
-			VolumeMountGroupRequired: m.enableVolumeMountGroup,
-			EnableTopology:           m.enableTopology,
+			DisableAttach:               !m.attachable,
+			DriverName:                  "csi-mock-" + f.UniqueName,
+			AttachLimit:                 int64(m.attachLimit),
+			NodeExpansionRequired:       m.enableNodeExpansion,
+			NodeVolumeConditionRequired: m.enableNodeVolumeCondition,
+			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
+			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{
 				F:             f,
 				Namespace:     m.driverNamespace.Name,
