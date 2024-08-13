@@ -19,11 +19,13 @@ package cp
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -279,7 +281,21 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
-	return o.execute(options)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+
+	go func() {
+		done <- o.execute(options)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("timeout exceeded while checking the destination")
+	case err := <-done:
+		return err
+	}
 }
 
 func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) error {
