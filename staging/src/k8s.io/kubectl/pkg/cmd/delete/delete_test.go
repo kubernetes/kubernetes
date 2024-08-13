@@ -948,7 +948,10 @@ func TestDeleteSetDryRun(t *testing.T) {
 	t.Run("server side dry run", func(t *testing.T) {
 		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 		cmd := NewCmdDelete(tf, ioStreams)
-		cmd.Flags().Set("dry-run", "server")
+		err := cmd.Flags().Set("dry-run", "server")
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
 		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (server dry run)\n" {
 			t.Errorf("unexpected output: %s", buf.String())
@@ -958,7 +961,10 @@ func TestDeleteSetDryRun(t *testing.T) {
 	t.Run("client side dry run", func(t *testing.T) {
 		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 		cmd := NewCmdDelete(tf, ioStreams)
-		cmd.Flags().Set("dry-run", "client")
+		err := cmd.Flags().Set("dry-run", "client")
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		cmd.Run(cmd, []string{"replicationcontrollers/redis-master"})
 		if buf.String() != "resourceNamespace replicationcontroller \"redis-master\" deleted (dry run)\n" {
 			t.Errorf("unexpected output: %s", buf.String())
