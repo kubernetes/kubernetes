@@ -19,6 +19,7 @@ package cache
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -75,7 +76,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
 
 	f.Add(mkFifoObj("foo", 10))
-	_, err := f.Pop(func(obj interface{}) error {
+	_, err := f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -88,7 +89,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -101,7 +102,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -275,6 +276,34 @@ func TestFIFO_HasSynced(t *testing.T) {
 		}
 		if e, a := test.expectedSynced, f.HasSynced(); a != e {
 			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+		}
+	}
+}
+
+// TestFIFO_PopShouldUnblockWhenClosed checks that any blocking Pop on an empty queue
+// should unblock and return after Close is called.
+func TestFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
+	f := NewFIFO(testFifoObjectKeyFunc)
+
+	c := make(chan struct{})
+	const jobs = 10
+	for i := 0; i < jobs; i++ {
+		go func() {
+			f.Pop(func(obj interface{}, isInInitialList bool) error {
+				return nil
+			})
+			c <- struct{}{}
+		}()
+	}
+
+	runtime.Gosched()
+	f.Close()
+
+	for i := 0; i < jobs; i++ {
+		select {
+		case <-c:
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timed out waiting for Pop to return after Close")
 		}
 	}
 }

@@ -16,8 +16,6 @@
  *
  */
 
-//go:generate protoc --go_out=plugins=grpc:. grpc_testing/test.proto
-
 // Package stats is for collecting and reporting various network and RPC stats.
 // This package is for monitoring purpose only. All fields are read-only.
 // All APIs are experimental.
@@ -38,15 +36,22 @@ type RPCStats interface {
 	IsClient() bool
 }
 
-// Begin contains stats when an RPC begins.
+// Begin contains stats when an RPC attempt begins.
 // FailFast is only valid if this Begin is from client side.
 type Begin struct {
 	// Client is true if this Begin is from client side.
 	Client bool
-	// BeginTime is the time when the RPC begins.
+	// BeginTime is the time when the RPC attempt begins.
 	BeginTime time.Time
 	// FailFast indicates if this RPC is failfast.
 	FailFast bool
+	// IsClientStream indicates whether the RPC is a client streaming RPC.
+	IsClientStream bool
+	// IsServerStream indicates whether the RPC is a server streaming RPC.
+	IsServerStream bool
+	// IsTransparentRetryAttempt indicates whether this attempt was initiated
+	// due to transparently retrying a previous attempt.
+	IsTransparentRetryAttempt bool
 }
 
 // IsClient indicates if the stats information is from client side.
@@ -54,18 +59,39 @@ func (s *Begin) IsClient() bool { return s.Client }
 
 func (s *Begin) isRPCStats() {}
 
+// PickerUpdated indicates that the LB policy provided a new picker while the
+// RPC was waiting for one.
+type PickerUpdated struct{}
+
+// IsClient indicates if the stats information is from client side. Only Client
+// Side interfaces with a Picker, thus always returns true.
+func (*PickerUpdated) IsClient() bool { return true }
+
+func (*PickerUpdated) isRPCStats() {}
+
 // InPayload contains the information for an incoming payload.
 type InPayload struct {
 	// Client is true if this InPayload is from client side.
 	Client bool
-	// Payload is the payload with original type.
-	Payload interface{}
+	// Payload is the payload with original type.  This may be modified after
+	// the call to HandleRPC which provides the InPayload returns and must be
+	// copied if needed later.
+	Payload any
 	// Data is the serialized message payload.
+	// Deprecated: Data will be removed in the next release.
 	Data []byte
-	// Length is the length of uncompressed data.
+
+	// Length is the size of the uncompressed payload data. Does not include any
+	// framing (gRPC or HTTP/2).
 	Length int
-	// WireLength is the length of data on wire (compressed, signed, encrypted).
+	// CompressedLength is the size of the compressed payload data. Does not
+	// include any framing (gRPC or HTTP/2). Same as Length if compression not
+	// enabled.
+	CompressedLength int
+	// WireLength is the size of the compressed payload data plus gRPC framing.
+	// Does not include HTTP/2 framing.
 	WireLength int
+
 	// RecvTime is the time when the payload is received.
 	RecvTime time.Time
 }
@@ -81,6 +107,10 @@ type InHeader struct {
 	Client bool
 	// WireLength is the wire length of header.
 	WireLength int
+	// Compression is the compression algorithm used for the RPC.
+	Compression string
+	// Header contains the header metadata received.
+	Header metadata.MD
 
 	// The following fields are valid only if Client is false.
 	// FullMethod is the full RPC method string, i.e., /package.service/method.
@@ -89,10 +119,6 @@ type InHeader struct {
 	RemoteAddr net.Addr
 	// LocalAddr is the local address of the corresponding connection.
 	LocalAddr net.Addr
-	// Compression is the compression algorithm used for the RPC.
-	Compression string
-	// Header contains the header metadata received.
-	Header metadata.MD
 }
 
 // IsClient indicates if the stats information is from client side.
@@ -120,13 +146,22 @@ func (s *InTrailer) isRPCStats() {}
 type OutPayload struct {
 	// Client is true if this OutPayload is from client side.
 	Client bool
-	// Payload is the payload with original type.
-	Payload interface{}
+	// Payload is the payload with original type.  This may be modified after
+	// the call to HandleRPC which provides the OutPayload returns and must be
+	// copied if needed later.
+	Payload any
 	// Data is the serialized message payload.
+	// Deprecated: Data will be removed in the next release.
 	Data []byte
-	// Length is the length of uncompressed data.
+	// Length is the size of the uncompressed payload data. Does not include any
+	// framing (gRPC or HTTP/2).
 	Length int
-	// WireLength is the length of data on wire (compressed, signed, encrypted).
+	// CompressedLength is the size of the compressed payload data. Does not
+	// include any framing (gRPC or HTTP/2). Same as Length if compression not
+	// enabled.
+	CompressedLength int
+	// WireLength is the size of the compressed payload data plus gRPC framing.
+	// Does not include HTTP/2 framing.
 	WireLength int
 	// SentTime is the time when the payload is sent.
 	SentTime time.Time
@@ -141,6 +176,10 @@ func (s *OutPayload) isRPCStats() {}
 type OutHeader struct {
 	// Client is true if this OutHeader is from client side.
 	Client bool
+	// Compression is the compression algorithm used for the RPC.
+	Compression string
+	// Header contains the header metadata sent.
+	Header metadata.MD
 
 	// The following fields are valid only if Client is true.
 	// FullMethod is the full RPC method string, i.e., /package.service/method.
@@ -149,10 +188,6 @@ type OutHeader struct {
 	RemoteAddr net.Addr
 	// LocalAddr is the local address of the corresponding connection.
 	LocalAddr net.Addr
-	// Compression is the compression algorithm used for the RPC.
-	Compression string
-	// Header contains the header metadata sent.
-	Header metadata.MD
 }
 
 // IsClient indicates if this stats information is from client side.
@@ -165,6 +200,9 @@ type OutTrailer struct {
 	// Client is true if this OutTrailer is from client side.
 	Client bool
 	// WireLength is the wire length of trailer.
+	//
+	// Deprecated: This field is never set. The length is not known when this message is
+	// emitted because the trailer fields are compressed with hpack after that.
 	WireLength int
 	// Trailer contains the trailer metadata sent to the client. This
 	// field is only valid if this OutTrailer is from the server side.

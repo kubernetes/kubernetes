@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package apps
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -29,13 +28,11 @@ import (
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	interval = 10 * time.Second
-	timeout  = 5 * time.Minute
 	rsName   = "rs"
 	scaleNum = 2
 )
@@ -52,24 +49,24 @@ type ReplicaSetUpgradeTest struct {
 func (ReplicaSetUpgradeTest) Name() string { return "[sig-apps] replicaset-upgrade" }
 
 // Setup creates a ReplicaSet and makes sure it's replicas ready.
-func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
+func (r *ReplicaSetUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
 	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := newReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
-	rs, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), replicaSet, metav1.CreateOptions{})
+	rs, err := c.AppsV1().ReplicaSets(ns).Create(ctx, replicaSet, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
 
 	r.UID = rs.UID
 }
 
 // Test checks whether the replicasets are the same after an upgrade.
-func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (r *ReplicaSetUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
 	rsClient := c.AppsV1().ReplicaSets(ns)
@@ -80,14 +77,14 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the RS is the same (survives) after the upgrade
 	ginkgo.By(fmt.Sprintf("Checking UID to verify replicaset %s survives upgrade", rsName))
-	upgradedRS, err := rsClient.Get(context.TODO(), rsName, metav1.GetOptions{})
+	upgradedRS, err := rsClient.Get(ctx, rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	if upgradedRS.UID != r.UID {
 		framework.ExpectNoError(fmt.Errorf("expected same replicaset UID: %v got: %v", r.UID, upgradedRS.UID))
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after upgrade", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
@@ -97,11 +94,11 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
 }
 
 // Teardown cleans up any remaining resources.
-func (r *ReplicaSetUpgradeTest) Teardown(f *framework.Framework) {
+func (r *ReplicaSetUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 

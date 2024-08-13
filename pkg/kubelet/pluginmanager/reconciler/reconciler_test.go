@@ -18,8 +18,9 @@ package reconciler
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ var (
 )
 
 func init() {
-	d, err := ioutil.TempDir("", "reconciler_test")
+	d, err := os.MkdirTemp("", "reconciler_test")
 	if err != nil {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
@@ -126,7 +127,7 @@ func (d *DummyImpl) ValidatePlugin(pluginName string, endpoint string, versions 
 }
 
 // RegisterPlugin is a dummy implementation
-func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	return nil
 }
 
@@ -167,6 +168,11 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Calls Run()
 // Verifies the actual state of world contains that plugin
 func Test_Run_Positive_Register(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
@@ -188,10 +194,13 @@ func Test_Run_Positive_Register(t *testing.T) {
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
-	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	defer func() {
+		require.NoError(t, p.Stop())
+	}()
 	timestampBeforeRegistration := time.Now()
 	dsw.AddOrUpdatePlugin(socketPath)
 	waitForRegistration(t, socketPath, timestampBeforeRegistration, asw)
@@ -212,6 +221,11 @@ func Test_Run_Positive_Register(t *testing.T) {
 // Deletes plugin from desired state of world.
 // Verifies that plugin no longer exists in actual state of world.
 func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
@@ -234,7 +248,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 
-	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
@@ -268,6 +282,11 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 // Verifies that the plugin is reregistered.
 // Verifies the plugin with updated timestamp now in actual state of world.
 func Test_Run_Positive_ReRegister(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
@@ -290,7 +309,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 
-	socketPath := fmt.Sprintf("%s/plugin2.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))

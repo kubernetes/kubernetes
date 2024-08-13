@@ -21,7 +21,7 @@ FROM $BASEIMAGE
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 # Base Packages
-RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse && yum clean all
+RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse hostname && yum clean all
 
 # Get ports exposed
 EXPOSE 6789

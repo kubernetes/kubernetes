@@ -26,11 +26,21 @@ func sizeMessageSet(mi *MessageInfo, p pointer, opts marshalOptions) (size int) 
 		}
 		num, _ := protowire.DecodeTag(xi.wiretag)
 		size += messageset.SizeField(num)
+		if fullyLazyExtensions(opts) {
+			// Don't expand the extension, instead use the buffer to calculate size
+			if lb := x.lazyBuffer(); lb != nil {
+				// We got hold of the buffer, so it's still lazy.
+				// Don't count the tag size in the extension buffer, it's already added.
+				size += protowire.SizeTag(messageset.FieldMessage) + len(lb) - xi.tagsize
+				continue
+			}
+		}
 		size += xi.funcs.size(x.Value(), protowire.SizeTag(messageset.FieldMessage), opts)
 	}
 
-	unknown := *p.Apply(mi.unknownOffset).Bytes()
-	size += messageset.SizeUnknown(unknown)
+	if u := mi.getUnknownBytes(p); u != nil {
+		size += messageset.SizeUnknown(*u)
+	}
 
 	return size
 }
@@ -69,10 +79,12 @@ func marshalMessageSet(mi *MessageInfo, b []byte, p pointer, opts marshalOptions
 		}
 	}
 
-	unknown := *p.Apply(mi.unknownOffset).Bytes()
-	b, err := messageset.AppendUnknown(b, unknown)
-	if err != nil {
-		return b, err
+	if u := mi.getUnknownBytes(p); u != nil {
+		var err error
+		b, err = messageset.AppendUnknown(b, *u)
+		if err != nil {
+			return b, err
+		}
 	}
 
 	return b, nil
@@ -82,6 +94,19 @@ func marshalMessageSetField(mi *MessageInfo, b []byte, x ExtensionField, opts ma
 	xi := getExtensionFieldInfo(x.Type())
 	num, _ := protowire.DecodeTag(xi.wiretag)
 	b = messageset.AppendFieldStart(b, num)
+
+	if fullyLazyExtensions(opts) {
+		// Don't expand the extension if it's still in wire format, instead use the buffer content.
+		if lb := x.lazyBuffer(); lb != nil {
+			// The tag inside the lazy buffer is a different tag (the extension
+			// number), but what we need here is the tag for FieldMessage:
+			b = protowire.AppendVarint(b, protowire.EncodeTag(messageset.FieldMessage, protowire.BytesType))
+			b = append(b, lb[xi.tagsize:]...)
+			b = messageset.AppendFieldEnd(b)
+			return b, nil
+		}
+	}
+
 	b, err := xi.funcs.marshal(b, x.Value(), protowire.EncodeTag(messageset.FieldMessage, protowire.BytesType), opts)
 	if err != nil {
 		return b, err
@@ -100,13 +125,13 @@ func unmarshalMessageSet(mi *MessageInfo, b []byte, p pointer, opts unmarshalOpt
 		*ep = make(map[int32]ExtensionField)
 	}
 	ext := *ep
-	unknown := p.Apply(mi.unknownOffset).Bytes()
 	initialized := true
 	err = messageset.Unmarshal(b, true, func(num protowire.Number, v []byte) error {
 		o, err := mi.unmarshalExtension(v, num, protowire.BytesType, ext, opts)
 		if err == errUnknown {
-			*unknown = protowire.AppendTag(*unknown, num, protowire.BytesType)
-			*unknown = append(*unknown, v...)
+			u := mi.mutableUnknownBytes(p)
+			*u = protowire.AppendTag(*u, num, protowire.BytesType)
+			*u = append(*u, v...)
 			return nil
 		}
 		if !o.initialized {

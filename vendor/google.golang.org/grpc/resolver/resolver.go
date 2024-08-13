@@ -22,10 +22,14 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"net/url"
+	"strings"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/serviceconfig"
 )
 
@@ -38,8 +42,9 @@ var (
 
 // TODO(bar) install dns resolver in init(){}.
 
-// Register registers the resolver builder to the resolver map. b.Scheme will be
-// used as the scheme registered with this builder.
+// Register registers the resolver builder to the resolver map. b.Scheme will
+// be used as the scheme registered with this builder. The registry is case
+// sensitive, and schemes should not contain any uppercase characters.
 //
 // NOTE: this function must only be called during initialization time (i.e. in
 // an init() function), and is not thread-safe. If multiple Resolvers are
@@ -59,38 +64,28 @@ func Get(scheme string) Builder {
 }
 
 // SetDefaultScheme sets the default scheme that will be used. The default
-// default scheme is "passthrough".
+// scheme is initially set to "passthrough".
 //
 // NOTE: this function must only be called during initialization time (i.e. in
 // an init() function), and is not thread-safe. The scheme set last overrides
 // previously set values.
 func SetDefaultScheme(scheme string) {
 	defaultScheme = scheme
+	internal.UserSetDefaultScheme = true
 }
 
-// GetDefaultScheme gets the default scheme that will be used.
+// GetDefaultScheme gets the default scheme that will be used by grpc.Dial.  If
+// SetDefaultScheme is never called, the default scheme used by grpc.NewClient is "dns" instead.
 func GetDefaultScheme() string {
 	return defaultScheme
 }
 
-// AddressType indicates the address type returned by name resolution.
-//
-// Deprecated: use Attributes in Address instead.
-type AddressType uint8
-
-const (
-	// Backend indicates the address is for a backend server.
-	//
-	// Deprecated: use Attributes in Address instead.
-	Backend AddressType = iota
-	// GRPCLB indicates the address is for a grpclb load balancer.
-	//
-	// Deprecated: use Attributes in Address instead.
-	GRPCLB
-)
-
 // Address represents a server the client connects to.
-// This is the EXPERIMENTAL API and may be changed or extended in the future.
+//
+// # Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
 type Address struct {
 	// Addr is the server address on which a connection will be established.
 	Addr string
@@ -100,34 +95,57 @@ type Address struct {
 	// the address, instead of the hostname from the Dial target string. In most cases,
 	// this should not be set.
 	//
-	// If Type is GRPCLB, ServerName should be the name of the remote load
-	// balancer, not the name of the backend.
-	//
 	// WARNING: ServerName must only be populated with trusted values. It
 	// is insecure to populate it with data from untrusted inputs since untrusted
 	// values could be used to bypass the authority checks performed by TLS.
 	ServerName string
 
 	// Attributes contains arbitrary data about this address intended for
-	// consumption by the load balancing policy.
+	// consumption by the SubConn.
 	Attributes *attributes.Attributes
 
-	// Type is the type of this address.
+	// BalancerAttributes contains arbitrary data about this address intended
+	// for consumption by the LB policy.  These attributes do not affect SubConn
+	// creation, connection establishment, handshaking, etc.
 	//
-	// Deprecated: use Attributes instead.
-	Type AddressType
+	// Deprecated: when an Address is inside an Endpoint, this field should not
+	// be used, and it will eventually be removed entirely.
+	BalancerAttributes *attributes.Attributes
 
 	// Metadata is the information associated with Addr, which may be used
 	// to make load balancing decision.
 	//
 	// Deprecated: use Attributes instead.
-	Metadata interface{}
+	Metadata any
 }
 
-// BuildOption is a type alias of BuildOptions for legacy reasons.
+// Equal returns whether a and o are identical.  Metadata is compared directly,
+// not with any recursive introspection.
 //
-// Deprecated: use BuildOptions instead.
-type BuildOption = BuildOptions
+// This method compares all fields of the address. When used to tell apart
+// addresses during subchannel creation or connection establishment, it might be
+// more appropriate for the caller to implement custom equality logic.
+func (a Address) Equal(o Address) bool {
+	return a.Addr == o.Addr && a.ServerName == o.ServerName &&
+		a.Attributes.Equal(o.Attributes) &&
+		a.BalancerAttributes.Equal(o.BalancerAttributes) &&
+		a.Metadata == o.Metadata
+}
+
+// String returns JSON formatted string representation of the address.
+func (a Address) String() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("{Addr: %q, ", a.Addr))
+	sb.WriteString(fmt.Sprintf("ServerName: %q, ", a.ServerName))
+	if a.Attributes != nil {
+		sb.WriteString(fmt.Sprintf("Attributes: %v, ", a.Attributes.String()))
+	}
+	if a.BalancerAttributes != nil {
+		sb.WriteString(fmt.Sprintf("BalancerAttributes: %v", a.BalancerAttributes.String()))
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
 
 // BuildOptions includes additional information for the builder to create
 // the resolver.
@@ -153,12 +171,41 @@ type BuildOptions struct {
 	// field. In most cases though, it is not appropriate, and this field may
 	// be ignored.
 	Dialer func(context.Context, string) (net.Conn, error)
+	// Authority is the effective authority of the clientconn for which the
+	// resolver is built.
+	Authority string
+}
+
+// An Endpoint is one network endpoint, or server, which may have multiple
+// addresses with which it can be accessed.
+type Endpoint struct {
+	// Addresses contains a list of addresses used to access this endpoint.
+	Addresses []Address
+
+	// Attributes contains arbitrary data about this endpoint intended for
+	// consumption by the LB policy.
+	Attributes *attributes.Attributes
 }
 
 // State contains the current Resolver state relevant to the ClientConn.
 type State struct {
 	// Addresses is the latest set of resolved addresses for the target.
+	//
+	// If a resolver sets Addresses but does not set Endpoints, one Endpoint
+	// will be created for each Address before the State is passed to the LB
+	// policy.  The BalancerAttributes of each entry in Addresses will be set
+	// in Endpoints.Attributes, and be cleared in the Endpoint's Address's
+	// BalancerAttributes.
+	//
+	// Soon, Addresses will be deprecated and replaced fully by Endpoints.
 	Addresses []Address
+
+	// Endpoints is the latest set of resolved endpoints for the target.
+	//
+	// If a resolver produces a State containing Endpoints but not Addresses,
+	// it must take care to ensure the LB policies it selects will support
+	// Endpoints.
+	Endpoints []Endpoint
 
 	// ServiceConfig contains the result from parsing the latest service
 	// config.  If it is nil, it indicates no service config is present or the
@@ -179,7 +226,16 @@ type State struct {
 // gRPC to add new methods to this interface.
 type ClientConn interface {
 	// UpdateState updates the state of the ClientConn appropriately.
-	UpdateState(State)
+	//
+	// If an error is returned, the resolver should try to resolve the
+	// target again. The resolver should use a backoff timer to prevent
+	// overloading the server with requests. If a resolver is certain that
+	// reresolving will not change the result, e.g. because it is
+	// a watch-based resolver, returned errors can be ignored.
+	//
+	// If the resolved State is the same as the last reported one, calling
+	// UpdateState can be omitted.
+	UpdateState(State) error
 	// ReportError notifies the ClientConn that the Resolver encountered an
 	// error.  The ClientConn will notify the load balancer and begin calling
 	// ResolveNow on the Resolver with exponential backoff.
@@ -190,11 +246,6 @@ type ClientConn interface {
 	//
 	// Deprecated: Use UpdateState instead.
 	NewAddress(addresses []Address)
-	// NewServiceConfig is called by resolver to notify ClientConn a new
-	// service config. The service config should be provided as a json string.
-	//
-	// Deprecated: Use UpdateState instead.
-	NewServiceConfig(serviceConfig string)
 	// ParseServiceConfig parses the provided service config and returns an
 	// object that provides the parsed config.
 	ParseServiceConfig(serviceConfigJSON string) *serviceconfig.ParseResult
@@ -202,25 +253,43 @@ type ClientConn interface {
 
 // Target represents a target for gRPC, as specified in:
 // https://github.com/grpc/grpc/blob/master/doc/naming.md.
-// It is parsed from the target string that gets passed into Dial or DialContext by the user. And
-// grpc passes it to the resolver and the balancer.
+// It is parsed from the target string that gets passed into Dial or DialContext
+// by the user. And gRPC passes it to the resolver and the balancer.
 //
-// If the target follows the naming spec, and the parsed scheme is registered with grpc, we will
-// parse the target string according to the spec. e.g. "dns://some_authority/foo.bar" will be parsed
-// into &Target{Scheme: "dns", Authority: "some_authority", Endpoint: "foo.bar"}
-//
-// If the target does not contain a scheme, we will apply the default scheme, and set the Target to
-// be the full target string. e.g. "foo.bar" will be parsed into
-// &Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "foo.bar"}.
-//
-// If the parsed scheme is not registered (i.e. no corresponding resolver available to resolve the
-// endpoint), we set the Scheme to be the default scheme, and set the Endpoint to be the full target
-// string. e.g. target string "unknown_scheme://authority/endpoint" will be parsed into
-// &Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}.
+// If the target follows the naming spec, and the parsed scheme is registered
+// with gRPC, we will parse the target string according to the spec. If the
+// target does not contain a scheme or if the parsed scheme is not registered
+// (i.e. no corresponding resolver available to resolve the endpoint), we will
+// apply the default scheme, and will attempt to reparse it.
 type Target struct {
-	Scheme    string
-	Authority string
-	Endpoint  string
+	// URL contains the parsed dial target with an optional default scheme added
+	// to it if the original dial target contained no scheme or contained an
+	// unregistered scheme. Any query params specified in the original dial
+	// target can be accessed from here.
+	URL url.URL
+}
+
+// Endpoint retrieves endpoint without leading "/" from either `URL.Path`
+// or `URL.Opaque`. The latter is used when the former is empty.
+func (t Target) Endpoint() string {
+	endpoint := t.URL.Path
+	if endpoint == "" {
+		endpoint = t.URL.Opaque
+	}
+	// For targets of the form "[scheme]://[authority]/endpoint, the endpoint
+	// value returned from url.Parse() contains a leading "/". Although this is
+	// in accordance with RFC 3986, we do not want to break existing resolver
+	// implementations which expect the endpoint without the leading "/". So, we
+	// end up stripping the leading "/" here. But this will result in an
+	// incorrect parsing for something like "unix:///path/to/socket". Since we
+	// own the "unix" resolver, we can workaround in the unix resolver by using
+	// the `URL` field.
+	return strings.TrimPrefix(endpoint, "/")
+}
+
+// String returns the canonical string representation of Target.
+func (t Target) String() string {
+	return t.URL.Scheme + "://" + t.URL.Host + "/" + t.Endpoint()
 }
 
 // Builder creates a resolver that will be used to watch name resolution updates.
@@ -230,15 +299,12 @@ type Builder interface {
 	// gRPC dial calls Build synchronously, and fails if the returned error is
 	// not nil.
 	Build(target Target, cc ClientConn, opts BuildOptions) (Resolver, error)
-	// Scheme returns the scheme supported by this resolver.
-	// Scheme is defined at https://github.com/grpc/grpc/blob/master/doc/naming.md.
+	// Scheme returns the scheme supported by this resolver.  Scheme is defined
+	// at https://github.com/grpc/grpc/blob/master/doc/naming.md.  The returned
+	// string should not contain uppercase characters, as they will not match
+	// the parsed target's scheme as defined in RFC 3986.
 	Scheme() string
 }
-
-// ResolveNowOption is a type alias of ResolveNowOptions for legacy reasons.
-//
-// Deprecated: use ResolveNowOptions instead.
-type ResolveNowOption = ResolveNowOptions
 
 // ResolveNowOptions includes additional information for ResolveNow.
 type ResolveNowOptions struct{}
@@ -255,9 +321,12 @@ type Resolver interface {
 	Close()
 }
 
-// UnregisterForTesting removes the resolver builder with the given scheme from the
-// resolver map.
-// This function is for testing only.
-func UnregisterForTesting(scheme string) {
-	delete(m, scheme)
+// AuthorityOverrider is implemented by Builders that wish to override the
+// default authority for the ClientConn.
+// By default, the authority used is target.Endpoint().
+type AuthorityOverrider interface {
+	// OverrideAuthority returns the authority to use for a ClientConn with the
+	// given target. The implementation must generate it without blocking,
+	// typically in line, and must keep it unchanged.
+	OverrideAuthority(Target) string
 }

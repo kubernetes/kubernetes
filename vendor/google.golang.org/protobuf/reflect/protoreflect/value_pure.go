@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build purego || appengine
 // +build purego appengine
 
 package protoreflect
@@ -31,11 +32,11 @@ const (
 type value struct {
 	pragma.DoNotCompare // 0B
 
-	typ   valueType   // 8B
-	num   uint64      // 8B
-	str   string      // 16B
-	bin   []byte      // 24B
-	iface interface{} // 16B
+	typ   valueType // 8B
+	num   uint64    // 8B
+	str   string    // 16B
+	bin   []byte    // 24B
+	iface any       // 16B
 }
 
 func valueOfString(v string) Value {
@@ -44,7 +45,7 @@ func valueOfString(v string) Value {
 func valueOfBytes(v []byte) Value {
 	return Value{typ: bytesType, bin: v}
 }
-func valueOfIface(v interface{}) Value {
+func valueOfIface(v any) Value {
 	return Value{typ: ifaceType, iface: v}
 }
 
@@ -54,6 +55,6 @@ func (v Value) getString() string {
 func (v Value) getBytes() []byte {
 	return v.bin
 }
-func (v Value) getIface() interface{} {
+func (v Value) getIface() any {
 	return v.iface
 }

@@ -1,5 +1,4 @@
-A partial copy of https://github.com/kubernetes-csi/docs/tree/master/book/src/example,
-with some modifications:
-- serviceAccountName is used instead of the deprecated serviceAccount
-- the RBAC roles from driver-registrar, external-attacher, external-provisioner
-  and external-snapshotter are used
+The files in this directory are exact copies of "kubernetes-latest" in
+https://github.com/kubernetes-csi/csi-driver-host-path/tree/release-1.14/deploy/
+
+Do not edit manually. Run ./update-hostpath.sh to refresh the content.

@@ -1,4 +1,5 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 labels:
-- sig/api-machinery
+  - sig/api-machinery
+  - sig/etcd

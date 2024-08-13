@@ -24,7 +24,7 @@ type freelist struct {
 	ids            []pgid                      // all free and available free page ids.
 	allocs         map[pgid]txid               // mapping of txid that allocated a pgid.
 	pending        map[txid]*txPending         // mapping of soon-to-be free page ids by tx.
-	cache          map[pgid]bool               // fast lookup of all free and pending page ids.
+	cache          map[pgid]struct{}           // fast lookup of all free and pending page ids.
 	freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
 	forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
 	backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
@@ -41,7 +41,7 @@ func newFreelist(freelistType FreelistType) *freelist {
 		freelistType: freelistType,
 		allocs:       make(map[pgid]txid),
 		pending:      make(map[txid]*txPending),
-		cache:        make(map[pgid]bool),
+		cache:        make(map[pgid]struct{}),
 		freemaps:     make(map[uint64]pidSet),
 		forwardMap:   make(map[pgid]uint64),
 		backwardMap:  make(map[pgid]uint64),
@@ -71,7 +71,7 @@ func (f *freelist) size() int {
 		// The first element will be used to store the count. See freelist.write.
 		n++
 	}
-	return pageHeaderSize + (int(unsafe.Sizeof(pgid(0))) * n)
+	return int(pageHeaderSize) + (int(unsafe.Sizeof(pgid(0))) * n)
 }
 
 // count returns count of pages on the freelist
@@ -93,7 +93,7 @@ func (f *freelist) pending_count() int {
 	return count
 }
 
-// copyall copies into dst a list of all free ids and all pending ids in one sorted list.
+// copyall copies a list of all free ids and all pending ids in one sorted list.
 // f.count returns the minimum length required for dst.
 func (f *freelist) copyall(dst []pgid) {
 	m := make(pgids, 0, f.pending_count())
@@ -171,13 +171,13 @@ func (f *freelist) free(txid txid, p *page) {
 
 	for id := p.id; id <= p.id+pgid(p.overflow); id++ {
 		// Verify that page is not already free.
-		if f.cache[id] {
+		if _, ok := f.cache[id]; ok {
 			panic(fmt.Sprintf("page %d already freed", id))
 		}
 		// Add to the freelist and cache.
 		txp.ids = append(txp.ids, id)
 		txp.alloctx = append(txp.alloctx, allocTxid)
-		f.cache[id] = true
+		f.cache[id] = struct{}{}
 	}
 }
 
@@ -256,8 +256,9 @@ func (f *freelist) rollback(txid txid) {
 }
 
 // freed returns whether a given page is in the free list.
-func (f *freelist) freed(pgid pgid) bool {
-	return f.cache[pgid]
+func (f *freelist) freed(pgId pgid) bool {
+	_, ok := f.cache[pgId]
+	return ok
 }
 
 // read initializes the freelist from a freelist page.
@@ -267,17 +268,23 @@ func (f *freelist) read(p *page) {
 	}
 	// If the page.count is at the max uint16 value (64k) then it's considered
 	// an overflow and the size of the freelist is stored as the first element.
-	idx, count := 0, int(p.count)
+	var idx, count = 0, int(p.count)
 	if count == 0xFFFF {
 		idx = 1
-		count = int(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
+		c := *(*pgid)(unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p)))
+		count = int(c)
+		if count < 0 {
+			panic(fmt.Sprintf("leading element count %d overflows int", c))
+		}
 	}
 
 	// Copy the list of page ids from the freelist.
 	if count == 0 {
 		f.ids = nil
 	} else {
-		ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[idx : idx+count]
+		var ids []pgid
+		data := unsafeIndex(unsafe.Pointer(p), unsafe.Sizeof(*p), unsafe.Sizeof(ids[0]), idx)
+		unsafeSlice(unsafe.Pointer(&ids), data, count)
 
 		// copy the ids, so we don't modify on the freelist page directly
 		idsCopy := make([]pgid, count)
@@ -310,16 +317,22 @@ func (f *freelist) write(p *page) error {
 
 	// The page.count can only hold up to 64k elements so if we overflow that
 	// number then we handle it by putting the size in the first element.
-	lenids := f.count()
-	if lenids == 0 {
-		p.count = uint16(lenids)
-	} else if lenids < 0xFFFF {
-		p.count = uint16(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
+	l := f.count()
+	if l == 0 {
+		p.count = uint16(l)
+	} else if l < 0xFFFF {
+		p.count = uint16(l)
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l)
+		f.copyall(ids)
 	} else {
 		p.count = 0xFFFF
-		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l+1)
+		ids[0] = pgid(l)
+		f.copyall(ids[1:])
 	}
 
 	return nil
@@ -374,13 +387,13 @@ func (f *freelist) noSyncReload(pgids []pgid) {
 // reindex rebuilds the free cache based on available and pending free lists.
 func (f *freelist) reindex() {
 	ids := f.getFreePageIDs()
-	f.cache = make(map[pgid]bool, len(ids))
+	f.cache = make(map[pgid]struct{}, len(ids))
 	for _, id := range ids {
-		f.cache[id] = true
+		f.cache[id] = struct{}{}
 	}
 	for _, txp := range f.pending {
 		for _, pendingID := range txp.ids {
-			f.cache[pendingID] = true
+			f.cache[pendingID] = struct{}{}
 		}
 	}
 }

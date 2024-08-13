@@ -30,6 +30,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -53,23 +54,15 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	return runtime.Encode(encoder, obj)
 }
 
-// UnmarshalFromYaml unmarshals yaml into an object.
-func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, error) {
-	return UnmarshalFromYamlForCodecs(buffer, gv, clientsetscheme.Codecs)
-}
-
-// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
-// TODO: Is specifying the gv really needed here?
-// TODO: Can we support json out of the box easily here?
-func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
-	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, errors.Errorf("unsupported media type %q", mediaType)
+// UniversalUnmarshal unmarshals YAML or JSON into a runtime.Object using the universal deserializer.
+func UniversalUnmarshal(buffer []byte) (runtime.Object, error) {
+	codecs := clientsetscheme.Codecs
+	decoder := codecs.UniversalDeserializer()
+	obj, _, err := decoder.Decode(buffer, nil, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
 	}
-
-	decoder := codecs.DecoderToVersion(info.Serializer, gv)
-	return runtime.Decode(decoder, buffer)
+	return obj, nil
 }
 
 // SplitYAMLDocuments reads the YAML bytes per-document, unmarshals the TypeMeta information from each document
@@ -152,4 +145,14 @@ func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool
 // GroupVersionKindsHasJoinConfiguration returns whether the following gvk slice contains a JoinConfiguration object
 func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool {
 	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
+}
+
+// GroupVersionKindsHasResetConfiguration returns whether the following gvk slice contains a ResetConfiguration object
+func GroupVersionKindsHasResetConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.ResetConfigurationKind)
+}
+
+// GroupVersionKindsHasUpgradeConfiguration returns whether the following gvk slice contains a UpgradeConfiguration object
+func GroupVersionKindsHasUpgradeConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.UpgradeConfigurationKind)
 }

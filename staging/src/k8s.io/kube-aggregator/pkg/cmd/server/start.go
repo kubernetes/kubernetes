@@ -17,27 +17,32 @@ limitations under the License.
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	"k8s.io/kube-aggregator/pkg/generated/openapi"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
 // AggregatorOptions contains everything necessary to create and run an API Aggregator.
 type AggregatorOptions struct {
+	ServerRunOptions   *genericoptions.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
 
@@ -52,11 +57,14 @@ type AggregatorOptions struct {
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
 // with a default AggregatorOptions.
-func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -64,12 +72,13 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(stopCh); err != nil {
+			if err := o.RunAggregator(c.Context()); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.SetContext(ctx)
 
 	o.AddFlags(cmd.Flags())
 	return cmd
@@ -77,6 +86,7 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 
 // AddFlags is necessary because hyperkube doesn't work using cobra, so we have to have different registration and execution paths
 func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
+	o.ServerRunOptions.AddUniversalFlags(fs)
 	o.RecommendedOptions.AddFlags(fs)
 	o.APIEnablement.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
@@ -86,10 +96,10 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("kube-aggregator", "kube-system"),
 		),
 		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
@@ -103,6 +113,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 // Validate validates all the required options.
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
+	errors = append(errors, o.ServerRunOptions.Validate()...)
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Scheme)...)
 	return utilerrors.NewAggregate(errors)
@@ -110,11 +121,11 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // RunAggregator runs the API Aggregator.
-func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
+func (o AggregatorOptions) RunAggregator(ctx context.Context) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -122,6 +133,9 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 
 	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
 
+	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
+		return err
+	}
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err
 	}
@@ -132,6 +146,11 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
+	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(aggregatorscheme.Scheme))
+	serverConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
+	// prevent generic API server from installing the OpenAPI handler. Aggregator server
+	// has its own customized OpenAPI handler.
+	serverConfig.SkipOpenAPIInstallation = true
 
 	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister())
 
@@ -142,19 +161,21 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		},
 	}
 
-	var err error
-	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
-	if err != nil {
-		return err
+	if len(o.ProxyClientCertFile) == 0 || len(o.ProxyClientKeyFile) == 0 {
+		return errors.New("missing a client certificate along with a key to identify the proxy to the API server")
 	}
-	config.ExtraConfig.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
-	if err != nil {
-		return err
-	}
+
+	config.ExtraConfig.ProxyClientCertFile = o.ProxyClientCertFile
+	config.ExtraConfig.ProxyClientKeyFile = o.ProxyClientKeyFile
 
 	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return err
 	}
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+
+	prepared, err := server.PrepareRun()
+	if err != nil {
+		return err
+	}
+	return prepared.Run(ctx)
 }

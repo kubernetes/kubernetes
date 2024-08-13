@@ -1,7 +1,8 @@
-// To regenerate api.pb.go run hack/update-generated-device-plugin.sh
-syntax = 'proto3';
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
 
 package v1beta1;
+option go_package = "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -25,8 +26,10 @@ service Registration {
 }
 
 message DevicePluginOptions {
-        // Indicates if PreStartContainer call is required before each container start
+	// Indicates if PreStartContainer call is required before each container start
 	bool pre_start_required = 1;
+	// Indicates if GetPreferredAllocation is implemented and available for calling
+	bool get_preferred_allocation_available = 2;
 }
 
 message RegisterRequest {
@@ -37,8 +40,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
-        // Options to be communicated with Device Manager
-        DevicePluginOptions options = 4;
+	// Options to be communicated with Device Manager
+	DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -47,7 +50,7 @@ message Empty {
 // DevicePlugin is the service advertised by Device Plugins
 service DevicePlugin {
 	// GetDevicePluginOptions returns options to be communicated with Device
-        // Manager
+	// Manager
 	rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
 
 	// ListAndWatch returns a stream of List of Devices
@@ -55,14 +58,21 @@ service DevicePlugin {
 	// returns the new list
 	rpc ListAndWatch(Empty) returns (stream ListAndWatchResponse) {}
 
+	// GetPreferredAllocation returns a preferred set of devices to allocate
+	// from a list of available ones. The resulting preferred allocation is not
+	// guaranteed to be the allocation ultimately performed by the
+	// devicemanager. It is only designed to help the devicemanager make a more
+	// informed allocation decision when possible.
+	rpc GetPreferredAllocation(PreferredAllocationRequest) returns (PreferredAllocationResponse) {}
+
 	// Allocate is called during container creation so that the Device
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
-        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
-        // before each container start. Device plugin can run device specific operations
-        // such as resetting the device before making devices available to the container
+	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as resetting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 
@@ -78,16 +88,16 @@ message TopologyInfo {
 }
 
 message NUMANode {
-    int64 ID = 1;
+	int64 ID = 1;
 }
 
 /* E.g:
 * struct Device {
 *    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
 *    Health: "Healthy",
-*    Topology: 
-*      Node: 
-         ID: 1 
+*    Topology:
+*      Node:
+*        ID: 1
 *} */
 message Device {
 	// A unique ID assigned by the device plugin used
@@ -105,11 +115,39 @@ message Device {
 // - PreStartContainer allows Device Plugin to run device specific operations on
 //   the Devices requested
 message PreStartContainerRequest {
-        repeated string devicesIDs = 1;
+	repeated string devices_ids = 1 [(gogoproto.customname) = "DevicesIDs"];
 }
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
 message PreStartContainerResponse {
+}
+
+// PreferredAllocationRequest is passed via a call to GetPreferredAllocation()
+// at pod admission time. The device plugin should take the list of
+// `available_deviceIDs` and calculate a preferred allocation of size
+// 'allocation_size' from them, making sure to include the set of devices
+// listed in 'must_include_deviceIDs'.
+message PreferredAllocationRequest {
+	repeated ContainerPreferredAllocationRequest container_requests = 1;
+}
+
+message ContainerPreferredAllocationRequest {
+	// List of available deviceIDs from which to choose a preferred allocation
+	repeated string available_deviceIDs = 1;
+	// List of deviceIDs that must be included in the preferred allocation
+	repeated string must_include_deviceIDs = 2;
+	// Number of devices to include in the preferred allocation
+	int32 allocation_size = 3;
+}
+
+// PreferredAllocationResponse returns a preferred allocation,
+// resulting from a PreferredAllocationRequest.
+message PreferredAllocationResponse {
+	repeated ContainerPreferredAllocationResponse container_responses = 1;
+}
+
+message ContainerPreferredAllocationResponse {
+	repeated string deviceIDs = 1;
 }
 
 // - Allocate is expected to be called during pod creation since allocation
@@ -123,7 +161,16 @@ message AllocateRequest {
 }
 
 message ContainerAllocateRequest {
-	repeated string devicesIDs = 1;
+	repeated string devices_ids = 1 [(gogoproto.customname) = "DevicesIDs"];
+}
+
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+	// Fully qualified CDI device name
+	// for example: vendor.com/gpu=gpudevice1
+	// see more details in the CDI specification:
+	// https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+	string name = 1;
 }
 
 // AllocateResponse includes the artifacts that needs to be injected into
@@ -147,6 +194,8 @@ message ContainerAllocateResponse {
 	repeated DeviceSpec devices = 3;
 	// Container annotations to pass to the container runtime
 	map<string, string> annotations = 4;
+	// CDI devices for the container.
+	repeated CDIDevice cdi_devices = 5 [(gogoproto.customname) = "CDIDevices"];
 }
 
 // Mount specifies a host volume to mount into a container.
@@ -162,13 +211,13 @@ message Mount {
 
 // DeviceSpec specifies a host device to mount into a container.
 message DeviceSpec {
-    // Path of the device within the container.
-    string container_path = 1;
-    // Path of the device on the host.
-    string host_path = 2;
-    // Cgroups permissions of the device, candidates are one or more of
-    // * r - allows container to read from the specified device.
-    // * w - allows container to write to the specified device.
-    // * m - allows container to create device files that do not yet exist.
-    string permissions = 3;
+	// Path of the device within the container.
+	string container_path = 1;
+	// Path of the device on the host.
+	string host_path = 2;
+	// Cgroups permissions of the device, candidates are one or more of
+	// * r - allows container to read from the specified device.
+	// * w - allows container to write to the specified device.
+	// * m - allows container to create device files that do not yet exist.
+	string permissions = 3;
 }

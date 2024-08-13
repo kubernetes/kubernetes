@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -28,9 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
-func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
+func createMaxInflightServer(t *testing.T, callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
+	fcmetrics.Register()
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
@@ -46,7 +49,9 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 			if waitForCalls {
 				callsWg.Done()
 			}
+			t.Logf("About to blockWg.Wait(), requestURI=%v, remoteAddr=%v", r.RequestURI, r.RemoteAddr)
 			blockWg.Wait()
+			t.Logf("Returned from blockWg.Wait(), requestURI=%v, remoteAddr=%v", r.RequestURI, r.RemoteAddr)
 		}),
 		nonMutating,
 		mutating,
@@ -70,13 +75,13 @@ func withFakeUser(handler http.Handler) http.Handler {
 }
 
 // Tests that MaxInFlightLimit works, i.e.
-// - "long" requests such as proxy or watch, identified by regexp are not accounted despite
-//   hanging for the long time,
-// - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
-//   constructor in flight at any given moment,
-// - subsequent "short" requests are rejected instantly with appropriate error,
-// - subsequent "long" requests are handled normally,
-// - we correctly recover after some "short" requests finish, i.e. we can process new ones.
+//   - "long" requests such as proxy or watch, identified by regexp are not accounted despite
+//     hanging for the long time,
+//   - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
+//     constructor in flight at any given moment,
+//   - subsequent "short" requests are rejected instantly with appropriate error,
+//   - subsequent "long" requests are handled normally,
+//   - we correctly recover after some "short" requests finish, i.e. we can process new ones.
 func TestMaxInFlightNonMutating(t *testing.T) {
 	const AllowedNonMutatingInflightRequestsNo = 3
 
@@ -100,8 +105,12 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1)
+	server := createMaxInflightServer(t, calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
 
 	// These should hang, but not affect accounting.  use a query param match
 	for i := 0; i < AllowedNonMutatingInflightRequestsNo; i++ {
@@ -180,8 +189,12 @@ func TestMaxInFlightMutating(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
+	server := createMaxInflightServer(t, calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
 
 	// These should hang and be accounted, i.e. saturate the server
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {
@@ -272,8 +285,12 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
+	server := createMaxInflightServer(t, calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
 
 	// These should hang and be accounted, i.e. saturate the server
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {

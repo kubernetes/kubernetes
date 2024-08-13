@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-security-webhook
+  namespace: pod-security-webhook
+  labels:
+    app: pod-security-webhook
+spec:
+  selector:
+    matchLabels:
+      app: pod-security-webhook
+  template:
+    metadata:
+      labels:
+        app: pod-security-webhook
+    spec:
+      serviceAccountName: pod-security-webhook
+      priorityClassName: system-cluster-critical
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      volumes:
+        - name: config
+          configMap:
+            name: pod-security-webhook
+        - name: pki
+          secret:
+            secretName: pod-security-webhook
+      containers:
+        - name: pod-security-webhook
+          image: registry.k8s.io/sig-auth/pod-security-webhook:v1.25.0
+          terminationMessagePolicy: FallbackToLogsOnError
+          ports:
+            - name: webhook
+              # A port > 1024 avoids needing low port bind privileges.
+              # Using the same port as the kubelet is likely to already be permitted in apiserver -> node firewall rules.
+              # The pod has its own IP and doesn't run with hostNetwork, so there's no port conflict with the kubelet.
+              containerPort: 10250
+          args:
+            [
+              "--config",
+              "/etc/config/podsecurityconfiguration.yaml",
+              "--tls-cert-file",
+              "/etc/pki/tls.crt",
+              "--tls-private-key-file",
+              "/etc/pki/tls.key",
+              "--secure-port",
+              "10250",
+            ]
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 500m
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/config"
+              readOnly: true
+            - name: pki
+              mountPath: "/etc/pki"
+              readOnly: true

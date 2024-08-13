@@ -37,7 +37,7 @@ Look for:
 
 ### Test triage
 
-Monitor [test grid](https://k8s-testgrid.appspot.com/sig-cli-master)
+Monitor [test grid](https://testgrid.k8s.io/sig-cli-master)
 and make sure the tests are passing.
 
 If any tests are failing, debug them and send a fix.  Ask for help if you get stuck.

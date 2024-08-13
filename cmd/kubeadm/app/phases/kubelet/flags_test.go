@@ -17,81 +17,42 @@ limitations under the License.
 package kubelet
 
 import (
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestBuildKubeletArgMap(t *testing.T) {
-
+func TestBuildKubeletArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		opts     kubeletFlagsOpts
-		expected map[string]string
+		expected []kubeadmapi.Arg
 	}{
 		{
-			name: "the simplest case",
+			name: "hostname override",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-					Taints: []v1.Taint{ // This should be ignored as registerTaintsUsingFlags is false
-						{
-							Key:    "foo",
-							Value:  "bar",
-							Effect: "baz",
-						},
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
+					KubeletExtraArgs: []kubeadmapi.Arg{
+						{Name: "hostname-override", Value: "override-name"},
 					},
 				},
 			},
-			expected: map[string]string{
-				"network-plugin": "cni",
-			},
-		},
-		{
-			name: "hostname override from NodeRegistrationOptions.Name",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-					Name:      "override-name",
-				},
-			},
-			expected: map[string]string{
-				"network-plugin":    "cni",
-				"hostname-override": "override-name",
-			},
-		},
-		{
-			name: "hostname override from NodeRegistrationOptions.KubeletExtraArgs",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket:        "/var/run/dockershim.sock",
-					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
-				},
-			},
-			expected: map[string]string{
-				"network-plugin":    "cni",
-				"hostname-override": "override-name",
-			},
-		},
-		{
-			name: "external CRI runtime",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
-				},
-			},
-			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
+			expected: []kubeadmapi.Arg{
+				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
+				{Name: "hostname-override", Value: "override-name"},
 			},
 		},
 		{
 			name: "register with taints",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					Taints: []v1.Taint{
 						{
 							Key:    "foo",
@@ -107,36 +68,123 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				},
 				registerTaintsUsingFlags: true,
 			},
-			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"register-with-taints":       "foo=bar:baz,key=val:eff",
+			expected: []kubeadmapi.Arg{
+				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
+				{Name: "register-with-taints", Value: "foo=bar:baz,key=val:eff"},
 			},
 		},
 		{
 			name: "pause image is set",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
 				},
-				pauseImage: "gcr.io/pause:3.2",
+				pauseImage: "registry.k8s.io/pause:ver",
 			},
-			expected: map[string]string{
-				"network-plugin":            "cni",
-				"pod-infra-container-image": "gcr.io/pause:3.2",
+			expected: []kubeadmapi.Arg{
+				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := buildKubeletArgMap(test.opts)
+			actual := buildKubeletArgs(test.opts)
 			if !reflect.DeepEqual(actual, test.expected) {
 				t.Errorf(
-					"failed buildKubeletArgMap:\n\texpected: %v\n\t  actual: %v",
+					"failed buildKubeletArgs:\n\texpected: %v\n\t  actual: %v",
 					test.expected,
 					actual,
 				)
+			}
+		})
+	}
+}
+
+func TestGetNodeNameAndHostname(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	testCases := []struct {
+		name             string
+		opts             kubeletFlagsOpts
+		expectedNodeName string
+		expectedHostName string
+	}{
+		{
+			name: "overridden hostname",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: []kubeadmapi.Arg{
+						{Name: "hostname-override", Value: "override-name"},
+					},
+				},
+			},
+			expectedNodeName: "override-name",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "overridden hostname uppercase",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: []kubeadmapi.Arg{
+						{Name: "hostname-override", Value: "OVERRIDE-NAME"},
+					},
+				},
+			},
+			expectedNodeName: "OVERRIDE-NAME",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "hostname contains only spaces",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: []kubeadmapi.Arg{
+						{Name: "hostname-override", Value: " "},
+					},
+				},
+			},
+			expectedNodeName: " ",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "empty parameter",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: []kubeadmapi.Arg{
+						{Name: "hostname-override", Value: ""},
+					},
+				},
+			},
+			expectedNodeName: "",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "nil parameter",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: nil,
+				},
+			},
+			expectedNodeName: strings.ToLower(hostname),
+			expectedHostName: strings.ToLower(hostname),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeName, hostname, err := GetNodeNameAndHostname(tc.opts.nodeRegOpts)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if nodeName != tc.expectedNodeName {
+				t.Errorf("expected nodeName: %v, got %v", tc.expectedNodeName, nodeName)
+			}
+			if hostname != tc.expectedHostName {
+				t.Errorf("expected hostname: %v, got %v", tc.expectedHostName, hostname)
 			}
 		})
 	}

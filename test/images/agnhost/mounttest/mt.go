@@ -18,7 +18,6 @@ package mounttest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -146,7 +145,7 @@ func readFileContent(path string) error {
 		return nil
 	}
 
-	contentBytes, err := ioutil.ReadFile(path)
+	contentBytes, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("error reading file content for %q: %v\n", path, err)
 		return err
@@ -164,7 +163,7 @@ func readWriteNewFile(path string, perm os.FileMode) error {
 		return nil
 	}
 
-	err := ioutil.WriteFile(path, []byte(initialContent), perm)
+	err := os.WriteFile(path, []byte(initialContent), perm)
 	if err != nil {
 		fmt.Printf("error writing new file %q: %v\n", path, err)
 		return err
@@ -188,7 +187,7 @@ func testFileContent(filePath string, retryDuration int, breakOnExpectedContent 
 
 	retryTime := time.Second * time.Duration(retryDuration)
 	for start := time.Now(); time.Since(start) < retryTime; time.Sleep(2 * time.Second) {
-		contentBytes, err = ioutil.ReadFile(filePath)
+		contentBytes, err = os.ReadFile(filePath)
 		if err != nil {
 			fmt.Printf("Error reading file %s: %v, retrying\n", filePath, err)
 			continue
@@ -196,7 +195,7 @@ func testFileContent(filePath string, retryDuration int, breakOnExpectedContent 
 		fmt.Printf("content of file %q: %v\n", filePath, string(contentBytes))
 		if breakOnExpectedContent {
 			if string(contentBytes) != initialContent {
-				fmt.Printf("Unexpected content. Expected: %s. Retrying", initialContent)
+				fmt.Printf("Unexpected content. Expected: %s. Retrying\n", initialContent)
 				continue
 			}
 			break

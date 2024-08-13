@@ -18,18 +18,22 @@ package version
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
-// Version is an opqaue representation of a version number
+// Version is an opaque representation of a version number
 type Version struct {
 	components    []uint
 	semver        bool
 	preRelease    string
 	buildMetadata string
+	info          apimachineryversion.Info
 }
 
 var (
@@ -85,6 +89,47 @@ func parse(str string, semver bool) (*Version, error) {
 	return v, nil
 }
 
+// HighestSupportedVersion returns the highest supported version
+// This function assumes that the highest supported version must be v1.x.
+func HighestSupportedVersion(versions []string) (*Version, error) {
+	if len(versions) == 0 {
+		return nil, errors.New("empty array for supported versions")
+	}
+
+	var (
+		highestSupportedVersion *Version
+		theErr                  error
+	)
+
+	for i := len(versions) - 1; i >= 0; i-- {
+		currentHighestVer, err := ParseGeneric(versions[i])
+		if err != nil {
+			theErr = err
+			continue
+		}
+
+		if currentHighestVer.Major() > 1 {
+			continue
+		}
+
+		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
+			highestSupportedVersion = currentHighestVer
+		}
+	}
+
+	if highestSupportedVersion == nil {
+		return nil, fmt.Errorf(
+			"could not find a highest supported version from versions (%v) reported: %+v",
+			versions, theErr)
+	}
+
+	if highestSupportedVersion.Major() != 1 {
+		return nil, fmt.Errorf("highest supported version reported is %v, must be v1.x", highestSupportedVersion)
+	}
+
+	return highestSupportedVersion, nil
+}
+
 // ParseGeneric parses a "generic" version string. The version string must consist of two
 // or more dot-separated numeric fields (the first of which can't have leading zeroes),
 // followed by arbitrary uninterpreted data (which need not be separated from the final
@@ -97,6 +142,43 @@ func ParseGeneric(str string) (*Version, error) {
 // MustParseGeneric is like ParseGeneric except that it panics on error
 func MustParseGeneric(str string) *Version {
 	v, err := ParseGeneric(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// Parse tries to do ParseSemantic first to keep more information.
+// If ParseSemantic fails, it would just do ParseGeneric.
+func Parse(str string) (*Version, error) {
+	v, err := parse(str, true)
+	if err != nil {
+		return parse(str, false)
+	}
+	return v, err
+}
+
+// MustParse is like Parse except that it panics on error
+func MustParse(str string) *Version {
+	v, err := Parse(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// ParseMajorMinor parses a "generic" version string and returns a version with the major and minor version.
+func ParseMajorMinor(str string) (*Version, error) {
+	v, err := ParseGeneric(str)
+	if err != nil {
+		return nil, err
+	}
+	return MajorMinor(v.Major(), v.Minor()), nil
+}
+
+// MustParseMajorMinor is like ParseMajorMinor except that it panics on error
+func MustParseMajorMinor(str string) *Version {
+	v, err := ParseMajorMinor(str)
 	if err != nil {
 		panic(err)
 	}
@@ -119,6 +201,11 @@ func MustParseSemantic(str string) *Version {
 		panic(err)
 	}
 	return v
+}
+
+// MajorMinor returns a version with the provided major and minor version.
+func MajorMinor(major, minor uint) *Version {
+	return &Version{components: []uint{major, minor}}
 }
 
 // Major returns the major release number
@@ -168,6 +255,32 @@ func (v *Version) WithMinor(minor uint) *Version {
 	return &result
 }
 
+// SubtractMinor returns the version with offset from the original minor, with the same major and no patch.
+// If -offset >= current minor, the minor would be 0.
+func (v *Version) OffsetMinor(offset int) *Version {
+	var minor uint
+	if offset >= 0 {
+		minor = v.Minor() + uint(offset)
+	} else {
+		diff := uint(-offset)
+		if diff < v.Minor() {
+			minor = v.Minor() - diff
+		}
+	}
+	return MajorMinor(v.Major(), minor)
+}
+
+// SubtractMinor returns the version diff minor versions back, with the same major and no patch.
+// If diff >= current minor, the minor would be 0.
+func (v *Version) SubtractMinor(diff uint) *Version {
+	return v.OffsetMinor(-int(diff))
+}
+
+// AddMinor returns the version diff minor versions forward, with the same major and no patch.
+func (v *Version) AddMinor(diff uint) *Version {
+	return v.OffsetMinor(int(diff))
+}
+
 // WithPatch returns copy of the version object with requested patch number
 func (v *Version) WithPatch(patch uint) *Version {
 	result := *v
@@ -177,6 +290,9 @@ func (v *Version) WithPatch(patch uint) *Version {
 
 // WithPreRelease returns copy of the version object with requested prerelease
 func (v *Version) WithPreRelease(preRelease string) *Version {
+	if len(preRelease) == 0 {
+		return v
+	}
 	result := *v
 	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
 	result.preRelease = preRelease
@@ -195,6 +311,9 @@ func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
 // ParseGeneric, this will not include the trailing uninterpreted portion of the version
 // number.
 func (v *Version) String() string {
+	if v == nil {
+		return "<nil>"
+	}
 	var buffer bytes.Buffer
 
 	for i, comp := range v.components {
@@ -295,6 +414,17 @@ func onlyZeros(array []uint) bool {
 	return true
 }
 
+// EqualTo tests if a version is equal to a given version.
+func (v *Version) EqualTo(other *Version) bool {
+	if v == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return v.compareInternal(other) == 0
+}
+
 // AtLeast tests if a version is at least equal to a given minimum version. If both
 // Versions are Semantic Versions, this will use the Semantic Version comparison
 // algorithm. Otherwise, it will compare only the numeric components, with non-present
@@ -310,6 +440,11 @@ func (v *Version) LessThan(other *Version) bool {
 	return v.compareInternal(other) == -1
 }
 
+// GreaterThan tests if a version is greater than a given version.
+func (v *Version) GreaterThan(other *Version) bool {
+	return v.compareInternal(other) == 1
+}
+
 // Compare compares v against a version string (which will be parsed as either Semantic
 // or non-Semantic depending on v). On success it returns -1 if v is less than other, 1 if
 // it is greater than other, or 0 if they are equal.
@@ -319,4 +454,31 @@ func (v *Version) Compare(other string) (int, error) {
 		return 0, err
 	}
 	return v.compareInternal(ov), nil
+}
+
+// WithInfo returns copy of the version object with requested info
+func (v *Version) WithInfo(info apimachineryversion.Info) *Version {
+	result := *v
+	result.info = info
+	return &result
+}
+
+func (v *Version) Info() *apimachineryversion.Info {
+	if v == nil {
+		return nil
+	}
+	// in case info is empty, or the major and minor in info is different from the actual major and minor
+	v.info.Major = itoa(v.Major())
+	v.info.Minor = itoa(v.Minor())
+	if v.info.GitVersion == "" {
+		v.info.GitVersion = v.String()
+	}
+	return &v.info
+}
+
+func itoa(i uint) string {
+	if i == 0 {
+		return ""
+	}
+	return strconv.Itoa(int(i))
 }

@@ -24,18 +24,20 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
+	apiserveradmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 )
 
 type fakeAuthorizer struct{}
@@ -50,6 +52,9 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
 			return authorizer.DecisionNoOpinion, "", nil
 		}
+		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
+			return authorizer.DecisionNoOpinion, "", nil
+		}
 		return authorizer.DecisionAllow, "", nil
 	}
 
@@ -58,6 +63,9 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
 			return authorizer.DecisionNoOpinion, "", nil
 		}
 		return authorizer.DecisionAllow, "", nil
@@ -70,6 +78,9 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
 			return authorizer.DecisionNoOpinion, "", nil
 		}
+		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
+			return authorizer.DecisionNoOpinion, "", nil
+		}
 		return authorizer.DecisionAllow, "", nil
 	}
 
@@ -80,8 +91,12 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 		if a.GetVerb() == "update" && a.GetResource() == "nodes" && a.GetSubresource() == "finalizers" {
 			return authorizer.DecisionNoOpinion, "", nil
 		}
+		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
+			return authorizer.DecisionNoOpinion, "", nil
+		}
 		return authorizer.DecisionAllow, "", nil
 	}
+
 	return authorizer.DecisionAllow, "", nil
 }
 
@@ -97,11 +112,10 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		},
 	}
 	gcAdmit := &gcPermissionsEnforcement{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		Handler:   apiserveradmission.NewHandler(apiserveradmission.Create, apiserveradmission.Update),
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
 	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
@@ -119,19 +133,52 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 			},
 		},
 	}
-
 	restMapperRes, err := restmapper.GetAPIGroupResources(fakeDiscoveryClient)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
-	initializersChain := admission.PluginInitializers{}
+	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, restMapper)
+	pluginInitializer := controlplaneadmission.NewPluginInitializer(nil, nil)
+	initializersChain := apiserveradmission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
 
 	initializersChain.Initialize(gcAdmit)
 	return gcAdmit, nil
+}
+
+type neverReturningRESTMapper struct{}
+
+var _ meta.RESTMapper = &neverReturningRESTMapper{}
+
+func (r *neverReturningRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
+}
+func (r *neverReturningRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	// this ok because if the test works, this method should never be called.
+	panic("test failed")
 }
 
 func TestGCAdmission(t *testing.T) {
@@ -302,14 +349,14 @@ func TestGCAdmission(t *testing.T) {
 				t.Error(err)
 			}
 
-			operation := admission.Create
+			operation := apiserveradmission.Create
 			var options runtime.Object = &metav1.CreateOptions{}
 			if tc.oldObj != nil {
-				operation = admission.Update
+				operation = apiserveradmission.Update
 				options = &metav1.UpdateOptions{}
 			}
 			user := &user.DefaultInfo{Name: tc.username}
-			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
+			attributes := apiserveradmission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
 			err = gcAdmit.Validate(context.TODO(), attributes, nil)
 			if !tc.checkError(err) {
@@ -414,12 +461,13 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on")
 	}
 	tests := []struct {
-		name        string
-		username    string
-		resource    schema.GroupVersionResource
-		subresource string
-		oldObj      runtime.Object
-		newObj      runtime.Object
+		name               string
+		username           string
+		resource           schema.GroupVersionResource
+		subresource        string
+		oldObj             runtime.Object
+		newObj             runtime.Object
+		restMapperOverride meta.RESTMapper
 
 		checkError func(error) bool
 	}{
@@ -444,6 +492,14 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockRC1, blockRC2, blockNode),
 			checkError: expectNoError,
+		},
+		{
+			name:               "super-user, create, some ownerReferences have blockOwnerDeletion=true, hangingRESTMapper",
+			username:           "super",
+			resource:           api.SchemeGroupVersion.WithResource("pods"),
+			newObj:             podWithOwnerRefs(blockRC1, blockRC2, blockNode),
+			restMapperOverride: &neverReturningRESTMapper{},
+			checkError:         expectNoError,
 		},
 		{
 			name:       "non-rc-deleter, create, no ownerReferences",
@@ -601,24 +657,30 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectCantSetBlockOwnerDeletionError,
 		},
 	}
-	gcAdmit, err := newGCPermissionsEnforcement()
-	if err != nil {
-		t.Error(err)
-	}
 
 	for _, tc := range tests {
-		operation := admission.Create
-		var options runtime.Object = &metav1.CreateOptions{}
-		if tc.oldObj != nil {
-			operation = admission.Update
-			options = &metav1.UpdateOptions{}
-		}
-		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
+		t.Run(tc.name, func(t *testing.T) {
+			gcAdmit, err := newGCPermissionsEnforcement()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.restMapperOverride != nil {
+				gcAdmit.restMapper = tc.restMapperOverride
+			}
 
-		err := gcAdmit.Validate(context.TODO(), attributes, nil)
-		if !tc.checkError(err) {
-			t.Errorf("%v: unexpected err: %v", tc.name, err)
-		}
+			operation := apiserveradmission.Create
+			var options runtime.Object = &metav1.CreateOptions{}
+			if tc.oldObj != nil {
+				operation = apiserveradmission.Update
+				options = &metav1.UpdateOptions{}
+			}
+			user := &user.DefaultInfo{Name: tc.username}
+			attributes := apiserveradmission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
+
+			err = gcAdmit.Validate(context.TODO(), attributes, nil)
+			if !tc.checkError(err) {
+				t.Fatal(err)
+			}
+		})
 	}
 }

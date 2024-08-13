@@ -23,26 +23,27 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for
 // container images compressed and stored in registries; 90%ile of images on dockerhub drops into this range.
 const (
-	mb           int64 = 1024 * 1024
-	minThreshold int64 = 23 * mb
-	maxThreshold int64 = 1000 * mb
+	mb                    int64 = 1024 * 1024
+	minThreshold          int64 = 23 * mb
+	maxContainerThreshold int64 = 1000 * mb
 )
 
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 }
 
 var _ framework.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "ImageLocality"
+const Name = names.ImageLocality
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {
@@ -53,16 +54,17 @@ func (pl *ImageLocality) Name() string {
 func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	nodeInfos, err := pl.handle.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, err.Error())
+		return 0, framework.AsStatus(err)
 	}
 	totalNumNodes := len(nodeInfos)
 
-	score := calculatePriority(sumImageScores(nodeInfo, pod.Spec.Containers, totalNumNodes))
+	imageScores := sumImageScores(nodeInfo, pod, totalNumNodes)
+	score := calculatePriority(imageScores, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 
 	return score, nil
 }
@@ -73,28 +75,34 @@ func (pl *ImageLocality) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	return &ImageLocality{handle: h}, nil
 }
 
 // calculatePriority returns the priority of a node. Given the sumScores of requested images on the node, the node's
 // priority is obtained by scaling the maximum priority value with a ratio proportional to the sumScores.
-func calculatePriority(sumScores int64) int64 {
+func calculatePriority(sumScores int64, numContainers int) int64 {
+	maxThreshold := maxContainerThreshold * int64(numContainers)
 	if sumScores < minThreshold {
 		sumScores = minThreshold
 	} else if sumScores > maxThreshold {
 		sumScores = maxThreshold
 	}
 
-	return int64(framework.MaxNodeScore) * (sumScores - minThreshold) / (maxThreshold - minThreshold)
+	return framework.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
-// the final score. Note that the init containers are not considered for it's rare for users to deploy huge init containers.
-func sumImageScores(nodeInfo *framework.NodeInfo, containers []v1.Container, totalNumNodes int) int64 {
+// the final score.
+func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
 	var sum int64
-	for _, container := range containers {
+	for _, container := range pod.Spec.InitContainers {
+		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+			sum += scaledImageScore(state, totalNumNodes)
+		}
+	}
+	for _, container := range pod.Spec.Containers {
 		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}

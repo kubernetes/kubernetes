@@ -1,39 +1,55 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
 reviewers:
-  - neolit123
+  - aojea
+  - dchen1107
   - johnSchnake
+  - liggitt
+  - neolit123
   - SataQiu
-  - tanjunchen
+  - smarterclayton
+  - thockin
+  - wojtek-t
 approvers:
-  - alejandrox1
   - andrewsykim
+  - aojea
+  - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
+  - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
-  - MrHohn
+  - dchen1107
   - deads2k
-  - enisoc
+  - dims
+  - enj
   - janetkuo
   - liggitt
   - mikedanese
+  - MrHohn
   - msau42
+  - neolit123
   - oomichi
+  - pohly
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - SataQiu
-  - sig-testing-approvers
   - smarterclayton
   - soltysh
+  - spiffxp
   - sttts
-  - timothysc
+  - thockin
+  - wojtek-t
 emeritus_approvers:
-  - enj
   - eparis
-  - erictune
   - foxish
   - gmarek
+  - ixdy
   - krousey
+  - krzyzacy
   - kow3ns
+  - lavalamp
   - madhusudancs
   - marun
   - zmerlynn
@@ -42,7 +58,9 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
-
+  - enisoc
+  - alejandrox1
+  - timothysc
 labels:
-- area/test
-- sig/testing
+  - area/test
+  - sig/testing

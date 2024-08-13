@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // PriorityLevelConfigurationStorage implements storage for priority level configuration.
@@ -45,13 +46,15 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against priority level configuration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
-		NewListFunc:              func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
-		DefaultQualifiedResource: flowcontrol.Resource("prioritylevelconfigurations"),
+		NewFunc:                   func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
+		NewListFunc:               func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
+		DefaultQualifiedResource:  flowcontrol.Resource("prioritylevelconfigurations"),
+		SingularQualifiedResource: flowcontrol.Resource("prioritylevelconfiguration"),
 
-		CreateStrategy: prioritylevelconfiguration.Strategy,
-		UpdateStrategy: prioritylevelconfiguration.Strategy,
-		DeleteStrategy: prioritylevelconfiguration.Strategy,
+		CreateStrategy:      prioritylevelconfiguration.Strategy,
+		UpdateStrategy:      prioritylevelconfiguration.Strategy,
+		DeleteStrategy:      prioritylevelconfiguration.Strategy,
+		ResetFieldsStrategy: prioritylevelconfiguration.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -64,6 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	statusStore.CreateStrategy = nil
 	statusStore.UpdateStrategy = prioritylevelconfiguration.StatusStrategy
 	statusStore.DeleteStrategy = nil
+	statusStore.ResetFieldsStrategy = prioritylevelconfiguration.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -78,6 +82,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &flowcontrol.PriorityLevelConfiguration{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -88,4 +98,13 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }

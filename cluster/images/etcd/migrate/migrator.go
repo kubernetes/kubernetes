@@ -19,10 +19,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"k8s.io/klog/v2"
 )
 
@@ -34,6 +33,7 @@ type EtcdMigrateCfg struct {
 	port              uint64
 	peerListenUrls    string
 	peerAdvertiseUrls string
+	clientListenUrls  string
 	etcdDataPrefix    string
 	ttlKeysDirectory  string
 	supportedVersions SupportedVersions
@@ -159,7 +159,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 	if err != nil {
 		return nil, err
 	}
-	err = exec.Command("mv", m.dataDirectory.path, backupDir).Run()
+	err = os.Rename(m.dataDirectory.path, backupDir)
 	if err != nil {
 		return nil, err
 	}

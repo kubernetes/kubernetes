@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // CommunicatingPlugin is an example of a plugin that implements two
@@ -50,26 +50,33 @@ func (s *stateData) Clone() framework.StateData {
 	return copy
 }
 
-// Reserve is the functions invoked by the framework at "reserve" extension point.
+// Reserve is the function invoked by the framework at "reserve" extension point.
 func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
 	if pod.Name == "my-test-pod" {
-		state.Lock()
 		state.Write(framework.StateKey(pod.Name), &stateData{data: "never bind"})
-		state.Unlock()
 	}
 	return nil
 }
 
-// PreBind is the functions invoked by the framework at "prebind" extension point.
+// Unreserve is the function invoked by the framework when any error happens
+// during "reserve" extension point or later.
+func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+	if pod.Name == "my-test-pod" {
+		// The pod is at the end of its lifecycle -- let's clean up the allocated
+		// resources. In this case, our clean up is simply deleting the key written
+		// in the Reserve operation.
+		state.Delete(framework.StateKey(pod.Name))
+	}
+}
+
+// PreBind is the function invoked by the framework at "prebind" extension point.
 func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
-	state.RLock()
-	defer state.RUnlock()
 	if v, e := state.Read(framework.StateKey(pod.Name)); e == nil {
 		if value, ok := v.(*stateData); ok && value.data == "never bind" {
 			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
@@ -79,6 +86,6 @@ func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.Cycl
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ context.Context, _ *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	return &CommunicatingPlugin{}, nil
 }

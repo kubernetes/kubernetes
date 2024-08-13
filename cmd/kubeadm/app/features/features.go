@@ -23,21 +23,39 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 const (
-	// IPv6DualStack is expected to be alpha in v1.16
-	IPv6DualStack = "IPv6DualStack"
 	// PublicKeysECDSA is expected to be alpha in v1.19
 	PublicKeysECDSA = "PublicKeysECDSA"
+	// RootlessControlPlane is expected to be in alpha in v1.22
+	RootlessControlPlane = "RootlessControlPlane"
+	// EtcdLearnerMode is expected to be in alpha in v1.27, beta in v1.29
+	EtcdLearnerMode = "EtcdLearnerMode"
+	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
+	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
+	// ControlPlaneKubeletLocalMode is expected to be in alpha in v1.31, beta in v1.32
+	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
 )
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	IPv6DualStack:   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	PublicKeysECDSA: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	PublicKeysECDSA: {
+		FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
+		DeprecationMessage: "The PublicKeysECDSA feature gate is deprecated and will be removed when v1beta3 is removed." +
+			" v1beta4 supports a new option 'ClusterConfiguration.EncryptionAlgorithm'.",
+	},
+	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha},
+		DeprecationMessage: "Deprecated in favor of the core kubelet feature UserNamespacesSupport which is beta since 1.30." +
+			" Once UserNamespacesSupport graduates to GA, kubeadm will start using it and RootlessControlPlane will be removed.",
+	},
+	EtcdLearnerMode:                  {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	ControlPlaneKubeletLocalMode:     {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated
@@ -74,30 +92,21 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 
 // Enabled indicates whether a feature name has been enabled
 func Enabled(featureList map[string]bool, featureName string) bool {
-	if enabled, ok := featureList[string(featureName)]; ok {
+	if enabled, ok := featureList[featureName]; ok {
 		return enabled
 	}
-	return InitFeatureGates[string(featureName)].Default
+	return InitFeatureGates[featureName].Default
 }
 
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k, v := range featureList {
-		if featureName == string(k) {
-			return v.PreRelease != featuregate.Deprecated
+	for k := range featureList {
+		if featureName == k {
+			return true
 		}
 	}
 	return false
-}
-
-// Keys returns a slice of feature names for a given feature set
-func Keys(featureList FeatureList) []string {
-	var list []string
-	for k := range featureList {
-		list = append(list, string(k))
-	}
-	return list
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureList features.
@@ -141,7 +150,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		}
 
 		if featureSpec.PreRelease == featuregate.Deprecated {
-			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
+			klog.Warningf("Setting deprecated feature gate %s=%s. It will be removed in a future release.", k, v)
 		}
 
 		boolValue, err := strconv.ParseBool(v)

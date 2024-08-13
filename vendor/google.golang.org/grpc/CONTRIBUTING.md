@@ -20,6 +20,15 @@ How to get your contributions merged smoothly and quickly.
   both author's & review's time is wasted. Create more PRs to address different
   concerns and everyone will be happy.
 
+- If you are searching for features to work on, issues labeled [Status: Help
+  Wanted](https://github.com/grpc/grpc-go/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22Status%3A+Help+Wanted%22)
+  is a great place to start. These issues are well-documented and usually can be
+  resolved with a single pull request.
+
+- If you are adding a new file, make sure it has the copyright message template 
+  at the top as a comment. You can copy over the message from an existing file 
+  and update the year.
+
 - The grpc package should only depend on standard Go packages and a small number
   of exceptions. If your contribution introduces new dependencies which are NOT
   in the [list](https://godoc.org/google.golang.org/grpc?imports), you need a
@@ -32,14 +41,18 @@ How to get your contributions merged smoothly and quickly.
 - Provide a good **PR description** as a record of **what** change is being made
   and **why** it was made. Link to a github issue if it exists.
 
-- Don't fix code style and formatting unless you are already changing that line
-  to address an issue. PRs with irrelevant changes won't be merged. If you do
-  want to fix formatting or style, do that in a separate PR.
+- If you want to fix formatting or style, consider whether your changes are an 
+  obvious improvement or might be considered a personal preference. If a style 
+  change is based on preference, it likely will not be accepted. If it corrects 
+  widely agreed-upon anti-patterns, then please do create a PR and explain the 
+  benefits of the change.
 
 - Unless your PR is trivial, you should expect there will be reviewer comments
-  that you'll need to address before merging. We expect you to be reasonably
-  responsive to those comments, otherwise the PR will be closed after 2-3 weeks
-  of inactivity.
+  that you'll need to address before merging. We'll mark it as `Status: Requires
+  Reporter Clarification` if we expect you to respond to these comments in a
+  timely manner. If the PR remains inactive for 6 days, it will be marked as
+  `stale` and automatically close 7 days after that if we don't hear back from
+  you.
 
 - Maintain **clean commit history** and use **meaningful commit messages**. PRs
   with messy commit history are difficult to review and won't be merged. Use
@@ -53,10 +66,8 @@ How to get your contributions merged smoothly and quickly.
 - **All tests need to be passing** before your change can be merged. We
   recommend you **run tests locally** before creating your PR to catch breakages
   early on.
-  - `make all` to test everything, OR
-  - `make vet` to catch vet errors
-  - `make test` to run the tests
-  - `make testrace` to run tests in race mode
-  - optional `make testappengine` to run tests with appengine
+  - `./scripts/vet.sh` to catch vet errors
+  - `go test -cpu 1,4 -timeout 7m ./...` to run the tests
+  - `go test -race -cpu 1,4 -timeout 7m ./...` to run tests in race mode
 
 - Exceptions to the rules can be made if there's a compelling reason for doing so.

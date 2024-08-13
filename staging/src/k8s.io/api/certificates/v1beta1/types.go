@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,7 +27,8 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.12
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequest
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
@@ -34,20 +36,20 @@ type CertificateSigningRequest struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The certificate request itself and any additional information.
-	// +optional
-	Spec CertificateSigningRequestSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
 	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// This information is immutable after the request is created. Only the Request
-// and Usages fields can be set on creation, other fields are derived by
-// Kubernetes and cannot be modified by users.
+// CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
+	// +listType=atomic
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Requested signer for the request. It is a qualified name in the form:
@@ -63,10 +65,59 @@ type CertificateSigningRequestSpec struct {
 	// +optional
 	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,7,opt,name=signerName"`
 
+	// expirationSeconds is the requested duration of validity of the issued
+	// certificate. The certificate signer may issue a certificate with a different
+	// validity duration so a client must check the delta between the notBefore and
+	// and notAfter fields in the issued certificate to determine the actual duration.
+	//
+	// The v1.22+ in-tree implementations of the well-known Kubernetes signers will
+	// honor this field as long as the requested duration is not greater than the
+	// maximum duration they will honor per the --cluster-signing-duration CLI
+	// flag to the Kubernetes controller manager.
+	//
+	// Certificate signers may not honor this field for various reasons:
+	//
+	//   1. Old signer that is unaware of the field (such as the in-tree
+	//      implementations prior to v1.22)
+	//   2. Signer whose configured maximum is shorter than the requested duration
+	//   3. Signer whose configured minimum is longer than the requested duration
+	//
+	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	//
+	// +optional
+	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
+
 	// allowedUsages specifies a set of usage contexts the key will be
 	// valid for.
-	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	// See:
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	//
+	// Valid values are:
+	//  "signing",
+	//  "digital signature",
+	//  "content commitment",
+	//  "key encipherment",
+	//  "key agreement",
+	//  "data encipherment",
+	//  "cert sign",
+	//  "crl sign",
+	//  "encipher only",
+	//  "decipher only",
+	//  "any",
+	//  "server auth",
+	//  "client auth",
+	//  "code signing",
+	//  "email protection",
+	//  "s/mime",
+	//  "ipsec end system",
+	//  "ipsec tunnel",
+	//  "ipsec user",
+	//  "timestamping",
+	//  "ocsp signing",
+	//  "microsoft sgc",
+	//  "netscape sgc"
+	// +listType=atomic
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.
@@ -79,6 +130,7 @@ type CertificateSigningRequestSpec struct {
 	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
 	// Group information about the requesting user.
 	// See user.Info interface for details.
+	// +listType=atomic
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
 	// Extra information about the requesting user.
@@ -120,10 +172,13 @@ func (t ExtraValue) String() string {
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
+	// +listType=atomic
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
@@ -134,11 +189,18 @@ type RequestConditionType string
 const (
 	CertificateApproved RequestConditionType = "Approved"
 	CertificateDenied   RequestConditionType = "Denied"
+	CertificateFailed   RequestConditionType = "Failed"
 )
 
 type CertificateSigningRequestCondition struct {
-	// request approval state, currently Approved or Denied.
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// Defaults to "True".
+	// If unset, should be treated as "True".
+	// +optional
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// brief reason for the request state
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
@@ -148,11 +210,17 @@ type CertificateSigningRequestCondition struct {
 	// timestamp for the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// If unset, when a new condition type is added or an existing condition's status is changed,
+	// the server defaults this to the current time.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,5,opt,name=lastTransitionTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.12
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -163,8 +231,10 @@ type CertificateSigningRequestList struct {
 }
 
 // KeyUsages specifies valid usage contexts for keys.
-// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+// See:
+//
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 type KeyUsage string
 
 const (

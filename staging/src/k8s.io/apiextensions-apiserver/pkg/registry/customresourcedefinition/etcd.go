@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rest implements a RESTStorage for API services against etcd
@@ -42,14 +43,16 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*RES
 	strategy := NewStrategy(scheme)
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
-		NewListFunc:              func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
-		PredicateFunc:            MatchCustomResourceDefinition,
-		DefaultQualifiedResource: apiextensions.Resource("customresourcedefinitions"),
+		NewFunc:                   func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
+		NewListFunc:               func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
+		PredicateFunc:             MatchCustomResourceDefinition,
+		DefaultQualifiedResource:  apiextensions.Resource("customresourcedefinitions"),
+		SingularQualifiedResource: apiextensions.Resource("customresourcedefinition"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		// TODO: define table converter that exposes more than name/creation timestamp
 		TableConvertor: rest.NewDefaultTableConvertor(apiextensions.Resource("customresourcedefinitions")),
@@ -67,6 +70,14 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"crd", "crds"}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"api-extensions"}
 }
 
 // Delete adds the CRD finalizer to the list
@@ -145,6 +156,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 				return existingCRD, nil
 			}),
 			dryrun.IsDryRun(options.DryRun),
+			nil,
 		)
 
 		if err != nil {
@@ -168,7 +180,9 @@ func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
 	statusStore := *rest.Store
 	statusStore.CreateStrategy = nil
 	statusStore.DeleteStrategy = nil
-	statusStore.UpdateStrategy = NewStatusStrategy(scheme)
+	statusStrategy := NewStatusStrategy(scheme)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 	return &StatusREST{store: &statusStore}
 }
 
@@ -182,6 +196,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &apiextensions.CustomResourceDefinition{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -192,4 +212,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

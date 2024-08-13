@@ -65,18 +65,18 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 // UpdateService fetches a service, calls the update function on it,
 // and then attempts to send the updated service. It retries up to 2
 // times in the face of timeouts and conflicts.
-func UpdateService(c clientset.Interface, namespace, serviceName string, update func(*v1.Service)) (*v1.Service, error) {
+func UpdateService(ctx context.Context, c clientset.Interface, namespace, serviceName string, update func(*v1.Service)) (*v1.Service, error) {
 	var service *v1.Service
 	var err error
 	for i := 0; i < 3; i++ {
-		service, err = c.CoreV1().Services(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		service, err = c.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
 			return service, err
 		}
 
 		update(service)
 
-		service, err = c.CoreV1().Services(namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
+		service, err = c.CoreV1().Services(namespace).Update(ctx, service, metav1.UpdateOptions{})
 
 		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			return service, err
@@ -86,8 +86,8 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 }
 
 // CleanupServiceResources cleans up service Type=LoadBalancer resources.
-func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	framework.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
+func CleanupServiceResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string) {
+	framework.TestContext.CloudConfig.Provider.CleanupServiceResources(ctx, c, loadBalancerName, region, zone)
 }
 
 // GetIngressPoint returns a host on which ingress serves.
@@ -100,8 +100,8 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 }
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
-func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+func GetServiceLoadBalancerCreationTimeout(ctx context.Context, cs clientset.Interface) time.Duration {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerCreateTimeoutLarge
@@ -110,8 +110,8 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 }
 
 // GetServiceLoadBalancerPropagationTimeout returns a timeout value for propagating a load balancer of a service.
-func GetServiceLoadBalancerPropagationTimeout(cs clientset.Interface) time.Duration {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+func GetServiceLoadBalancerPropagationTimeout(ctx context.Context, cs clientset.Interface) time.Duration {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerPropagationTimeoutLarge
@@ -120,10 +120,10 @@ func GetServiceLoadBalancerPropagationTimeout(cs clientset.Interface) time.Durat
 }
 
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func CreateServiceForSimpleAppWithPods(c clientset.Interface, contPort int, svcPort int, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
+func CreateServiceForSimpleAppWithPods(ctx context.Context, c clientset.Interface, contPort int, svcPort int, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
 	var err error
-	theService := CreateServiceForSimpleApp(c, contPort, svcPort, namespace, appName)
-	e2enode.CreatePodsPerNodeForSimpleApp(c, namespace, appName, podSpec, count)
+	theService := CreateServiceForSimpleApp(ctx, c, contPort, svcPort, namespace, appName)
+	e2enode.CreatePodsPerNodeForSimpleApp(ctx, c, namespace, appName, podSpec, count)
 	if block {
 		err = testutils.WaitForPodsWithLabelRunning(c, namespace, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
 	}
@@ -131,7 +131,7 @@ func CreateServiceForSimpleAppWithPods(c clientset.Interface, contPort int, svcP
 }
 
 // CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
-func CreateServiceForSimpleApp(c clientset.Interface, contPort, svcPort int, namespace, appName string) *v1.Service {
+func CreateServiceForSimpleApp(ctx context.Context, c clientset.Interface, contPort, svcPort int, namespace, appName string) *v1.Service {
 	if appName == "" {
 		panic(fmt.Sprintf("no app name provided"))
 	}
@@ -148,11 +148,11 @@ func CreateServiceForSimpleApp(c clientset.Interface, contPort, svcPort int, nam
 		return []v1.ServicePort{{
 			Protocol:   v1.ProtocolTCP,
 			Port:       int32(svcPort),
-			TargetPort: intstr.FromInt(contPort),
+			TargetPort: intstr.FromInt32(int32(contPort)),
 		}}
 	}
 	framework.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := c.CoreV1().Services(namespace).Create(context.TODO(), &v1.Service{
+	service, err := c.CoreV1().Services(namespace).Create(ctx, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{

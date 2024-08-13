@@ -21,18 +21,20 @@ package storage
 import (
 	"context"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // These tests need privileged containers, which are disabled by default.
 var _ = utils.SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled inside BeforeEach
@@ -45,7 +47,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	})
 
 	ginkgo.Describe("ConfigMap", func() {
-		ginkgo.It("should be mountable", func() {
+		ginkgo.It("should be mountable", func(ctx context.Context) {
 			config := e2evolume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",
@@ -64,11 +66,11 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(ctx, configMap.Name, metav1.DeleteOptions{})
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502
@@ -108,7 +110,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

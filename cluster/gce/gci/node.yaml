@@ -15,10 +15,10 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
       ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
       ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
-      # Use --retry-connrefused opt only if it's supported by curl.
-      ExecStartPre=/bin/bash -c 'OPT=""; if curl --help | grep -q -- "--retry-connrefused"; then OPT="--retry-connrefused"; fi; /usr/bin/curl --fail --retry 5 --retry-delay 3 $OPT --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh'
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
       ExecStart=/home/kubernetes/bin/configure.sh
+      StandardOutput=journal+console
 
       [Install]
       WantedBy=kubernetes.target
@@ -36,6 +36,7 @@ write_files:
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
       ExecStart=/home/kubernetes/bin/configure-helper.sh
+      StandardOutput=journal+console
 
       [Install]
       WantedBy=kubernetes.target
@@ -115,6 +116,13 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+
+  - path: /etc/modprobe.d/sunrpc.conf
+    permissions: 0644
+    owner: root
+    # The GKE metadata server uses ports 987-989, so the sunrpc range should be restricted to be below.
+    content: |
+      options sunrpc max_resvport=986
 
 runcmd:
  - systemctl daemon-reload

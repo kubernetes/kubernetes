@@ -18,6 +18,10 @@
 ###             -name="TestName" : the test name which will be shown in the junit report
 ###             -error="RegExp"  : a regexp which sets the test as failure when the output matches it
 ###             -ierror="RegExp" : same as -error but case insensitive
+###             -fail="RegExp"   : Any line from stderr which contains this pattern becomes part of
+###                                the failure messsage, without the text matching that pattern.
+###                                Example: -failure="^ERROR: "
+###                                Default is to use the entire stderr as failure message.
 ###             -output="Path"   : path to output directory, defaults to "./results"
 ###     - Junit reports are left in the folder 'result' under the directory where the script is executed.
 ###     - Configure Jenkins to parse junit files from the generated folder
@@ -61,6 +65,7 @@ function juLog() {
   errfile=/tmp/evErr.$$.log
   date="$(which gdate 2>/dev/null || which date)"
   asserts=00; errors=0; total=0; content=""
+  local failureRe=""
 
   # parse arguments
   ya=""; icase=""
@@ -70,6 +75,7 @@ function juLog() {
       -class=*)  class="$(echo "$1" | ${SED} -e 's/-class=//')";   shift;;
       -ierror=*) ereg="$(echo "$1" | ${SED} -e 's/-ierror=//')"; icase="-i"; shift;;
       -error=*)  ereg="$(echo "$1" | ${SED} -e 's/-error=//')";  shift;;
+      -fail=*)  failureRe="$(echo "$1" | ${SED} -e 's/-fail=//')";  shift;;
       -output=*) juDIR="$(echo "$1" | ${SED} -e 's/-output=//')";  shift;;
       *)         ya=1;;
     esac
@@ -116,13 +122,13 @@ function juLog() {
   echo "+++ exit code: ${evErr}"        | tee -a ${outf}
 
   # set the appropriate error, based in the exit code and the regex
-  [[ ${evErr} != 0 ]] && err=1 || err=0
+  [[ ${evErr} -ne 0 ]] && err=1 || err=0
   out="$(${SED} -e 's/^\([^+]\)/| \1/g' "$outf")"
-  if [ ${err} = 0 ] && [ -n "${ereg:-}" ]; then
+  if [ "${err}" -eq 0 ] && [ -n "${ereg:-}" ]; then
       H=$(echo "${out}" | grep -E ${icase} "${ereg}")
       [[ -n "${H}" ]] && err=1
   fi
-  [[ ${err} != 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
+  [[ ${err} -ne 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
   rm -f ${outf}
 
   errMsg=$(cat ${errf})
@@ -135,9 +141,23 @@ function juLog() {
 
   # write the junit xml report
   ## failure tag
-  [[ ${err} = 0 ]] && failure="" || failure="
-      <failure type=\"ScriptError\" message=\"Script Error\"><![CDATA[${errMsg}]]></failure>
+  local failure=""
+  if [[ ${err} -ne 0 ]]; then
+      local failureMsg
+      if [ -n "${failureRe}" ]; then
+          failureMsg="$(echo "${errMsg}" | grep -e "${failureRe}" | ${SED} -e "s;${failureRe};;")"
+          if [ -z "${failureMsg}" ]; then
+              failureMsg="see stderr for details"
+          fi
+      else
+          failureMsg="${errMsg}"
+      fi
+      failure="
+      <failure type=\"ScriptError\"><![CDATA[
+${failureMsg}
+]]></failure>
   "
+  fi
   ## testcase tag
   content="${content}
     <testcase assertions=\"1\" name=\"${name}\" time=\"${time}\" classname=\"${class}\">
@@ -175,5 +195,5 @@ EOF
 EOF
   fi
 
-  return ${err}
+  return "${err}"
 }

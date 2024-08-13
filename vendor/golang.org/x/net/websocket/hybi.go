@@ -16,7 +16,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -279,7 +278,7 @@ func (handler *hybiFrameHandler) HandleFrame(frame frameReader) (frameReader, er
 		}
 	}
 	if header := frame.HeaderReader(); header != nil {
-		io.Copy(ioutil.Discard, header)
+		io.Copy(io.Discard, header)
 	}
 	switch frame.PayloadType() {
 	case ContinuationFrame:
@@ -294,7 +293,7 @@ func (handler *hybiFrameHandler) HandleFrame(frame frameReader) (frameReader, er
 		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return nil, err
 		}
-		io.Copy(ioutil.Discard, frame)
+		io.Copy(io.Discard, frame)
 		if frame.PayloadType() == PingFrame {
 			if _, err := handler.WritePong(b[:n]); err != nil {
 				return nil, err
@@ -369,7 +368,7 @@ func generateNonce() (nonce []byte) {
 	return
 }
 
-// removeZone removes IPv6 zone identifer from host.
+// removeZone removes IPv6 zone identifier from host.
 // E.g., "[fe80::1%en0]:8080" to "[fe80::1]:8080"
 func removeZone(host string) string {
 	if !strings.HasPrefix(host, "[") {

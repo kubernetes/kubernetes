@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
@@ -93,7 +94,8 @@ func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) 
 
 	if !f.readOnly {
 		if f.plugin.capabilities.FSGroup {
-			volume.SetVolumeOwnership(f, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+			// fullPluginName helps to distinguish different driver from flex volume plugin
+			volume.SetVolumeOwnership(f, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(f.plugin, f.spec))
 		}
 	}
 
@@ -104,8 +106,4 @@ func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) 
 // using plugin callout after we finalize the callout syntax.
 func (f *flexVolumeMounter) GetAttributes() volume.Attributes {
 	return (*mounterDefaults)(f).GetAttributes()
-}
-
-func (f *flexVolumeMounter) CanMount() error {
-	return nil
 }

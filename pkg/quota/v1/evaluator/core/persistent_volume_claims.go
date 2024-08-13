@@ -25,13 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	k8sfeatures "k8s.io/kubernetes/pkg/features"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 // the name used for object count quota
@@ -94,7 +94,7 @@ func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	if op == admission.Update && utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.ExpandPersistentVolumes) {
+	if op == admission.Update {
 		return true
 	}
 	return false
@@ -111,7 +111,7 @@ func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopes []corev1.Scope
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
-// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+// It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (p *pvcEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
 	return []corev1.ScopedResourceSelectorRequirement{}, nil
 }
@@ -130,7 +130,7 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 			result = append(result, item)
 			continue
 		}
-		// match pvc resources scoped by storage class (<storage-class-name>.storage-class.kubernetes.io/<resource>)
+		// match pvc resources scoped by storage class (<storage-class-name>.storageclass.storage.k8s.io/<resource>)
 		for _, resource := range pvcResources {
 			byStorageClass := storageClassSuffix + string(resource)
 			if strings.HasSuffix(string(item), byStorageClass) {
@@ -153,22 +153,54 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	// charge for claim
 	result[corev1.ResourcePersistentVolumeClaims] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[pvcObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
-	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
+	storageClassRef := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 	if len(storageClassRef) > 0 {
 		storageClassClaim := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourcePersistentVolumeClaims))
 		result[storageClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 
-	// charge for storage
-	if request, found := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; found {
-		result[corev1.ResourceRequestsStorage] = request
+	requestedStorage := p.getStorageUsage(pvc)
+	if requestedStorage != nil {
+		result[corev1.ResourceRequestsStorage] = *requestedStorage
 		// charge usage to the storage class (if present)
 		if len(storageClassRef) > 0 {
 			storageClassStorage := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourceRequestsStorage))
-			result[storageClassStorage] = request
+			result[storageClassStorage] = *requestedStorage
 		}
 	}
+
 	return result, nil
+}
+
+func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resource.Quantity {
+	var result *resource.Quantity
+	roundUpFunc := func(i *resource.Quantity) *resource.Quantity {
+		roundedRequest := i.DeepCopy()
+		if !roundedRequest.RoundUp(0) {
+			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
+			// See https://issue.k8s.io/94313
+			return &roundedRequest
+		}
+		return i
+	}
+
+	if userRequest, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+		result = roundUpFunc(&userRequest)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) && result != nil {
+		if len(pvc.Status.AllocatedResources) == 0 {
+			return result
+		}
+
+		// if AllocatedResources is set and is greater than user request, we should use it.
+		if allocatedRequest, ok := pvc.Status.AllocatedResources[corev1.ResourceStorage]; ok {
+			if allocatedRequest.Cmp(*result) > 0 {
+				result = roundUpFunc(&allocatedRequest)
+			}
+		}
+	}
+	return result
 }
 
 // UsageStats calculates aggregate usage for the object.
@@ -192,4 +224,14 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 		return nil, fmt.Errorf("expect *api.PersistentVolumeClaim or *v1.PersistentVolumeClaim, got %v", t)
 	}
 	return pvc, nil
+}
+
+// RequiresQuotaReplenish enables quota monitoring for PVCs.
+func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
+		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
+			return true
+		}
+	}
+	return false
 }

@@ -1,31 +1,23 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- pmorie
-- saad-ali
-- thockin
-- SandeepPissay
-- divyenpatel
-- BaluDontu
-- abrarshivani
-- imkin
-- frapposelli
-- dougm
-- sandeeppsunny
+  - saad-ali
+  - thockin
+  - divyenpatel
 emeritus_approvers:
-- matchstick
+  - matchstick
+  - abrarshivani
+  - BaluDontu
+  - imkin
+  - sandeeppsunny
+  - SandeepPissay
+  - dougm
+  - frapposelli
+  - pmorie
 reviewers:
-- abrarshivani
-- saad-ali
-- justinsb
-- jsafrane
-- rootfs
-- jingxu97
-- msau42
-- SandeepPissay
-- divyenpatel
-- BaluDontu
-- imkin
-- frapposelli
-- dougm
-- sandeeppsunny
+  - saad-ali
+  - justinsb
+  - jsafrane
+  - jingxu97
+  - msau42
+  - divyenpatel

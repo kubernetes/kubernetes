@@ -17,99 +17,140 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"go.opentelemetry.io/otel/trace"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
 	fakeSeccompProfileRoot = "/fakeSeccompProfileRoot"
+
+	fakeNodeAllocatableMemory = "32Gi"
+	fakeNodeAllocatableCPU    = "16"
+
+	fakePodLogsDirectory = "/var/log/pods"
 )
 
 type fakeHTTP struct {
-	url string
+	req *http.Request
 	err error
 }
 
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
+func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.req = req
 	return nil, f.err
 }
 
 type fakePodStateProvider struct {
-	existingPods map[types.UID]struct{}
-	runningPods  map[types.UID]struct{}
+	terminated map[types.UID]struct{}
+	removed    map[types.UID]struct{}
 }
 
 func newFakePodStateProvider() *fakePodStateProvider {
 	return &fakePodStateProvider{
-		existingPods: make(map[types.UID]struct{}),
-		runningPods:  make(map[types.UID]struct{}),
+		terminated: make(map[types.UID]struct{}),
+		removed:    make(map[types.UID]struct{}),
 	}
 }
 
-func (f *fakePodStateProvider) IsPodDeleted(uid types.UID) bool {
-	_, found := f.existingPods[uid]
-	return !found
+func (f *fakePodStateProvider) IsPodTerminationRequested(uid types.UID) bool {
+	_, found := f.removed[uid]
+	return found
 }
 
-func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
-	_, found := f.runningPods[uid]
-	return !found
+func (f *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
+	_, found := f.terminated[uid]
+	return found
 }
 
-func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
+func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
+	_, found := f.removed[uid]
+	return found
+}
+
+type fakePodPullingTimeRecorder struct{}
+
+func (f *fakePodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID) {}
+
+func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
+
+func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring, tracer trace.Tracer) (*kubeGenericRuntimeManager, error) {
+	ctx := context.Background()
 	recorder := &record.FakeRecorder{}
+	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	if err != nil {
+		return nil, err
+	}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         false,
-		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
-		livenessManager:     proberesults.NewManager(),
-		startupManager:      proberesults.NewManager(),
-		containerRefManager: kubecontainer.NewRefManager(),
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      runtimeService,
-		imageService:        imageService,
-		keyring:             keyring,
-		seccompProfileRoot:  fakeSeccompProfileRoot,
-		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
-		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		recorder:               recorder,
+		cpuCFSQuota:            false,
+		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
+		livenessManager:        proberesults.NewManager(),
+		startupManager:         proberesults.NewManager(),
+		machineInfo:            machineInfo,
+		osInterface:            osInterface,
+		runtimeHelper:          runtimeHelper,
+		runtimeService:         runtimeService,
+		imageService:           imageService,
+		keyring:                keyring,
+		seccompProfileRoot:     fakeSeccompProfileRoot,
+		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
+		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:             logManager,
+		memoryThrottlingFactor: 0.9,
+		podLogsDirectory:       fakePodLogsDirectory,
 	}
 
-	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
+	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, newFakePodStateProvider(), kubeRuntimeManager)
+	podStateProvider := newFakePodStateProvider()
+	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
+	kubeRuntimeManager.podStateProvider = podStateProvider
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
 		false,
-		0, // Disable image pull throttling by setting QPS to 0,
+		utilpointer.Int32Ptr(0), // No limit on max parallel image pulls,
+		0,                       // Disable image pull throttling by setting QPS to 0,
 		0,
+		&fakePodPullingTimeRecorder{},
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,
-		kubeRuntimeManager)
+		kubeRuntimeManager,
+		recorder)
+
+	kubeRuntimeManager.getNodeAllocatable = func() v1.ResourceList {
+		return v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse(fakeNodeAllocatableMemory),
+			v1.ResourceCPU:    resource.MustParse(fakeNodeAllocatableCPU),
+		}
+	}
 
 	return kubeRuntimeManager, nil
 }

@@ -88,7 +88,7 @@ func ConvertFloat64(str string) (float64, error) {
 	return strconv.ParseFloat(str, 64)
 }
 
-// ConvertInt8 turn a string into int8 boolean
+// ConvertInt8 turn a string into an int8
 func ConvertInt8(str string) (int8, error) {
 	i, err := strconv.ParseInt(str, 10, 8)
 	if err != nil {
@@ -97,7 +97,7 @@ func ConvertInt8(str string) (int8, error) {
 	return int8(i), nil
 }
 
-// ConvertInt16 turn a string into a int16
+// ConvertInt16 turn a string into an int16
 func ConvertInt16(str string) (int16, error) {
 	i, err := strconv.ParseInt(str, 10, 16)
 	if err != nil {
@@ -106,7 +106,7 @@ func ConvertInt16(str string) (int16, error) {
 	return int16(i), nil
 }
 
-// ConvertInt32 turn a string into a int32
+// ConvertInt32 turn a string into an int32
 func ConvertInt32(str string) (int32, error) {
 	i, err := strconv.ParseInt(str, 10, 32)
 	if err != nil {
@@ -115,12 +115,12 @@ func ConvertInt32(str string) (int32, error) {
 	return int32(i), nil
 }
 
-// ConvertInt64 turn a string into a int64
+// ConvertInt64 turn a string into an int64
 func ConvertInt64(str string) (int64, error) {
 	return strconv.ParseInt(str, 10, 64)
 }
 
-// ConvertUint8 turn a string into a uint8
+// ConvertUint8 turn a string into an uint8
 func ConvertUint8(str string) (uint8, error) {
 	i, err := strconv.ParseUint(str, 10, 8)
 	if err != nil {
@@ -129,7 +129,7 @@ func ConvertUint8(str string) (uint8, error) {
 	return uint8(i), nil
 }
 
-// ConvertUint16 turn a string into a uint16
+// ConvertUint16 turn a string into an uint16
 func ConvertUint16(str string) (uint16, error) {
 	i, err := strconv.ParseUint(str, 10, 16)
 	if err != nil {
@@ -138,7 +138,7 @@ func ConvertUint16(str string) (uint16, error) {
 	return uint16(i), nil
 }
 
-// ConvertUint32 turn a string into a uint32
+// ConvertUint32 turn a string into an uint32
 func ConvertUint32(str string) (uint32, error) {
 	i, err := strconv.ParseUint(str, 10, 32)
 	if err != nil {
@@ -147,7 +147,7 @@ func ConvertUint32(str string) (uint32, error) {
 	return uint32(i), nil
 }
 
-// ConvertUint64 turn a string into a uint64
+// ConvertUint64 turn a string into an uint64
 func ConvertUint64(str string) (uint64, error) {
 	return strconv.ParseUint(str, 10, 64)
 }

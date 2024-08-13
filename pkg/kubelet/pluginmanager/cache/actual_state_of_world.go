@@ -43,7 +43,7 @@ type ActualStateOfWorld interface {
 	// Note that this is different from desired world cache's AddOrUpdatePlugin
 	// because for the actual state of world cache, there won't be a scenario where
 	// we need to update an existing plugin if the timestamps don't match. This is
-	// because the plugin should have been unregistered in the reconciller and therefore
+	// because the plugin should have been unregistered in the reconciler and therefore
 	// removed from the actual state of world cache first before adding it back into
 	// the actual state of world cache again with the new timestamp
 	AddPlugin(pluginInfo PluginInfo) error
@@ -91,7 +91,7 @@ func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
-		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)
+		klog.V(2).InfoS("Plugin exists in actual state cache", "path", pluginInfo.SocketPath)
 	}
 	asw.socketFileToInfo[pluginInfo.SocketPath] = pluginInfo
 	return nil

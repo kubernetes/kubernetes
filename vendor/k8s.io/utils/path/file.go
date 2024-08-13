@@ -30,7 +30,7 @@ const (
 	// the symlink exists.
 	CheckFollowSymlink LinkTreatment = iota
 
-	// CheckSymlinkOnly does not follow the symlink and verfies only that they
+	// CheckSymlinkOnly does not follow the symlink and verifies only that they
 	// symlink itself exists.
 	CheckSymlinkOnly
 )

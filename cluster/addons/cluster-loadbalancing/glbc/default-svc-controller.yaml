@@ -17,15 +17,16 @@ spec:
       labels:
         k8s-app: glbc
         name: glbc
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: default-http-backend
         # Any image is permissible as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: k8s.gcr.io/ingress-gce-404-server-with-metrics-amd64:v1.6.0
+        image:  registry.k8s.io/networking/ingress-gce-404-server-with-metrics-amd64:v1.10.11
         livenessProbe:
           httpGet:
             path: /healthz

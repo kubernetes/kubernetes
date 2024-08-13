@@ -17,6 +17,12 @@ var (
 	NameSpaceOID  = Must(Parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8"))
 	NameSpaceX500 = Must(Parse("6ba7b814-9dad-11d1-80b4-00c04fd430c8"))
 	Nil           UUID // empty UUID, all zeros
+
+	// The Max UUID is special form of UUID that is specified to have all 128 bits set to 1.
+	Max = UUID{
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	}
 )
 
 // NewHash returns a new UUID derived from the hash of space concatenated with
@@ -26,8 +32,8 @@ var (
 // NewMD5 and NewSHA1.
 func NewHash(h hash.Hash, space UUID, data []byte, version int) UUID {
 	h.Reset()
-	h.Write(space[:])
-	h.Write(data)
+	h.Write(space[:]) //nolint:errcheck
+	h.Write(data)     //nolint:errcheck
 	s := h.Sum(nil)
 	var uuid UUID
 	copy(uuid[:], s)

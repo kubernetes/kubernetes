@@ -17,37 +17,34 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
+	goerrors "errors"
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
+	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
+	networkingv1beta1client "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
-	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
-	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	limitrangestore "k8s.io/kubernetes/pkg/registry/core/limitrange/storage"
-	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	nodestore "k8s.io/kubernetes/pkg/registry/core/node/storage"
 	pvstore "k8s.io/kubernetes/pkg/registry/core/persistentvolume/storage"
 	pvcstore "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/storage"
@@ -55,283 +52,490 @@ import (
 	podtemplatestore "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
-	resourcequotastore "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage"
-	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	serviceallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	serviceipallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/serviceaccount"
-	utilsnet "k8s.io/utils/net"
+	"k8s.io/kubernetes/pkg/util/async"
+	netutils "k8s.io/utils/net"
 )
 
-// LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
-// does NOT implement the "normal" RESTStorageProvider (yet!)
-type LegacyRESTStorageProvider struct {
-	StorageFactory serverstorage.StorageFactory
-	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport      http.RoundTripper
+// Config provides information needed to build RESTStorage for core.
+type Config struct {
+	GenericConfig
+
+	Proxy    ProxyConfig
+	Services ServicesConfig
+}
+
+type ProxyConfig struct {
+	Transport           http.RoundTripper
 	KubeletClientConfig kubeletclient.KubeletClientConfig
-	EventTTL            time.Duration
-
-	// ServiceIPRange is used to build cluster IPs for discovery.
-	ServiceIPRange net.IPNet
-	// allocates ips for secondary service cidr in dual  stack clusters
-	SecondaryServiceIPRange net.IPNet
-	ServiceNodePortRange    utilnet.PortRange
-
-	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountMaxExpiration time.Duration
-	ExtendExpiration            bool
-
-	APIAudiences authenticator.Audiences
-
-	LoopbackClientConfig *restclient.Config
 }
 
-// LegacyRESTStorage returns stateful information about particular instances of REST storage to
-// master.go for wiring controllers.
-// TODO remove this by running the controller as a poststarthook
-type LegacyRESTStorage struct {
-	ServiceClusterIPAllocator          rangeallocation.RangeRegistry
-	SecondaryServiceClusterIPAllocator rangeallocation.RangeRegistry
-	ServiceNodePortAllocator           rangeallocation.RangeRegistry
+type ServicesConfig struct {
+	// Service IP ranges
+	ClusterIPRange          net.IPNet
+	SecondaryClusterIPRange net.IPNet
+	NodePortRange           utilnet.PortRange
+
+	IPRepairInterval time.Duration
 }
 
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo := genericapiserver.APIGroupInfo{
-		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
-		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                       legacyscheme.Scheme,
-		ParameterCodec:               legacyscheme.ParameterCodec,
-		NegotiatedSerializer:         legacyscheme.Codecs,
+type rangeRegistries struct {
+	clusterIP          rangeallocation.RangeRegistry
+	secondaryClusterIP rangeallocation.RangeRegistry
+	nodePort           rangeallocation.RangeRegistry
+}
+
+type legacyProvider struct {
+	Config
+
+	primaryServiceClusterIPAllocator ipallocator.Interface
+	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
+	serviceNodePortAllocator         *portallocator.PortAllocator
+
+	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
+}
+
+func New(c Config) (*legacyProvider, error) {
+	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
+	if err != nil {
+		return nil, err
 	}
 
-	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Scheme.IsVersionRegistered(policyGroupVersion) {
-		var err error
-		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-		}
+	p := &legacyProvider{
+		Config: c,
+
+		primaryServiceClusterIPAllocator: serviceClusterIPAllocator,
+		serviceClusterIPAllocators:       serviceIPAllocators,
+		serviceNodePortAllocator:         serviceNodePortAllocator,
 	}
-	restStorage := LegacyRESTStorage{}
+
+	// create service node port repair controller
+	client, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
+
+	// create service cluster ip repair controller
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
+			c.Services.IPRepairInterval,
+			client.CoreV1(),
+			client.EventsV1(),
+			&c.Services.ClusterIPRange,
+			rangeRegistries.clusterIP,
+			&c.Services.SecondaryClusterIPRange,
+			rangeRegistries.secondaryClusterIP,
+		).RunUntil
+	} else {
+		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
+			c.Services.IPRepairInterval,
+			client,
+			c.Informers.Core().V1().Services(),
+			c.Informers.Networking().V1beta1().ServiceCIDRs(),
+			c.Informers.Networking().V1beta1().IPAddresses(),
+		).RunUntil
+	}
+
+	return p, nil
+}
+
+func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
+	podDisruptionClient, err := policyclient.NewForConfig(p.LoopbackClientConfig)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
 
 	podTemplateStorage, err := podtemplatestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
 	limitRangeStorage, err := limitrangestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	resourceQuotaStorage, resourceQuotaStatusStorage, err := resourcequotastore.NewREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-	secretStorage, err := secretstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
 	persistentVolumeStorage, persistentVolumeStatusStorage, err := pvstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage, err := pvcstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-	configMapStorage, err := configmapstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	endpointsStorage, err := endpointsstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, p.Proxy.KubeletClientConfig, p.Proxy.Transport)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podStorage, err := podstore.NewStorage(
 		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
-		c.ProxyTransport,
+		p.Proxy.Transport,
 		podDisruptionClient,
 	)
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
+	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
+		restOptionsGetter,
+		p.primaryServiceClusterIPAllocator.IPFamily(),
+		p.serviceClusterIPAllocators,
+		p.serviceNodePortAllocator,
+		endpointsStorage,
+		podStorage.Pod,
+		p.Proxy.Transport)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
+	storage := apiGroupInfo.VersionedResourcesStorageMap["v1"]
+	if storage == nil {
+		storage = map[string]rest.Storage{}
+	}
+
+	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store, c.ExtendExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil, false)
-	}
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
-	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
-	var serviceClusterIPRegistry rangeallocation.RangeRegistry
-	serviceClusterIPRange := c.ServiceIPRange
-	if serviceClusterIPRange.IP == nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
-	}
-
-	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
-	serviceClusterIPAllocator, err := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
-		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
-		if err != nil {
-			return nil, err
+	if p.ServiceAccountIssuer != nil {
+		var nodeGetter rest.Getter
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			nodeGetter = nodeStorage.Node.Store
 		}
-		serviceClusterIPRegistry = etcd
-		return etcd, nil
-	})
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 	}
-	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
 
-	// allocator for secondary service ip range
-	var secondaryServiceClusterIPAllocator ipallocator.Interface
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
-		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-			mem := allocator.NewAllocationMap(max, rangeSpec)
+	if resource := "pods"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = podStorage.Pod
+		storage[resource+"/attach"] = podStorage.Attach
+		storage[resource+"/status"] = podStorage.Status
+		storage[resource+"/log"] = podStorage.Log
+		storage[resource+"/exec"] = podStorage.Exec
+		storage[resource+"/portforward"] = podStorage.PortForward
+		storage[resource+"/proxy"] = podStorage.Proxy
+		storage[resource+"/binding"] = podStorage.Binding
+		if podStorage.Eviction != nil {
+			storage[resource+"/eviction"] = podStorage.Eviction
+		}
+		storage[resource+"/ephemeralcontainers"] = podStorage.EphemeralContainers
+	}
+	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = podStorage.LegacyBinding
+	}
+
+	if resource := "podtemplates"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = podTemplateStorage
+	}
+
+	if resource := "replicationcontrollers"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
+		storage[resource] = controllerStorage.Controller
+		storage[resource+"/status"] = controllerStorage.Status
+		if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+			storage[resource+"/scale"] = controllerStorage.Scale
+		}
+	}
+
+	// potentially override generic storage for service account (with pod support)
+	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		// don't leak go routines
+		storage[resource].Destroy()
+		if storage[resource+"/token"] != nil {
+			storage[resource+"/token"].Destroy()
+		}
+
+		storage[resource] = serviceAccountStorage
+		if serviceAccountStorage.Token != nil {
+			storage[resource+"/token"] = serviceAccountStorage.Token
+		}
+	}
+
+	if resource := "services"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = serviceRESTStorage
+		storage[resource+"/proxy"] = serviceRESTProxy
+		storage[resource+"/status"] = serviceStatusStorage
+	}
+
+	if resource := "endpoints"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = endpointsStorage
+	}
+
+	if resource := "nodes"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = nodeStorage.Node
+		storage[resource+"/proxy"] = nodeStorage.Proxy
+		storage[resource+"/status"] = nodeStorage.Status
+	}
+
+	if resource := "limitranges"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = limitRangeStorage
+	}
+
+	if resource := "persistentvolumes"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = persistentVolumeStorage
+		storage[resource+"/status"] = persistentVolumeStatusStorage
+	}
+
+	if resource := "persistentvolumeclaims"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = persistentVolumeClaimStorage
+		storage[resource+"/status"] = persistentVolumeClaimStatusStorage
+	}
+
+	if resource := "componentstatuses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		storage[resource] = componentstatus.NewStorage(componentStatusStorage{p.StorageFactory}.serversToValidate)
+	}
+
+	if len(storage) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
+	}
+
+	return apiGroupInfo, nil
+}
+
+func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
+	clusterIPAllocators = map[api.IPFamily]ipallocator.Interface{}
+
+	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"), &api.Service{})
+	if err != nil {
+		return rangeRegistries{}, nil, nil, nil, err
+	}
+
+	serviceClusterIPRange := c.Services.ClusterIPRange
+	if serviceClusterIPRange.IP == nil {
+		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		primaryClusterIPAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			var mem allocator.Snapshottable
+			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
-			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 			if err != nil {
 				return nil, err
 			}
-			secondaryServiceClusterIPRegistry = etcd
+			registries.clusterIP = etcd
 			return etcd, nil
 		})
 		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
-		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+	} else {
+		networkingv1beta1Client, err := networkingv1beta1client.NewForConfig(c.LoopbackClientConfig)
+		if err != nil {
+			return rangeRegistries{}, nil, nil, nil, err
+		}
+		var bitmapAllocator ipallocator.Interface
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+			bitmapAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+				mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+				if err != nil {
+					return nil, err
+				}
+				// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
+				// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
+				// the ResourceVersion of the opaque API object is zero.
+				rangeRegistry, err := etcd.Get()
+				if err != nil {
+					return nil, err
+				}
+				rangeRegistry.Range = serviceClusterIPRange.String()
+				if len(rangeRegistry.ResourceVersion) == 0 {
+					klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
+					err := etcd.CreateOrUpdate(rangeRegistry)
+					if err != nil {
+						return nil, err
+					}
+				}
+				registries.clusterIP = etcd
+				return etcd, nil
+			})
+			if err != nil {
+				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %w", err)
+			}
+
+		}
+		// TODO(aojea) Revisit the initialization of the allocators
+		// since right now it depends on the service-cidr flags and
+		// sets the default IPFamily that may not be coherent with the
+		// existing default ServiceCIDR
+		primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+			networkingv1beta1Client,
+			c.Informers.Networking().V1beta1().ServiceCIDRs(),
+			c.Informers.Networking().V1beta1().IPAddresses(),
+			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+			bitmapAllocator,
+		)
+		if err != nil {
+			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
+		}
+	}
+	primaryClusterIPAllocator.EnableMetrics()
+	clusterIPAllocators[primaryClusterIPAllocator.IPFamily()] = primaryClusterIPAllocator
+
+	var secondaryClusterIPAllocator ipallocator.Interface
+	if c.Services.SecondaryClusterIPRange.IP != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+			var err error
+			secondaryClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+				var mem allocator.Snapshottable
+				mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+				// TODO etcdallocator package to return a storage interface via the storageFactory
+				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+				if err != nil {
+					return nil, err
+				}
+				registries.secondaryClusterIP = etcd
+				return etcd, nil
+			})
+			if err != nil {
+				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			}
+		} else {
+			networkingv1beta1Client, err := networkingv1beta1client.NewForConfig(c.LoopbackClientConfig)
+			if err != nil {
+				return rangeRegistries{}, nil, nil, nil, err
+			}
+			var bitmapAllocator ipallocator.Interface
+			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+				bitmapAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+					mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+					// TODO etcdallocator package to return a storage interface via the storageFactory
+					etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+					if err != nil {
+						return nil, err
+					}
+					// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
+					// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
+					// the ResourceVersion of the opaque API object is zero.
+					rangeRegistry, err := etcd.Get()
+					if err != nil {
+						return nil, err
+					}
+					rangeRegistry.Range = serviceClusterIPRange.String()
+					if len(rangeRegistry.ResourceVersion) == 0 {
+						klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
+						err := etcd.CreateOrUpdate(rangeRegistry)
+						if err != nil {
+							return nil, err
+						}
+					}
+					registries.secondaryClusterIP = etcd
+					return etcd, nil
+				})
+				if err != nil {
+					return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %w", err)
+				}
+			}
+			// TODO(aojea) Revisit the initialization of the allocators
+			// since right now it depends on the service-cidr flags and
+			// sets the default IPFamily that may not be coherent with the
+			// existing default ServiceCIDR
+			secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+				networkingv1beta1Client,
+				c.Informers.Networking().V1beta1().ServiceCIDRs(),
+				c.Informers.Networking().V1beta1().IPAddresses(),
+				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+				bitmapAllocator,
+			)
+			if err != nil {
+				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			}
+		}
+		secondaryClusterIPAllocator.EnableMetrics()
+		clusterIPAllocators[secondaryClusterIPAllocator.IPFamily()] = secondaryClusterIPAllocator
 	}
 
-	var serviceNodePortRegistry rangeallocation.RangeRegistry
-	serviceNodePortAllocator, err := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
+	nodePortAllocator, err = portallocator.New(c.Services.NodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
 		if err != nil {
 			return nil, err
 		}
-		serviceNodePortRegistry = etcd
+		registries.nodePort = etcd
 		return etcd, nil
 	})
 	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
+		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster port allocator: %v", err)
 	}
-	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
+	nodePortAllocator.EnableMetrics()
 
-	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
-	serviceRest, serviceRestProxy := servicestore.NewREST(serviceRESTStorage,
-		endpointsStorage,
-		podStorage.Pod,
-		serviceClusterIPAllocator,
-		secondaryServiceClusterIPAllocator,
-		serviceNodePortAllocator,
-		c.ProxyTransport)
-
-	restStorageMap := map[string]rest.Storage{
-		"pods":             podStorage.Pod,
-		"pods/attach":      podStorage.Attach,
-		"pods/status":      podStorage.Status,
-		"pods/log":         podStorage.Log,
-		"pods/exec":        podStorage.Exec,
-		"pods/portforward": podStorage.PortForward,
-		"pods/proxy":       podStorage.Proxy,
-		"pods/binding":     podStorage.Binding,
-		"bindings":         podStorage.LegacyBinding,
-
-		"podTemplates": podTemplateStorage,
-
-		"replicationControllers":        controllerStorage.Controller,
-		"replicationControllers/status": controllerStorage.Status,
-
-		"services":        serviceRest,
-		"services/proxy":  serviceRestProxy,
-		"services/status": serviceStatusStorage,
-
-		"endpoints": endpointsStorage,
-
-		"nodes":        nodeStorage.Node,
-		"nodes/status": nodeStorage.Status,
-		"nodes/proxy":  nodeStorage.Proxy,
-
-		"events": eventStorage,
-
-		"limitRanges":                   limitRangeStorage,
-		"resourceQuotas":                resourceQuotaStorage,
-		"resourceQuotas/status":         resourceQuotaStatusStorage,
-		"namespaces":                    namespaceStorage,
-		"namespaces/status":             namespaceStatusStorage,
-		"namespaces/finalize":           namespaceFinalizeStorage,
-		"secrets":                       secretStorage,
-		"serviceAccounts":               serviceAccountStorage,
-		"persistentVolumes":             persistentVolumeStorage,
-		"persistentVolumes/status":      persistentVolumeStatusStorage,
-		"persistentVolumeClaims":        persistentVolumeClaimStorage,
-		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
-		"configMaps":                    configMapStorage,
-
-		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
-	}
-	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
-		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
-	}
-	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
-		restStorageMap["pods/eviction"] = podStorage.Eviction
-	}
-	if serviceAccountStorage.Token != nil {
-		restStorageMap["serviceaccounts/token"] = serviceAccountStorage.Token
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		restStorageMap["pods/ephemeralcontainers"] = podStorage.EphemeralContainers
-	}
-	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
-
-	return restStorage, apiGroupInfo, nil
+	return
 }
 
-func (p LegacyRESTStorageProvider) GroupName() string {
+var _ genericapiserver.PostStartHookProvider = &legacyProvider{}
+
+func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+	return "start-service-ip-repair-controllers", func(context genericapiserver.PostStartHookContext) error {
+		// We start both repairClusterIPs and repairNodePorts to ensure repair
+		// loops of ClusterIPs and NodePorts.
+		// We run both repair loops using RunUntil public interface.
+		// However, we want to fail liveness/readiness until the first
+		// successful repair loop, so we basically pass appropriate
+		// callbacks to RunUtil methods.
+		// Additionally, we ensure that we don't wait for it for longer
+		// than 1 minute for backward compatibility of failing the whole
+		// apiserver if we can't repair them.
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		runner := async.NewRunner(
+			func(stopCh chan struct{}) { p.startServiceClusterIPRepair(wg.Done, stopCh) },
+			func(stopCh chan struct{}) { p.startServiceNodePortsRepair(wg.Done, stopCh) },
+		)
+		runner.Start()
+		go func() {
+			defer runner.Stop()
+			<-context.Done()
+		}()
+
+		// For backward compatibility, we ensure that if we never are able
+		// to repair clusterIPs and/or nodeports, we not only fail the liveness
+		// and/or readiness, but also explicitly fail.
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			wg.Wait()
+		}()
+		select {
+		case <-done:
+		case <-time.After(time.Minute):
+			return goerrors.New("unable to perform initial IP and Port allocation check")
+		}
+
+		return nil
+	}, nil
+}
+
+func (p *legacyProvider) GroupName() string {
 	return api.GroupName
 }
 
@@ -339,42 +543,16 @@ type componentStatusStorage struct {
 	storageFactory serverstorage.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
 	// this is fragile, which assumes that the default port is being used
-	serversToValidate := map[string]*componentstatus.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultInsecureSchedulerPort, Path: "/healthz"},
+	// TODO: switch to secure port until these components remove the ability to serve insecurely.
+	serversToValidate := map[string]componentstatus.Server{
+		"controller-manager": &componentstatus.HttpServer{EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: ports.KubeControllerManagerPort, Path: "/healthz"},
+		"scheduler":          &componentstatus.HttpServer{EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultKubeSchedulerPort, Path: "/healthz"},
 	}
 
-	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine.Server)
-		if err != nil {
-			klog.Errorf("Failed to parse etcd url for validation: %v", err)
-			continue
-		}
-		var port int
-		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
-			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
-			if err != nil {
-				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
-				continue
-			}
-			port, _ = utilsnet.ParsePort(portString, true)
-		} else {
-			addr = etcdUrl.Host
-			port = 2379
-		}
-		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
-			Addr:        addr,
-			EnableHTTPS: etcdUrl.Scheme == "https",
-			TLSConfig:   machine.TLSConfig,
-			Port:        port,
-			Path:        "/health",
-			Validate:    etcd3.EtcdHealthCheck,
-		}
+	for ix, cfg := range s.storageFactory.Configs() {
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.EtcdServer{Config: cfg}
 	}
 	return serversToValidate
 }

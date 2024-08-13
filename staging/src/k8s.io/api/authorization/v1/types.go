@@ -26,10 +26,13 @@ import (
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.6
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 type SubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -45,12 +48,15 @@ type SubjectAccessReview struct {
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -65,12 +71,15 @@ type SelfSubjectAccessReview struct {
 // +genclient
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -109,6 +118,72 @@ type ResourceAttributes struct {
 	// Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,7,opt,name=name"`
+	// fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
+	//
+	// This field  is alpha-level. To use this field, you must enable the
+	// `AuthorizeWithSelectors` feature gate (disabled by default).
+	// +optional
+	FieldSelector *FieldSelectorAttributes `json:"fieldSelector,omitempty" protobuf:"bytes,8,opt,name=fieldSelector"`
+	// labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
+	//
+	// This field  is alpha-level. To use this field, you must enable the
+	// `AuthorizeWithSelectors` feature gate (disabled by default).
+	// +optional
+	LabelSelector *LabelSelectorAttributes `json:"labelSelector,omitempty" protobuf:"bytes,9,opt,name=labelSelector"`
+}
+
+// LabelSelectorAttributes indicates a label limited access.
+// Webhook authors are encouraged to
+// * ensure rawSelector and requirements are not both set
+// * consider the requirements field if set
+// * not try to parse or consider the rawSelector field if set. This is to avoid another CVE-2022-2880 (i.e. getting different systems to agree on how exactly to parse a query is not something we want), see https://www.oxeye.io/resources/golang-parameter-smuggling-attack for more details.
+// For the *SubjectAccessReview endpoints of the kube-apiserver:
+// * If rawSelector is empty and requirements are empty, the request is not limited.
+// * If rawSelector is present and requirements are empty, the rawSelector will be parsed and limited if the parsing succeeds.
+// * If rawSelector is empty and requirements are present, the requirements should be honored
+// * If rawSelector is present and requirements are present, the request is invalid.
+type LabelSelectorAttributes struct {
+	// rawSelector is the serialization of a field selector that would be included in a query parameter.
+	// Webhook implementations are encouraged to ignore rawSelector.
+	// The kube-apiserver's *SubjectAccessReview will parse the rawSelector as long as the requirements are not present.
+	// +optional
+	RawSelector string `json:"rawSelector,omitempty" protobuf:"bytes,1,opt,name=rawSelector"`
+
+	// requirements is the parsed interpretation of a label selector.
+	// All requirements must be met for a resource instance to match the selector.
+	// Webhook implementations should handle requirements, but how to handle them is up to the webhook.
+	// Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements
+	// are not understood.
+	// +optional
+	// +listType=atomic
+	Requirements []metav1.LabelSelectorRequirement `json:"requirements,omitempty" protobuf:"bytes,2,rep,name=requirements"`
+}
+
+// FieldSelectorAttributes indicates a field limited access.
+// Webhook authors are encouraged to
+// * ensure rawSelector and requirements are not both set
+// * consider the requirements field if set
+// * not try to parse or consider the rawSelector field if set. This is to avoid another CVE-2022-2880 (i.e. getting different systems to agree on how exactly to parse a query is not something we want), see https://www.oxeye.io/resources/golang-parameter-smuggling-attack for more details.
+// For the *SubjectAccessReview endpoints of the kube-apiserver:
+// * If rawSelector is empty and requirements are empty, the request is not limited.
+// * If rawSelector is present and requirements are empty, the rawSelector will be parsed and limited if the parsing succeeds.
+// * If rawSelector is empty and requirements are present, the requirements should be honored
+// * If rawSelector is present and requirements are present, the request is invalid.
+type FieldSelectorAttributes struct {
+	// rawSelector is the serialization of a field selector that would be included in a query parameter.
+	// Webhook implementations are encouraged to ignore rawSelector.
+	// The kube-apiserver's *SubjectAccessReview will parse the rawSelector as long as the requirements are not present.
+	// +optional
+	RawSelector string `json:"rawSelector,omitempty" protobuf:"bytes,1,opt,name=rawSelector"`
+
+	// requirements is the parsed interpretation of a field selector.
+	// All requirements must be met for a resource instance to match the selector.
+	// Webhook implementations should handle requirements, but how to handle them is up to the webhook.
+	// Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements
+	// are not understood.
+	// +optional
+	// +listType=atomic
+	Requirements []metav1.FieldSelectorRequirement `json:"requirements,omitempty" protobuf:"bytes,2,rep,name=requirements"`
 }
 
 // NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface
@@ -137,6 +212,7 @@ type SubjectAccessReviewSpec struct {
 	User string `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
 	// Groups is the groups you're testing for.
 	// +optional
+	// +listType=atomic
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
 	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
 	// it needs a reflection here.
@@ -191,6 +267,7 @@ type SubjectAccessReviewStatus struct {
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
 // The returned list of actions may be incomplete depending on the server's authorization mode,
@@ -200,6 +277,8 @@ type SubjectAccessReviewStatus struct {
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
 type SelfSubjectRulesReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -211,6 +290,7 @@ type SelfSubjectRulesReview struct {
 	Status SubjectRulesReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 type SelfSubjectRulesReviewSpec struct {
 	// Namespace to evaluate rules for. Required.
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
@@ -223,9 +303,11 @@ type SelfSubjectRulesReviewSpec struct {
 type SubjectRulesReviewStatus struct {
 	// ResourceRules is the list of actions the subject is allowed to perform on resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +listType=atomic
 	ResourceRules []ResourceRule `json:"resourceRules" protobuf:"bytes,1,rep,name=resourceRules"`
 	// NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +listType=atomic
 	NonResourceRules []NonResourceRule `json:"nonResourceRules" protobuf:"bytes,2,rep,name=nonResourceRules"`
 	// Incomplete is true when the rules returned by this call are incomplete. This is most commonly
 	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
@@ -241,28 +323,34 @@ type SubjectRulesReviewStatus struct {
 // may contain duplicates, and possibly be incomplete.
 type ResourceRule struct {
 	// Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
 	// the enumerated resources in any API group will be allowed.  "*" means all.
 	// +optional
+	// +listType=atomic
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,2,rep,name=apiGroups"`
 	// Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
 	//  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
 	// +optional
+	// +listType=atomic
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
 	// +optional
+	// +listType=atomic
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,4,rep,name=resourceNames"`
 }
 
 // NonResourceRule holds information that describes a rule for the non-resource
 type NonResourceRule struct {
 	// Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full,
 	// final step in the path.  "*" means all.
 	// +optional
+	// +listType=atomic
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,2,rep,name=nonResourceURLs"`
 }

@@ -34,7 +34,7 @@ type NodeExpansion interface {
 // the node that the server returns, or an error.
 func (c *nodes) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
 	result := &v1.Node{}
-	err := c.client.Patch(types.StrategicMergePatchType).
+	err := c.GetClient().Patch(types.StrategicMergePatchType).
 		Resource("nodes").
 		Name(nodeName).
 		SubResource("status").

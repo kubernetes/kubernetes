@@ -18,22 +18,27 @@ package config
 
 import (
 	"bytes"
-	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -42,12 +47,22 @@ import (
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
+var (
+	// PlaceholderToken is only set statically to make kubeadm not randomize the token on every run
+	PlaceholderToken = bootstraptokenv1.BootstrapToken{
+		Token: &bootstraptokenv1.BootstrapTokenString{
+			ID:     "abcdef",
+			Secret: "0123456789abcdef",
+		},
+	}
+)
+
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
-func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
+func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration, skipCRIDetect bool) error {
 	if err := SetBootstrapTokensDynamicDefaults(&cfg.BootstrapTokens); err != nil {
 		return err
 	}
-	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true); err != nil {
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true, skipCRIDetect); err != nil {
 		return err
 	}
 	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
@@ -57,7 +72,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
-func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
+func SetBootstrapTokensDynamicDefaults(cfg *[]bootstraptokenv1.BootstrapToken) error {
 	// Populate the .Token field with a random value if unset
 	// We do this at this layer, and not the API defaulting layer
 	// because of possible security concerns, and more practically
@@ -72,7 +87,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't generate random token")
 		}
-		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+		token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 		if err != nil {
 			return err
 		}
@@ -83,24 +98,36 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 }
 
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
-func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
+func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, controlPlaneTaint, skipCRIDetect bool) error {
 	var err error
-	cfg.Name, err = kubeadmutil.GetHostname(cfg.Name)
+	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
 
 	// Only if the slice is nil, we should append the control-plane taint. This allows the user to specify an empty slice for no default control-plane taint
-	if ControlPlaneTaint && cfg.Taints == nil {
+	if controlPlaneTaint && cfg.Taints == nil {
 		cfg.Taints = []v1.Taint{kubeadmconstants.ControlPlaneTaint}
 	}
 
 	if cfg.CRISocket == "" {
+		if skipCRIDetect {
+			klog.V(4).Infof("skip CRI socket detection, fill with the default CRI socket %s", kubeadmconstants.DefaultCRISocket)
+			cfg.CRISocket = kubeadmconstants.DefaultCRISocket
+			return nil
+		}
 		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()
 		if err != nil {
 			return err
 		}
 		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
+	} else {
+		if !strings.HasPrefix(cfg.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme) {
+			klog.Warningf("Usage of CRI endpoints without URL scheme is deprecated and can cause kubelet errors "+
+				"in the future. Automatically prepending scheme %q to the \"criSocket\" with value %q. "+
+				"Please update your configuration!", kubeadmapiv1.DefaultContainerRuntimeURLScheme, cfg.CRISocket)
+			cfg.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + cfg.CRISocket
+		}
 	}
 
 	return nil
@@ -109,7 +136,7 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 // SetAPIEndpointDynamicDefaults checks and sets configuration values for the APIEndpoint object
 func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	// validate cfg.API.AdvertiseAddress.
-	addressIP := net.ParseIP(cfg.AdvertiseAddress)
+	addressIP := netutils.ParseIPSloppy(cfg.AdvertiseAddress)
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
 		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
@@ -168,8 +195,42 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, localAPIEnd
 	return nil
 }
 
+// DefaultedStaticInitConfiguration returns the internal InitConfiguration with static defaults.
+func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
+	versionedInitCfg := &kubeadmapiv1.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		BootstrapTokens:  []bootstraptokenv1.BootstrapToken{PlaceholderToken},
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+			CRISocket: kubeadmconstants.DefaultCRISocket, // avoid CRI detection
+			Name:      "node",
+		},
+	}
+	versionedClusterCfg := &kubeadmapiv1.ClusterConfiguration{
+		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+	}
+
+	internalcfg := &kubeadmapi.InitConfiguration{}
+
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
+	// static default values to cfg only for values not provided with flags
+	kubeadmscheme.Scheme.Default(versionedInitCfg)
+	if err := kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil); err != nil {
+		return nil, err
+	}
+
+	kubeadmscheme.Scheme.Default(versionedClusterCfg)
+	if err := kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil); err != nil {
+		return nil, err
+	}
+
+	// Default all the embedded ComponentConfig structs
+	componentconfigs.Default(&internalcfg.ClusterConfiguration, &internalcfg.LocalAPIEndpoint, &internalcfg.NodeRegistration)
+
+	return internalcfg, nil
+}
+
 // DefaultedInitConfiguration takes a versioned init config (often populated by flags), defaults it and converts it into internal InitConfiguration
-func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1.InitConfiguration, versionedClusterCfg *kubeadmapiv1.ClusterConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.InitConfiguration, error) {
 	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
@@ -185,7 +246,7 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 	}
 
 	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(internalcfg); err != nil {
+	if err := SetInitDynamicDefaults(internalcfg, opts.SkipCRIDetect); err != nil {
 		return nil, err
 	}
 	// Validates cfg (flags/configs + defaults + dynamic defaults)
@@ -196,15 +257,15 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 }
 
 // LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
-func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
+func LoadInitConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.InitConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
-	b, err := ioutil.ReadFile(cfgPath)
+	b, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	return BytesToInitConfiguration(b)
+	return BytesToInitConfiguration(b, opts.SkipCRIDetect)
 }
 
 // LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
@@ -212,42 +273,67 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 // The external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1.InitConfiguration, versionedClusterCfg *kubeadmapiv1.ClusterConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.InitConfiguration, error) {
+	var (
+		config *kubeadmapi.InitConfiguration
+		err    error
+	)
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags
-		return LoadInitConfigurationFromFile(cfgPath)
+		config, err = LoadInitConfigurationFromFile(cfgPath, opts)
+	} else {
+		config, err = DefaultedInitConfiguration(versionedInitCfg, versionedClusterCfg, opts)
 	}
-
-	return DefaultedInitConfiguration(versionedInitCfg, versionedClusterCfg)
+	if err == nil {
+		prepareStaticVariables(config)
+	}
+	return config, err
 }
 
 // BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
 // The map may contain many different YAML documents. These YAML documents are parsed one-by-one
 // and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
 // The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
-func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
+func BytesToInitConfiguration(b []byte, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 	if err != nil {
 		return nil, err
 	}
 
-	return documentMapToInitConfiguration(gvkmap, false)
+	return documentMapToInitConfiguration(gvkmap, false, false, false, skipCRIDetect)
 }
 
 // documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
-func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.InitConfiguration, error) {
+func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental, strictErrors, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
 
-	for gvk, fileContent := range gvkmap {
+	// Sort the GVKs deterministically by GVK string.
+	// This allows ClusterConfiguration to be decoded first.
+	gvks := make([]schema.GroupVersionKind, 0, len(gvkmap))
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+	sort.Slice(gvks, func(i, j int) bool {
+		return gvks[i].String() < gvks[j].String()
+	})
+
+	for _, gvk := range gvks {
+		fileContent := gvkmap[gvk]
+
 		// first, check if this GVK is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated); err != nil {
+		if err := validateSupportedVersion(gvk, allowDeprecated, allowExperimental); err != nil {
 			return nil, err
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(fileContent, gvk)
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}, gvk, fileContent); err != nil {
+			if !strictErrors {
+				klog.Warning(err.Error())
+			} else {
+				return nil, err
+			}
+		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			// Set initcfg to an empty struct value the deserializer will populate
@@ -272,7 +358,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
 		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 		}
 	}
 
@@ -283,7 +369,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 	// If InitConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
 	if initcfg == nil {
-		extinitcfg := &kubeadmapiv1beta2.InitConfiguration{}
+		extinitcfg := &kubeadmapiv1.InitConfiguration{}
 		kubeadmscheme.Scheme.Default(extinitcfg)
 		// Set initcfg to an empty struct value the deserializer will populate
 		initcfg = &kubeadmapi.InitConfiguration{}
@@ -294,6 +380,13 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
 	if clustercfg != nil {
 		initcfg.ClusterConfiguration = *clustercfg
+	} else {
+		// Populate the internal InitConfiguration.ClusterConfiguration with defaults
+		extclustercfg := &kubeadmapiv1.ClusterConfiguration{}
+		kubeadmscheme.Scheme.Default(extclustercfg)
+		if err := kubeadmscheme.Scheme.Convert(extclustercfg, &initcfg.ClusterConfiguration, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	// Load any component configs
@@ -302,7 +395,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	}
 
 	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(initcfg); err != nil {
+	if err := SetInitDynamicDefaults(initcfg, skipCRIDetect); err != nil {
 		return nil, err
 	}
 

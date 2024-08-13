@@ -18,6 +18,9 @@ package statusupdater
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {
@@ -30,7 +33,15 @@ type fakeNodeStatusUpdater struct {
 	returnError bool
 }
 
-func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatuses() error {
+func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatuses(logger klog.Logger) error {
+	if fnsu.returnError {
+		return fmt.Errorf("fake error on update node status")
+	}
+
+	return nil
+}
+
+func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatusForNode(logger klog.Logger, nodeName types.NodeName) error {
 	if fnsu.returnError {
 		return fmt.Errorf("fake error on update node status")
 	}

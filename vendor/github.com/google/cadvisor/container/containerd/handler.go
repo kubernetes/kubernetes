@@ -17,21 +17,22 @@ package containerd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/google/cadvisor/container/containerd/errdefs"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"golang.org/x/net/context"
+
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
 	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type containerdContainerHandler struct {
@@ -60,20 +61,18 @@ func newContainerdContainerHandler(
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
-	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
+	cgroupSubsystems map[string]string,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems, name)
 
 	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroupfs.Manager{
-		Cgroups: &libcontainerconfigs.Cgroup{
-			Name: name,
-		},
-		Paths: cgroupPaths,
+	cgroupManager, err := containerlibcontainer.NewCgroupManager(name, cgroupPaths)
+	if err != nil {
+		return nil, err
 	}
 
 	id := ContainerNameToContainerdID(name)
@@ -103,10 +102,14 @@ func newContainerdContainerHandler(
 		if err == nil {
 			break
 		}
-		retry--
-		if !errdefs.IsNotFound(err) || retry == 0 {
+
+		// Retry when task is not created yet or task is in unknown state (likely in process of initializing)
+		isRetriableError := errdefs.IsNotFound(err) || errors.Is(err, ErrTaskIsInUnknownState)
+		if !isRetriableError || retry == 0 {
 			return nil, err
 		}
+
+		retry--
 		time.Sleep(backoff)
 		backoff *= 2
 	}
@@ -123,7 +126,14 @@ func newContainerdContainerHandler(
 		Aliases:   []string{id, name},
 	}
 
-	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), includedMetrics)
+	// Containers that don't have their own network -- this includes
+	// containers running in Kubernetes pods that use the network of the
+	// infrastructure container -- does not need their stats to be
+	// reported. This stops metrics being reported multiple times for each
+	// container in a pod.
+	metrics := common.RemoveNetMetrics(includedMetrics, cntr.Labels["io.cri-containerd.kind"] != "sandbox")
+
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), metrics)
 
 	handler := &containerdContainerHandler{
 		machineInfoFactory:  machineInfoFactory,
@@ -131,17 +141,25 @@ func newContainerdContainerHandler(
 		fsInfo:              fsInfo,
 		envs:                make(map[string]string),
 		labels:              cntr.Labels,
-		includedMetrics:     includedMetrics,
+		includedMetrics:     metrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 	}
 	// Add the name and bare ID as aliases of the container.
 	handler.image = cntr.Image
-	for _, envVar := range spec.Process.Env {
-		if envVar != "" {
-			splits := strings.SplitN(envVar, "=", 2)
-			if len(splits) == 2 {
-				handler.envs[splits[0]] = splits[1]
+
+	for _, exposedEnv := range metadataEnvAllowList {
+		if exposedEnv == "" {
+			// if no containerdEnvWhitelist provided, len(metadataEnvAllowList) == 1, metadataEnvAllowList[0] == ""
+			continue
+		}
+
+		for _, envVar := range spec.Process.Env {
+			if envVar != "" {
+				splits := strings.SplitN(envVar, "=", 2)
+				if len(splits) == 2 && strings.HasPrefix(splits[0], exposedEnv) {
+					handler.envs[splits[0]] = splits[1]
+				}
 			}
 		}
 	}
@@ -153,22 +171,12 @@ func (h *containerdContainerHandler) ContainerReference() (info.ContainerReferen
 	return h.reference, nil
 }
 
-func (h *containerdContainerHandler) needNet() bool {
-	// Since containerd does not handle networking ideally we need to return based
-	// on includedMetrics list. Here the assumption is the presence of cri-containerd
-	// label
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
-		//TODO change it to exported cri-containerd constants
-		return h.labels["io.cri-containerd.kind"] == "sandbox"
-	}
-	return false
-}
-
 func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	// TODO: Since we dont collect disk usage stats for containerd, we set hasFilesystem
 	// to false. Revisit when we support disk usage stats for containerd
 	hasFilesystem := false
-	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
+	hasNet := h.includedMetrics.Has(container.NetworkUsageMetrics)
+	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, hasNet, hasFilesystem)
 	spec.Labels = h.labels
 	spec.Envs = h.envs
 	spec.Image = h.image
@@ -193,13 +201,6 @@ func (h *containerdContainerHandler) GetStats() (*info.ContainerStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	// Clean up stats for containers that don't have their own network - this
-	// includes containers running in Kubernetes pods that use the network of the
-	// infrastructure container. This stops metrics being reported multiple times
-	// for each container in a pod.
-	if !h.needNet() {
-		stats.Network = info.NetworkStats{}
-	}
 
 	// Get filesystem stats.
 	err = h.getFsStats(stats)
@@ -211,7 +212,11 @@ func (h *containerdContainerHandler) ListContainers(listType container.ListType)
 }
 
 func (h *containerdContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := h.cgroupPaths[resource]
+	var res string
+	if !cgroups.IsCgroup2UnifiedMode() {
+		res = resource
+	}
+	path, ok := h.cgroupPaths[res]
 	if !ok {
 		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.reference.Name)
 	}

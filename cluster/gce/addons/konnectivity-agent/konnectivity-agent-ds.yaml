@@ -22,16 +22,26 @@ spec:
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+        - operator: "Exists"
+          effect: "NoExecute"
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
-        - image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8
+        - image: registry.k8s.io/kas-network-proxy/proxy-agent:v0.30.3
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [
                   "--logtostderr=true",
                   "--ca-cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+__EXTRA_PARAMS__
                   "--proxy-server-host=__APISERVER_IP__",
                   "--proxy-server-port=8132",
-                  "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token"
+                  "--sync-interval=5s",
+                  "--sync-interval-cap=30s",
+                  "--probe-interval=5s",
+                  "--keepalive-time=60s",
+                  "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token",
+                  "--agent-identifiers=ipv4=$(HOST_IP)"
                   ]
           env:
             - name: POD_NAME
@@ -42,11 +52,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
           resources:
-            limits:
+            requests:
               cpu: 50m
+            limits:
               memory: 30Mi
           volumeMounts:
+__EXTRA_VOL_MNTS__
             - mountPath: /var/run/secrets/tokens
               name: konnectivity-agent-token
           livenessProbe:
@@ -57,6 +73,7 @@ spec:
             timeoutSeconds: 15
       serviceAccountName: konnectivity-agent
       volumes:
+__EXTRA_VOLS__
         - name: konnectivity-agent-token
           projected:
             sources:

@@ -19,7 +19,7 @@ package remote
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,19 +36,55 @@ var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test resu
 
 const archiveName = "e2e_node_test.tar.gz"
 
+func copyKubeletConfigIfExists(kubeletConfigFile, dstDir string) error {
+	srcStat, err := os.Stat(kubeletConfigFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", kubeletConfigFile)
+	}
+
+	source, err := os.Open(kubeletConfigFile)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	dst := filepath.Join(dstDir, "kubeletconfig.yaml")
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+
 // CreateTestArchive creates the archive package for the node e2e test.
-func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
+func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string) (string, error) {
 	klog.V(2).Infof("Building archive...")
-	tardir, err := ioutil.TempDir("", "node-e2e-archive")
+	tardir, err := os.MkdirTemp("", "node-e2e-archive")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary directory %v", err)
 	}
 	defer os.RemoveAll(tardir)
 
+	err = copyKubeletConfigIfExists(kubeletConfigFile, tardir)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy kubelet config: %w", err)
+	}
+
 	// Call the suite function to setup the test package.
 	err = suite.SetupTestPackage(tardir, systemSpecName)
 	if err != nil {
-		return "", fmt.Errorf("failed to setup test package %q: %v", tardir, err)
+		return "", fmt.Errorf("failed to setup test package %q: %w", tardir, err)
 	}
 
 	// Build the tar
@@ -64,30 +100,37 @@ func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 	return filepath.Join(dir, archiveName), nil
 }
 
-// RunRemote returns the command output, whether the exit was ok, and any errors
-// TODO(random-liu): junitFilePrefix is not prefix actually, the file name is junit-junitFilePrefix.xml. Change the variable name.
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string, extraEnvs string) (string, bool, error) {
+// RunRemote returns the command Output, whether the exit was ok, and any errors
+type RunRemoteConfig struct {
+	Suite                                                                                    TestSuite
+	Archive                                                                                  string
+	Host                                                                                     string
+	Cleanup                                                                                  bool
+	ImageDesc, JunitFileName, TestArgs, GinkgoArgs, SystemSpecName, ExtraEnvs, RuntimeConfig string
+}
+
+func RunRemote(cfg RunRemoteConfig) (string, bool, error) {
 	// Create the temp staging directory
-	klog.V(2).Infof("Staging test binaries on %q", host)
+	klog.V(2).Infof("Staging test binaries on %q", cfg.Host)
 	workspace := newWorkspaceDir()
 	// Do not sudo here, so that we can use scp to copy test archive to the directory.
-	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to create workspace directory %q on host %q: %v output: %q", workspace, host, err, output)
+		return "", false, fmt.Errorf("failed to create workspace directory %q on Host %q: %v Output: %q", workspace, cfg.Host, err, output)
 	}
-	if cleanup {
+	if cfg.Cleanup {
 		defer func() {
-			output, err := SSH(host, "rm", "-rf", workspace)
+			output, err := SSH(cfg.Host, "rm", "-rf", workspace)
 			if err != nil {
-				klog.Errorf("failed to cleanup workspace %q on host %q: %v.  Output:\n%s", workspace, host, err, output)
+				klog.Errorf("failed to cleanup workspace %q on Host %q: %v.  Output:\n%s", workspace, cfg.Host, err, output)
 			}
 		}()
 	}
 
 	// Copy the archive to the staging directory
-	if output, err := runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(host), workspace)); err != nil {
+	if output, err := runSSHCommand(cfg.Host, "scp", cfg.Archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(cfg.Host), workspace)); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to copy test archive: %v, output: %q", err, output)
+		return "", false, fmt.Errorf("failed to copy test archive: %v, Output: %q", err, output)
 	}
 
 	// Extract the archive
@@ -95,33 +138,46 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
-	klog.V(2).Infof("Extracting tar on %q", host)
+	klog.V(2).Infof("Extracting tar on %q", cfg.Host)
 	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
 	// we want the extracted files to be owned by the current user.
-	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to extract test archive: %v, output: %q", err, output)
+		return "", false, fmt.Errorf("failed to extract test archive: %v, Output: %q", err, output)
 	}
 
 	// Create the test result directory.
 	resultDir := filepath.Join(workspace, "results")
-	if output, err := SSHNoSudo(host, "mkdir", resultDir); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "mkdir", resultDir); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to create test result directory %q on host %q: %v output: %q", resultDir, host, err, output)
+		return "", false, fmt.Errorf("failed to create test result directory %q on Host %q: %v Output: %q", resultDir, cfg.Host, err, output)
 	}
 
-	klog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, *testTimeout)
+	allGinkgoFlags := cfg.GinkgoArgs
+	if !strings.Contains(allGinkgoFlags, "--timeout") {
+		klog.Warningf("ginkgo flags are missing explicit --timeout (ginkgo defaults to 60 minutes)")
+		// see https://github.com/onsi/ginkgo/blob/master/docs/index.md#:~:text=ginkgo%20%2D%2Dtimeout%3Dduration
+		// ginkgo suite timeout should be more than the default but less than the
+		// full test timeout, so we should use the average of the two.
+		suiteTimeout := int(testTimeout.Minutes())
+		suiteTimeout = (60 + suiteTimeout) / 2
+		allGinkgoFlags = fmt.Sprintf("%s --timeout=%dm", allGinkgoFlags, suiteTimeout)
+		klog.Infof("updated ginkgo flags: %s", allGinkgoFlags)
+	}
 
-	aggErrs := []error{}
-	// Do not log the output here, let the caller deal with the test output.
+	klog.V(2).Infof("Running test on %q", cfg.Host)
+	output, err := cfg.Suite.RunTest(cfg.Host, workspace, resultDir, cfg.ImageDesc, cfg.JunitFileName, cfg.TestArgs,
+		allGinkgoFlags, cfg.SystemSpecName, cfg.ExtraEnvs, cfg.RuntimeConfig, *testTimeout)
+
+	var aggErrs []error
+	// Do not log the Output here, let the caller deal with the test Output.
 	if err != nil {
 		aggErrs = append(aggErrs, err)
-		collectSystemLog(host)
+		collectSystemLog(cfg.Host)
 	}
 
-	klog.V(2).Infof("Copying test artifacts from %q", host)
-	scpErr := getTestArtifacts(host, workspace)
+	klog.V(2).Infof("Copying test artifacts from %q", cfg.Host)
+	scpErr := getTestArtifacts(cfg.Host, workspace)
 	if scpErr != nil {
 		aggErrs = append(aggErrs, scpErr)
 	}
@@ -161,21 +217,30 @@ func GetTimestampFromWorkspaceDir(dir string) string {
 func getTestArtifacts(host, testDir string) error {
 	logPath := filepath.Join(*resultsDir, host)
 	if err := os.MkdirAll(logPath, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+		return fmt.Errorf("failed to create log directory %q: %w", logPath, err)
 	}
-	// Copy logs to artifacts/hostname
-	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
-		return err
-	}
-	// Copy json files (if any) to artifacts.
-	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
-		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
+	// Copy logs (if any) to artifacts/hostname
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.log", testDir)); err == nil {
+		if _, err := runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
 			return err
 		}
 	}
+	// Copy json files (if any) to artifacts.
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
+		if _, err = runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
+			return err
+		}
+	}
+	// Copy junit results (if any) to artifacts
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/junit*", testDir)); err == nil {
 		// Copy junit (if any) to the top of artifacts
-		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
+		if _, err = runSSHCommand(host, "scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
+			return err
+		}
+	}
+	// Copy container logs to artifacts/hostname
+	if _, err := SSH(host, "chmod", "-R", "a+r", "/var/log/pods"); err == nil {
+		if _, err = runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:/var/log/pods/", GetHostnameOrIP(host)), logPath); err != nil {
 			return err
 		}
 	}
@@ -201,7 +266,7 @@ func collectSystemLog(host string) {
 	// it could've be been removed if the node was rebooted.
 	if output, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath)); err == nil {
 		klog.V(2).Infof("Got the system logs from journald; copying it back...")
-		if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIP(host), logPath), destPath); err != nil {
+		if output, err := runSSHCommand(host, "scp", fmt.Sprintf("%s:%s", GetHostnameOrIP(host), logPath), destPath); err != nil {
 			klog.V(2).Infof("Failed to copy the log: err: %v, output: %q", err, output)
 		}
 	} else {
@@ -215,7 +280,7 @@ func collectSystemLog(host string) {
 func WriteLog(host, filename, content string) error {
 	logPath := filepath.Join(*resultsDir, host)
 	if err := os.MkdirAll(logPath, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+		return fmt.Errorf("failed to create log directory %q: %w", logPath, err)
 	}
 	f, err := os.Create(filepath.Join(logPath, filename))
 	if err != nil {

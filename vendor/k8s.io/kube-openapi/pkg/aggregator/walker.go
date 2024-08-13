@@ -19,11 +19,12 @@ package aggregator
 import (
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
 	definitionPrefix = "#/definitions/"
+	parameterPrefix  = "#/parameters/"
 )
 
 // Run a readonlyReferenceWalker method on all references of an OpenAPI spec

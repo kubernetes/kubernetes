@@ -22,13 +22,22 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
-// TextOutput describes the plain text output
-const TextOutput = "text"
+const (
+	// TextOutput describes the plain text output
+	TextOutput = "text"
+
+	// JSONOutput describes the JSON output
+	JSONOutput = "json"
+
+	// YAMLOutput describes the YAML output
+	YAMLOutput = "yaml"
+)
 
 // TextPrintFlags is an interface to handle custom text output
 type TextPrintFlags interface {
@@ -43,7 +52,7 @@ type PrintFlags struct {
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	// KubeTemplatePrintFlags composes print flags that provide both a JSONPath and a go-template printer.
 	KubeTemplatePrintFlags *genericclioptions.KubeTemplatePrintFlags
-	// JSONYamlPrintFlags provides default flags necessary for kubeadm text printing.
+	// TextPrintFlags provides default flags necessary for kubeadm text printing.
 	TextPrintFlags TextPrintFlags
 	// TypeSetterPrinter is an implementation of ResourcePrinter that wraps another printer with types set on the objects
 	TypeSetterPrinter *printers.TypeSetterPrinter
@@ -51,7 +60,7 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
-// AllowedFormats returns list of allowed output formats
+// AllowedFormats returns a list of allowed output formats
 func (pf *PrintFlags) AllowedFormats() []string {
 	ret := []string{TextOutput}
 	ret = append(ret, pf.JSONYamlPrintFlags.AllowedFormats()...)
@@ -95,7 +104,9 @@ func (pf *PrintFlags) ToPrinter() (Printer, error) {
 func (pf *PrintFlags) AddFlags(cmd *cobra.Command) {
 	pf.JSONYamlPrintFlags.AddFlags(cmd)
 	pf.KubeTemplatePrintFlags.AddFlags(cmd)
-	cmd.Flags().StringVarP(pf.OutputFormat, "experimental-output", "o", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
+	cmd.Flags().StringVarP(pf.OutputFormat, "output", "o", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
+	cmd.Flags().StringVarP(pf.OutputFormat, "experimental-output", "", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
+	_ = cmd.Flags().MarkDeprecated("experimental-output", "please use --output instead.")
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
@@ -132,7 +143,9 @@ func NewOutputFlags(textPrintFlags TextPrintFlags) *PrintFlags {
 type Printer interface {
 	PrintObj(obj runtime.Object, writer io.Writer) error
 	Fprintf(writer io.Writer, format string, args ...interface{}) (n int, err error)
+	Fprintln(writer io.Writer, args ...interface{}) (n int, err error)
 	Printf(format string, args ...interface{}) (n int, err error)
+	Println(args ...interface{}) (n int, err error)
 }
 
 // TextPrinter implements Printer interface for generic text output
@@ -150,9 +163,19 @@ func (tp *TextPrinter) Fprintf(writer io.Writer, format string, args ...interfac
 	return fmt.Fprintf(writer, format, args...)
 }
 
+// Fprintln is a wrapper around fmt.Fprintln
+func (tp *TextPrinter) Fprintln(writer io.Writer, args ...interface{}) (n int, err error) {
+	return fmt.Fprintln(writer, args...)
+}
+
 // Printf is a wrapper around fmt.Printf
 func (tp *TextPrinter) Printf(format string, args ...interface{}) (n int, err error) {
 	return fmt.Printf(format, args...)
+}
+
+// Println is a wrapper around fmt.Printf
+func (tp *TextPrinter) Println(args ...interface{}) (n int, err error) {
+	return fmt.Println(args...)
 }
 
 // ResourcePrinterWrapper wraps ResourcePrinter and implements Printer interface
@@ -180,9 +203,23 @@ func (rpw *ResourcePrinterWrapper) Fprintf(writer io.Writer, format string, args
 	return 0, nil
 }
 
+// Fprintln is an empty method to satisfy the Printer interface
+// and silent info printing for structured output
+// This method is usually redefined for the text output
+func (rpw *ResourcePrinterWrapper) Fprintln(writer io.Writer, args ...interface{}) (n int, err error) {
+	return 0, nil
+}
+
 // Printf is an empty method to satisfy Printer interface
 // and silent info printing for structured output
 // This method is usually redefined for the text output
 func (rpw *ResourcePrinterWrapper) Printf(format string, args ...interface{}) (n int, err error) {
+	return 0, nil
+}
+
+// Println is an empty method to satisfy Printer interface
+// and silent info printing for structured output
+// This method is usually redefined for the text output
+func (rpw *ResourcePrinterWrapper) Println(args ...interface{}) (n int, err error) {
 	return 0, nil
 }

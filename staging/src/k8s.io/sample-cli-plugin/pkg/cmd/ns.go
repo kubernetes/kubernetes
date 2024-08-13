@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 var (
@@ -60,11 +61,11 @@ type NamespaceOptions struct {
 	listNamespaces bool
 	args           []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewNamespaceOptions provides an instance of NamespaceOptions with default values
-func NewNamespaceOptions(streams genericclioptions.IOStreams) *NamespaceOptions {
+func NewNamespaceOptions(streams genericiooptions.IOStreams) *NamespaceOptions {
 	return &NamespaceOptions{
 		configFlags: genericclioptions.NewConfigFlags(true),
 
@@ -73,7 +74,7 @@ func NewNamespaceOptions(streams genericclioptions.IOStreams) *NamespaceOptions 
 }
 
 // NewCmdNamespace provides a cobra command wrapping NamespaceOptions
-func NewCmdNamespace(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdNamespace(streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNamespaceOptions(streams)
 
 	cmd := &cobra.Command{
@@ -81,6 +82,9 @@ func NewCmdNamespace(streams genericclioptions.IOStreams) *cobra.Command {
 		Short:        "View or set the current namespace",
 		Example:      fmt.Sprintf(namespaceExample, "kubectl"),
 		SilenceUsage: true,
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "kubectl ns",
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(c, args); err != nil {
 				return err

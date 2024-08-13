@@ -17,20 +17,24 @@ limitations under the License.
 package logging
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var loggingSoak struct {
@@ -39,9 +43,10 @@ var loggingSoak struct {
 }
 var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
-var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
+var _ = instrumentation.SIGDescribe("Logging soak [Performance]", framework.WithSlow(), framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
 	kbRateInSeconds := 1 * time.Second
@@ -52,20 +57,20 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 	// This can expose problems in your docker configuration (logging), log searching infrastructure, to tune deployments to match high load
 	// scenarios.  TODO jayunit100 add this to the kube CI in a follow on infra patch.
 
-	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func() {
+	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("scaling up to %v pods per node", loggingSoak.Scale))
 		defer ginkgo.GinkgoRecover()
 		var wg sync.WaitGroup
 		wg.Add(loggingSoak.Scale)
 		for i := 0; i < loggingSoak.Scale; i++ {
-			go func() {
+			go func(i int) {
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
-				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
+				RunLogPodsWithSleepOf(ctx, f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
-			}()
+			}(i)
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
@@ -76,17 +81,18 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 
 // RunLogPodsWithSleepOf creates a pod on every node, logs continuously (with "sleep" pauses), and verifies that the log string
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
-func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
+func RunLogPodsWithSleepOf(ctx context.Context, f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
-	framework.ExpectNotEqual(totalPods, 0)
+	gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
 	appName := "logging-soak" + podname
 	podlables := e2enode.CreatePodsPerNodeForSimpleApp(
+		ctx,
 		f.ClientSet,
 		f.Namespace.Name,
 		appName,
@@ -116,14 +122,14 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			// we don't validate total log data, since there is no guarantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
 			Verify: func(p v1.Pod) (bool, error) {
-				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
+				s, err := e2eoutput.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
 				return s != "", err
 			},
 		},
 	)
 
 	largeClusterForgiveness := time.Duration(len(nodes.Items)/5) * time.Second // i.e. a 100 node cluster gets an extra 20 seconds to complete.
-	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
+	pods, err := logSoakVerification.WaitFor(ctx, totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
 		framework.Failf("Error in wait... %v", err)

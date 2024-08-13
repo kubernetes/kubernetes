@@ -17,9 +17,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/proto"
 )
 
 // WrapRegistererWith returns a Registerer wrapping the provided
@@ -27,10 +28,13 @@ import (
 // registered with the wrapped Registerer in a modified way. The modified
 // Collector adds the provided Labels to all Metrics it collects (as
 // ConstLabels). The Metrics collected by the unmodified Collector must not
-// duplicate any of those labels.
+// duplicate any of those labels. Wrapping a nil value is valid, resulting
+// in a no-op Registerer.
 //
 // WrapRegistererWith provides a way to add fixed labels to a subset of
-// Collectors. It should not be used to add fixed labels to all metrics exposed.
+// Collectors. It should not be used to add fixed labels to all metrics
+// exposed. See also
+// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 //
 // Conflicts between Collectors registered through the original Registerer with
 // Collectors registered through the wrapping Registerer will still be
@@ -50,6 +54,7 @@ func WrapRegistererWith(labels Labels, reg Registerer) Registerer {
 // Registerer. Collectors registered with the returned Registerer will be
 // registered with the wrapped Registerer in a modified way. The modified
 // Collector adds the provided prefix to the name of all Metrics it collects.
+// Wrapping a nil value is valid, resulting in a no-op Registerer.
 //
 // WrapRegistererWithPrefix is useful to have one place to prefix all metrics of
 // a sub-system. To make this work, register metrics of the sub-system with the
@@ -80,6 +85,9 @@ type wrappingRegisterer struct {
 }
 
 func (r *wrappingRegisterer) Register(c Collector) error {
+	if r.wrappedRegisterer == nil {
+		return nil
+	}
 	return r.wrappedRegisterer.Register(&wrappingCollector{
 		wrappedCollector: c,
 		prefix:           r.prefix,
@@ -88,6 +96,9 @@ func (r *wrappingRegisterer) Register(c Collector) error {
 }
 
 func (r *wrappingRegisterer) MustRegister(cs ...Collector) {
+	if r.wrappedRegisterer == nil {
+		return
+	}
 	for _, c := range cs {
 		if err := r.Register(c); err != nil {
 			panic(err)
@@ -96,6 +107,9 @@ func (r *wrappingRegisterer) MustRegister(cs ...Collector) {
 }
 
 func (r *wrappingRegisterer) Unregister(c Collector) bool {
+	if r.wrappedRegisterer == nil {
+		return false
+	}
 	return r.wrappedRegisterer.Unregister(&wrappingCollector{
 		wrappedCollector: c,
 		prefix:           r.prefix,
@@ -168,7 +182,7 @@ func (m *wrappingMetric) Write(out *dto.Metric) error {
 			Value: proto.String(lv),
 		})
 	}
-	sort.Sort(labelPairSorter(out.Label))
+	sort.Sort(internal.LabelPairSorter(out.Label))
 	return nil
 }
 
@@ -190,7 +204,7 @@ func wrapDesc(desc *Desc, prefix string, labels Labels) *Desc {
 		constLabels[ln] = lv
 	}
 	// NewDesc will do remaining validations.
-	newDesc := NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels)
+	newDesc := V2.NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels)
 	// Propagate errors if there was any. This will override any errer
 	// created by NewDesc above, i.e. earlier errors get precedence.
 	if desc.err != nil {

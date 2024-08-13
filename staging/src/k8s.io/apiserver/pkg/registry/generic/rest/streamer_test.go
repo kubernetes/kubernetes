@@ -75,7 +75,6 @@ func TestInputStreamNullLocation(t *testing.T) {
 
 type testTransport struct {
 	body string
-	err  error
 }
 
 func (tt *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {

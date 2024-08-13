@@ -1,7 +1,4 @@
-version: '2'
-
-env:
-  GOFLAGS: -mod=vendor
+version: '3'
 
 tasks:
   default:
@@ -25,6 +22,6 @@ tasks:
       - go test -race  ./...
 
   test-coverage:
-    desc: Runs go tests and calucates test coverage
+    desc: Runs go tests and calculates test coverage
     cmds:
       - go test -race -coverprofile=c.out ./...

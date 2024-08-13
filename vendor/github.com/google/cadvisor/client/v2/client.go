@@ -19,7 +19,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	v1 "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	v2 "github.com/google/cadvisor/info/v2"
 )
 
 // Client represents the base URL for a cAdvisor client.
@@ -96,6 +96,9 @@ func (c *Client) Stats(name string, request *v2.RequestOptions) (map[string]v2.C
 		"count":     []string{strconv.Itoa(request.Count)},
 		"recursive": []string{strconv.FormatBool(request.Recursive)},
 	}
+	if request.MaxAge != nil {
+		data.Set("max_age", request.MaxAge.String())
+	}
 
 	u = fmt.Sprintf("%s?%s", u, data.Encode())
 	if err := c.httpGetJSONData(&ret, nil, u, "stats"); err != nil {
@@ -144,7 +147,7 @@ func (c *Client) httpGetResponse(postData interface{}, urlPath, infoName string)
 		return nil, fmt.Errorf("received empty response for %q from %q", infoName, urlPath)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = fmt.Errorf("unable to read all %q from %q: %v", infoName, urlPath, err)
 		return nil, err

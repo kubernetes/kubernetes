@@ -4,21 +4,34 @@
 "metadata": {
   "name":"kube-controller-manager",
   "namespace": "kube-system",
-  "annotations": {
-    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
-  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-controller-manager"
   }
 },
 "spec":{
+"securityContext": {
+  {{runAsUser}}
+  {{runAsGroup}}
+  {{supplementalGroups}}
+  "seccompProfile": {
+      "type": "RuntimeDefault"
+  }
+},
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
 "hostNetwork": true,
 "containers":[
     {
     "name": "kube-controller-manager",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+          "all"
+        ]
+      }
+    },
     "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager-amd64:{{pillar['kube-controller-manager_docker_tag']}}",
     "resources": {
       "requests": {
@@ -26,15 +39,16 @@
       }
     },
     "command": [
-                 "/bin/sh",
-                 "-c",
-                 "exec /usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
+                 "/go-runner", "--log-file=/var/log/kube-controller-manager.log", "--also-stdout=false", "--redirect-stderr=true",
+                 "/usr/local/bin/kube-controller-manager",
+                 {{params}}
                ],
     {{container_env}}
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
-        "port": 10252,
+        "port": 10257,
+        "scheme": "HTTPS",
         "path": "/healthz"
       },
       "initialDelaySeconds": 15,

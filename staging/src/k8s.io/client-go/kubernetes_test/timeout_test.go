@@ -19,14 +19,13 @@ package kubernetes_test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -39,9 +38,9 @@ func TestListTimeout(t *testing.T) {
 		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get("timeout") != "21s" {
-				t.Fatal(spew.Sdump(req.URL.Query()))
+				t.Fatal(dump.Pretty(req.URL.Query()))
 			}
-			return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(&bytes.Buffer{})}, nil
+			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(&bytes.Buffer{})}, nil
 		}),
 	}
 	clientConfig := &rest.Config{

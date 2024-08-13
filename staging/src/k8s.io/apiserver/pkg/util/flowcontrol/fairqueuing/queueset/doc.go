@@ -52,12 +52,12 @@ limitations under the License.
 // limit.  In the original paper, the partial derivative of R(t) with
 // respect to t is
 //
-//                 1 / NEQ(t) .
+//	1 / NEQ(t) .
 //
 // To generalize from transmitting one packet at a time to executing C
 // requests at a time, that derivative becomes
 //
-//                C / NEQ(t) .
+//	C / NEQ(t) .
 //
 // However, sometimes there are fewer than C requests available to
 // execute.  For a given queue "q", let us also write "reqs(q, t)" for
@@ -70,7 +70,7 @@ limitations under the License.
 // for server requests: at a particular time t, the partial derivative
 // of R(t) with respect to t is
 //
-//      min( C, sum[over q] reqs(q, t) ) / NEQ(t) .
+//	min( C, sum[over q] reqs(q, t) ) / NEQ(t) .
 //
 // In terms of the implementation outline, this is the rate at which
 // virtual time is advancing at time t (in virtual nanoseconds per
@@ -116,5 +116,4 @@ limitations under the License.
 // queue’s virtual start time is advanced by G. When a request
 // finishes being served, and the actual service time was S, the
 // queue’s virtual start time is decremented by G - S.
-//
-package queueset
+package queueset // import "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"

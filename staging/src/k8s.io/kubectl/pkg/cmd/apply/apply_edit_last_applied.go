@@ -19,21 +19,23 @@ package apply
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
+	"k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	applyEditLastAppliedLong = templates.LongDesc(`
+	applyEditLastAppliedLong = templates.LongDesc(i18n.T(`
 		Edit the latest last-applied-configuration annotations of resources from the default editor.
 
 		The edit-last-applied command allows you to directly edit any API resource you can retrieve via the
-		command line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
+		command-line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
 		environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
 		You can edit multiple objects, although changes are applied one at a time. The command
-		accepts filenames as well as command line arguments, although the files you point to must
+		accepts file names as well as command-line arguments, although the files you point to must
 		be previously saved versions of resources.
 
 		The default format is YAML. To edit in JSON, specify "-o json".
@@ -45,33 +47,30 @@ var (
 		that contains your unapplied changes. The most common error when updating a resource
 		is another editor changing the resource on the server. When this occurs, you will have
 		to apply your changes to the newer version of the resource, or update your temporary
-		saved copy to include the latest resource version.`)
+		saved copy to include the latest resource version.`))
 
 	applyEditLastAppliedExample = templates.Examples(`
-		# Edit the last-applied-configuration annotations by type/name in YAML.
+		# Edit the last-applied-configuration annotations by type/name in YAML
 		kubectl apply edit-last-applied deployment/nginx
 
-		# Edit the last-applied-configuration annotations by file in JSON.
+		# Edit the last-applied-configuration annotations by file in JSON
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
 // NewCmdApplyEditLastApplied created the cobra CLI command for the `apply edit-last-applied` command.
-func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 "Edit latest last-applied-configuration annotations of a resource/object",
+		Short:                 i18n.T("Edit latest last-applied-configuration annotations of a resource/object"),
 		Long:                  applyEditLastAppliedLong,
 		Example:               applyEditLastAppliedExample,
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, args, cmd); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Run(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -84,6 +83,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
+	cmdutil.AddValidateFlags(cmd)
 
 	return cmd
 }

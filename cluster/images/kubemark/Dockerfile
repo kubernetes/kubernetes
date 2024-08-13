@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The line below points to distroless/base as of 2019-11-15. The SHA should be
-# kept in sycn with distroless_base definition in the WORKSPACE file.
-FROM gcr.io/distroless/base@sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5
+# The line below points to the latest go-runner image, a wrapper around
+# gcr.io/distroless/static which adds the go-runner command that we need
+# for redirecting log output.
+#
+# See https://console.cloud.google.com/gcr/images/k8s-staging-build-image/global/go-runner
+# for a list of available versions. This base image should be updated
+# periodically.
+FROM registry.k8s.io/build-image/go-runner:v2.3.1-go1.17.2-bullseye.0
 
 COPY kubemark /kubemark

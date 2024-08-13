@@ -1,6 +1,6 @@
 // Copyright 2018, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmpopts
 
@@ -19,15 +19,16 @@ func (xf xformFilter) filter(p cmp.Path) bool {
 	return true
 }
 
-// AcyclicTransformer returns a Transformer with a filter applied that ensures
+// AcyclicTransformer returns a [cmp.Transformer] with a filter applied that ensures
 // that the transformer cannot be recursively applied upon its own output.
 //
 // An example use case is a transformer that splits a string by lines:
+//
 //	AcyclicTransformer("SplitLines", func(s string) []string{
 //		return strings.Split(s, "\n")
 //	})
 //
-// Had this been an unfiltered Transformer instead, this would result in an
+// Had this been an unfiltered [cmp.Transformer] instead, this would result in an
 // infinite cycle converting a string to []string to [][]string and so on.
 func AcyclicTransformer(name string, xformFunc interface{}) cmp.Option {
 	xf := xformFilter{cmp.Transformer(name, xformFunc)}

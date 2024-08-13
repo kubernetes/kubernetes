@@ -35,32 +35,20 @@ do
     then
         errors_expect_no_error+=( "${file}" )
     fi
-done
-
-errors_expect_error=()
-for file in "${all_e2e_files[@]}"
-do
-    if grep "Expect(.*)\.To(.*HaveOccurred()" "${file}" > /dev/null
+    if grep -E "Expect\(err\)\.To\(gomega\.BeNil\(\)\)" "${file}" > /dev/null
     then
-        errors_expect_error+=( "${file}" )
+        errors_expect_no_error+=( "${file}" )
     fi
 done
 
-errors_expect_no_equal=()
-for file in "${all_e2e_files[@]}"
+all_e2e_framework_files=()
+kube::util::read-array all_e2e_framework_files < <(find test/e2e/framework/ -name '*.go' | grep -v "_test.go")
+errors_framework_contains_tests=()
+for file in "${all_e2e_framework_files[@]}"
 do
-    if grep -E "Expect\(.*\)\.(NotTo|ToNot)\((gomega\.Equal|Equal)" "${file}" > /dev/null
+    if grep -E "(ConformanceIt\(.*, func\(\) {|ginkgo.It\(.*, func\(\) {)" "${file}" > /dev/null
     then
-        errors_expect_no_equal+=( "${file}" )
-    fi
-done
-
-errors_expect_equal=()
-for file in "${all_e2e_files[@]}"
-do
-    if grep -E "Expect\(.*\)\.To\((gomega\.Equal|Equal)" "${file}" > /dev/null
-    then
-        errors_expect_equal+=( "${file}" )
+        errors_framework_contains_tests+=( "${file}" )
     fi
 done
 
@@ -78,43 +66,15 @@ if [ ${#errors_expect_no_error[@]} -ne 0 ]; then
   exit 1
 fi
 
-if [ ${#errors_expect_error[@]} -ne 0 ]; then
+if [ ${#errors_framework_contains_tests[@]} -ne 0 ]; then
   {
     echo "Errors:"
-    for err in "${errors_expect_error[@]}"; do
+    for err in "${errors_framework_contains_tests[@]}"; do
       echo "$err"
     done
     echo
-    echo 'The above files need to use framework.ExpectError(err) instead of '
-    echo 'Expect(err).To(HaveOccurred()) or gomega.Expect(err).To(gomega.HaveOccurred())'
-    echo
-  } >&2
-  exit 1
-fi
-
-if [ ${#errors_expect_no_equal[@]} -ne 0 ]; then
-  {
-    echo "Errors:"
-    for err in "${errors_expect_no_equal[@]}"; do
-      echo "$err"
-    done
-    echo
-    echo 'The above files need to use framework.ExpectNotEqual(foo, bar) instead of '
-    echo 'Expect(foo).NotTo(Equal(bar)) or gomega.Expect(foo).NotTo(gomega.Equal(bar))'
-    echo
-  } >&2
-  exit 1
-fi
-
-if [ ${#errors_expect_equal[@]} -ne 0 ]; then
-  {
-    echo "Errors:"
-    for err in "${errors_expect_equal[@]}"; do
-      echo "$err"
-    done
-    echo
-    echo 'The above files need to use framework.ExpectEqual(foo, bar) instead of '
-    echo 'Expect(foo).To(Equal(bar)) or gomega.Expect(foo).To(gomega.Equal(bar))'
+    echo 'The above e2e framework files should not contain any e2e tests which are implemented '
+    echo 'with framework.ConformanceIt() or ginkgo.It()'
     echo
   } >&2
   exit 1

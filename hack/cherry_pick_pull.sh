@@ -44,8 +44,8 @@ if [[ -z ${GITHUB_USER:-} ]]; then
   exit 1
 fi
 
-if ! which hub > /dev/null; then
-  echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
+if ! command -v gh > /dev/null; then
+  echo "Can't find 'gh' tool in PATH, please install from https://github.com/cli/cli"
   exit 1
 fi
 
@@ -70,6 +70,9 @@ if [[ "$#" -lt 2 ]]; then
   echo "  For merge process info, see https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md"
   exit 2
 fi
+
+# Checks if you are logged in. Will error/bail if you are not.
+gh auth status
 
 if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [[ -n "${git_status}" ]]; then
   echo "!!! Dirty tree. Clean up and try again."
@@ -109,7 +112,6 @@ declare -r NEWBRANCHUNIQ
 echo "+++ Creating local branch ${NEWBRANCHUNIQ}"
 
 cleanbranch=""
-prtext=""
 gitamcleanup=false
 function return_to_kansas {
   if [[ "${gitamcleanup}" == "true" ]]; then
@@ -126,9 +128,6 @@ function return_to_kansas {
     if [[ -n "${cleanbranch}" ]]; then
       git branch -D "${cleanbranch}" >/dev/null 2>&1 || true
     fi
-    if [[ -n "${prtext}" ]]; then
-      rm "${prtext}"
-    fi
   fi
 }
 trap return_to_kansas EXIT
@@ -140,24 +139,22 @@ function make-a-pr() {
   echo
   echo "+++ Creating a pull request on GitHub at ${GITHUB_USER}:${NEWBRANCH}"
 
-  # This looks like an unnecessary use of a tmpfile, but it avoids
-  # https://github.com/github/hub/issues/976 Otherwise stdin is stolen
-  # when we shove the heredoc at hub directly, tickling the ioctl
-  # crash.
-  prtext="$(mktemp -t prtext.XXXX)" # cleaned in return_to_kansas
   local numandtitle
   numandtitle=$(printf '%s\n' "${SUBJECTS[@]}")
-  cat >"${prtext}" <<EOF
-Automated cherry pick of ${numandtitle}
-
+  prtext=$(cat <<EOF
 Cherry pick of ${PULLSUBJ} on ${rel}.
 
 ${numandtitle}
 
 For details on the cherry pick process, see the [cherry pick requests](https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md) page.
-EOF
 
-  hub pull-request -F "${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "${MAIN_REPO_ORG}:${rel}"
+\`\`\`release-note
+
+\`\`\`
+EOF
+)
+
+  gh pr create --title="Automated cherry pick of ${numandtitle}" --body="${prtext}" --head "${GITHUB_USER}:${NEWBRANCH}" --base "${rel}" --repo="${MAIN_REPO_ORG}/${MAIN_REPO_NAME}"
 }
 
 git checkout -b "${NEWBRANCHUNIQ}" "${BRANCH}"
@@ -183,7 +180,7 @@ for pull in "${PULLS[@]}"; do
       (git status --porcelain | grep ^U) || echo "!!! None. Did you git am --continue?"
       echo
       echo "+++ Please resolve the conflicts in another window (and remember to 'git add / git am --continue')"
-      read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
+      read -p "+++ Proceed (anything other than 'y' aborts the cherry-pick)? [y/n] " -r
       echo
       if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
         echo "Aborting." >&2
@@ -250,7 +247,7 @@ echo "+++ I'm about to do the following to push to GitHub (and I'm assuming ${FO
 echo
 echo "  git push ${FORK_REMOTE} ${NEWBRANCHUNIQ}:${NEWBRANCH}"
 echo
-read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
+read -p "+++ Proceed (anything other than 'y' aborts the cherry-pick)? [y/n] " -r
 if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
   echo "Aborting." >&2
   exit 1

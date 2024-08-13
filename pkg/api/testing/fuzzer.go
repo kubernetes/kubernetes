@@ -31,7 +31,6 @@ import (
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
-	auditregistrationfuzzer "k8s.io/kubernetes/pkg/apis/auditregistration/fuzzer"
 	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
 	batchfuzzer "k8s.io/kubernetes/pkg/apis/batch/fuzzer"
 	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
@@ -39,9 +38,11 @@ import (
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	discoveryfuzzer "k8s.io/kubernetes/pkg/apis/discovery/fuzzer"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
+	flowcontrolfuzzer "k8s.io/kubernetes/pkg/apis/flowcontrol/fuzzer"
 	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
+	resourcefuzzer "k8s.io/kubernetes/pkg/apis/resource/fuzzer"
 	schedulingfuzzer "k8s.io/kubernetes/pkg/apis/scheduling/fuzzer"
 	storagefuzzer "k8s.io/kubernetes/pkg/apis/storage/fuzzer"
 )
@@ -101,12 +102,13 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	autoscalingfuzzer.Funcs,
 	rbacfuzzer.Funcs,
 	policyfuzzer.Funcs,
+	resourcefuzzer.Funcs,
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,
-	auditregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
 	networkingfuzzer.Funcs,
 	metafuzzer.Funcs,
 	schedulingfuzzer.Funcs,
 	discoveryfuzzer.Funcs,
+	flowcontrolfuzzer.Funcs,
 )

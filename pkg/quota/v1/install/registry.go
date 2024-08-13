@@ -17,10 +17,13 @@ limitations under the License.
 package install
 
 import (
+	eventv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	core "k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
-	generic "k8s.io/kubernetes/pkg/quota/v1/generic"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/apis/authorization"
+	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
@@ -38,16 +41,18 @@ func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Co
 // ignoredResources are ignored by quota by default
 var ignoredResources = map[schema.GroupResource]struct{}{
 	// virtual resources that aren't stored and shouldn't be quota-ed
-	{Group: "", Resource: "bindings"}:                                      {},
-	{Group: "", Resource: "componentstatuses"}:                             {},
-	{Group: "authentication.k8s.io", Resource: "tokenreviews"}:             {},
-	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
-	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
-	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
+	{Group: "", Resource: "bindings"}:                                       {},
+	{Group: "", Resource: "componentstatuses"}:                              {},
+	{Group: authentication.GroupName, Resource: "tokenreviews"}:             {},
+	{Group: authentication.GroupName, Resource: "selfsubjectreviews"}:       {},
+	{Group: authorization.GroupName, Resource: "subjectaccessreviews"}:      {},
+	{Group: authorization.GroupName, Resource: "selfsubjectaccessreviews"}:  {},
+	{Group: authorization.GroupName, Resource: "localsubjectaccessreviews"}: {},
+	{Group: authorization.GroupName, Resource: "selfsubjectrulesreviews"}:   {},
 
 	// events haven't been quota-ed before
-	{Group: "", Resource: "events"}: {},
+	{Group: "", Resource: "events"}:                {},
+	{Group: eventv1.GroupName, Resource: "events"}: {},
 }
 
 // DefaultIgnoredResources returns the default set of resources that quota system

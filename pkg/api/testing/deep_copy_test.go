@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -46,7 +46,6 @@ var benchmarkPod = api.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:              "etcd-server-e2e-test-wojtekt-master",
 		Namespace:         "default",
-		SelfLink:          "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
 		UID:               types.UID("a671734a-e8e5-11e4-8fde-42010af09327"),
 		ResourceVersion:   "22",
 		CreationTimestamp: parseTimeOrDie("2015-04-22T11:49:36Z"),
@@ -65,7 +64,7 @@ var benchmarkPod = api.Pod{
 		Containers: []api.Container{
 			{
 				Name:  "etcd-container",
-				Image: "k8s.gcr.io/etcd:2.0.9",
+				Image: "registry.k8s.io/etcd:2.0.9",
 				Command: []string{
 					"/usr/local/bin/etcd",
 					"--addr",
@@ -121,7 +120,7 @@ var benchmarkPod = api.Pod{
 				},
 				Ready:        true,
 				RestartCount: 0,
-				Image:        "k8s.gcr.io/etcd:2.0.9",
+				Image:        "registry.k8s.io/etcd:2.0.9",
 				ImageID:      "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
 				ContainerID:  "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d",
 			},
@@ -140,7 +139,7 @@ func BenchmarkPodCopy(b *testing.B) {
 }
 
 func BenchmarkNodeCopy(b *testing.B) {
-	data, err := ioutil.ReadFile("node_example.json")
+	data, err := os.ReadFile("node_example.json")
 	if err != nil {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
@@ -159,7 +158,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 }
 
 func BenchmarkReplicationControllerCopy(b *testing.B) {
-	data, err := ioutil.ReadFile("replication_controller_example.json")
+	data, err := os.ReadFile("replication_controller_example.json")
 	if err != nil {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}

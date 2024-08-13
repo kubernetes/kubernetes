@@ -14,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockery
 package stats
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -30,9 +32,9 @@ import (
 type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
-	Get(updateStats bool) (*statsapi.Summary, error)
+	Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error)
 	// GetCPUAndMemoryStats provides a new Summary with the CPU and memory stats from Kubelet,
-	GetCPUAndMemoryStats() (*statsapi.Summary, error)
+	GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.
@@ -54,7 +56,7 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	bootTime, err := util.GetBootTime()
 	if err != nil {
 		// bootTime will be zero if we encounter an error getting the boot time.
-		klog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
 	}
 
 	return &summaryProviderImpl{
@@ -64,7 +66,7 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	}
 }
 
-func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
+func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
@@ -80,15 +82,15 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs stats: %v", err)
 	}
-	imageFsStats, err := sp.provider.ImageFsStats()
+	imageFsStats, containerFsStats, err := sp.provider.ImageFsStats(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
 	}
 	var podStats []statsapi.PodStats
 	if updateStats {
-		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage()
+		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage(ctx)
 	} else {
-		podStats, err = sp.provider.ListPodStats()
+		podStats, err = sp.provider.ListPodStats(ctx)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
@@ -103,10 +105,11 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
 		Network:          networkStats,
 		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
-		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
+		Runtime:          &statsapi.RuntimeStats{ContainerFs: containerFsStats, ImageFs: imageFsStats},
 		Rlimit:           rlimit,
 		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
 	}
@@ -117,7 +120,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	return &summary, nil
 }
 
-func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
@@ -130,7 +133,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error)
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 	}
 
-	podStats, err := sp.provider.ListPodCPUAndMemoryStats()
+	podStats, err := sp.provider.ListPodCPUAndMemoryStats(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
@@ -139,6 +142,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error)
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
+		Swap:             rootStats.Swap,
 		StartTime:        rootStats.StartTime,
 		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
 	}

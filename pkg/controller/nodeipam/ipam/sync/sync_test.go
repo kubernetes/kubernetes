@@ -26,14 +26,16 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
+	netutils "k8s.io/utils/net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
-	_, clusterCIDRRange, _ = net.ParseCIDR("10.1.0.0/16")
+	_, clusterCIDRRange, _ = netutils.ParseCIDRSloppy("10.1.0.0/16")
 )
 
 type fakeEvent struct {
@@ -56,6 +58,8 @@ type fakeAPIs struct {
 	calls   []string
 	events  []fakeEvent
 	results []error
+
+	logger klog.Logger
 }
 
 func (f *fakeAPIs) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
@@ -88,7 +92,7 @@ func (f *fakeAPIs) EmitNodeWarningEvent(nodeName, reason, fmtStr string, args ..
 }
 
 func (f *fakeAPIs) ReportResult(err error) {
-	klog.V(2).Infof("ReportResult %v", err)
+	f.logger.V(2).Info("ReportResult", "err", err)
 	f.results = append(f.results, err)
 	if f.reportChan != nil {
 		f.reportChan <- struct{}{}
@@ -104,7 +108,7 @@ func (f *fakeAPIs) ResyncTimeout() time.Duration {
 
 func (f *fakeAPIs) dumpTrace() {
 	for i, x := range f.calls {
-		klog.Infof("trace %v: %v", i, x)
+		f.logger.Info("trace", "index", i, "call", x)
 	}
 }
 
@@ -194,12 +198,14 @@ func TestNodeSyncUpdate(t *testing.T) {
 			wantError: false,
 		},
 	} {
+		logger, _ := ktesting.NewTestContext(t)
 		cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
+		tc.fake.logger = logger
 		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidr)
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
-		go sync.Loop(doneChan)
+		go sync.Loop(logger, doneChan)
 		sync.Update(tc.node)
 		close(sync.opChan)
 		<-doneChan
@@ -221,16 +227,17 @@ func TestNodeSyncUpdate(t *testing.T) {
 }
 
 func TestNodeSyncResync(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	fake := &fakeAPIs{
 		nodeRet:       nodeWithCIDRRange,
 		resyncTimeout: time.Millisecond,
 		reportChan:    make(chan struct{}),
+		logger:        logger,
 	}
 	cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
 	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)
 	doneChan := make(chan struct{})
-
-	go sync.Loop(doneChan)
+	go sync.Loop(logger, doneChan)
 	<-fake.reportChan
 	close(sync.opChan)
 	// Unblock loop().
@@ -269,12 +276,14 @@ func TestNodeSyncDelete(t *testing.T) {
 			},
 		},
 	} {
+		logger, _ := ktesting.NewTestContext(t)
 		cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
+		tc.fake.logger = logger
 		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidr)
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
-		go sync.Loop(doneChan)
+		go sync.Loop(logger, doneChan)
 		sync.Delete(tc.node)
 		<-doneChan
 		tc.fake.dumpTrace()

@@ -22,24 +22,29 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func TestNewCmdVersionWithoutConfigFile(t *testing.T) {
-	tf := cmdutil.NewFactory(&genericclioptions.ConfigFlags{})
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+func TestNewCmdVersionClientVersion(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	o := NewOptions(streams)
-	if err := o.Complete(tf, &cobra.Command{}); err != nil {
+	if err := o.Complete(tf, &cobra.Command{}, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := o.Validate(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// FIXME soltysh:
-	// since we have defaulting to localhost:8080 in staging/src/k8s.io/client-go/tools/clientcmd/client_config.go#getDefaultServer
-	// we need to ignore the localhost:8080 server, when above gets removed this should be dropped too
-	if err := o.Run(); err != nil && !strings.Contains(err.Error(), "localhost:8080") {
+	if err := o.Complete(tf, &cobra.Command{}, []string{"extraParameter0"}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := o.Validate(); !strings.Contains(err.Error(), "extra arguments") {
+		t.Errorf("Unexpected error: should fail to validate the args length greater than 0")
+	}
+	if err := o.Run(); err != nil {
 		t.Errorf("Cannot execute version command: %v", err)
 	}
 	if !strings.Contains(buf.String(), "Client Version") {

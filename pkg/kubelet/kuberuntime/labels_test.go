@@ -20,9 +20,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -31,14 +34,14 @@ func TestContainerLabels(t *testing.T) {
 	terminationGracePeriod := int64(10)
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"action1", "action2"},
 			},
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "path",
 				Host:   "host",
-				Port:   intstr.FromInt(8080),
+				Port:   intstr.FromInt32(8080),
 				Scheme: "scheme",
 			},
 			TCPSocket: &v1.TCPSocketAction{
@@ -100,14 +103,14 @@ func TestContainerAnnotations(t *testing.T) {
 	}
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"action1", "action2"},
 			},
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "path",
 				Host:   "host",
-				Port:   intstr.FromInt(8080),
+				Port:   intstr.FromInt32(8080),
 				Scheme: "scheme",
 			},
 			TCPSocket: &v1.TCPSocketAction{
@@ -157,6 +160,7 @@ func TestContainerAnnotations(t *testing.T) {
 		PreStopHandler:            container.Lifecycle.PreStop,
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	// Test whether we can get right information from label
 	annotations := newContainerAnnotations(container, pod, restartCount, opts)
 	containerInfo := getContainerInfoFromAnnotations(annotations)

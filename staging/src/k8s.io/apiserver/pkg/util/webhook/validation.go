@@ -23,7 +23,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/transport"
 )
+
+func ValidateCABundle(fldPath *field.Path, caBundle []byte) field.ErrorList {
+	var allErrors field.ErrorList
+	_, err := transport.TLSConfigFor(&transport.Config{TLS: transport.TLSConfig{CAData: caBundle}})
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, caBundle, err.Error()))
+	}
+	return allErrors
+}
 
 // ValidateWebhookURL validates webhook's URL.
 func ValidateWebhookURL(fldPath *field.Path, URL string, forceHttps bool) field.ErrorList {
@@ -36,7 +46,7 @@ func ValidateWebhookURL(fldPath *field.Path, URL string, forceHttps bool) field.
 			allErrors = append(allErrors, field.Invalid(fldPath, u.Scheme, "'https' is the only allowed URL scheme"+form))
 		}
 		if len(u.Host) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, u.Host, "host must be provided"+form))
+			allErrors = append(allErrors, field.Invalid(fldPath, u.Host, "host must be specified"+form))
 		}
 		if u.User != nil {
 			allErrors = append(allErrors, field.Invalid(fldPath, u.User.String(), "user information is not permitted in the URL"))

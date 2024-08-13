@@ -32,7 +32,7 @@ type histogram struct {
 	valueCount   int64   // number of values recorded for single value
 }
 
-// AddMeasurement records a value measurement observation to the histogram.
+// addMeasurement records a value measurement observation to the histogram.
 func (h *histogram) addMeasurement(value int64) {
 	// TODO: assert invariant
 	h.sum += value

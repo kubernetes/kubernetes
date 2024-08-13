@@ -1,5 +1,7 @@
 package types
 
+import "github.com/opencontainers/runc/libcontainer/intelrdt"
+
 // Event struct for encoding the event data to json.
 type Event struct {
 	Type string      `json:"type"`
@@ -10,6 +12,7 @@ type Event struct {
 // stats is the runc specific stats structure for stability when encoding and decoding stats.
 type Stats struct {
 	CPU               Cpu                 `json:"cpu"`
+	CPUSet            CPUSet              `json:"cpuset"`
 	Memory            Memory              `json:"memory"`
 	Pids              Pids                `json:"pids"`
 	Blkio             Blkio               `json:"blkio"`
@@ -55,15 +58,31 @@ type Throttling struct {
 
 type CpuUsage struct {
 	// Units: nanoseconds.
-	Total  uint64   `json:"total,omitempty"`
-	Percpu []uint64 `json:"percpu,omitempty"`
-	Kernel uint64   `json:"kernel"`
-	User   uint64   `json:"user"`
+	Total        uint64   `json:"total,omitempty"`
+	Percpu       []uint64 `json:"percpu,omitempty"`
+	PercpuKernel []uint64 `json:"percpu_kernel,omitempty"`
+	PercpuUser   []uint64 `json:"percpu_user,omitempty"`
+	Kernel       uint64   `json:"kernel"`
+	User         uint64   `json:"user"`
 }
 
 type Cpu struct {
 	Usage      CpuUsage   `json:"usage,omitempty"`
 	Throttling Throttling `json:"throttling,omitempty"`
+}
+
+type CPUSet struct {
+	CPUs                  []uint16 `json:"cpus,omitempty"`
+	CPUExclusive          uint64   `json:"cpu_exclusive"`
+	Mems                  []uint16 `json:"mems,omitempty"`
+	MemHardwall           uint64   `json:"mem_hardwall"`
+	MemExclusive          uint64   `json:"mem_exclusive"`
+	MemoryMigrate         uint64   `json:"memory_migrate"`
+	MemorySpreadPage      uint64   `json:"memory_spread_page"`
+	MemorySpreadSlab      uint64   `json:"memory_spread_slab"`
+	MemoryPressure        uint64   `json:"memory_pressure"`
+	SchedLoadBalance      uint64   `json:"sched_load_balance"`
+	SchedRelaxDomainLevel int64    `json:"sched_relax_domain_level"`
 }
 
 type MemoryEntry struct {
@@ -113,6 +132,12 @@ type IntelRdt struct {
 
 	// The memory bandwidth schema in 'container_id' group
 	MemBwSchema string `json:"mem_bw_schema,omitempty"`
+
+	// The memory bandwidth monitoring statistics from NUMA nodes in 'container_id' group
+	MBMStats *[]intelrdt.MBMNumaNodeStats `json:"mbm_stats,omitempty"`
+
+	// The cache monitoring technology statistics from NUMA nodes in 'container_id' group
+	CMTStats *[]intelrdt.CMTNumaNodeStats `json:"cmt_stats,omitempty"`
 }
 
 type NetworkInterface struct {

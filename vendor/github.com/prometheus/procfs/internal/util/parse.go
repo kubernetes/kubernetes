@@ -14,7 +14,7 @@
 package util
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -64,13 +64,37 @@ func ParsePInt64s(ss []string) ([]*int64, error) {
 	return us, nil
 }
 
+// Parses a uint64 from given hex in string.
+func ParseHexUint64s(ss []string) ([]*uint64, error) {
+	us := make([]*uint64, 0, len(ss))
+	for _, s := range ss {
+		u, err := strconv.ParseUint(s, 16, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		us = append(us, &u)
+	}
+
+	return us, nil
+}
+
 // ReadUintFromFile reads a file and attempts to parse a uint64 from it.
 func ReadUintFromFile(path string) (uint64, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}
 	return strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+}
+
+// ReadIntFromFile reads a file and attempts to parse a int64 from it.
+func ReadIntFromFile(path string) (int64, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
 }
 
 // ParseBool parses a string into a boolean pointer.

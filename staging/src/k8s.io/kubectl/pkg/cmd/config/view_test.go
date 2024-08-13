@@ -17,14 +17,14 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	utiltesting "k8s.io/client-go/util/testing"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type viewClusterTest struct {
@@ -48,8 +48,18 @@ func TestViewCluster(t *testing.T) {
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":   {Token: "REDACTED"},
-			"mu-cluster": {Token: "REDACTED"},
+			"minikube": {
+				ClientKeyData: []byte("notredacted"),
+				Token:         "notredacted",
+				Username:      "foo",
+				Password:      "notredacted",
+			},
+			"mu-cluster": {
+				ClientKeyData: []byte("notredacted"),
+				Token:         "notredacted",
+				Username:      "bar",
+				Password:      "notredacted",
+			},
 		},
 	}
 
@@ -79,13 +89,110 @@ preferences: {}
 users:
 - name: minikube
   user:
+    client-key-data: DATA+OMITTED
+    password: REDACTED
     token: REDACTED
+    username: foo
 - name: mu-cluster
   user:
-    token: REDACTED` + "\n",
+    client-key-data: DATA+OMITTED
+    password: REDACTED
+    token: REDACTED
+    username: bar` + "\n",
 	}
 
 	test.run(t)
+
+}
+
+func TestViewClusterUnredacted(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube":   {Server: "https://192.168.99.100:8443"},
+			"my-cluster": {Server: "https://192.168.0.1:3434"},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
+			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
+		},
+		CurrentContext: "minikube",
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"minikube": {
+				ClientKeyData:         []byte("notredacted"),
+				ClientCertificateData: []byte("plaintext"),
+				Token:                 "notredacted",
+				Username:              "foo",
+				Password:              "notredacted",
+			},
+			"mu-cluster": {
+				ClientKeyData:         []byte("notredacted"),
+				ClientCertificateData: []byte("plaintext"),
+				Token:                 "notredacted",
+				Username:              "bar",
+				Password:              "notredacted",
+			},
+		},
+	}
+
+	testCases := []struct {
+		description string
+		config      clientcmdapi.Config
+		flags       []string
+		expected    string
+	}{
+		{
+			description: "Testing for kubectl config view --raw=true",
+			config:      conf,
+			flags:       []string{"--raw=true"},
+			expected: `apiVersion: v1
+clusters:
+- cluster:
+    server: https://192.168.99.100:8443
+  name: minikube
+- cluster:
+    server: https://192.168.0.1:3434
+  name: my-cluster
+contexts:
+- context:
+    cluster: minikube
+    user: minikube
+  name: minikube
+- context:
+    cluster: my-cluster
+    user: mu-cluster
+  name: my-cluster
+current-context: minikube
+kind: Config
+preferences: {}
+users:
+- name: minikube
+  user:
+    client-certificate-data: cGxhaW50ZXh0
+    client-key-data: bm90cmVkYWN0ZWQ=
+    password: notredacted
+    token: notredacted
+    username: foo
+- name: mu-cluster
+  user:
+    client-certificate-data: cGxhaW50ZXh0
+    client-key-data: bm90cmVkYWN0ZWQ=
+    password: notredacted
+    token: notredacted
+    username: bar` + "\n",
+		},
+	}
+
+	for _, test := range testCases {
+		cmdTest := viewClusterTest{
+			description: test.description,
+			config:      test.config,
+			flags:       test.flags,
+			expected:    test.expected,
+		}
+		cmdTest.run(t)
+	}
 
 }
 
@@ -103,8 +210,18 @@ func TestViewClusterMinify(t *testing.T) {
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":   {Token: "REDACTED"},
-			"mu-cluster": {Token: "REDACTED"},
+			"minikube": {
+				ClientKeyData: []byte("notredacted"),
+				Token:         "notredacted",
+				Username:      "foo",
+				Password:      "notredacted",
+			},
+			"mu-cluster": {
+				ClientKeyData: []byte("notredacted"),
+				Token:         "notredacted",
+				Username:      "bar",
+				Password:      "notredacted",
+			},
 		},
 	}
 
@@ -134,7 +251,10 @@ preferences: {}
 users:
 - name: minikube
   user:
-    token: REDACTED` + "\n",
+    client-key-data: DATA+OMITTED
+    password: REDACTED
+    token: REDACTED
+    username: foo` + "\n",
 		},
 		{
 			description: "Testing for kubectl config view --minify=true --context=my-cluster",
@@ -156,7 +276,10 @@ preferences: {}
 users:
 - name: mu-cluster
   user:
-    token: REDACTED` + "\n",
+    client-key-data: DATA+OMITTED
+    password: REDACTED
+    token: REDACTED
+    username: bar` + "\n",
 		},
 	}
 
@@ -172,11 +295,11 @@ users:
 }
 
 func (test viewClusterTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(fakeKubeFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -184,8 +307,8 @@ func (test viewClusterTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdConfigView(cmdutil.NewFactory(genericclioptions.NewTestConfigFlags()), streams, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigView(streams, pathOptions)
 	// "context" is a global flag, inherited from base kubectl command in the real world
 	cmd.Flags().String("context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().Parse(test.flags)

@@ -17,7 +17,7 @@ spec:
     spec:
       initContainers:
       - name: init-inotify-limit
-        image: busybox
+        image: busybox:1.32
         command: ['sysctl', '-w', 'fs.inotify.max_user_instances=1000']
         securityContext:
           privileged: true
@@ -31,6 +31,9 @@ spec:
       - name: logs-volume
         hostPath:
           path: /var/log
+      - name: containerd
+        hostPath:
+          path: /run/containerd
       - name: no-serviceaccount-access-to-real-master
         emptyDir: {}
       containers:
@@ -41,23 +44,17 @@ spec:
         - containerPort: 10250
         - containerPort: 10255
         env:
-        - name: CONTENT_TYPE
-          valueFrom:
-            configMapKeyRef:
-              name: node-configmap
-              key: content.type
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
         command: [
+          "/go-runner",
+          "-log-file=/var/log/kubelet-$(NODE_NAME).log",
           "/kubemark",
           "--morph=kubelet",
           "--name=$(NODE_NAME)",
           "--kubeconfig=/kubeconfig/kubelet.kubeconfig",
-          "$(CONTENT_TYPE)",
-          "--log-file=/var/log/kubelet-$(NODE_NAME).log",
-          "--logtostderr=false",
           "--node-labels={{hollow_node_labels}}",
           {{hollow_kubelet_params}}
         ]
@@ -67,6 +64,8 @@ spec:
           readOnly: true
         - name: logs-volume
           mountPath: /var/log
+        - name: containerd
+          mountPath: /run/containerd
         resources:
           requests:
             cpu: {{hollow_kubelet_millicpu}}m
@@ -76,23 +75,17 @@ spec:
       - name: hollow-proxy
         image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
         env:
-        - name: CONTENT_TYPE
-          valueFrom:
-            configMapKeyRef:
-              name: node-configmap
-              key: content.type
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
         command: [
+          "/go-runner",
+          "-log-file=/var/log/kubeproxy-$(NODE_NAME).log",
           "/kubemark",
           "--morph=proxy",
           "--name=$(NODE_NAME)",
           "--kubeconfig=/kubeconfig/kubeproxy.kubeconfig",
-          "$(CONTENT_TYPE)",
-          "--log-file=/var/log/kubeproxy-$(NODE_NAME).log",
-          "--logtostderr=false",
           {{hollow_proxy_params}}
         ]
         volumeMounts:
@@ -106,7 +99,7 @@ spec:
             cpu: {{hollow_proxy_millicpu}}m
             memory: {{hollow_proxy_mem_Ki}}Ki
       - name: hollow-node-problem-detector
-        image: k8s.gcr.io/node-problem-detector:v0.8.0
+        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.19
         env:
         - name: NODE_NAME
           valueFrom:

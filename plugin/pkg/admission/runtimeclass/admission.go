@@ -17,7 +17,7 @@ limitations under the License.
 // Package runtimeclass contains an admission controller for modifying and validating new Pods to
 // take RuntimeClass into account. For RuntimeClass definitions which describe an overhead associated
 // with running a pod, this admission controller will set the pod.Spec.Overhead field accordingly. This
-// field should only be set through this controller, so vaidation will be carried out to ensure the pod's
+// field should only be set through this controller, so validation will be carried out to ensure the pod's
 // value matches what is defined in the coresponding RuntimeClass.
 package runtimeclass
 
@@ -26,18 +26,19 @@ import (
 	"fmt"
 	"io"
 
-	v1beta1 "k8s.io/api/node/v1beta1"
+	nodev1 "k8s.io/api/node/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
-	nodev1beta1listers "k8s.io/client-go/listers/node/v1beta1"
-	"k8s.io/component-base/featuregate"
+	"k8s.io/client-go/kubernetes"
+	nodev1client "k8s.io/client-go/kubernetes/typed/node/v1"
+	nodev1listers "k8s.io/client-go/listers/node/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
-	nodev1beta1 "k8s.io/kubernetes/pkg/apis/node/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
+	apinodev1 "k8s.io/kubernetes/pkg/apis/node/v1"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )
 
@@ -57,68 +58,52 @@ func Register(plugins *admission.Plugins) {
 // not specified, the pod is rejected.
 type RuntimeClass struct {
 	*admission.Handler
-	runtimeClassLister nodev1beta1listers.RuntimeClassLister
-
-	inspectedFeatures   bool
-	runtimeClassEnabled bool
-	podOverheadEnabled  bool
+	runtimeClassLister nodev1listers.RuntimeClassLister
+	runtimeClassClient nodev1client.RuntimeClassInterface
 }
 
 var _ admission.MutationInterface = &RuntimeClass{}
 var _ admission.ValidationInterface = &RuntimeClass{}
 
 var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeClass{}
+var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &RuntimeClass{}
 
-// InspectFeatureGates allows setting bools without taking a dep on a global variable
-func (r *RuntimeClass) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	r.runtimeClassEnabled = featureGates.Enabled(features.RuntimeClass)
-	r.podOverheadEnabled = featureGates.Enabled(features.PodOverhead)
-	r.inspectedFeatures = true
+// SetExternalKubeClientSet sets the client for the plugin
+func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {
+	r.runtimeClassClient = client.NodeV1().RuntimeClasses()
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	if !r.runtimeClassEnabled {
-		return
-	}
-	runtimeClassInformer := f.Node().V1beta1().RuntimeClasses()
+	runtimeClassInformer := f.Node().V1().RuntimeClasses()
 	r.SetReadyFunc(runtimeClassInformer.Informer().HasSynced)
 	r.runtimeClassLister = runtimeClassInformer.Lister()
 }
 
 // ValidateInitialization implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) ValidateInitialization() error {
-	if !r.inspectedFeatures {
-		return fmt.Errorf("InspectFeatureGates was not called")
-	}
-	if !r.runtimeClassEnabled {
-		return nil
-	}
 	if r.runtimeClassLister == nil {
 		return fmt.Errorf("missing RuntimeClass lister")
+	}
+	if r.runtimeClassClient == nil {
+		return fmt.Errorf("missing RuntimeClass client")
 	}
 	return nil
 }
 
 // Admit makes an admission decision based on the request attributes
 func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
-	if !r.runtimeClassEnabled {
-		return nil
-	}
-
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
 	}
 
-	pod, runtimeClass, err := r.prepareObjects(attributes)
+	pod, runtimeClass, err := r.prepareObjects(ctx, attributes)
 	if err != nil {
 		return err
 	}
-	if r.podOverheadEnabled {
-		if err := setOverhead(attributes, pod, runtimeClass); err != nil {
-			return err
-		}
+	if err := setOverhead(attributes, pod, runtimeClass); err != nil {
+		return err
 	}
 
 	if err := setScheduling(attributes, pod, runtimeClass); err != nil {
@@ -130,23 +115,17 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 
 // Validate makes sure that pod adhere's to RuntimeClass's definition
 func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
-	if !r.runtimeClassEnabled {
-		return nil
-	}
-
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
 	}
 
-	pod, runtimeClass, err := r.prepareObjects(attributes)
+	pod, runtimeClass, err := r.prepareObjects(ctx, attributes)
 	if err != nil {
 		return err
 	}
-	if r.podOverheadEnabled {
-		if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
-			return err
-		}
+	if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
+		return err
 	}
 
 	return nil
@@ -160,7 +139,7 @@ func NewRuntimeClass() *RuntimeClass {
 }
 
 // prepareObjects returns pod and runtimeClass types from the given admission attributes
-func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api.Pod, runtimeClass *v1beta1.RuntimeClass, err error) {
+func (r *RuntimeClass) prepareObjects(ctx context.Context, attributes admission.Attributes) (pod *api.Pod, runtimeClass *nodev1.RuntimeClass, err error) {
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return nil, nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
@@ -173,26 +152,30 @@ func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api
 	// get RuntimeClass object
 	runtimeClass, err = r.runtimeClassLister.Get(*pod.Spec.RuntimeClassName)
 	if apierrors.IsNotFound(err) {
-		return pod, nil, admission.NewForbidden(attributes, fmt.Errorf("pod rejected: RuntimeClass %q not found", *pod.Spec.RuntimeClassName))
+		// if not found, our informer cache could be lagging, do a live lookup
+		runtimeClass, err = r.runtimeClassClient.Get(ctx, *pod.Spec.RuntimeClassName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return pod, nil, admission.NewForbidden(attributes, fmt.Errorf("pod rejected: RuntimeClass %q not found", *pod.Spec.RuntimeClassName))
+		}
 	}
 
 	// return the pod and runtimeClass.
 	return pod, runtimeClass, err
 }
 
-func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.RuntimeClass) (err error) {
+func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.RuntimeClass) (err error) {
 	if runtimeClass == nil || runtimeClass.Overhead == nil {
 		return nil
 	}
 
 	// convert to internal type and assign to pod's Overhead
 	nodeOverhead := &node.Overhead{}
-	if err = nodev1beta1.Convert_v1beta1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil); err != nil {
+	if err = apinodev1.Convert_v1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil); err != nil {
 		return err
 	}
 
 	// reject pod if Overhead is already set that differs from what is defined in RuntimeClass
-	if pod.Spec.Overhead != nil && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
+	if len(pod.Spec.Overhead) > 0 && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
 		return admission.NewForbidden(a, fmt.Errorf("pod rejected: Pod's Overhead doesn't match RuntimeClass's defined Overhead"))
 	}
 
@@ -201,14 +184,14 @@ func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.Run
 	return nil
 }
 
-func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.RuntimeClass) (err error) {
+func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.RuntimeClass) (err error) {
 	if runtimeClass == nil || runtimeClass.Scheduling == nil {
 		return nil
 	}
 
 	// convert to internal type and assign to pod's Scheduling
 	nodeScheduling := &node.Scheduling{}
-	if err = nodev1beta1.Convert_v1beta1_Scheduling_To_node_Scheduling(runtimeClass.Scheduling, nodeScheduling, nil); err != nil {
+	if err = apinodev1.Convert_v1_Scheduling_To_node_Scheduling(runtimeClass.Scheduling, nodeScheduling, nil); err != nil {
 		return err
 	}
 
@@ -233,11 +216,11 @@ func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.R
 	return nil
 }
 
-func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.RuntimeClass) (err error) {
+func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.RuntimeClass) (err error) {
 	if runtimeClass != nil && runtimeClass.Overhead != nil {
 		// If the Overhead set doesn't match what is provided in the RuntimeClass definition, reject the pod
 		nodeOverhead := &node.Overhead{}
-		if err := nodev1beta1.Convert_v1beta1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil); err != nil {
+		if err := apinodev1.Convert_v1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil); err != nil {
 			return err
 		}
 		if !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {

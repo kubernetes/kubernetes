@@ -24,54 +24,49 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
-type fakeGroupRegisty struct{}
+type fakeGroupRegistry struct{}
 
-func (f fakeGroupRegisty) IsGroupRegistered(group string) bool {
+func (f fakeGroupRegistry) IsGroupRegistered(group string) bool {
 	return group == "apiregistration.k8s.io"
 }
 
 func TestAPIEnablementOptionsValidate(t *testing.T) {
 	testCases := []struct {
-		name        string
-		testOptions *APIEnablementOptions
-		expectErr   string
+		name          string
+		runtimeConfig cliflag.ConfigurationMap
+		expectErr     string
 	}{
 		{
 			name: "test when options is nil",
 		},
 		{
-			name: "test when invalid key with only api/all=false",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
-			},
-			expectErr: "invalid key with only api/all=false",
+			name:          "test when invalid key with only api/all=false",
+			runtimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
+			expectErr:     "invalid key with only api/all=false",
 		},
 		{
-			name: "test when ConfigurationMap key is invalid",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
-			},
-			expectErr: "runtime-config invalid key",
+			name:          "test when ConfigurationMap key is invalid",
+			runtimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
+			expectErr:     "runtime-config invalid key",
 		},
 		{
-			name: "test when unknown api groups",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
-			},
-			expectErr: "unknown api groups",
+			name:          "test when unknown api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
+			expectErr:     "unknown api groups",
 		},
 		{
-			name: "test when valid api groups",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
-			},
+			name:          "test when valid api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
 		},
 	}
-	testGroupRegisty := fakeGroupRegisty{}
+	testGroupRegistry := fakeGroupRegistry{}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			errs := testcase.testOptions.Validate(testGroupRegisty)
+			testOptions := &APIEnablementOptions{
+				RuntimeConfig: testcase.runtimeConfig,
+			}
+			errs := testOptions.Validate(testGroupRegistry)
 			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
 			}

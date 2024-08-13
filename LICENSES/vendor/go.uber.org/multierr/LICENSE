@@ -1,6 +1,6 @@
 = vendor/go.uber.org/multierr licensed under: =
 
-Copyright (c) 2017 Uber Technologies, Inc.
+Copyright (c) 2017-2021 Uber Technologies, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,4 +20,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-= vendor/go.uber.org/multierr/LICENSE.txt f65b21a547112d1bc7b11b90f9b31997
+= vendor/go.uber.org/multierr/LICENSE.txt 721ac51ede11efb667ff53a866be23c4

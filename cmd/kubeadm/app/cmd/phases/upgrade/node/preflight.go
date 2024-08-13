@@ -20,10 +20,12 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
+	utilsexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	utilsexec "k8s.io/utils/exec"
 )
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
@@ -52,13 +54,19 @@ func runPreflight(c workflow.RunData) error {
 		return err
 	}
 
-	// if this is a control-plane node, pull the basic images
+	// If this is a control-plane node, pull the basic images
 	if data.IsControlPlaneNode() {
+		// Update the InitConfiguration used for RunPullImagesCheck with ImagePullPolicy and ImagePullSerial
+		// that come from UpgradeNodeConfiguration.
+		initConfig := data.InitCfg()
+		initConfig.NodeRegistration.ImagePullPolicy = data.Cfg().Node.ImagePullPolicy
+		initConfig.NodeRegistration.ImagePullSerial = data.Cfg().Node.ImagePullSerial
+
 		if !data.DryRun() {
 			fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
 			fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-			fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
-			if err := preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
+			fmt.Println("[preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
+			if err := preflight.RunPullImagesCheck(utilsexec.New(), initConfig, data.IgnorePreflightErrors()); err != nil {
 				return err
 			}
 		} else {

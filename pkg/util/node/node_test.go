@@ -17,10 +17,15 @@ limitations under the License.
 package node
 
 import (
+	"net"
+	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/stretchr/testify/assert"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	netutils "k8s.io/utils/net"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -89,115 +94,163 @@ func TestGetPreferredAddress(t *testing.T) {
 	}
 }
 
-func TestGetHostname(t *testing.T) {
-	testCases := []struct {
-		hostName         string
-		expectedHostName string
-		expectError      bool
+func TestGetNodeHostIPs(t *testing.T) {
+	testcases := []struct {
+		name      string
+		addresses []v1.NodeAddress
+
+		expectIPs []net.IP
 	}{
 		{
-			hostName:    "   ",
-			expectError: true,
+			name:      "no addresses",
+			expectIPs: nil,
 		},
 		{
-			hostName:         " abc  ",
-			expectedHostName: "abc",
-			expectError:      false,
+			name: "no InternalIP/ExternalIP",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeHostName, Address: "example.com"},
+			},
+			expectIPs: nil,
+		},
+		{
+			name: "IPv4-only, simple",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
+		},
+		{
+			name: "IPv4-only, external-first",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
+		},
+		{
+			name: "IPv4-only, no internal",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("4.3.2.1")},
+		},
+		{
+			name: "dual-stack node",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
+		},
+		{
+			name: "dual-stack node, different order",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
+		},
+		{
+			name: "dual-stack node, IPv6-first, no internal IPv4, dual-stack cluster",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 	}
 
-	for idx, test := range testCases {
-		hostName, err := GetHostname(test.hostName)
-		if err != nil && !test.expectError {
-			t.Errorf("[%d]: unexpected error: %s", idx, err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("[%d]: expected error, got none", idx)
-		}
-		if test.expectedHostName != hostName {
-			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
-		}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			node := &v1.Node{
+				Status: v1.NodeStatus{Addresses: tc.addresses},
+			}
+			nodeIPs, err := GetNodeHostIPs(node)
+			nodeIP, err2 := GetNodeHostIP(node)
 
+			if (err == nil && err2 != nil) || (err != nil && err2 == nil) {
+				t.Errorf("GetNodeHostIPs() returned error=%q but GetNodeHostIP() returned error=%q", err, err2)
+			}
+			if err != nil {
+				if tc.expectIPs != nil {
+					t.Errorf("expected %v, got error (%v)", tc.expectIPs, err)
+				}
+			} else if tc.expectIPs == nil {
+				t.Errorf("expected error, got %v", nodeIPs)
+			} else if !reflect.DeepEqual(nodeIPs, tc.expectIPs) {
+				t.Errorf("expected %v, got %v", tc.expectIPs, nodeIPs)
+			} else if !nodeIP.Equal(nodeIPs[0]) {
+				t.Errorf("GetNodeHostIP did not return same primary (%s) as GetNodeHostIPs (%s)", nodeIP.String(), nodeIPs[0].String())
+			}
+		})
 	}
 }
 
-func Test_GetZoneKey(t *testing.T) {
-	tests := []struct {
-		name string
-		node *v1.Node
-		zone string
+func TestIsNodeReady(t *testing.T) {
+	testCases := []struct {
+		name   string
+		Node   *v1.Node
+		expect bool
 	}{
 		{
-			name: "has no zone or region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{},
-				},
-			},
-			zone: "",
-		},
-		{
-			name: "has beta zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomain: "zone1",
-						v1.LabelZoneRegion:        "region1",
+			name: "case that returns true",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
 					},
 				},
 			},
-			zone: "region1:\x00:zone1",
+			expect: true,
 		},
 		{
-			name: "has GA zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
+			name: "case that returns false",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
+						},
 					},
 				},
 			},
-			zone: "region1:\x00:zone1",
+			expect: false,
 		},
 		{
-			name: "has both beta and GA zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
-						v1.LabelZoneFailureDomain:       "zone1",
-						v1.LabelZoneRegion:              "region1",
+			name: "case that returns false",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeMemoryPressure,
+							Status: v1.ConditionFalse,
+						},
 					},
 				},
 			},
-			zone: "region1:\x00:zone1",
-		},
-		{
-			name: "has both beta and GA zone and region keys, beta labels take precedent",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
-						v1.LabelZoneFailureDomain:       "zone2",
-						v1.LabelZoneRegion:              "region2",
-					},
-				},
-			},
-			zone: "region2:\x00:zone2",
+			expect: false,
 		},
 	}
-
-	for _, test := range tests {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			zone := GetZoneKey(test.node)
-			if zone != test.zone {
-				t.Logf("actual zone key: %q", zone)
-				t.Logf("expected zone key: %q", test.zone)
-				t.Errorf("unexpected zone key")
-			}
+			result := IsNodeReady(test.Node)
+			assert.Equal(t, test.expect, result)
 		})
 	}
 }

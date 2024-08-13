@@ -19,7 +19,7 @@ package guestbook
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -38,10 +38,10 @@ var CmdGuestbook = &cobra.Command{
 	Short: "Creates a HTTP server with various endpoints representing a guestbook app",
 	Long: `Starts a HTTP server on the given --http-port (default: 80), serving various endpoints representing a guestbook app. The endpoints and their purpose are:
 
-- /register: A guestbook slave will subscribe to a master, to its given --slaveof endpoint. The master will then push any updates it receives to its registered slaves through the --backend-port.
+- /register: A guestbook replica will subscribe to a primary, to its given --replicaof endpoint. The primary will then push any updates it receives to its registered replicas through the --backend-port.
 - /get: Returns '{"data": value}', where the value is the stored value for the given key if non-empty, or the entire store.
-- /set: Will set the given key-value pair in its own store and propagate it to its slaves, if any. Will return '{"data": "Updated"}' to the caller on success.
-- /guestbook: Will proxy the request to agnhost-master if the given cmd is 'set', or agnhost-slave if the given cmd is 'get'.`,
+- /set: Will set the given key-value pair in its own store and propagate it to its replicas, if any. Will return '{"data": "Updated"}' to the caller on success.
+- /guestbook: Will proxy the request to agnhost-primary if the given cmd is 'set', or agnhost-replica if the given cmd is 'get'.`,
 	Args: cobra.MaximumNArgs(0),
 	Run:  main,
 }
@@ -49,8 +49,8 @@ var CmdGuestbook = &cobra.Command{
 var (
 	httpPort    string
 	backendPort string
-	slaveOf     string
-	slaves      []string
+	replicaOf   string
+	replicas    []string
 	store       map[string]interface{}
 )
 
@@ -62,12 +62,12 @@ const (
 func init() {
 	CmdGuestbook.Flags().StringVar(&httpPort, "http-port", "80", "HTTP Listen Port")
 	CmdGuestbook.Flags().StringVar(&backendPort, "backend-port", "6379", "Backend's HTTP Listen Port")
-	CmdGuestbook.Flags().StringVar(&slaveOf, "slaveof", "", "The host's name to register to")
+	CmdGuestbook.Flags().StringVar(&replicaOf, "replicaof", "", "The host's name to register to")
 	store = make(map[string]interface{})
 }
 
 func main(cmd *cobra.Command, args []string) {
-	go registerNode(slaveOf, backendPort)
+	go registerNode(replicaOf, backendPort)
 	startHTTPServer(httpPort)
 }
 
@@ -88,17 +88,17 @@ func registerNode(registerTo, port string) {
 		}
 
 		request := fmt.Sprintf("register?host=%s", host.String())
-		log.Printf("Registering to master: %s/%s", hostPort, request)
+		log.Printf("Registering to primary: %s/%s", hostPort, request)
 		_, err = net.ResolveTCPAddr("tcp", hostPort)
 		if err != nil {
-			log.Printf("unable to resolve %s, --slaveof param and/or --backend-port param are invalid: %v. Retrying in %s.", hostPort, err, sleep)
+			log.Printf("unable to resolve %s, --replicaof param and/or --backend-port param are invalid: %v. Retrying in %s.", hostPort, err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
 
 		response, err := dialHTTP(request, hostPort)
 		if err != nil {
-			log.Printf("encountered error while registering to master: %v. Retrying in %s.", err, sleep)
+			log.Printf("encountered error while registering to primary: %v. Retrying in %s.", err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
@@ -106,7 +106,7 @@ func registerNode(registerTo, port string) {
 		responseJSON := make(map[string]interface{})
 		err = json.Unmarshal([]byte(response), &responseJSON)
 		if err != nil {
-			log.Fatalf("Error while unmarshaling master's response: %v", err)
+			log.Fatalf("Error while unmarshaling primary's response: %v", err)
 		}
 
 		var ok bool
@@ -118,7 +118,7 @@ func registerNode(registerTo, port string) {
 		return
 	}
 
-	log.Fatal("Timed out while registering to master.")
+	log.Fatal("Timed out while registering to primary.")
 }
 
 func startHTTPServer(port string) {
@@ -129,8 +129,8 @@ func startHTTPServer(port string) {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
 
-// registerHandler will register the caller in this server's list of slaves.
-// /set requests will be propagated to slaves, if any.
+// registerHandler will register the caller in this server's list of replicas.
+// /set requests will be propagated to replicas, if any.
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	values, err := url.Parse(r.URL.RequestURI())
 	if err != nil {
@@ -141,7 +141,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	ip := values.Query().Get("host")
 	log.Printf("GET /register?host=%s", ip)
 
-	// send all the store to the slave as well.
+	// send all the store to the replica as well.
 	output := make(map[string]interface{})
 	output["data"] = store
 	bytes, err := json.Marshal(output)
@@ -150,7 +150,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprint(w, string(bytes))
-	slaves = append(slaves, ip)
+	replicas = append(replicas, ip)
 	log.Printf("Node '%s' registered.", ip)
 }
 
@@ -187,7 +187,7 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // setHandler will set the given key-value pair in its own store and propagate
-// it to its slaves, if any. Will return '{"message": "Updated"}' to the caller on success.
+// it to its replicas, if any. Will return '{"message": "Updated"}' to the caller on success.
 func setHandler(w http.ResponseWriter, r *http.Request) {
 	values, err := url.Parse(r.URL.RequestURI())
 	if err != nil {
@@ -207,11 +207,11 @@ func setHandler(w http.ResponseWriter, r *http.Request) {
 
 	store[key] = value
 	request := fmt.Sprintf("set?key=%s&value=%s", key, value)
-	for _, slave := range slaves {
-		hostPort := net.JoinHostPort(slave, backendPort)
+	for _, replica := range replicas {
+		hostPort := net.JoinHostPort(replica, backendPort)
 		_, err = dialHTTP(request, hostPort)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("encountered error while propagating to slave '%s': %v", slave, err), http.StatusExpectationFailed)
+			http.Error(w, fmt.Sprintf("encountered error while propagating to replica '%s': %v", replica, err), http.StatusExpectationFailed)
 			return
 		}
 	}
@@ -226,8 +226,8 @@ func setHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// guestbookHandler will proxy the request to agnhost-master if the given cmd is
-// 'set' or agnhost-slave if the given cmd is 'get'.
+// guestbookHandler will proxy the request to agnhost-primary if the given cmd is
+// 'set' or agnhost-replica if the given cmd is 'get'.
 func guestbookHandler(w http.ResponseWriter, r *http.Request) {
 	values, err := url.Parse(r.URL.RequestURI())
 	if err != nil {
@@ -250,9 +250,9 @@ func guestbookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := "agnhost-master"
+	host := "agnhost-primary"
 	if cmd == "get" {
-		host = "agnhost-slave"
+		host = "agnhost-replica"
 	}
 
 	hostPort := net.JoinHostPort(host, backendPort)
@@ -278,7 +278,7 @@ func dialHTTP(request, hostPort string) (string, error) {
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), nil
 		}

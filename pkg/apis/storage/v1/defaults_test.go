@@ -20,10 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -47,6 +51,20 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
+func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
+	driver := &storagev1.CSIDriver{}
+
+	// field should be defaulted
+	defaultStorageCapacity := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
+	outStorageCapacity := output.Spec.StorageCapacity
+	if outStorageCapacity == nil {
+		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: nil", defaultStorageCapacity)
+	} else if *outStorageCapacity != defaultStorageCapacity {
+		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: %+v", defaultStorageCapacity, outStorageCapacity)
+	}
+}
+
 func TestSetDefaultVolumeBindingMode(t *testing.T) {
 	class := &storagev1.StorageClass{}
 
@@ -58,5 +76,74 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 		t.Errorf("Expected VolumeBindingMode to be defaulted to: %+v, got: nil", defaultMode)
 	} else if *outMode != defaultMode {
 		t.Errorf("Expected VolumeBindingMode to be defaulted to: %+v, got: %+v", defaultMode, outMode)
+	}
+}
+
+func TestSetDefaultCSIDriver(t *testing.T) {
+	enabled := true
+	disabled := false
+	tests := []struct {
+		desc     string
+		field    string
+		wantSpec *storagev1.CSIDriverSpec
+	}{
+		{
+			desc:     "AttachRequired default to true",
+			field:    "AttachRequired",
+			wantSpec: &storagev1.CSIDriverSpec{AttachRequired: &enabled},
+		},
+		{
+			desc:     "PodInfoOnMount default to false",
+			field:    "PodInfoOnMount",
+			wantSpec: &storagev1.CSIDriverSpec{PodInfoOnMount: &disabled},
+		},
+		{
+			desc:     "VolumeLifecycleModes default to VolumeLifecyclePersistent",
+			field:    "VolumeLifecycleModes",
+			wantSpec: &storagev1.CSIDriverSpec{VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecyclePersistent}},
+		},
+		{
+			desc:     "RequiresRepublish default to false",
+			field:    "RequiresRepublish",
+			wantSpec: &storagev1.CSIDriverSpec{RequiresRepublish: &disabled},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			gotSpec := roundTrip(t, runtime.Object(&storagev1.CSIDriver{})).(*storagev1.CSIDriver).Spec
+			got := reflect.Indirect(reflect.ValueOf(gotSpec)).FieldByName(test.field).Interface()
+			want := reflect.Indirect(reflect.ValueOf(test.wantSpec)).FieldByName(test.field).Interface()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("CSIDriver defaults diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
+	driver := &storagev1.CSIDriver{}
+
+	// field should be defaulted
+	defaultSELinuxMount := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount == nil {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: nil", defaultSELinuxMount)
+	} else if *outSELinuxMount != defaultSELinuxMount {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: %+v", defaultSELinuxMount, outSELinuxMount)
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)
+	driver := &storagev1.CSIDriver{}
+
+	// field should not be defaulted
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount != nil {
+		t.Errorf("Expected SELinuxMount to remain nil, got: %+v", outSELinuxMount)
 	}
 }

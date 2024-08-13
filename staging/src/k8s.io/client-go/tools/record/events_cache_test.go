@@ -18,14 +18,15 @@ package record
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/diff"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
@@ -69,10 +70,10 @@ func makeUniqueEvents(num int) []v1.Event {
 	events := []v1.Event{}
 	kind := "Pod"
 	for i := 0; i < num; i++ {
-		reason := strings.Join([]string{"reason", string(i)}, "-")
-		message := strings.Join([]string{"message", string(i)}, "-")
-		name := strings.Join([]string{"pod", string(i)}, "-")
-		namespace := strings.Join([]string{"ns", string(i)}, "-")
+		reason := strings.Join([]string{"reason", strconv.Itoa(i)}, "-")
+		message := strings.Join([]string{"message", strconv.Itoa(i)}, "-")
+		name := strings.Join([]string{"pod", strconv.Itoa(i)}, "-")
+		namespace := strings.Join([]string{"ns", strconv.Itoa(i)}, "-")
 		involvedObject := makeObjectReference(kind, name, namespace)
 		events = append(events, makeEvent(reason, message, involvedObject))
 	}
@@ -82,7 +83,7 @@ func makeUniqueEvents(num int) []v1.Event {
 func makeSimilarEvents(num int, template v1.Event, messagePrefix string) []v1.Event {
 	events := makeEvents(num, template)
 	for i := range events {
-		events[i].Message = strings.Join([]string{messagePrefix, string(i), events[i].Message}, "-")
+		events[i].Message = strings.Join([]string{messagePrefix, strconv.Itoa(i), events[i].Message}, "-")
 	}
 	return events
 }
@@ -114,13 +115,16 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
+
+	recvEvent.ReportingController = expectedEvent.ReportingController
+
 	// Check that name has the right prefix.
 	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
 		t.Errorf("%v - Name '%v' does not contain prefix '%v'", messagePrefix, n, en)
 	}
 	recvEvent.Name = expectedEvent.Name
 	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
-		t.Errorf("%v - diff: %s", messagePrefix, diff.ObjectGoPrintDiff(e, a))
+		t.Errorf("%v - diff: %s", messagePrefix, cmp.Diff(e, a))
 	}
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp
@@ -233,7 +237,7 @@ func TestEventCorrelator(t *testing.T) {
 
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
-		clock := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
+		clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
 		correlator := NewEventCorrelator(&clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
@@ -274,6 +278,89 @@ func TestEventCorrelator(t *testing.T) {
 		_, err = validateEvent(testScenario, result.Event, &testInput.expectedEvent, t)
 		if err != nil {
 			t.Errorf("scenario %v: unexpected error validating result %v", testScenario, err)
+		}
+	}
+}
+
+func TestEventSpamFilter(t *testing.T) {
+	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) string {
+		return strings.Join([]string{
+			e.Source.Component,
+			e.Source.Host,
+			e.InvolvedObject.Kind,
+			e.InvolvedObject.Namespace,
+			e.InvolvedObject.Name,
+			string(e.InvolvedObject.UID),
+			e.InvolvedObject.APIVersion,
+			e.Reason,
+		},
+			"")
+	}
+	burstSize := 1
+	eventInterval := time.Duration(1) * time.Second
+	originalEvent := makeEvent("original", "i am first", makeObjectReference("Pod", "my-pod", "my-ns"))
+	differentReasonEvent := makeEvent("duplicate", "me again", makeObjectReference("Pod", "my-pod", "my-ns"))
+	spamEvent := makeEvent("original", "me again", makeObjectReference("Pod", "my-pod", "my-ns"))
+	testCases := map[string]struct {
+		newEvent      v1.Event
+		expectedEvent v1.Event
+		expectedSkip  bool
+		spamKeyFunc   EventSpamKeyFunc
+	}{
+		"event should be reported as spam if object reference is the same for default spam filter": {
+			newEvent:     differentReasonEvent,
+			expectedSkip: true,
+		},
+		"event should not be reported as spam if object reference is the same, but reason is different for custom spam filter": {
+			newEvent:      differentReasonEvent,
+			expectedEvent: differentReasonEvent,
+			expectedSkip:  false,
+			spamKeyFunc:   spamKeyFuncBasedOnObjectsAndReason,
+		},
+		"event should  be reported as spam if object reference and reason is the same, but message is different for custom spam filter": {
+			newEvent:     spamEvent,
+			expectedSkip: true,
+			spamKeyFunc:  spamKeyFuncBasedOnObjectsAndReason,
+		},
+	}
+
+	for testDescription, testInput := range testCases {
+		c := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
+		correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
+			Clock:       &c,
+			SpamKeyFunc: testInput.spamKeyFunc,
+			BurstSize:   burstSize,
+		})
+		// emitting original event
+		result, err := correlator.EventCorrelate(&originalEvent)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error correlating originalEvent %v", testDescription, err)
+		}
+		// if we are skipping the event, we can avoid updating state
+		if !result.Skip {
+			correlator.UpdateState(result.Event)
+		}
+
+		result, err = correlator.EventCorrelate(&testInput.newEvent)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error correlating input event %v", testDescription, err)
+		}
+
+		// verify we did not get skip from filter function unexpectedly...
+		if result.Skip != testInput.expectedSkip {
+			t.Errorf("scenario %v: expected skip %v, but got %v", testDescription, testInput.expectedSkip, result.Skip)
+			continue
+		}
+
+		// we wanted to actually skip, so no event is needed to validate
+		if testInput.expectedSkip {
+			continue
+		}
+
+		// validate event
+		_, err = validateEvent(testDescription, result.Event, &testInput.expectedEvent, t)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error validating result %v", testDescription, err)
 		}
 	}
 }

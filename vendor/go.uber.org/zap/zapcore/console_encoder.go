@@ -22,20 +22,20 @@ package zapcore
 
 import (
 	"fmt"
-	"sync"
 
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/internal/bufferpool"
+	"go.uber.org/zap/internal/pool"
 )
 
-var _sliceEncoderPool = sync.Pool{
-	New: func() interface{} {
-		return &sliceArrayEncoder{elems: make([]interface{}, 0, 2)}
-	},
-}
+var _sliceEncoderPool = pool.New(func() *sliceArrayEncoder {
+	return &sliceArrayEncoder{
+		elems: make([]interface{}, 0, 2),
+	}
+})
 
 func getSliceEncoder() *sliceArrayEncoder {
-	return _sliceEncoderPool.Get().(*sliceArrayEncoder)
+	return _sliceEncoderPool.Get()
 }
 
 func putSliceEncoder(e *sliceArrayEncoder) {
@@ -56,6 +56,10 @@ type consoleEncoder struct {
 // encoder configuration, it will omit any element whose key is set to the empty
 // string.
 func NewConsoleEncoder(cfg EncoderConfig) Encoder {
+	if cfg.ConsoleSeparator == "" {
+		// Use a default delimiter of '\t' for backwards compatibility
+		cfg.ConsoleSeparator = "\t"
+	}
 	return consoleEncoder{newJSONEncoder(cfg, true)}
 }
 
@@ -89,12 +93,17 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 
 		nameEncoder(ent.LoggerName, arr)
 	}
-	if ent.Caller.Defined && c.CallerKey != "" && c.EncodeCaller != nil {
-		c.EncodeCaller(ent.Caller, arr)
+	if ent.Caller.Defined {
+		if c.CallerKey != "" && c.EncodeCaller != nil {
+			c.EncodeCaller(ent.Caller, arr)
+		}
+		if c.FunctionKey != "" {
+			arr.AppendString(ent.Caller.Function)
+		}
 	}
 	for i := range arr.elems {
 		if i > 0 {
-			line.AppendByte('\t')
+			line.AppendString(c.ConsoleSeparator)
 		}
 		fmt.Fprint(line, arr.elems[i])
 	}
@@ -102,7 +111,7 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 
 	// Add the message itself.
 	if c.MessageKey != "" {
-		c.addTabIfNecessary(line)
+		c.addSeparatorIfNecessary(line)
 		line.AppendString(ent.Message)
 	}
 
@@ -116,17 +125,18 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 		line.AppendString(ent.Stack)
 	}
 
-	if c.LineEnding != "" {
-		line.AppendString(c.LineEnding)
-	} else {
-		line.AppendString(DefaultLineEnding)
-	}
+	line.AppendString(c.LineEnding)
 	return line, nil
 }
 
 func (c consoleEncoder) writeContext(line *buffer.Buffer, extra []Field) {
 	context := c.jsonEncoder.Clone().(*jsonEncoder)
-	defer context.buf.Free()
+	defer func() {
+		// putJSONEncoder assumes the buffer is still used, but we write out the buffer so
+		// we can free it.
+		context.buf.Free()
+		putJSONEncoder(context)
+	}()
 
 	addFields(context, extra)
 	context.closeOpenNamespaces()
@@ -134,14 +144,14 @@ func (c consoleEncoder) writeContext(line *buffer.Buffer, extra []Field) {
 		return
 	}
 
-	c.addTabIfNecessary(line)
+	c.addSeparatorIfNecessary(line)
 	line.AppendByte('{')
 	line.Write(context.buf.Bytes())
 	line.AppendByte('}')
 }
 
-func (c consoleEncoder) addTabIfNecessary(line *buffer.Buffer) {
+func (c consoleEncoder) addSeparatorIfNecessary(line *buffer.Buffer) {
 	if line.Len() > 0 {
-		line.AppendByte('\t')
+		line.AppendString(c.ConsoleSeparator)
 	}
 }

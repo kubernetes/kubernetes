@@ -1,6 +1,6 @@
 # cachecontrol: HTTP Caching Parser and Interpretation
 
-[![GoDoc](https://godoc.org/github.com/pquerna/cachecontrol?status.svg)](https://godoc.org/github.com/pquerna/cachecontrol)[![Build Status](https://travis-ci.org/pquerna/cachecontrol.svg?branch=master)](https://travis-ci.org/pquerna/cachecontrol)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/pquerna/cachecontrol?tab=doc)](https://pkg.go.dev/github.com/pquerna/cachecontrol?tab=doc)[![Build Status](https://travis-ci.org/pquerna/cachecontrol.svg?branch=master)](https://travis-ci.org/pquerna/cachecontrol)
 
  
 

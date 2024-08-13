@@ -18,13 +18,11 @@ package openapi
 
 import (
 	"reflect"
-	"strings"
 	"testing"
-
-	"github.com/go-openapi/spec"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	openapitesting "k8s.io/apiserver/pkg/endpoints/openapi/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func assertEqual(t *testing.T, expected, actual interface{}) {
@@ -46,12 +44,6 @@ func TestGetDefinitionName(t *testing.T) {
 	// "k8s.io/kubernetes/vendor" prefix.
 	typePkgName := "k8s.io/apiserver/pkg/endpoints/openapi/testing.TestType"
 	typeFriendlyName := "io.k8s.apiserver.pkg.endpoints.openapi.testing.TestType"
-	if strings.HasSuffix(reflect.TypeOf(testType).PkgPath(), "go_default_test") {
-		// the test is running inside bazel where the package name is changed and
-		// "go_default_test" will add to package path.
-		typePkgName = "k8s.io/apiserver/pkg/endpoints/openapi/testing/go_default_test.TestType"
-		typeFriendlyName = "io.k8s.apiserver.pkg.endpoints.openapi.testing.go_default_test.TestType"
-	}
 	s := runtime.NewScheme()
 	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
 	namer := NewDefinitionNamer(s)
@@ -67,4 +59,34 @@ func TestGetDefinitionName(t *testing.T) {
 	n, e2 := namer.GetDefinitionName("test.com/another.Type")
 	assertEqual(t, "com.test.another.Type", n)
 	assertEqual(t, e2, spec.Extensions(nil))
+}
+
+func TestToValidOperationID(t *testing.T) {
+	scenarios := []struct {
+		s                     string
+		capitalizeFirstLetter bool
+		expectedResult        string
+	}{
+		{
+			s:                     "test_operation",
+			capitalizeFirstLetter: true,
+			expectedResult:        "Test_operation",
+		},
+		{
+			s:                     "test operation& test",
+			capitalizeFirstLetter: true,
+			expectedResult:        "TestOperationTest",
+		},
+		{
+			s:                     "test78operation",
+			capitalizeFirstLetter: false,
+			expectedResult:        "test78operation",
+		},
+	}
+	for _, tt := range scenarios {
+		result := ToValidOperationID(tt.s, tt.capitalizeFirstLetter)
+		if result != tt.expectedResult {
+			t.Errorf("expected result: %s, got: %s", tt.expectedResult, result)
+		}
+	}
 }

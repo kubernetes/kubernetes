@@ -16,14 +16,13 @@ limitations under the License.
 
 package framework
 
-// NOTE: constants in this file are copied from pkg/master/ports/ports.go
+// NOTE: constants in this file are copied from pkg/cluster/ports/ports.go
 
 const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeControllerManagerPort instead.
-	InsecureKubeControllerManagerPort = 10252
+	KubeControllerManagerPort = 10257
 )

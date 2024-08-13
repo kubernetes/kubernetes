@@ -16,9 +16,13 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.4.7}
+ETCD_VERSION=${ETCD_VERSION:-3.5.15}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
+# This is intentionally not called ETCD_LOG_LEVEL:
+# etcd checks that and compains when it is set in addition
+# to the command line argument, even when both have the same value.
+ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-warn}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 
 kube::etcd::validate() {
@@ -41,15 +45,13 @@ kube::etcd::validate() {
   fi
   if ${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}" >/dev/null 2>&1; then
     kube::log::usage "unable to start etcd as port ${ETCD_PORT} is in use. please stop the process listening on this port and retry."
-    kube::log::usage "$(netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN")"
+    kube::log::usage "$(${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}")"
     exit 1
   fi
 
   # need set the env of "ETCD_UNSUPPORTED_ARCH" on unstable arch.
   arch=$(uname -m)
-  if [[ $arch =~ aarch* ]]; then
-	  export ETCD_UNSUPPORTED_ARCH=arm64
-  elif [[ $arch =~ arm* ]]; then
+  if [[ $arch =~ arm* ]]; then
 	  export ETCD_UNSUPPORTED_ARCH=arm
   fi
   # validate installed version is at least equal to minimum
@@ -82,8 +84,8 @@ kube::etcd::start() {
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
-  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --log-level=${ETCD_LOGLEVEL} 2> \"${ETCD_LOGFILE}\" >/dev/null"
+  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --log-level="${ETCD_LOGLEVEL}" 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
@@ -91,7 +93,39 @@ kube::etcd::start() {
   curl -fs -X POST "${KUBE_INTEGRATION_ETCD_URL}/v3/kv/put" -d '{"key": "X3Rlc3Q=", "value": ""}'
 }
 
+kube::etcd::start_scraping() {
+  if [[ -d "${ARTIFACTS:-}" ]]; then
+    ETCD_SCRAPE_DIR="${ARTIFACTS}/etcd-scrapes"
+  else
+    ETCD_SCRAPE_DIR=$(mktemp -d -t test.XXXXXX)/etcd-scrapes
+  fi
+  kube::log::info "Periodically scraping etcd to ${ETCD_SCRAPE_DIR} ."
+  mkdir -p "${ETCD_SCRAPE_DIR}"
+  (
+    while sleep 30; do
+      kube::etcd::scrape
+    done
+  ) &
+  ETCD_SCRAPE_PID=$!
+}
+
+kube::etcd::scrape() {
+    curl -s -S "${KUBE_INTEGRATION_ETCD_URL}/metrics" > "${ETCD_SCRAPE_DIR}/next" && mv "${ETCD_SCRAPE_DIR}/next" "${ETCD_SCRAPE_DIR}/$(date +%s).scrape"
+}
+
+
 kube::etcd::stop() {
+  if [[ -n "${ETCD_SCRAPE_PID:-}" ]] && [[ -n "${ETCD_SCRAPE_DIR:-}" ]] ; then
+    kill "${ETCD_SCRAPE_PID}" &>/dev/null || :
+    wait "${ETCD_SCRAPE_PID}" &>/dev/null || :
+    kube::etcd::scrape || :
+    (
+      # shellcheck disable=SC2015
+      cd "${ETCD_SCRAPE_DIR}"/.. && \
+      tar czf etcd-scrapes.tgz etcd-scrapes && \
+      rm -rf etcd-scrapes || :
+    )
+  fi
   if [[ -n "${ETCD_PID-}" ]]; then
     kill "${ETCD_PID}" &>/dev/null || :
     wait "${ETCD_PID}" &>/dev/null || :
@@ -110,6 +144,12 @@ kube::etcd::cleanup() {
 }
 
 kube::etcd::install() {
+  # Make sure that we will abort if the inner shell fails.
+  set -o errexit
+  set -o pipefail
+  set -o nounset
+
+  # We change directories below, so this subshell is needed.
   (
     local os
     local arch
@@ -119,27 +159,34 @@ kube::etcd::install() {
 
     cd "${KUBE_ROOT}/third_party" || return 1
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
-      kube::log::info "etcd v${ETCD_VERSION} already installed. To use:"
-      kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
-      return  #already installed
+      V=3 kube::log::info "etcd v${ETCD_VERSION} is already installed"
+      return 0 # already installed
     fi
 
     if [[ ${os} == "darwin" ]]; then
-      download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
-    else
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
-      download_file="etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
+    elif [[ ${os} == "linux" ]]; then
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
       kube::util::download_file "${url}" "${download_file}"
       tar xzf "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-linux-${arch}" etcd
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
+    else
+      kube::log::info "${os} is NOT supported."
+      return 1
     fi
-    kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
-    kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
+    V=4 kube::log::info "installed etcd v${ETCD_VERSION}"
+    return 0 # newly installed
   )
+  # Through the magic of errexit, we will not get here if the above shell
+  # fails!
+  PATH="${KUBE_ROOT}/third_party/etcd:${PATH}" # export into current process
+  export PATH
+  V=3 kube::log::info "added etcd to PATH: ${KUBE_ROOT}/third_party/etcd"
 }

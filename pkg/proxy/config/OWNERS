@@ -1,9 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- sig-network-reviewers
-- lavalamp
-- smarterclayton
-- brendandburns
+  - sig-network-reviewers
+  - smarterclayton
 labels:
-- sig/network
+  - sig/network

@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
 
@@ -87,7 +87,7 @@ func TestCounter(t *testing.T) {
 			mfs, err := registry.Gather()
 			var buf bytes.Buffer
 			enc := expfmt.NewEncoder(&buf, "text/plain; version=0.0.4; charset=utf-8")
-			assert.Equalf(t, test.expectedMetricCount, len(mfs), "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
+			assert.Lenf(t, mfs, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 			for _, metric := range mfs {
 				err := enc.Encode(metric)
@@ -186,12 +186,12 @@ func TestCounterVec(t *testing.T) {
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()
 			mfs, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricFamilyCount, len(mfs), "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
+			assert.Lenf(t, mfs, test.expectedMetricFamilyCount, "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
-				assert.Equalf(t, 1, len(mf.GetMetric()), "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 1, "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
 				assert.Equalf(t, test.expectedHelp, mf.GetHelp(), "Got %s as help message, want %s", mf.GetHelp(), test.expectedHelp)
 			}
 
@@ -203,7 +203,84 @@ func TestCounterVec(t *testing.T) {
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+			}
+		})
+	}
+}
+
+func TestCounterWithLabelValueAllowList(t *testing.T) {
+	labelAllowValues := map[string]string{
+		"namespace_subsystem_metric_allowlist_test,label_a": "allowed",
+	}
+	labels := []string{"label_a", "label_b"}
+	opts := &CounterOpts{
+		Namespace: "namespace",
+		Name:      "metric_allowlist_test",
+		Subsystem: "subsystem",
+	}
+	var tests = []struct {
+		desc               string
+		labelValues        [][]string
+		expectMetricValues map[string]int
+	}{
+		{
+			desc:        "Test no unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"allowed", "b2"}},
+			expectMetricValues: map[string]int{
+				"allowed b1": 1,
+				"allowed b2": 1,
+			},
+		},
+		{
+			desc:        "Test unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"not_allowed", "b1"}},
+			expectMetricValues: map[string]int{
+				"allowed b1":    1,
+				"unexpected b1": 1,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			SetLabelAllowListFromCLI(labelAllowValues)
+			registry := newKubeRegistry(apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
+			c := NewCounterVec(opts, labels)
+			registry.MustRegister(c)
+
+			for _, lv := range test.labelValues {
+				c.WithLabelValues(lv...).Inc()
+			}
+			mfs, err := registry.Gather()
+			assert.Nil(t, err, "Gather failed %v", err)
+
+			for _, mf := range mfs {
+				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
+					continue
+				}
+				mfMetric := mf.GetMetric()
+
+				for _, m := range mfMetric {
+					var aValue, bValue string
+					for _, l := range m.Label {
+						if *l.Name == "label_a" {
+							aValue = *l.Value
+						}
+						if *l.Name == "label_b" {
+							bValue = *l.Value
+						}
+					}
+					labelValuePair := aValue + " " + bValue
+					expectedValue, ok := test.expectMetricValues[labelValuePair]
+					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					actualValue := int(m.GetCounter().GetValue())
+					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
+				}
 			}
 		})
 	}

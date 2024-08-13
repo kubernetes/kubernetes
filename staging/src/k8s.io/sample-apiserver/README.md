@@ -26,28 +26,11 @@ Code changes are made in that location, merged into `k8s.io/kubernetes` and late
 
 ## Fetch sample-apiserver and its dependencies
 
-Like the rest of Kubernetes, sample-apiserver has used
-[godep](https://github.com/tools/godep) and `$GOPATH` for years and is
-now adopting go 1.11 modules.  There are thus two alternative ways to
-go about fetching this demo and its dependencies.
-
-### Fetch with godep
-
-When NOT using go 1.11 modules, you can use the following commands.
+Issue the following commands --- starting in whatever working directory you
+like.
 
 ```sh
-go get -d k8s.io/sample-apiserver
-cd $GOPATH/src/k8s.io/sample-apiserver  # assuming your GOPATH has just one entry
-godep restore
-```
-
-### When using go 1.11 modules
-
-When using go 1.11 modules (`GO111MODULE=on`), issue the following
-commands --- starting in whatever working directory you like.
-
-```sh
-git clone https://github.com/kubernetes/sample-apiserver.git
+git clone https://github.com/kubernetes/sample-apiserver
 cd sample-apiserver
 ```
 
@@ -152,7 +135,7 @@ only this superuser group is authorized.
 
    ``` shell
    openssl req -out client.csr -new -newkey rsa:4096 -nodes -keyout client.key -subj "/CN=development/O=system:masters"
-   openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
+   openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out client.crt
    ```
 
 3. As curl requires client certificates in p12 format with password, do the conversion:
@@ -186,7 +169,7 @@ only this superuser group is authorized.
 5. Use curl to access the server using the client certificate in p12 format for authentication:
 
    ``` shell
-   curl -fv -k --cert client.p12:password \
+   curl -fv -k --cert-type P12 --cert client.p12:password \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
@@ -203,3 +186,4 @@ only this superuser group is authorized.
    http --verify=no --cert client.crt --cert-key client.key \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
+

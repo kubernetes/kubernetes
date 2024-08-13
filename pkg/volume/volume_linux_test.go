@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -26,10 +27,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type localFakeMounter struct {
@@ -43,10 +41,6 @@ func (l *localFakeMounter) GetPath() string {
 
 func (l *localFakeMounter) GetAttributes() Attributes {
 	return l.attributes
-}
-
-func (l *localFakeMounter) CanMount() error {
-	return nil
 }
 
 func (l *localFakeMounter) SetUp(mounterArgs MounterArgs) error {
@@ -172,7 +166,7 @@ func TestSkipPermissionChange(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: tmpDir}
-			ok = skipPermissionChange(mounter, &expectedGid, test.fsGroupChangePolicy)
+			ok = skipPermissionChange(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy)
 			if ok != test.skipPermssion {
 				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
 			}
@@ -181,7 +175,7 @@ func TestSkipPermissionChange(t *testing.T) {
 	}
 }
 
-func TestSetVolumeOwnership(t *testing.T) {
+func TestSetVolumeOwnershipMode(t *testing.T) {
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	expectedMask := rwMask | os.ModeSetgid | execMask
@@ -191,12 +185,10 @@ func TestSetVolumeOwnership(t *testing.T) {
 		fsGroupChangePolicy *v1.PodFSGroupChangePolicy
 		setupFunc           func(path string) error
 		assertFunc          func(path string) error
-		featureGate         bool
 	}{
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=always",
 			fsGroupChangePolicy: &always,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				info, err := os.Lstat(path)
 				if err != nil {
@@ -229,7 +221,6 @@ func TestSetVolumeOwnership(t *testing.T) {
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=validperm",
 			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				info, err := os.Lstat(path)
 				if err != nil {
@@ -261,7 +252,6 @@ func TestSetVolumeOwnership(t *testing.T) {
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=invalidperm",
 			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				// change mode of root folder to be right
 				err := os.Chmod(path, 0770)
@@ -290,7 +280,6 @@ func TestSetVolumeOwnership(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, test.featureGate)()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
@@ -313,8 +302,8 @@ func TestSetVolumeOwnership(t *testing.T) {
 				t.Errorf("for %s error running setup with: %v", test.description, err)
 			}
 
-			mounter := &localFakeMounter{path: tmpDir}
-			err = SetVolumeOwnership(mounter, &expectedGid, test.fsGroupChangePolicy)
+			mounter := &localFakeMounter{path: "FAKE_DIR_DOESNT_EXIST"} // SetVolumeOwnership() must rely on tmpDir
+			err = SetVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil)
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}
@@ -349,4 +338,134 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 		return true
 	}
 	return false
+}
+
+func TestSetVolumeOwnershipOwner(t *testing.T) {
+	fsGroup := int64(3000)
+	currentUid := os.Geteuid()
+	if currentUid != 0 {
+		t.Skip("running as non-root")
+	}
+	currentGid := os.Getgid()
+
+	tests := []struct {
+		description string
+		fsGroup     *int64
+		setupFunc   func(path string) error
+		assertFunc  func(path string) error
+	}{
+		{
+			description: "fsGroup=nil",
+			fsGroup:     nil,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+				return nil
+			},
+			assertFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				if !verifyFileOwner(filename, currentUid, currentGid) {
+					return fmt.Errorf("invalid owner on %s", filename)
+				}
+				return nil
+			},
+		},
+		{
+			description: "*fsGroup=3000",
+			fsGroup:     &fsGroup,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+				return nil
+			},
+			assertFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				if !verifyFileOwner(filename, currentUid, int(fsGroup)) {
+					return fmt.Errorf("invalid owner on %s", filename)
+				}
+				return nil
+			},
+		},
+		{
+			description: "symlink",
+			fsGroup:     &fsGroup,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+
+				symname := filepath.Join(path, "file_link.txt")
+				err = os.Symlink(filename, symname)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+			assertFunc: func(path string) error {
+				symname := filepath.Join(path, "file_link.txt")
+				if !verifyFileOwner(symname, currentUid, int(fsGroup)) {
+					return fmt.Errorf("invalid owner on %s", symname)
+				}
+				return nil
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
+			if err != nil {
+				t.Fatalf("error creating temp dir: %v", err)
+			}
+
+			defer os.RemoveAll(tmpDir)
+
+			err = test.setupFunc(tmpDir)
+			if err != nil {
+				t.Errorf("for %s error running setup with: %v", test.description, err)
+			}
+
+			mounter := &localFakeMounter{path: tmpDir}
+			always := v1.FSGroupChangeAlways
+			err = SetVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil)
+			if err != nil {
+				t.Errorf("for %s error changing ownership with: %v", test.description, err)
+			}
+			err = test.assertFunc(tmpDir)
+			if err != nil {
+				t.Errorf("for %s error verifying permissions with: %v", test.description, err)
+			}
+		})
+	}
+}
+
+// verifyFileOwner checks if given path is owned by uid and gid.
+// It returns true if it is otherwise false.
+func verifyFileOwner(path string, uid, gid int) bool {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat == nil {
+		return false
+	}
+
+	if int(stat.Uid) != uid || int(stat.Gid) != gid {
+		return false
+	}
+
+	return true
 }

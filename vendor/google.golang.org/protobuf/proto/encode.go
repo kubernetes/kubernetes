@@ -5,21 +5,24 @@
 package proto
 
 import (
-	"sort"
+	"errors"
+	"fmt"
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
-	"google.golang.org/protobuf/internal/fieldsort"
-	"google.golang.org/protobuf/internal/mapsort"
+	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/runtime/protoiface"
+
+	protoerrors "google.golang.org/protobuf/internal/errors"
 )
 
 // MarshalOptions configures the marshaler.
 //
 // Example usage:
-//   b, err := MarshalOptions{Deterministic: true}.Marshal(m)
+//
+//	b, err := MarshalOptions{Deterministic: true}.Marshal(m)
 type MarshalOptions struct {
 	pragma.NoUnkeyedLiterals
 
@@ -72,7 +75,32 @@ type MarshalOptions struct {
 	UseCachedSize bool
 }
 
+// flags turns the specified MarshalOptions (user-facing) into
+// protoiface.MarshalInputFlags (used internally by the marshaler).
+//
+// See impl.marshalOptions.Options for the inverse operation.
+func (o MarshalOptions) flags() protoiface.MarshalInputFlags {
+	var flags protoiface.MarshalInputFlags
+
+	// Note: o.AllowPartial is always forced to true by MarshalOptions.marshal,
+	// which is why it is not a part of MarshalInputFlags.
+
+	if o.Deterministic {
+		flags |= protoiface.MarshalDeterministic
+	}
+
+	if o.UseCachedSize {
+		flags |= protoiface.MarshalUseCachedSize
+	}
+
+	return flags
+}
+
 // Marshal returns the wire-format encoding of m.
+//
+// This is the most common entry point for encoding a Protobuf message.
+//
+// See the [MarshalOptions] type if you need more control.
 func Marshal(m Message) ([]byte, error) {
 	// Treat nil message interface as an empty message; nothing to output.
 	if m == nil {
@@ -104,7 +132,9 @@ func (o MarshalOptions) Marshal(m Message) ([]byte, error) {
 // otherwise it returns a non-nil empty buffer.
 //
 // This is to assist the edge-case where user-code does the following:
+//
 //	m1.OptionalBytes, _ = proto.Marshal(m2)
+//
 // where they expect the proto2 "optional_bytes" field to be populated
 // if any only if m2 is a valid message.
 func emptyBytesForMessage(m Message) []byte {
@@ -116,6 +146,9 @@ func emptyBytesForMessage(m Message) []byte {
 
 // MarshalAppend appends the wire-format encoding of m to b,
 // returning the result.
+//
+// This is a less common entry point than [Marshal], which is only needed if you
+// need to supply your own buffers for performance reasons.
 func (o MarshalOptions) MarshalAppend(b []byte, m Message) ([]byte, error) {
 	// Treat nil message interface as an empty message; nothing to append.
 	if m == nil {
@@ -129,11 +162,14 @@ func (o MarshalOptions) MarshalAppend(b []byte, m Message) ([]byte, error) {
 // MarshalState returns the wire-format encoding of a message.
 //
 // This method permits fine-grained control over the marshaler.
-// Most users should use Marshal instead.
+// Most users should use [Marshal] instead.
 func (o MarshalOptions) MarshalState(in protoiface.MarshalInput) (protoiface.MarshalOutput, error) {
 	return o.marshal(in.Buf, in.Message)
 }
 
+// marshal is a centralized function that all marshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for marshal that do not go through this.
 func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoiface.MarshalOutput, err error) {
 	allowPartial := o.AllowPartial
 	o.AllowPartial = true
@@ -142,12 +178,7 @@ func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoifac
 		in := protoiface.MarshalInput{
 			Message: m,
 			Buf:     b,
-		}
-		if o.Deterministic {
-			in.Flags |= protoiface.MarshalDeterministic
-		}
-		if o.UseCachedSize {
-			in.Flags |= protoiface.MarshalUseCachedSize
+			Flags:   o.flags(),
 		}
 		if methods.Size != nil {
 			sout := methods.Size(protoiface.SizeInput{
@@ -165,6 +196,10 @@ func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoifac
 		out.Buf, err = o.marshalMessageSlow(b, m)
 	}
 	if err != nil {
+		var mismatch *protoerrors.SizeMismatchError
+		if errors.As(err, &mismatch) {
+			return out, fmt.Errorf("marshaling %s: %v", string(m.Descriptor().FullName()), err)
+		}
 		return out, err
 	}
 	if allowPartial {
@@ -206,16 +241,17 @@ func growcap(oldcap, wantcap int) (newcap int) {
 
 func (o MarshalOptions) marshalMessageSlow(b []byte, m protoreflect.Message) ([]byte, error) {
 	if messageset.IsMessageSet(m.Descriptor()) {
-		return marshalMessageSet(b, m, o)
+		return o.marshalMessageSet(b, m)
 	}
-	// There are many choices for what order we visit fields in. The default one here
-	// is chosen for reasonable efficiency and simplicity given the protoreflect API.
-	// It is not deterministic, since Message.Range does not return fields in any
-	// defined order.
-	//
-	// When using deterministic serialization, we sort the known fields.
+	fieldOrder := order.AnyFieldOrder
+	if o.Deterministic {
+		// TODO: This should use a more natural ordering like NumberFieldOrder,
+		// but doing so breaks golden tests that make invalid assumption about
+		// output stability of this implementation.
+		fieldOrder = order.LegacyFieldOrder
+	}
 	var err error
-	o.rangeFields(m, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+	order.RangeFields(m, fieldOrder, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		b, err = o.marshalField(b, fd, v)
 		return err == nil
 	})
@@ -224,27 +260,6 @@ func (o MarshalOptions) marshalMessageSlow(b []byte, m protoreflect.Message) ([]
 	}
 	b = append(b, m.GetUnknown()...)
 	return b, nil
-}
-
-// rangeFields visits fields in a defined order when deterministic serialization is enabled.
-func (o MarshalOptions) rangeFields(m protoreflect.Message, f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
-	if !o.Deterministic {
-		m.Range(f)
-		return
-	}
-	var fds []protoreflect.FieldDescriptor
-	m.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
-		fds = append(fds, fd)
-		return true
-	})
-	sort.Slice(fds, func(a, b int) bool {
-		return fieldsort.Less(fds[a], fds[b])
-	})
-	for _, fd := range fds {
-		if !f(fd, m.Get(fd)) {
-			break
-		}
-	}
 }
 
 func (o MarshalOptions) marshalField(b []byte, fd protoreflect.FieldDescriptor, value protoreflect.Value) ([]byte, error) {
@@ -289,8 +304,12 @@ func (o MarshalOptions) marshalList(b []byte, fd protoreflect.FieldDescriptor, l
 func (o MarshalOptions) marshalMap(b []byte, fd protoreflect.FieldDescriptor, mapv protoreflect.Map) ([]byte, error) {
 	keyf := fd.MapKey()
 	valf := fd.MapValue()
+	keyOrder := order.AnyKeyOrder
+	if o.Deterministic {
+		keyOrder = order.GenericKeyOrder
+	}
 	var err error
-	o.rangeMap(mapv, keyf.Kind(), func(key protoreflect.MapKey, value protoreflect.Value) bool {
+	order.RangeEntries(mapv, keyOrder, func(key protoreflect.MapKey, value protoreflect.Value) bool {
 		b = protowire.AppendTag(b, fd.Number(), protowire.BytesType)
 		var pos int
 		b, pos = appendSpeculativeLength(b)
@@ -307,14 +326,6 @@ func (o MarshalOptions) marshalMap(b []byte, fd protoreflect.FieldDescriptor, ma
 		return true
 	})
 	return b, err
-}
-
-func (o MarshalOptions) rangeMap(mapv protoreflect.Map, kind protoreflect.Kind, f func(protoreflect.MapKey, protoreflect.Value) bool) {
-	if !o.Deterministic {
-		mapv.Range(f)
-		return
-	}
-	mapsort.Range(mapv, kind, f)
 }
 
 // When encoding length-prefixed fields, we speculatively set aside some number of bytes

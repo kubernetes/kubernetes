@@ -90,7 +90,7 @@ run_multi_resources_tests() {
     fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    kubectl replace -f "${replace_file}" --force --cascade "${kube_flags[@]}"
+    kubectl replace -f "${replace_file}" --force --cascade=background "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field:?}.status}}" 'replaced'
@@ -259,32 +259,6 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{${labels_field}.status}}:{{end}}" 'replaced:replaced:'
   kube::test::if_has_string "${output_message}" 'error validating data: kind not set'
 
-
-  ### Convert deployment YAML file locally without affecting the live deployment.
-  # Pre-condition: no deployments exist
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command
-  # Create a deployment (revision 1)
-  kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
-  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
-  # Command
-  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=extensions/v1beta1 -o yaml "${kube_flags[@]}")
-  # Post-condition: apiVersion is still apps/v1 in the live deployment, but command output is the new value
-  kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'apps/v1'
-  kube::test::if_has_string "${output_message}" "extensions/v1beta1"
-  # Clean up
-  kubectl delete deployment nginx "${kube_flags[@]}"
-
-  ## Convert multiple busybox PODs recursively from directory of YAML files
-  # Pre-condition: only busybox0 & busybox1 PODs exist
-  kube::test::wait_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  # Command
-  output_message=$(! kubectl convert -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
-  # Post-condition: busybox0 & busybox1 PODs are converted, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
-
   ## Get multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
@@ -389,11 +363,11 @@ run_recursive_resources_tests() {
   # Create deployments (revision 1) recursively from directory of YAML files
   ! kubectl create -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx0-deployment:nginx1-deployment:'
-  kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   ## Rollback the deployments to revision 1 recursively
   output_message=$(! kubectl rollout undo -f hack/testdata/recursive/deployment --recursive --to-revision=1 2>&1 "${kube_flags[@]}")
   # Post-condition: nginx0 & nginx1 should be a no-op, and since nginx2 is malformed, it should error
-  kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Pause the deployments recursively
   # shellcheck disable=SC2034  # PRESERVE_ERR_FILE is used in kubectl-with-retry
@@ -408,6 +382,17 @@ run_recursive_resources_tests() {
   output_message=$(cat "${ERROR_FILE}")
   # Post-condition: nginx0 & nginx1 should both have paused set to nothing, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Fetch rollout status for multiple resources
+  output_message=$(! kubectl rollout status -f hack/testdata/recursive/deployment/deployment --timeout=1s 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: nginx1 should both exist and nginx2 should error
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx1-deployment\" rollout to finish"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Fetch rollout status for deployments recursively
+  output_message=$(! kubectl rollout status -f hack/testdata/recursive/deployment -R --timeout=1s 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: nginx0 & nginx1 should both exist, nginx2 should error
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx0-deployment\" rollout to finish"
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx1-deployment\" rollout to finish"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Retrieve the rollout history of the deployments recursively
   output_message=$(! kubectl rollout history -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")

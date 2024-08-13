@@ -33,28 +33,29 @@ import (
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
 // with the actual state of the world by triggering register and unregister
-// operations.
+// operations. Also provides a means to add a handler for a plugin type.
 type Reconciler interface {
-	// Starts running the reconciliation loop which executes periodically, checks
-	// if plugins that should be registered are register and plugins that should be
-	// unregistered are unregistered. If not, it will trigger register/unregister
-	// operations to rectify.
+	// Run starts running the reconciliation loop which executes periodically,
+	// checks if plugins are correctly registered or unregistered.
+	// If not, it will trigger register/unregister operations to rectify.
 	Run(stopCh <-chan struct{})
 
-	// AddHandler adds the given plugin handler for a specific plugin type
+	// AddHandler adds the given plugin handler for a specific plugin type,
+	// which will be added to the actual state of world cache.
 	AddHandler(pluginType string, pluginHandler cache.PluginHandler)
 }
 
 // NewReconciler returns a new instance of Reconciler.
 //
-// loopSleepDuration - the amount of time the reconciler loop sleeps between
-//   successive executions
-//   syncDuration - the amount of time the syncStates sleeps between
-//   successive executions
 // operationExecutor - used to trigger register/unregister operations safely
-//   (prevents more than one operation from being triggered on the same
-//   socket path)
+// (prevents more than one operation from being triggered on the same
+// socket path)
+//
+// loopSleepDuration - the amount of time the reconciler loop sleeps between
+// successive executions
+//
 // desiredStateOfWorld - cache containing the desired state of the world
+//
 // actualStateOfWorld - cache containing the actual state of the world
 func NewReconciler(
 	operationExecutor operationexecutor.OperationExecutor,
@@ -100,7 +101,11 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 	rc.RLock()
 	defer rc.RUnlock()
 
-	return rc.handlers
+	var copyHandlers = make(map[string]cache.PluginHandler)
+	for pluginType, handler := range rc.handlers {
+		copyHandlers[pluginType] = handler
+	}
+	return copyHandlers
 }
 
 func (rc *reconciler) reconcile() {
@@ -118,7 +123,7 @@ func (rc *reconciler) reconcile() {
 			// with the same socket path but different timestamp.
 			for _, dswPlugin := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 				if dswPlugin.SocketPath == registeredPlugin.SocketPath && dswPlugin.Timestamp != registeredPlugin.Timestamp {
-					klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("An updated version of plugin has been found, unregistering the plugin first before reregistering", ""))
+					klog.V(5).InfoS("An updated version of plugin has been found, unregistering the plugin first before reregistering", "plugin", registeredPlugin)
 					unregisterPlugin = true
 					break
 				}
@@ -126,17 +131,17 @@ func (rc *reconciler) reconcile() {
 		}
 
 		if unregisterPlugin {
-			klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("Starting operationExecutor.UnregisterPlugin", ""))
+			klog.V(5).InfoS("Starting operationExecutor.UnregisterPlugin", "plugin", registeredPlugin)
 			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin, rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				klog.Errorf(registeredPlugin.GenerateErrorDetailed("operationExecutor.UnregisterPlugin failed", err).Error())
+				klog.ErrorS(err, "OperationExecutor.UnregisterPlugin failed", "plugin", registeredPlugin)
 			}
 			if err == nil {
-				klog.V(1).Infof(registeredPlugin.GenerateMsgDetailed("operationExecutor.UnregisterPlugin started", ""))
+				klog.V(1).InfoS("OperationExecutor.UnregisterPlugin started", "plugin", registeredPlugin)
 			}
 		}
 	}
@@ -144,16 +149,16 @@ func (rc *reconciler) reconcile() {
 	// Ensure plugins that should be registered are registered
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
-			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
+			klog.V(5).InfoS("Starting operationExecutor.RegisterPlugin", "plugin", pluginToRegister)
 			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				klog.Errorf(pluginToRegister.GenerateErrorDetailed("operationExecutor.RegisterPlugin failed", err).Error())
+				klog.ErrorS(err, "OperationExecutor.RegisterPlugin failed", "plugin", pluginToRegister)
 			}
 			if err == nil {
-				klog.V(1).Infof(pluginToRegister.GenerateMsgDetailed("operationExecutor.RegisterPlugin started", ""))
+				klog.V(1).InfoS("OperationExecutor.RegisterPlugin started", "plugin", pluginToRegister)
 			}
 		}
 	}

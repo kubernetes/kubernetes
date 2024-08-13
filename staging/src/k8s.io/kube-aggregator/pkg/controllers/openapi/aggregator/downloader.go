@@ -21,13 +21,73 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/go-openapi/spec"
-	jsoniter "github.com/json-iterator/go"
+	"sync/atomic"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+type CacheableDownloader interface {
+	UpdateHandler(http.Handler)
+	Get() (*spec.Swagger, string, error)
+}
+
+// cacheableDownloader is a downloader that will always return the data
+// and the etag.
+type cacheableDownloader struct {
+	name       string
+	downloader *Downloader
+	// handler is the http Handler for the apiservice that can be replaced
+	handler atomic.Pointer[http.Handler]
+	etag    string
+	spec    *spec.Swagger
+}
+
+// NewCacheableDownloader creates a downloader that also returns the etag, making it useful to use as a cached dependency.
+func NewCacheableDownloader(apiServiceName string, downloader *Downloader, handler http.Handler) CacheableDownloader {
+	c := &cacheableDownloader{
+		name:       apiServiceName,
+		downloader: downloader,
+	}
+	c.handler.Store(&handler)
+	return c
+}
+func (d *cacheableDownloader) UpdateHandler(handler http.Handler) {
+	d.handler.Store(&handler)
+}
+
+func (d *cacheableDownloader) Get() (*spec.Swagger, string, error) {
+	spec, etag, err := d.get()
+	if err != nil {
+		return spec, etag, fmt.Errorf("failed to download %v: %v", d.name, err)
+	}
+	return spec, etag, err
+}
+
+func (d *cacheableDownloader) get() (*spec.Swagger, string, error) {
+	h := *d.handler.Load()
+	swagger, etag, status, err := d.downloader.Download(h, d.etag)
+	if err != nil {
+		return nil, "", err
+	}
+	switch status {
+	case http.StatusNotModified:
+		// Nothing has changed, do nothing.
+	case http.StatusOK:
+		if swagger != nil {
+			d.etag = etag
+			d.spec = swagger
+			break
+		}
+		fallthrough
+	case http.StatusNotFound:
+		return nil, "", ErrAPIServiceNotFound
+	default:
+		return nil, "", fmt.Errorf("invalid status code: %v", status)
+	}
+	return d.spec, d.etag, nil
+}
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
 type Downloader struct {
@@ -80,7 +140,7 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 		return nil, "", http.StatusNotFound, nil
 	case http.StatusOK:
 		openAPISpec := &spec.Swagger{}
-		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(writer.data, openAPISpec); err != nil {
+		if err := openAPISpec.UnmarshalJSON(writer.data); err != nil {
 			return nil, "", 0, err
 		}
 		newEtag = writer.Header().Get("Etag")

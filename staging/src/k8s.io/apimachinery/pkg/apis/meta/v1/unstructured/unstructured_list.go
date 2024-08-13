@@ -52,6 +52,15 @@ func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 	return nil
 }
 
+func (u *UnstructuredList) EachListItemWithAlloc(fn func(runtime.Object) error) error {
+	for i := range u.Items {
+		if err := fn(&Unstructured{Object: u.Items[i].Object}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
 // This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
 func (u *UnstructuredList) NewEmptyInstance() runtime.Unstructured {

@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
@@ -42,6 +43,7 @@ type ServiceAccountTokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	GetSecret(namespace, name string) (*v1.Secret, error)
+	GetNode(name string) (*v1.Node, error)
 }
 
 type TokenGenerator interface {
@@ -223,38 +225,113 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(iss string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
-	return &jwtTokenAuthenticator{
-		iss:          iss,
-		keys:         keys,
+func JWTTokenAuthenticator[PrivateClaims any](issuers []string, publicKeysGetter PublicKeysGetter, implicitAuds authenticator.Audiences, validator Validator[PrivateClaims]) authenticator.Token {
+	issuersMap := make(map[string]bool)
+	for _, issuer := range issuers {
+		issuersMap[issuer] = true
+	}
+	return &jwtTokenAuthenticator[PrivateClaims]{
+		issuers:      issuersMap,
+		keysGetter:   publicKeysGetter,
 		implicitAuds: implicitAuds,
 		validator:    validator,
 	}
 }
 
-type jwtTokenAuthenticator struct {
-	iss          string
-	keys         []interface{}
-	validator    Validator
+// Listener is an interface to use to notify interested parties of a change.
+type Listener interface {
+	// Enqueue should be called when an input may have changed
+	Enqueue()
+}
+
+// PublicKeysGetter returns public keys for a given key id.
+type PublicKeysGetter interface {
+	// AddListener is adds a listener to be notified of potential input changes.
+	// This is a noop on static providers.
+	AddListener(listener Listener)
+
+	// GetCacheAgeMaxSeconds returns the seconds a call to GetPublicKeys() can be cached for.
+	// If the results of GetPublicKeys() can be dynamic, this means a new key must be included in the results
+	// for at least this long before it is used to sign new tokens.
+	GetCacheAgeMaxSeconds() int
+
+	// GetPublicKeys returns public keys to use for verifying a token with the given key id.
+	// keyIDHint may be empty if the token did not have a kid header, or if all public keys are desired.
+	GetPublicKeys(keyIDHint string) []PublicKey
+}
+
+type PublicKey struct {
+	KeyID     string
+	PublicKey interface{}
+}
+
+type staticPublicKeysGetter struct {
+	allPublicKeys  []PublicKey
+	publicKeysByID map[string][]PublicKey
+}
+
+// StaticPublicKeysGetter constructs an implementation of PublicKeysGetter
+// which returns all public keys when key id is unspecified, and returns
+// the public keys matching the keyIDFromPublicKey-derived key id when
+// a key id is specified.
+func StaticPublicKeysGetter(keys []interface{}) (PublicKeysGetter, error) {
+	allPublicKeys := []PublicKey{}
+	publicKeysByID := map[string][]PublicKey{}
+	for _, key := range keys {
+		if privateKey, isPrivateKey := key.(publicKeyGetter); isPrivateKey {
+			// This is a private key. Extract its public key.
+			key = privateKey.Public()
+		}
+
+		keyID, err := keyIDFromPublicKey(key)
+		if err != nil {
+			return nil, err
+		}
+		pk := PublicKey{PublicKey: key, KeyID: keyID}
+		publicKeysByID[keyID] = append(publicKeysByID[keyID], pk)
+		allPublicKeys = append(allPublicKeys, pk)
+	}
+	return &staticPublicKeysGetter{
+		allPublicKeys:  allPublicKeys,
+		publicKeysByID: publicKeysByID,
+	}, nil
+}
+
+func (s staticPublicKeysGetter) AddListener(listener Listener) {
+	// no-op, static key content never changes
+}
+
+func (s staticPublicKeysGetter) GetCacheAgeMaxSeconds() int {
+	// hard-coded to match cache max-age set in OIDC discovery
+	return 3600
+}
+
+func (s staticPublicKeysGetter) GetPublicKeys(keyID string) []PublicKey {
+	if len(keyID) == 0 {
+		return s.allPublicKeys
+	}
+	return s.publicKeysByID[keyID]
+}
+
+type jwtTokenAuthenticator[PrivateClaims any] struct {
+	issuers      map[string]bool
+	keysGetter   PublicKeysGetter
+	validator    Validator[PrivateClaims]
 	implicitAuds authenticator.Audiences
 }
 
 // Validator is called by the JWT token authenticator to apply domain specific
 // validation to a token and extract user information.
-type Validator interface {
+// PrivateClaims is the struct that the authenticator should deserialize the JWT payload into, thus
+// it should contain fields for any private claims that the Validator requires to validate the JWT.
+type Validator[PrivateClaims any] interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private interface{}) (*ServiceAccountInfo, error)
-	// NewPrivateClaims returns a struct that the authenticator should
-	// deserialize the JWT payload into. The authenticator may then pass this
-	// struct back to the Validator as the 'private' argument to a Validate()
-	// call. This struct should contain fields for any private claims that the
-	// Validator requires to validate the JWT.
-	NewPrivateClaims() interface{}
+	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private *PrivateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error)
 }
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
+func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
@@ -265,15 +342,27 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 	}
 
 	public := &jwt.Claims{}
-	private := j.validator.NewPrivateClaims()
+	private := new(PrivateClaims)
 
-	// TODO: Pick the key that has the same key ID as `tok`, if one exists.
+	// Pick the key that has the same key ID as `tok`, if one exists.
+	var kid string
+	for _, header := range tok.Headers {
+		if header.KeyID != "" {
+			kid = header.KeyID
+			break
+		}
+	}
+
 	var (
 		found   bool
 		errlist []error
 	)
-	for _, key := range j.keys {
-		if err := tok.Claims(key, public, private); err != nil {
+	keys := j.keysGetter.GetPublicKeys(kid)
+	if len(keys) == 0 {
+		return nil, false, fmt.Errorf("invalid signature, no keys found")
+	}
+	for _, key := range keys {
+		if err := tok.Claims(key.PublicKey, public, private); err != nil {
 			errlist = append(errlist, err)
 			continue
 		}
@@ -285,11 +374,16 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 		return nil, false, utilerrors.NewAggregate(errlist)
 	}
 
+	// sanity check issuer since we parsed it out before signature validation
+	if !j.issuers[public.Issuer] {
+		return nil, false, fmt.Errorf("token issuer %q is invalid", public.Issuer)
+	}
+
 	tokenAudiences := authenticator.Audiences(public.Audience)
 	if len(tokenAudiences) == 0 {
 		// only apiserver audiences are allowed for legacy tokens
 		audit.AddAuditAnnotation(ctx, "authentication.k8s.io/legacy-token", public.Subject)
-		legacyTokensTotal.Inc()
+		legacyTokensTotal.WithContext(ctx).Inc()
 		tokenAudiences = j.implicitAuds
 	}
 
@@ -323,7 +417,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 //
 // Note: go-jose currently does not allow access to unverified JWS payloads.
 // See https://github.com/square/go-jose/issues/169
-func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
+func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string) bool {
+	if strings.HasPrefix(strings.TrimSpace(tokenData), "{") {
+		return false
+	}
 	parts := strings.Split(tokenData, ".")
 	if len(parts) != 3 {
 		return false
@@ -339,9 +436,5 @@ func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return false
 	}
-	if claims.Issuer != j.iss {
-		return false
-	}
-	return true
-
+	return j.issuers[claims.Issuer]
 }

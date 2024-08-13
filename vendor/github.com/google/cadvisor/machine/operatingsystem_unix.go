@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build freebsd || darwin || linux
 // +build freebsd darwin linux
 
 package machine
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -38,10 +38,10 @@ func getOperatingSystem() (string, error) {
 		}
 		return string(osName), nil
 	}
-	bytes, err := ioutil.ReadFile("/etc/os-release")
+	bytes, err := os.ReadFile("/etc/os-release")
 	if err != nil && os.IsNotExist(err) {
 		// /usr/lib/os-release in stateless systems like Clear Linux
-		bytes, err = ioutil.ReadFile("/usr/lib/os-release")
+		bytes, err = os.ReadFile("/usr/lib/os-release")
 	}
 	if err != nil {
 		return "", fmt.Errorf("error opening file : %v", err)

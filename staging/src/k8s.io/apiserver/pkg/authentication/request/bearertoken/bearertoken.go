@@ -22,6 +22,11 @@ import (
 	"strings"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/warning"
+)
+
+const (
+	invalidTokenWithSpaceWarning = "the provided Authorization header contains extra space before the bearer token, and is ignored"
 )
 
 type Authenticator struct {
@@ -39,7 +44,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	if auth == "" {
 		return nil, false, nil
 	}
-	parts := strings.Split(auth, " ")
+	parts := strings.SplitN(auth, " ", 3)
 	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
 		return nil, false, nil
 	}
@@ -48,6 +53,10 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 	// Empty bearer tokens aren't valid
 	if len(token) == 0 {
+		// The space before the token case
+		if len(parts) == 3 {
+			warning.AddWarning(req.Context(), "", invalidTokenWithSpaceWarning)
+		}
 		return nil, false, nil
 	}
 

@@ -27,19 +27,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestWatchBasedManager(t *testing.T) {
 	testNamespace := "test-watch-based-manager"
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
+	const n = 10
 	server.ClientConfig.QPS = 10000
 	server.ClientConfig.Burst = 10000
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -60,13 +63,17 @@ func TestWatchBasedManager(t *testing.T) {
 	// We want all watches to be up and running to stress test it.
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"})
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
 	wg := sync.WaitGroup{}
-	errCh := make(chan error, 1)
-	for i := 0; i < 10; i++ {
+	errCh := make(chan error, n)
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -93,15 +100,15 @@ func TestWatchBasedManager(t *testing.T) {
 
 	// fetch all secrets
 	wg = sync.WaitGroup{}
-	errCh = make(chan error, 1)
-	for i := 0; i < 10; i++ {
+	errCh = make(chan error, n)
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
-				store.AddReference(testNamespace, name)
+				store.AddReference(testNamespace, name, types.UID(name))
 				err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 					obj, err := store.Get(testNamespace, name)
 					if err != nil {

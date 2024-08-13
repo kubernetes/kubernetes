@@ -17,12 +17,21 @@ limitations under the License.
 package create
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -36,16 +45,37 @@ var (
 	  kubectl create namespace my-namespace`))
 )
 
-// NamespaceOpts is the options for 'create namespace' sub command
-type NamespaceOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+// NamespaceOptions is the options for 'create namespace' sub command
+type NamespaceOptions struct {
+	// PrintFlags holds options necessary for obtaining a printer
+	PrintFlags *genericclioptions.PrintFlags
+	// Name of resource being created
+	Name string
+
+	DryRunStrategy      cmdutil.DryRunStrategy
+	ValidationDirective string
+	CreateAnnotation    bool
+	FieldManager        string
+
+	Client *coreclient.CoreV1Client
+
+	PrintObj func(obj runtime.Object) error
+
+	genericiooptions.IOStreams
+}
+
+// NewNamespaceOptions creates a new *NamespaceOptions with sane defaults
+func NewNamespaceOptions(ioStreams genericiooptions.IOStreams) *NamespaceOptions {
+	return &NamespaceOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
+	}
 }
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
-func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &NamespaceOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+
+	o := NewNamespaceOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "namespace NAME [--dry-run=server|client|none]",
@@ -55,40 +85,95 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Long:                  namespaceLong,
 		Example:               namespaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.NamespaceV1GeneratorName)
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
 }
 
 // Complete completes all the required options
-func (o *NamespaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.NamespaceV1GeneratorName:
-		generator = &generateversioned.NamespaceGeneratorV1{Name: name}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+	restConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = coreclient.NewForConfig(restConfig)
+	if err != nil {
+		return err
 	}
 
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+	o.Name = name
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	return err
 }
 
 // Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
-func (o *NamespaceOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
+func (o *NamespaceOptions) Run() error {
+	namespace := o.createNamespace()
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		createOptions.FieldValidation = o.ValidationDirective
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		var err error
+		namespace, err = o.Client.Namespaces().Create(context.TODO(), namespace, createOptions)
+		if err != nil {
+			return err
+		}
+	}
+	return o.PrintObj(namespace)
+}
+
+// createNamespace outputs a namespace object using the configured fields
+func (o *NamespaceOptions) createNamespace() *corev1.Namespace {
+	namespace := &corev1.Namespace{
+		TypeMeta:   metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Namespace"},
+		ObjectMeta: metav1.ObjectMeta{Name: o.Name},
+	}
+	return namespace
+}
+
+// Validate validates required fields are set to support structured generation
+func (o *NamespaceOptions) Validate() error {
+	if len(o.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	return nil
 }

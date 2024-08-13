@@ -22,9 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	"k8s.io/kubernetes/pkg/apis/coordination/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // leaseStrategy implements verification logic for Leases.
@@ -43,10 +45,26 @@ func (leaseStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate prepares Lease for creation.
 func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	lease := obj.(*coordination.Lease)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CoordinatedLeaderElection) {
+		lease.Spec.Strategy = nil
+		lease.Spec.PreferredHolder = nil
+	}
+
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (leaseStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	oldLease := old.(*coordination.Lease)
+	newLease := obj.(*coordination.Lease)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CoordinatedLeaderElection) {
+		if oldLease == nil || oldLease.Spec.Strategy == nil {
+			newLease.Spec.Strategy = nil
+		}
+		if oldLease == nil || oldLease.Spec.PreferredHolder == nil {
+			newLease.Spec.PreferredHolder = nil
+		}
+	}
 }
 
 // Validate validates a new Lease.
@@ -54,6 +72,9 @@ func (leaseStrategy) Validate(ctx context.Context, obj runtime.Object) field.Err
 	lease := obj.(*coordination.Lease)
 	return validation.ValidateLease(lease)
 }
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (leaseStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 // Canonicalize normalizes the object after validation.
 func (leaseStrategy) Canonicalize(obj runtime.Object) {
@@ -67,6 +88,11 @@ func (leaseStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (leaseStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateLeaseUpdate(obj.(*coordination.Lease), old.(*coordination.Lease))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (leaseStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for Lease objects.

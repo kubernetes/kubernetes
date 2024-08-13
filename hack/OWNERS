@@ -1,38 +1,46 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
 reviewers:
   - bentheelder
   - cblecker
-  - eparis
-  - fejta
-  - ixdy
-  - juanvallejo
+  - dchen1107
   - hwdef
-  - lavalamp
+  - justaugustus
+  - liggitt
+  - mikedanese
+  - pohly
   - SataQiu
+  - smarterclayton
   - spiffxp
   - sttts
-  - vishh
-  - xichengliudui
-  - zmerlynn
-  - mikedanese
+  - thockin
+  - wojtek-t
 approvers:
   - bentheelder
   - cblecker
+  - dchen1107
   - deads2k
   - dims # for local-up-cluster related files
-  - eparis
-  - fejta
-  - ixdy
-  - lavalamp
+  - enj # for sig-auth related stuff like cert testdata
   - liggitt
+  - mikedanese
+  - pohly # for logging and linting
   - pwittrock
   - SataQiu
+  - smarterclayton
   - soltysh # for sig-cli related stuff
   - spiffxp
   - sttts
-  - vishh
-  - zmerlynn
-  - mikedanese
+  - thockin
+  - wojtek-t
 emeritus_approvers:
+  - eparis
+  - fejta
+  - ixdy
   - jbeda
+  - lavalamp
+  - zmerlynn
+  - vishh

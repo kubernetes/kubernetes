@@ -14,8 +14,11 @@ import (
 	"time"
 )
 
-// These constants from [PROTOCOL.certkeys] represent the algorithm names
-// for certificate types supported by this package.
+// Certificate algorithm names from [PROTOCOL.certkeys]. These values can appear
+// in Certificate.Type, PublicKey.Type, and ClientConfig.HostKeyAlgorithms.
+// Unlike key algorithm names, these are not passed to AlgorithmSigner nor
+// returned by MultiAlgorithmSigner and don't appear in the Signature.Format
+// field.
 const (
 	CertAlgoRSAv01        = "ssh-rsa-cert-v01@openssh.com"
 	CertAlgoDSAv01        = "ssh-dss-cert-v01@openssh.com"
@@ -25,6 +28,21 @@ const (
 	CertAlgoSKECDSA256v01 = "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoED25519v01    = "ssh-ed25519-cert-v01@openssh.com"
 	CertAlgoSKED25519v01  = "sk-ssh-ed25519-cert-v01@openssh.com"
+
+	// CertAlgoRSASHA256v01 and CertAlgoRSASHA512v01 can't appear as a
+	// Certificate.Type (or PublicKey.Type), but only in
+	// ClientConfig.HostKeyAlgorithms.
+	CertAlgoRSASHA256v01 = "rsa-sha2-256-cert-v01@openssh.com"
+	CertAlgoRSASHA512v01 = "rsa-sha2-512-cert-v01@openssh.com"
+)
+
+const (
+	// Deprecated: use CertAlgoRSAv01.
+	CertSigAlgoRSAv01 = CertAlgoRSAv01
+	// Deprecated: use CertAlgoRSASHA256v01.
+	CertSigAlgoRSASHA2256v01 = CertAlgoRSASHA256v01
+	// Deprecated: use CertAlgoRSASHA512v01.
+	CertSigAlgoRSASHA2512v01 = CertAlgoRSASHA512v01
 )
 
 // Certificate types distinguish between host and user
@@ -234,14 +252,21 @@ type algorithmOpenSSHCertSigner struct {
 // private key is held by signer. It returns an error if the public key in cert
 // doesn't match the key used by signer.
 func NewCertSigner(cert *Certificate, signer Signer) (Signer, error) {
-	if bytes.Compare(cert.Key.Marshal(), signer.PublicKey().Marshal()) != 0 {
+	if !bytes.Equal(cert.Key.Marshal(), signer.PublicKey().Marshal()) {
 		return nil, errors.New("ssh: signer and cert have different public key")
 	}
 
-	if algorithmSigner, ok := signer.(AlgorithmSigner); ok {
+	switch s := signer.(type) {
+	case MultiAlgorithmSigner:
+		return &multiAlgorithmSigner{
+			AlgorithmSigner: &algorithmOpenSSHCertSigner{
+				&openSSHCertSigner{cert, signer}, s},
+			supportedAlgorithms: s.Algorithms(),
+		}, nil
+	case AlgorithmSigner:
 		return &algorithmOpenSSHCertSigner{
-			&openSSHCertSigner{cert, signer}, algorithmSigner}, nil
-	} else {
+			&openSSHCertSigner{cert, signer}, s}, nil
+	default:
 		return &openSSHCertSigner{cert, signer}, nil
 	}
 }
@@ -414,14 +439,38 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	return nil
 }
 
-// SignCert sets c.SignatureKey to the authority's public key and stores a
-// Signature, by authority, in the certificate.
+// SignCert signs the certificate with an authority, setting the Nonce,
+// SignatureKey, and Signature fields. If the authority implements the
+// MultiAlgorithmSigner interface the first algorithm in the list is used. This
+// is useful if you want to sign with a specific algorithm.
 func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 	c.Nonce = make([]byte, 32)
 	if _, err := io.ReadFull(rand, c.Nonce); err != nil {
 		return err
 	}
 	c.SignatureKey = authority.PublicKey()
+
+	if v, ok := authority.(MultiAlgorithmSigner); ok {
+		if len(v.Algorithms()) == 0 {
+			return errors.New("the provided authority has no signature algorithm")
+		}
+		// Use the first algorithm in the list.
+		sig, err := v.SignWithAlgorithm(rand, c.bytesForSigning(), v.Algorithms()[0])
+		if err != nil {
+			return err
+		}
+		c.Signature = sig
+		return nil
+	} else if v, ok := authority.(AlgorithmSigner); ok && v.PublicKey().Type() == KeyAlgoRSA {
+		// Default to KeyAlgoRSASHA512 for ssh-rsa signers.
+		// TODO: consider using KeyAlgoRSASHA256 as default.
+		sig, err := v.SignWithAlgorithm(rand, c.bytesForSigning(), KeyAlgoRSASHA512)
+		if err != nil {
+			return err
+		}
+		c.Signature = sig
+		return nil
+	}
 
 	sig, err := authority.Sign(rand, c.bytesForSigning())
 	if err != nil {
@@ -431,26 +480,42 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 	return nil
 }
 
-var certAlgoNames = map[string]string{
-	KeyAlgoRSA:        CertAlgoRSAv01,
-	KeyAlgoDSA:        CertAlgoDSAv01,
-	KeyAlgoECDSA256:   CertAlgoECDSA256v01,
-	KeyAlgoECDSA384:   CertAlgoECDSA384v01,
-	KeyAlgoECDSA521:   CertAlgoECDSA521v01,
-	KeyAlgoSKECDSA256: CertAlgoSKECDSA256v01,
-	KeyAlgoED25519:    CertAlgoED25519v01,
-	KeyAlgoSKED25519:  CertAlgoSKED25519v01,
+// certKeyAlgoNames is a mapping from known certificate algorithm names to the
+// corresponding public key signature algorithm.
+//
+// This map must be kept in sync with the one in agent/client.go.
+var certKeyAlgoNames = map[string]string{
+	CertAlgoRSAv01:        KeyAlgoRSA,
+	CertAlgoRSASHA256v01:  KeyAlgoRSASHA256,
+	CertAlgoRSASHA512v01:  KeyAlgoRSASHA512,
+	CertAlgoDSAv01:        KeyAlgoDSA,
+	CertAlgoECDSA256v01:   KeyAlgoECDSA256,
+	CertAlgoECDSA384v01:   KeyAlgoECDSA384,
+	CertAlgoECDSA521v01:   KeyAlgoECDSA521,
+	CertAlgoSKECDSA256v01: KeyAlgoSKECDSA256,
+	CertAlgoED25519v01:    KeyAlgoED25519,
+	CertAlgoSKED25519v01:  KeyAlgoSKED25519,
 }
 
-// certToPrivAlgo returns the underlying algorithm for a certificate algorithm.
-// Panics if a non-certificate algorithm is passed.
-func certToPrivAlgo(algo string) string {
-	for privAlgo, pubAlgo := range certAlgoNames {
-		if pubAlgo == algo {
-			return privAlgo
+// underlyingAlgo returns the signature algorithm associated with algo (which is
+// an advertised or negotiated public key or host key algorithm). These are
+// usually the same, except for certificate algorithms.
+func underlyingAlgo(algo string) string {
+	if a, ok := certKeyAlgoNames[algo]; ok {
+		return a
+	}
+	return algo
+}
+
+// certificateAlgo returns the certificate algorithms that uses the provided
+// underlying signature algorithm.
+func certificateAlgo(algo string) (certAlgo string, ok bool) {
+	for certName, algoName := range certKeyAlgoNames {
+		if algoName == algo {
+			return certName, true
 		}
 	}
-	panic("unknown cert algorithm")
+	return "", false
 }
 
 func (cert *Certificate) bytesForSigning() []byte {
@@ -494,13 +559,13 @@ func (c *Certificate) Marshal() []byte {
 	return result
 }
 
-// Type returns the key name. It is part of the PublicKey interface.
+// Type returns the certificate algorithm name. It is part of the PublicKey interface.
 func (c *Certificate) Type() string {
-	algo, ok := certAlgoNames[c.Key.Type()]
+	certName, ok := certificateAlgo(c.Key.Type())
 	if !ok {
-		panic("unknown cert key type " + c.Key.Type())
+		panic("unknown certificate type for key type " + c.Key.Type())
 	}
-	return algo
+	return certName
 }
 
 // Verify verifies a signature against the certificate's public

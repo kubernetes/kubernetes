@@ -17,23 +17,26 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
+var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
@@ -48,9 +51,9 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 		}
 	}
 }`
-			// The following images are not added into NodeImageWhiteList, because this test is
+			// The following images are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image white list check.
+			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
 			for _, testCase := range []struct {
 				description string
 				image       string
@@ -65,11 +68,11 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 				},
 			} {
 				testCase := testCase
-				ginkgo.It(testCase.description+" [NodeConformance]", func() {
+				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-					container := common.ConformanceContainer{
-						PodClient: f.PodClient(),
+					container := node.ConformanceContainer{
+						PodClient: e2epod.NewPodClient(f),
 						Container: v1.Container{
 							Name:    name,
 							Image:   testCase.image,
@@ -81,15 +84,15 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 
 					// checkContainerStatus checks whether the container status matches expectation.
-					checkContainerStatus := func() error {
-						status, err := container.GetStatus()
+					checkContainerStatus := func(ctx context.Context) error {
+						status, err := container.GetStatus(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to get container status: %v", err)
+							return fmt.Errorf("failed to get container status: %w", err)
 						}
 						// We need to check container state first. The default pod status is pending, If we check
 						// pod phase first, and the expected pod phase is Pending, the container status may not
@@ -98,13 +101,13 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 						if !testCase.waiting {
 							if status.State.Running == nil {
 								return fmt.Errorf("expected container state: Running, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 						}
 						if testCase.waiting {
 							if status.State.Waiting == nil {
 								return fmt.Errorf("expected container state: Waiting, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 							reason := status.State.Waiting.Reason
 							if reason != images.ErrImagePull.Error() &&
@@ -113,9 +116,9 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 							}
 						}
 						// Check pod phase
-						phase, err := container.GetPhase()
+						phase, err := container.GetPhase(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to get pod phase: %v", err)
+							return fmt.Errorf("failed to get pod phase: %w", err)
 						}
 						if phase != testCase.phase {
 							return fmt.Errorf("expected pod phase: %q, got: %q", testCase.phase, phase)
@@ -128,15 +131,15 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 					for i := 1; i <= flakeRetry; i++ {
 						var err error
 						ginkgo.By("create the container")
-						container.Create()
+						container.Create(ctx)
 						ginkgo.By("check the container status")
-						for start := time.Now(); time.Since(start) < common.ContainerStatusRetryTimeout; time.Sleep(common.ContainerStatusPollInterval) {
-							if err = checkContainerStatus(); err == nil {
+						for start := time.Now(); time.Since(start) < node.ContainerStatusRetryTimeout; time.Sleep(node.ContainerStatusPollInterval) {
+							if err = checkContainerStatus(ctx); err == nil {
 								break
 							}
 						}
 						ginkgo.By("delete the container")
-						container.Delete()
+						_ = container.Delete(ctx)
 						if err == nil {
 							break
 						}

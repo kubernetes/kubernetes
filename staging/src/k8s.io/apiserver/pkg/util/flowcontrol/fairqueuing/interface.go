@@ -18,7 +18,10 @@ package fairqueuing
 
 import (
 	"context"
-	"time"
+
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 // QueueSetFactory is used to create QueueSet objects.  Creation, like
@@ -27,8 +30,15 @@ import (
 // are separated so that errors from the first phase can be found
 // before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
-	// BeginConstruction does the first phase of creating a QueueSet
-	BeginConstruction(QueuingConfig) (QueueSetCompleter, error)
+	// BeginConstruction does the first phase of creating a QueueSet.
+	// The RatioedGaugePair observes number of requests,
+	// execution covering just the regular phase.
+	// The denominator for the waiting phase is
+	// max(1, QueuingConfig.QueueLengthLimit) X max(1, QueuingConfig.DesiredNumQueues).
+	// The RatioedGauge observes number of seats occupied through all phases of execution.
+	// The denominator for all the ratioed concurrency gauges is supplied later in the DispatchingConfig.
+	// The Gauge observes the seat demand (executing + queued seats).
+	BeginConstruction(QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge, metrics.Gauge) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or
@@ -43,7 +53,7 @@ type QueueSetCompleter interface {
 // functionality of one non-exempt priority level.  It covers the
 // functionality described in the "Assignment to a Queue", "Queuing",
 // and "Dispatching" sections of
-// https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
@@ -66,18 +76,28 @@ type QueueSet interface {
 	IsIdle() bool
 
 	// StartRequest begins the process of handling a request.  If the
-	// request gets queued and the number of queues is greater than
-	// 1 then Wait uses the given hashValue as the source of entropy
-	// as it shuffle-shards the request into a queue.  The descr1 and
-	// descr2 values play no role in the logic but appear in log
-	// messages.  This method always returns quickly (without waiting
-	// for the request to be dequeued).  If this method returns a nil
-	// Request value then caller should reject the request and the
-	// returned bool indicates whether the QueueSet was idle at the
-	// moment of the return.  Otherwise idle==false and the client
-	// must call the Wait method of the Request exactly once.
-	StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (req Request, idle bool)
+	// request gets queued and the number of queues is greater than 1
+	// then StartRequest uses the given hashValue as the source of
+	// entropy as it shuffle-shards the request into a queue.  The
+	// descr1 and descr2 values play no role in the logic but appear
+	// in log messages.  This method always returns quickly (without
+	// waiting for the request to be dequeued).  If this method
+	// returns a nil Request value then caller should reject the
+	// request and the returned bool indicates whether the QueueSet
+	// was idle at the moment of the return.  Otherwise idle==false
+	// and the client must call the Finish method of the Request
+	// exactly once.
+	StartRequest(ctx context.Context, width *request.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
+
+	// Dump saves and returns the instant internal state of the queue-set.
+	// Note that dumping process will stop the queue-set from proceeding
+	// any requests.
+	// For debugging only.
+	Dump(includeRequestDetails bool) debug.QueueSetDump
 }
+
+// QueueNoteFn is called when a request enters and leaves a queue
+type QueueNoteFn func(inQueue bool)
 
 // Request represents the remainder of the handling of one request
 type Request interface {
@@ -95,8 +115,11 @@ type QueuingConfig struct {
 	Name string
 
 	// DesiredNumQueues is the number of queues that the API says
-	// should exist now.  This may be zero, in which case
-	// QueueLengthLimit, HandSize, and RequestWaitLimit are ignored.
+	// should exist now.  This may be non-positive, in which case
+	// QueueLengthLimit, and HandSize are ignored.
+	// A value of zero means to respect the ConcurrencyLimit of the DispatchingConfig.
+	// A negative value means to always dispatch immediately upon arrival
+	// (i.e., the requests are "exempt" from limitation).
 	DesiredNumQueues int
 
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
@@ -105,21 +128,14 @@ type QueuingConfig struct {
 	// HandSize is a parameter of shuffle sharding.  Upon arrival of a request, a queue is chosen by randomly
 	// dealing a "hand" of this many queues and then picking one of minimum length.
 	HandSize int
-
-	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.
-	// If, by the end of that time, the request has not been dispatched then it is rejected.
-	RequestWaitLimit time.Duration
 }
 
 // DispatchingConfig defines the configuration of the dispatching aspect of a QueueSet.
 type DispatchingConfig struct {
 	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
 	ConcurrencyLimit int
-}
 
-// EmptyHandler is used to notify the callee when all the queues
-// of a QueueSet have been drained.
-type EmptyHandler interface {
-	// HandleEmpty is called to deliver the notification
-	HandleEmpty()
+	// ConcurrencyDenominator is used in relative metrics of concurrency.
+	// It equals ConcurrencyLimit except when that is zero.
+	ConcurrencyDenominator int
 }

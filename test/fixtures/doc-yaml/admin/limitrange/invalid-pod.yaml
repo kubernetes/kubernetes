@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-serve-hostname
-    image: k8s.gcr.io/serve_hostname
+    image: registry.k8s.io/serve_hostname
     resources:
       limits:
         cpu: "3"

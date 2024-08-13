@@ -24,12 +24,27 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
+
+type TB interface {
+	Logf(format string, args ...any)
+	Errorf(format string, args ...any)
+	Fatalf(format string, args ...any)
+}
 
 // CollectAndCompare registers the provided Collector with a newly created
 // pedantic Registry. It then does the same as GatherAndCompare, gathering the
 // metrics from the pedantic Registry.
 func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...string) error {
+	lintProblems, err := testutil.CollectAndLint(c, metricNames...)
+	if err != nil {
+		return err
+	}
+	if err := getLintError(lintProblems); err != nil {
+		return err
+	}
+
 	return testutil.CollectAndCompare(c, expected, metricNames...)
 }
 
@@ -38,6 +53,14 @@ func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...s
 // exposition format. If any metricNames are provided, only metrics with those
 // names are compared.
 func GatherAndCompare(g metrics.Gatherer, expected io.Reader, metricNames ...string) error {
+	lintProblems, err := testutil.GatherAndLint(g, metricNames...)
+	if err != nil {
+		return err
+	}
+	if err := getLintError(lintProblems); err != nil {
+		return err
+	}
+
 	return testutil.GatherAndCompare(g, expected, metricNames...)
 }
 
@@ -49,6 +72,13 @@ func CustomCollectAndCompare(c metrics.StableCollector, expected io.Reader, metr
 	registry.CustomMustRegister(c)
 
 	return GatherAndCompare(registry, expected, metricNames...)
+}
+
+// ScrapeAndCompare calls a remote exporter's endpoint which is expected to return some metrics in
+// plain text format. Then it compares it with the results that the `expected` would return.
+// If the `metricNames` is not empty it would filter the comparison only to the given metric names.
+func ScrapeAndCompare(url string, expected io.Reader, metricNames ...string) error {
+	return testutil.ScrapeAndCompare(url, expected, metricNames...)
 }
 
 // NewFakeKubeRegistry creates a fake `KubeRegistry` that takes the input version as `build in version`.
@@ -67,4 +97,63 @@ func NewFakeKubeRegistry(ver string) metrics.KubeRegistry {
 	}
 
 	return metrics.NewKubeRegistry()
+}
+
+func AssertVectorCount(t TB, name string, labelFilter map[string]string, wantCount int) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %s", err)
+	}
+
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !LabelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetCounter().GetValue())
+		}
+	}
+	if wantCount != counterSum {
+		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
+		for _, mf := range metrics {
+			if mf.GetName() == name {
+				for _, metric := range mf.GetMetric() {
+					t.Logf("\tnear match: %s", metric.String())
+				}
+			}
+		}
+	}
+}
+
+func AssertHistogramTotalCount(t TB, name string, labelFilter map[string]string, wantCount int) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %s", err)
+	}
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !LabelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetHistogram().GetSampleCount())
+		}
+	}
+	if wantCount != counterSum {
+		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
+		for _, mf := range metrics {
+			if mf.GetName() == name {
+				for _, metric := range mf.GetMetric() {
+					t.Logf("\tnear match: %s\n", metric.String())
+				}
+			}
+		}
+	}
 }

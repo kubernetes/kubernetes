@@ -24,15 +24,12 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
-
-	restclient "k8s.io/client-go/rest"
 )
 
 func TestMakeTransportInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
-		EnableHTTPS: true,
-		//Invalid certificate and key path
-		TLSClientConfig: restclient.TLSClientConfig{
+		// Invalid certificate and key path
+		TLSClientConfig: KubeletTLSConfig{
 			CertFile: "../../client/testdata/mycertinvalid.cer",
 			KeyFile:  "../../client/testdata/mycertinvalid.key",
 			CAFile:   "../../client/testdata/myCA.cer",
@@ -50,20 +47,19 @@ func TestMakeTransportInvalid(t *testing.T) {
 
 func TestMakeTransportValid(t *testing.T) {
 	config := &KubeletClientConfig{
-		Port:        1234,
-		EnableHTTPS: true,
-		TLSClientConfig: restclient.TLSClientConfig{
+		Port: 1234,
+		TLSClientConfig: KubeletTLSConfig{
 			CertFile: "../../client/testdata/mycertvalid.cer",
-			// TLS Configuration, only applies if EnableHTTPS is true.
+			// TLS Configuration
 			KeyFile: "../../client/testdata/mycertvalid.key",
-			// TLS Configuration, only applies if EnableHTTPS is true.
+			// TLS Configuration
 			CAFile: "../../client/testdata/myCA.cer",
 		},
 	}
 
 	rt, err := MakeTransport(config)
 	if err != nil {
-		t.Errorf("Not expecting an error #%v", err)
+		t.Errorf("Not expecting an error %#v", err)
 	}
 	if rt == nil {
 		t.Error("rt should not be nil")
@@ -90,13 +86,12 @@ func TestMakeInsecureTransport(t *testing.T) {
 	}
 
 	config := &KubeletClientConfig{
-		Port:        uint(port),
-		EnableHTTPS: true,
-		TLSClientConfig: restclient.TLSClientConfig{
+		Port: uint(port),
+		TLSClientConfig: KubeletTLSConfig{
 			CertFile: "../../client/testdata/mycertvalid.cer",
-			// TLS Configuration, only applies if EnableHTTPS is true.
+			// TLS Configuration
 			KeyFile: "../../client/testdata/mycertvalid.key",
-			// TLS Configuration, only applies if EnableHTTPS is true.
+			// TLS Configuration
 			CAFile: "../../client/testdata/myCA.cer",
 		},
 	}

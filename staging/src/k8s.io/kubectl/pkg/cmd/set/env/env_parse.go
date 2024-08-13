@@ -23,21 +23,16 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 var argumentEnvironment = regexp.MustCompile("(?ms)^(.+)\\=(.*)$")
-var validArgumentEnvironment = regexp.MustCompile("(?ms)^(\\w+)\\=(.*)$")
 
 // IsEnvironmentArgument checks whether a string is an environment argument, that is, whether it matches the "anycharacters=anycharacters" pattern.
 func IsEnvironmentArgument(s string) bool {
 	return argumentEnvironment.MatchString(s)
-}
-
-// IsValidEnvironmentArgument checks whether a string is a valid environment argument, that is, whether it matches the "wordcharacters=anycharacters" pattern. Word characters can be letters, numbers, and underscores.
-func IsValidEnvironmentArgument(s string) bool {
-	return validArgumentEnvironment.MatchString(s)
 }
 
 // SplitEnvironmentFromResources separates resources from environment arguments.
@@ -64,27 +59,30 @@ func SplitEnvironmentFromResources(args []string) (resources, envArgs []string, 
 
 // parseIntoEnvVar parses the list of key-value pairs into kubernetes EnvVar.
 // envVarType is for making errors more specific to user intentions.
-func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) ([]v1.EnvVar, []string, error) {
+func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) ([]v1.EnvVar, []string, bool, error) {
 	env := []v1.EnvVar{}
 	exists := sets.NewString()
 	var remove []string
+	usedStdin := false
 	for _, envSpec := range spec {
 		switch {
-		case !IsValidEnvironmentArgument(envSpec) && !strings.HasSuffix(envSpec, "-"):
-			return nil, nil, fmt.Errorf("%ss must be of the form key=value and can only contain letters, numbers, and underscores", envVarType)
 		case envSpec == "-":
 			if defaultReader == nil {
-				return nil, nil, fmt.Errorf("when '-' is used, STDIN must be open")
+				return nil, nil, usedStdin, fmt.Errorf("when '-' is used, STDIN must be open")
 			}
 			fileEnv, err := readEnv(defaultReader, envVarType)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, usedStdin, err
 			}
 			env = append(env, fileEnv...)
+			usedStdin = true
 		case strings.Contains(envSpec, "="):
 			parts := strings.SplitN(envSpec, "=", 2)
 			if len(parts) != 2 {
-				return nil, nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
+				return nil, nil, usedStdin, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
+			}
+			if errs := validation.IsEnvVarName(parts[0]); len(errs) != 0 {
+				return nil, nil, usedStdin, fmt.Errorf("%q is not a valid key name: %s", parts[0], strings.Join(errs, ";"))
 			}
 			exists.Insert(parts[0])
 			env = append(env, v1.EnvVar{
@@ -94,20 +92,20 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 		case strings.HasSuffix(envSpec, "-"):
 			remove = append(remove, envSpec[:len(envSpec)-1])
 		default:
-			return nil, nil, fmt.Errorf("unknown %s: %v", envVarType, envSpec)
+			return nil, nil, usedStdin, fmt.Errorf("unknown %s: %v", envVarType, envSpec)
 		}
 	}
 	for _, removeLabel := range remove {
 		if _, found := exists[removeLabel]; found {
-			return nil, nil, fmt.Errorf("can not both modify and remove the same %s in the same command", envVarType)
+			return nil, nil, usedStdin, fmt.Errorf("can not both modify and remove the same %s in the same command", envVarType)
 		}
 	}
-	return env, remove, nil
+	return env, remove, usedStdin, nil
 }
 
-// ParseEnv parses the elements of the first argument looking for environment variables in key=value form and, if one of those values is "-", it also scans the reader.
+// ParseEnv parses the elements of the first argument looking for environment variables in key=value form and, if one of those values is "-", it also scans the reader and returns true for its third return value.
 // The same environment variable cannot be both modified and removed in the same command.
-func ParseEnv(spec []string, defaultReader io.Reader) ([]v1.EnvVar, []string, error) {
+func ParseEnv(spec []string, defaultReader io.Reader) ([]v1.EnvVar, []string, bool, error) {
 	return parseIntoEnvVar(spec, defaultReader, "environment variable")
 }
 

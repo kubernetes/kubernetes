@@ -1,49 +1,43 @@
-// +build linux
-
 package libcontainer
 
 import (
-	"fmt"
+	"errors"
 	"os"
+	"os/exec"
 
 	"github.com/opencontainers/runc/libcontainer/system"
 )
 
-func newRestoredProcess(pid int, fds []string) (*restoredProcess, error) {
-	var (
-		err error
-	)
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return nil, err
-	}
+func newRestoredProcess(cmd *exec.Cmd, fds []string) (*restoredProcess, error) {
+	var err error
+	pid := cmd.Process.Pid
 	stat, err := system.Stat(pid)
 	if err != nil {
 		return nil, err
 	}
 	return &restoredProcess{
-		proc:             proc,
+		cmd:              cmd,
 		processStartTime: stat.StartTime,
 		fds:              fds,
 	}, nil
 }
 
 type restoredProcess struct {
-	proc             *os.Process
+	cmd              *exec.Cmd
 	processStartTime uint64
 	fds              []string
 }
 
 func (p *restoredProcess) start() error {
-	return newGenericError(fmt.Errorf("restored process cannot be started"), SystemError)
+	return errors.New("restored process cannot be started")
 }
 
 func (p *restoredProcess) pid() int {
-	return p.proc.Pid
+	return p.cmd.Process.Pid
 }
 
 func (p *restoredProcess) terminate() error {
-	err := p.proc.Kill()
+	err := p.cmd.Process.Kill()
 	if _, werr := p.wait(); err == nil {
 		err = werr
 	}
@@ -53,10 +47,14 @@ func (p *restoredProcess) terminate() error {
 func (p *restoredProcess) wait() (*os.ProcessState, error) {
 	// TODO: how do we wait on the actual process?
 	// maybe use --exec-cmd in criu
-	st, err := p.proc.Wait()
+	err := p.cmd.Wait()
 	if err != nil {
-		return nil, err
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return nil, err
+		}
 	}
+	st := p.cmd.ProcessState
 	return st, nil
 }
 
@@ -65,7 +63,7 @@ func (p *restoredProcess) startTime() (uint64, error) {
 }
 
 func (p *restoredProcess) signal(s os.Signal) error {
-	return p.proc.Signal(s)
+	return p.cmd.Process.Signal(s)
 }
 
 func (p *restoredProcess) externalDescriptors() []string {
@@ -76,7 +74,8 @@ func (p *restoredProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *restoredProcess) forwardChildLogs() {
+func (p *restoredProcess) forwardChildLogs() chan error {
+	return nil
 }
 
 // nonChildProcess represents a process where the calling process is not
@@ -89,7 +88,7 @@ type nonChildProcess struct {
 }
 
 func (p *nonChildProcess) start() error {
-	return newGenericError(fmt.Errorf("restored process cannot be started"), SystemError)
+	return errors.New("restored process cannot be started")
 }
 
 func (p *nonChildProcess) pid() int {
@@ -97,11 +96,11 @@ func (p *nonChildProcess) pid() int {
 }
 
 func (p *nonChildProcess) terminate() error {
-	return newGenericError(fmt.Errorf("restored process cannot be terminated"), SystemError)
+	return errors.New("restored process cannot be terminated")
 }
 
 func (p *nonChildProcess) wait() (*os.ProcessState, error) {
-	return nil, newGenericError(fmt.Errorf("restored process cannot be waited on"), SystemError)
+	return nil, errors.New("restored process cannot be waited on")
 }
 
 func (p *nonChildProcess) startTime() (uint64, error) {
@@ -124,5 +123,6 @@ func (p *nonChildProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *nonChildProcess) forwardChildLogs() {
+func (p *nonChildProcess) forwardChildLogs() chan error {
+	return nil
 }

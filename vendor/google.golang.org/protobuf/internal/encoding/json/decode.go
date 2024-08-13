@@ -121,7 +121,7 @@ func (d *Decoder) Read() (Token, error) {
 
 	case ObjectClose:
 		if len(d.openStack) == 0 ||
-			d.lastToken.kind == comma ||
+			d.lastToken.kind&(Name|comma) != 0 ||
 			d.openStack[len(d.openStack)-1] != ObjectOpen {
 			return Token{}, d.newSyntaxError(tok.pos, unexpectedFmt, tok.RawString())
 		}
@@ -214,7 +214,7 @@ func (d *Decoder) parseNext() (Token, error) {
 
 // newSyntaxError returns an error with line and column information useful for
 // syntax errors.
-func (d *Decoder) newSyntaxError(pos int, f string, x ...interface{}) error {
+func (d *Decoder) newSyntaxError(pos int, f string, x ...any) error {
 	e := errors.New(f, x...)
 	line, column := d.Position(pos)
 	return errors.New("syntax error (line %d:%d): %v", line, column, e)
@@ -294,7 +294,7 @@ func (d *Decoder) isValueNext() bool {
 }
 
 // consumeToken constructs a Token for given Kind with raw value derived from
-// current d.in and given size, and consumes the given size-lenght of it.
+// current d.in and given size, and consumes the given size-length of it.
 func (d *Decoder) consumeToken(kind Kind, size int) Token {
 	tok := Token{
 		kind: kind,

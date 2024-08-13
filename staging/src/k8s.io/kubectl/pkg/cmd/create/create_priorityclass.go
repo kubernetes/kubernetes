@@ -17,95 +17,182 @@ limitations under the License.
 package create
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
-	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	schedulingv1client "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	pcLong = templates.LongDesc(i18n.T(`
-		Create a priorityclass with the specified name, value, globalDefault and description`))
+		Create a priority class with the specified name, value, globalDefault and description.`))
 
 	pcExample = templates.Examples(i18n.T(`
-		# Create a priorityclass named high-priority
+		# Create a priority class named high-priority
 		kubectl create priorityclass high-priority --value=1000 --description="high priority"
 
-		# Create a priorityclass named default-priority that considered as the global default priority
+		# Create a priority class named default-priority that is considered as the global default priority
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"
 
-		# Create a priorityclass named high-priority that can not preempt pods with lower priority
+		# Create a priority class named high-priority that cannot preempt pods with lower priority
 		kubectl create priorityclass high-priority --value=1000 --description="high priority" --preemption-policy="Never"`))
 )
 
-// PriorityClassOpts holds the options for 'create priorityclass' sub command
-type PriorityClassOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+// PriorityClassOptions holds the options for 'create priorityclass' sub command
+type PriorityClassOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+	PrintObj   func(obj runtime.Object) error
+
+	Name             string
+	Value            int32
+	GlobalDefault    bool
+	Description      string
+	PreemptionPolicy string
+	FieldManager     string
+	CreateAnnotation bool
+
+	Client              *schedulingv1client.SchedulingV1Client
+	DryRunStrategy      cmdutil.DryRunStrategy
+	ValidationDirective string
+
+	genericiooptions.IOStreams
+}
+
+// NewPriorityClassOptions returns an initialized PriorityClassOptions instance
+func NewPriorityClassOptions(ioStreams genericiooptions.IOStreams) *PriorityClassOptions {
+	return &PriorityClassOptions{
+		Value:            0,
+		PreemptionPolicy: "PreemptLowerPriority",
+		PrintFlags:       genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:        ioStreams,
+	}
 }
 
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.
-func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &PriorityClassOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+	o := NewPriorityClassOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pc"},
-		Short:                 i18n.T("Create a priorityclass with the specified name."),
+		Short:                 i18n.T("Create a priority class with the specified name"),
 		Long:                  pcLong,
 		Example:               pcExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.PriorityClassV1GeneratorName)
-
-	cmd.Flags().Int32("value", 0, i18n.T("the value of this priority class."))
-	cmd.Flags().Bool("global-default", false, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
-	cmd.Flags().String("description", "", i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
-	cmd.Flags().String("preemption-policy", "", i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().Int32Var(&o.Value, "value", o.Value, i18n.T("the value of this priority class."))
+	cmd.Flags().BoolVar(&o.GlobalDefault, "global-default", o.GlobalDefault, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
+	cmd.Flags().StringVar(&o.Description, "description", o.Description, i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
+	cmd.Flags().StringVar(&o.PreemptionPolicy, "preemption-policy", o.PreemptionPolicy, i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
 // Complete completes all the required options
-func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+func (o *PriorityClassOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+	o.Name, err = NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.PriorityClassV1GeneratorName:
-		generator = &generateversioned.PriorityClassV1Generator{
-			Name:             name,
-			Value:            cmdutil.GetFlagInt32(cmd, "value"),
-			GlobalDefault:    cmdutil.GetFlagBool(cmd, "global-default"),
-			Description:      cmdutil.GetFlagString(cmd, "description"),
-			PreemptionPolicy: apiv1.PreemptionPolicy(cmdutil.GetFlagString(cmd, "preemption-policy")),
-		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+	restConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = schedulingv1client.NewForConfig(restConfig)
+	if err != nil {
+		return err
 	}
 
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in the PriorityClassOpts instance
-func (o *PriorityClassOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
+// Run calls the CreateSubcommandOptions.Run in the PriorityClassOptions instance
+func (o *PriorityClassOptions) Run() error {
+	priorityClass, err := o.createPriorityClass()
+	if err != nil {
+		return err
+	}
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, priorityClass, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		createOptions.FieldValidation = o.ValidationDirective
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		var err error
+		priorityClass, err = o.Client.PriorityClasses().Create(context.TODO(), priorityClass, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create priorityclass: %v", err)
+		}
+	}
+
+	return o.PrintObj(priorityClass)
+}
+
+func (o *PriorityClassOptions) createPriorityClass() (*schedulingv1.PriorityClass, error) {
+	preemptionPolicy := corev1.PreemptionPolicy(o.PreemptionPolicy)
+	return &schedulingv1.PriorityClass{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1.SchemeGroupVersion.String(), Kind: "PriorityClass"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: o.Name,
+		},
+		Value:            o.Value,
+		GlobalDefault:    o.GlobalDefault,
+		Description:      o.Description,
+		PreemptionPolicy: &preemptionPolicy,
+	}, nil
 }

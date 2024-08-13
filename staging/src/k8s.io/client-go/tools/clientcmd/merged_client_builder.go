@@ -49,38 +49,37 @@ type InClusterConfig interface {
 	Possible() bool
 }
 
-// NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
+// NewNonInteractiveDeferredLoadingClientConfig creates a ClientConfig using the passed context name
 func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
 	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: &inClusterClientConfig{overrides: overrides}}
 }
 
-// NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
+// NewInteractiveDeferredLoadingClientConfig creates a ClientConfig using the passed context name and the fallback auth reader
 func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
 	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: &inClusterClientConfig{overrides: overrides}, fallbackReader: fallbackReader}
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	if config.clientConfig == nil {
-		config.loadingLock.Lock()
-		defer config.loadingLock.Unlock()
+	config.loadingLock.Lock()
+	defer config.loadingLock.Unlock()
 
-		if config.clientConfig == nil {
-			mergedConfig, err := config.loader.Load()
-			if err != nil {
-				return nil, err
-			}
-
-			var mergedClientConfig ClientConfig
-			if config.fallbackReader != nil {
-				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
-			} else {
-				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
-			}
-
-			config.clientConfig = mergedClientConfig
-		}
+	if config.clientConfig != nil {
+		return config.clientConfig, nil
+	}
+	mergedConfig, err := config.loader.Load()
+	if err != nil {
+		return nil, err
 	}
 
+	var currentContext string
+	if config.overrides != nil {
+		currentContext = config.overrides.CurrentContext
+	}
+	if config.fallbackReader != nil {
+		config.clientConfig = NewInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.fallbackReader, config.loader)
+	} else {
+		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.loader)
+	}
 	return config.clientConfig, nil
 }
 

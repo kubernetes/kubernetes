@@ -19,6 +19,7 @@ limitations under the License.
 package remote
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -47,6 +48,45 @@ type TestSuite interface {
 	// * systemSpecName is the name of the system spec used for validating the
 	//   image on which the test runs.
 	// * extraEnvs is the extra environment variables needed for node e2e tests.
+	// * runtimeConfig is the API runtime configuration used for node e2e tests.
 	// * timeout is the test timeout.
-	RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error)
+	RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string, timeout time.Duration) (string, error)
+}
+
+var testSuites = make(map[string]TestSuite)
+
+func RegisterTestSuite(name string, suite TestSuite) {
+	testSuites[name] = suite
+}
+
+func GetTestSuiteKeys() []string {
+	var keys []string
+	for key := range testSuites {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func GetTestSuite(name string) (TestSuite, error) {
+	suite, ok := testSuites[name]
+	if ok {
+		return suite, nil
+	}
+	return nil, fmt.Errorf("unable to find testsuite for %s", name)
+}
+
+type NewRunner func(Config) Runner
+
+var runners = make(map[string]NewRunner)
+
+func RegisterRunner(name string, runner NewRunner) {
+	runners[name] = runner
+}
+
+func GetRunner(name string) (NewRunner, error) {
+	runner, ok := runners[name]
+	if ok {
+		return runner, nil
+	}
+	return nil, fmt.Errorf("unable to runner for %s", name)
 }

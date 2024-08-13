@@ -17,16 +17,19 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -40,12 +43,12 @@ import (
 func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, func(<-chan struct{}), error) {
 	// Get clients, if provided
 	var (
-		tokenClient authenticationclient.TokenReviewInterface
-		sarClient   authorizationclient.SubjectAccessReviewInterface
+		tokenClient authenticationclient.AuthenticationV1Interface
+		sarClient   authorizationclient.AuthorizationV1Interface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
-		tokenClient = client.AuthenticationV1().TokenReviews()
-		sarClient = client.AuthorizationV1().SubjectAccessReviews()
+		tokenClient = client.AuthenticationV1()
+		sarClient = client.AuthorizationV1()
 	}
 
 	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
@@ -64,7 +67,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
+func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
 	var dynamicCAContentFromFile *dynamiccertificates.DynamicFileCAContent
 	var err error
 	if len(authn.X509.ClientCAFile) > 0 {
@@ -75,7 +78,7 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 	}
 
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:                          authn.Anonymous.Enabled,
+		Anonymous:                          &apiserver.AnonymousAuthConfig{Enabled: authn.Anonymous.Enabled},
 		CacheTTL:                           authn.Webhook.CacheTTL.Duration,
 		ClientCertificateCAContentProvider: dynamicCAContentFromFile,
 	}
@@ -84,6 +87,7 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 		if client == nil {
 			return nil, nil, errors.New("no client provided, cannot use webhook authentication")
 		}
+		authenticatorConfig.WebhookRetryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
@@ -93,14 +97,24 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 	}
 
 	return authenticator, func(stopCh <-chan struct{}) {
+		// generate a context from stopCh. This is to avoid modifying files which are relying on this method
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-stopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
 		if dynamicCAContentFromFile != nil {
-			go dynamicCAContentFromFile.Run(1, stopCh)
+			go dynamicCAContentFromFile.Run(ctx, 1)
 		}
 	}, err
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
-func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
+func BuildAuthz(client authorizationclient.AuthorizationV1Interface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
 	switch authz.Mode {
 	case kubeletconfig.KubeletAuthorizationModeAlwaysAllow:
 		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil
@@ -113,6 +127,7 @@ func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz k
 			SubjectAccessReviewClient: client,
 			AllowCacheTTL:             authz.Webhook.CacheAuthorizedTTL.Duration,
 			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,
+			WebhookRetryBackoff:       genericoptions.DefaultAuthWebhookRetryBackoff(),
 		}
 		return authorizerConfig.New()
 

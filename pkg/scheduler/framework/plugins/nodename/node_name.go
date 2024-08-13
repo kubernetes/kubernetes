@@ -21,21 +21,31 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
 var _ framework.FilterPlugin = &NodeName{}
+var _ framework.EnqueueExtensions = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeName"
+	Name = names.NodeName
 
 	// ErrReason returned when node name doesn't match.
-	ErrReason = "node(s) didn't match the requested hostname"
+	ErrReason = "node(s) didn't match the requested node name"
 )
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeName) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
+	}, nil
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {
@@ -44,9 +54,7 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
+
 	if !Fits(pod, nodeInfo) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
 	}
@@ -59,6 +67,6 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &NodeName{}, nil
 }

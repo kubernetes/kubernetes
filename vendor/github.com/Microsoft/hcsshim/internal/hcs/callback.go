@@ -7,12 +7,13 @@ import (
 
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/Microsoft/hcsshim/internal/logfields"
+	"github.com/Microsoft/hcsshim/internal/vmcompute"
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	nextCallback    uintptr
-	callbackMap     = map[uintptr]*notifcationWatcherContext{}
+	callbackMap     = map[uintptr]*notificationWatcherContext{}
 	callbackMapLock = sync.RWMutex{}
 
 	notificationWatcherCallback = syscall.NewCallback(notificationWatcher)
@@ -86,9 +87,9 @@ func (hn hcsNotification) String() string {
 
 type notificationChannel chan error
 
-type notifcationWatcherContext struct {
+type notificationWatcherContext struct {
 	channels notificationChannels
-	handle   hcsCallback
+	handle   vmcompute.HcsCallback
 
 	systemID  string
 	processID int
@@ -98,21 +99,28 @@ type notificationChannels map[hcsNotification]notificationChannel
 
 func newSystemChannels() notificationChannels {
 	channels := make(notificationChannels)
-
-	channels[hcsNotificationSystemExited] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemCreateCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemStartCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemPauseCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemResumeCompleted] = make(notificationChannel, 1)
-
+	for _, notif := range []hcsNotification{
+		hcsNotificationServiceDisconnect,
+		hcsNotificationSystemExited,
+		hcsNotificationSystemCreateCompleted,
+		hcsNotificationSystemStartCompleted,
+		hcsNotificationSystemPauseCompleted,
+		hcsNotificationSystemResumeCompleted,
+		hcsNotificationSystemSaveCompleted,
+	} {
+		channels[notif] = make(notificationChannel, 1)
+	}
 	return channels
 }
 
 func newProcessChannels() notificationChannels {
 	channels := make(notificationChannels)
-
-	channels[hcsNotificationProcessExited] = make(notificationChannel, 1)
-
+	for _, notif := range []hcsNotification{
+		hcsNotificationServiceDisconnect,
+		hcsNotificationProcessExited,
+	} {
+		channels[notif] = make(notificationChannel, 1)
+	}
 	return channels
 }
 
@@ -143,18 +151,7 @@ func notificationWatcher(notificationType hcsNotification, callbackNumber uintpt
 	if context.processID != 0 {
 		log.Data[logfields.ProcessID] = context.processID
 	}
-	log.Debug("")
-
-	// The HCS notification system can grow overtime. We explicitly opt-in to
-	// the notifications we would like to handle, all others we simply return.
-	// This means that as it grows we don't have issues associated with new
-	// notification types the code didn't know about.
-	switch notificationType {
-	case hcsNotificationSystemExited, hcsNotificationSystemCreateCompleted, hcsNotificationSystemStartCompleted, hcsNotificationSystemPauseCompleted, hcsNotificationSystemResumeCompleted:
-	case hcsNotificationProcessExited:
-	default:
-		return 0
-	}
+	log.Debug("HCS notification")
 
 	if channel, ok := context.channels[notificationType]; ok {
 		channel <- result

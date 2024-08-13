@@ -71,10 +71,13 @@ var (
 	procHcnQueryLoadBalancerProperties = modcomputenetwork.NewProc("HcnQueryLoadBalancerProperties")
 	procHcnDeleteLoadBalancer          = modcomputenetwork.NewProc("HcnDeleteLoadBalancer")
 	procHcnCloseLoadBalancer           = modcomputenetwork.NewProc("HcnCloseLoadBalancer")
-	procHcnOpenService                 = modcomputenetwork.NewProc("HcnOpenService")
-	procHcnRegisterServiceCallback     = modcomputenetwork.NewProc("HcnRegisterServiceCallback")
-	procHcnUnregisterServiceCallback   = modcomputenetwork.NewProc("HcnUnregisterServiceCallback")
-	procHcnCloseService                = modcomputenetwork.NewProc("HcnCloseService")
+	procHcnEnumerateSdnRoutes          = modcomputenetwork.NewProc("HcnEnumerateSdnRoutes")
+	procHcnCreateSdnRoute              = modcomputenetwork.NewProc("HcnCreateSdnRoute")
+	procHcnOpenSdnRoute                = modcomputenetwork.NewProc("HcnOpenSdnRoute")
+	procHcnModifySdnRoute              = modcomputenetwork.NewProc("HcnModifySdnRoute")
+	procHcnQuerySdnRouteProperties     = modcomputenetwork.NewProc("HcnQuerySdnRouteProperties")
+	procHcnDeleteSdnRoute              = modcomputenetwork.NewProc("HcnDeleteSdnRoute")
+	procHcnCloseSdnRoute               = modcomputenetwork.NewProc("HcnCloseSdnRoute")
 )
 
 func SetCurrentThreadCompartmentId(compartmentId uint32) (hr error) {
@@ -657,11 +660,20 @@ func hcnCloseLoadBalancer(loadBalancer hcnLoadBalancer) (hr error) {
 	return
 }
 
-func hcnOpenService(service *hcnService, result **uint16) (hr error) {
-	if hr = procHcnOpenService.Find(); hr != nil {
+func hcnEnumerateRoutes(query string, routes **uint16, result **uint16) (hr error) {
+	var _p0 *uint16
+	_p0, hr = syscall.UTF16PtrFromString(query)
+	if hr != nil {
 		return
 	}
-	r0, _, _ := syscall.Syscall(procHcnOpenService.Addr(), 2, uintptr(unsafe.Pointer(service)), uintptr(unsafe.Pointer(result)), 0)
+	return _hcnEnumerateRoutes(_p0, routes, result)
+}
+
+func _hcnEnumerateRoutes(query *uint16, routes **uint16, result **uint16) (hr error) {
+	if hr = procHcnEnumerateSdnRoutes.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall(procHcnEnumerateSdnRoutes.Addr(), 3, uintptr(unsafe.Pointer(query)), uintptr(unsafe.Pointer(routes)), uintptr(unsafe.Pointer(result)))
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff
@@ -671,11 +683,20 @@ func hcnOpenService(service *hcnService, result **uint16) (hr error) {
 	return
 }
 
-func hcnRegisterServiceCallback(service hcnService, callback int32, context int32, callbackHandle *hcnCallbackHandle) (hr error) {
-	if hr = procHcnRegisterServiceCallback.Find(); hr != nil {
+func hcnCreateRoute(id *_guid, settings string, route *hcnRoute, result **uint16) (hr error) {
+	var _p0 *uint16
+	_p0, hr = syscall.UTF16PtrFromString(settings)
+	if hr != nil {
 		return
 	}
-	r0, _, _ := syscall.Syscall6(procHcnRegisterServiceCallback.Addr(), 4, uintptr(service), uintptr(callback), uintptr(context), uintptr(unsafe.Pointer(callbackHandle)), 0, 0)
+	return _hcnCreateRoute(id, _p0, route, result)
+}
+
+func _hcnCreateRoute(id *_guid, settings *uint16, route *hcnRoute, result **uint16) (hr error) {
+	if hr = procHcnCreateSdnRoute.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall6(procHcnCreateSdnRoute.Addr(), 4, uintptr(unsafe.Pointer(id)), uintptr(unsafe.Pointer(settings)), uintptr(unsafe.Pointer(route)), uintptr(unsafe.Pointer(result)), 0, 0)
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff
@@ -685,11 +706,11 @@ func hcnRegisterServiceCallback(service hcnService, callback int32, context int3
 	return
 }
 
-func hcnUnregisterServiceCallback(callbackHandle hcnCallbackHandle) (hr error) {
-	if hr = procHcnUnregisterServiceCallback.Find(); hr != nil {
+func hcnOpenRoute(id *_guid, route *hcnRoute, result **uint16) (hr error) {
+	if hr = procHcnOpenSdnRoute.Find(); hr != nil {
 		return
 	}
-	r0, _, _ := syscall.Syscall(procHcnUnregisterServiceCallback.Addr(), 1, uintptr(callbackHandle), 0, 0)
+	r0, _, _ := syscall.Syscall(procHcnOpenSdnRoute.Addr(), 3, uintptr(unsafe.Pointer(id)), uintptr(unsafe.Pointer(route)), uintptr(unsafe.Pointer(result)))
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff
@@ -699,11 +720,71 @@ func hcnUnregisterServiceCallback(callbackHandle hcnCallbackHandle) (hr error) {
 	return
 }
 
-func hcnCloseService(service hcnService) (hr error) {
-	if hr = procHcnCloseService.Find(); hr != nil {
+func hcnModifyRoute(route hcnRoute, settings string, result **uint16) (hr error) {
+	var _p0 *uint16
+	_p0, hr = syscall.UTF16PtrFromString(settings)
+	if hr != nil {
 		return
 	}
-	r0, _, _ := syscall.Syscall(procHcnCloseService.Addr(), 1, uintptr(service), 0, 0)
+	return _hcnModifyRoute(route, _p0, result)
+}
+
+func _hcnModifyRoute(route hcnRoute, settings *uint16, result **uint16) (hr error) {
+	if hr = procHcnModifySdnRoute.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall(procHcnModifySdnRoute.Addr(), 3, uintptr(route), uintptr(unsafe.Pointer(settings)), uintptr(unsafe.Pointer(result)))
+	if int32(r0) < 0 {
+		if r0&0x1fff0000 == 0x00070000 {
+			r0 &= 0xffff
+		}
+		hr = syscall.Errno(r0)
+	}
+	return
+}
+
+func hcnQueryRouteProperties(route hcnRoute, query string, properties **uint16, result **uint16) (hr error) {
+	var _p0 *uint16
+	_p0, hr = syscall.UTF16PtrFromString(query)
+	if hr != nil {
+		return
+	}
+	return _hcnQueryRouteProperties(route, _p0, properties, result)
+}
+
+func _hcnQueryRouteProperties(route hcnRoute, query *uint16, properties **uint16, result **uint16) (hr error) {
+	if hr = procHcnQuerySdnRouteProperties.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall6(procHcnQuerySdnRouteProperties.Addr(), 4, uintptr(route), uintptr(unsafe.Pointer(query)), uintptr(unsafe.Pointer(properties)), uintptr(unsafe.Pointer(result)), 0, 0)
+	if int32(r0) < 0 {
+		if r0&0x1fff0000 == 0x00070000 {
+			r0 &= 0xffff
+		}
+		hr = syscall.Errno(r0)
+	}
+	return
+}
+
+func hcnDeleteRoute(id *_guid, result **uint16) (hr error) {
+	if hr = procHcnDeleteSdnRoute.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall(procHcnDeleteSdnRoute.Addr(), 2, uintptr(unsafe.Pointer(id)), uintptr(unsafe.Pointer(result)), 0)
+	if int32(r0) < 0 {
+		if r0&0x1fff0000 == 0x00070000 {
+			r0 &= 0xffff
+		}
+		hr = syscall.Errno(r0)
+	}
+	return
+}
+
+func hcnCloseRoute(route hcnRoute) (hr error) {
+	if hr = procHcnCloseSdnRoute.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall(procHcnCloseSdnRoute.Addr(), 1, uintptr(route), 0, 0)
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff

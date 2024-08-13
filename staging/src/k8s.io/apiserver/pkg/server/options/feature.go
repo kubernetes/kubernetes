@@ -17,15 +17,22 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 )
 
 type FeatureOptions struct {
 	EnableProfiling           bool
+	DebugSocketPath           string
 	EnableContentionProfiling bool
+	EnablePriorityAndFairness bool
 }
 
 func NewFeatureOptions() *FeatureOptions {
@@ -33,7 +40,9 @@ func NewFeatureOptions() *FeatureOptions {
 
 	return &FeatureOptions{
 		EnableProfiling:           defaults.EnableProfiling,
+		DebugSocketPath:           defaults.DebugSocketPath,
 		EnableContentionProfiling: defaults.EnableContentionProfiling,
+		EnablePriorityAndFairness: true,
 	}
 }
 
@@ -45,19 +54,36 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
-		"Enable lock contention profiling, if profiling is enabled")
-	dummy := false
-	fs.BoolVar(&dummy, "enable-swagger-ui", dummy, "Enables swagger ui on the apiserver at /swagger-ui")
-	fs.MarkDeprecated("enable-swagger-ui", "swagger 1.2 support has been removed")
+		"Enable block profiling, if profiling is enabled")
+	fs.StringVar(&o.DebugSocketPath, "debug-socket-path", o.DebugSocketPath,
+		"Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path")
+	fs.BoolVar(&o.EnablePriorityAndFairness, "enable-priority-and-fairness", o.EnablePriorityAndFairness, ""+
+		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 }
 
-func (o *FeatureOptions) ApplyTo(c *server.Config) error {
+func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interface, informers informers.SharedInformerFactory) error {
 	if o == nil {
 		return nil
 	}
 
 	c.EnableProfiling = o.EnableProfiling
+	c.DebugSocketPath = o.DebugSocketPath
 	c.EnableContentionProfiling = o.EnableContentionProfiling
+
+	if o.EnablePriorityAndFairness {
+		if clientset == nil {
+			return fmt.Errorf("invalid configuration: priority and fairness requires a core Kubernetes client")
+		}
+		if c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight <= 0 {
+			return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight)
+
+		}
+		c.FlowControl = utilflowcontrol.New(
+			informers,
+			clientset.FlowcontrolV1(),
+			c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight,
+		)
+	}
 
 	return nil
 }

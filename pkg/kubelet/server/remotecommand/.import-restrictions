@@ -1,5 +1,0 @@
-rules:
-  # prevent exposing internal api in streaming packages
-  - selectorRegexp: k8s[.]io/kubernetes
-    forbiddenPrefixes:
-      - ''

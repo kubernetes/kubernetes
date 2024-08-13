@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=staging-k8s.gcr.io/kube-addon-manager
+IMAGE=gcr.io/k8s-staging-addon-manager/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v9.1.0
-KUBECTL_VERSION?=v1.13.2
+VERSION=v9.1.7
+KUBECTL_VERSION?=v1.27.1
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
+BASEIMAGE=registry.k8s.io/debian-base-$(ARCH):v1.0.1
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
@@ -29,15 +29,14 @@ all: build
 build:
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
-	chmod +x $(TEMP_DIR)/kubectl
-	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+	chmod a+rx $(TEMP_DIR)/kube-addons.sh $(TEMP_DIR)/kube-addons-main.sh $(TEMP_DIR)/kubectl
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 
-	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR) --build-arg BASEIMAGE=$(BASEIMAGE)
 
 push: build
 	docker push $(IMAGE)-$(ARCH):$(VERSION)
@@ -47,6 +46,12 @@ ifeq ($(ARCH),amd64)
 	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
 	docker push $(IMAGE):$(VERSION)
 endif
+
+test:
+	cp ./* $(TEMP_DIR)
+	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
+	chmod a+rx $(TEMP_DIR)/kube-addons.sh $(TEMP_DIR)/kube-addons-test.sh $(TEMP_DIR)/kubectl
+	cd $(TEMP_DIR) && KUBECTL_BIN=$(TEMP_DIR)/kubectl ./kube-addons-test.sh
 
 clean:
 	docker rmi -f $(IMAGE)-$(ARCH):$(VERSION)

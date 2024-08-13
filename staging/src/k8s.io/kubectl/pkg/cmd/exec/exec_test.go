@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -30,24 +29,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
 )
 
 type fakeRemoteExecutor struct {
-	method  string
 	url     *url.URL
 	execErr error
 }
 
-func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	f.method = method
+func (f *fakeRemoteExecutor) Execute(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	f.url = url
 	return f.execErr
 }
@@ -113,20 +110,17 @@ func TestPodAndContainer(t *testing.T) {
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: -1,
-			expectedPod:   "foo",
-			expectedArgs:  []string{"cmd"},
+			expectError:   true,
 			name:          "cmd, cmd is behind dash",
 			obj:           execPod(),
 		},
 		{
-			p:                 &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
-			args:              []string{"foo", "cmd"},
-			argsLenAtDash:     -1,
-			expectedPod:       "foo",
-			expectedContainer: "bar",
-			expectedArgs:      []string{"cmd"},
-			name:              "cmd, container in flag",
-			obj:               execPod(),
+			p:             &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "cmd, container in flag",
+			obj:           execPod(),
 		},
 	}
 	for _, test := range tests {
@@ -143,7 +137,7 @@ func TestPodAndContainer(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
+			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
 			options := test.p
 			options.ErrOut = bytes.NewBuffer([]byte{})
 			options.Out = bytes.NewBuffer([]byte{})
@@ -236,13 +230,13 @@ func TestExec(t *testing.T) {
 				StreamOptions: StreamOptions{
 					PodName:       "foo",
 					ContainerName: "bar",
-					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
+					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 				},
 				Executor: ex,
 			}
-			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
-			args := []string{"pod/foo", "command"}
-			if err := params.Complete(tf, cmd, args, -1); err != nil {
+			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
+			args := []string{"pod/foo", "--", "command"}
+			if err := params.Complete(tf, cmd, args, 1); err != nil {
 				t.Fatal(err)
 			}
 			err := params.Run()
@@ -264,9 +258,6 @@ func TestExec(t *testing.T) {
 			if strings.Count(ex.url.RawQuery, "container=bar") != 1 {
 				t.Errorf("%s: Did not get expected container query param for exec request", test.name)
 				return
-			}
-			if ex.method != "POST" {
-				t.Errorf("%s: Did not get method for exec request: %s", test.name, ex.method)
 			}
 		})
 	}
@@ -291,7 +282,7 @@ func execPod() *corev1.Pod {
 }
 
 func TestSetupTTY(t *testing.T) {
-	streams, _, _, stderr := genericclioptions.NewTestIOStreams()
+	streams, _, _, stderr := genericiooptions.NewTestIOStreams()
 
 	// test 1 - don't attach stdin
 	o := &StreamOptions{
@@ -373,7 +364,7 @@ func TestSetupTTY(t *testing.T) {
 	stderr.Reset()
 	o.TTY = true
 
-	overrideStdin := ioutil.NopCloser(&bytes.Buffer{})
+	overrideStdin := io.NopCloser(&bytes.Buffer{})
 	overrideStdout := &bytes.Buffer{}
 	overrideStderr := &bytes.Buffer{}
 	o.overrideStreams = func() (io.ReadCloser, io.Writer, io.Writer) {
@@ -406,5 +397,39 @@ func TestSetupTTY(t *testing.T) {
 	}
 	if tty.Out != o.Out {
 		t.Errorf("attach stdin, TTY, is a terminal: tty.Out should equal o.Out")
+	}
+}
+
+func TestCreateExecutor(t *testing.T) {
+	url, err := url.Parse("http://localhost:8080/index.html")
+	if err != nil {
+		t.Fatalf("unable to parse test url: %v", err)
+	}
+	config := cmdtesting.DefaultClientConfig()
+	// First, ensure that no environment variable creates the fallback executor.
+	executor, err := createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Next, check turning on feature flag explicitly also creates fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Finally, check explicit disabling does NOT create the fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 }

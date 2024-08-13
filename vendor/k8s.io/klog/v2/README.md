@@ -23,20 +23,39 @@ Historical context is available here:
  * https://groups.google.com/forum/#!msg/kubernetes-sig-architecture/wCWiWf3Juzs/hXRVBH90CgAJ
  * https://groups.google.com/forum/#!msg/kubernetes-dev/7vnijOMhLS0/1oRiNtigBgAJ
 
+## Release versioning
+
+Semantic versioning is used in this repository. It contains several Go modules
+with different levels of stability:
+- `k8s.io/klog/v2` - stable API, `vX.Y.Z` tags
+- `examples` - no stable API, no tags, no intention to ever stabilize
+
+Exempt from the API stability guarantee are items (packages, functions, etc.)
+which are marked explicitly as `EXPERIMENTAL` in their docs comment. Those
+may still change in incompatible ways or get removed entirely. This can only
+be used for code that is used in tests to avoid situations where non-test
+code from two different Kubernetes dependencies depends on incompatible
+releases of klog because an experimental API was changed.
+
 ----
 
 How to use klog
 ===============
-- Replace imports for `github.com/golang/glog` with `k8s.io/klog`
+- Replace imports for `"github.com/golang/glog"` with `"k8s.io/klog/v2"`
 - Use `klog.InitFlags(nil)` explicitly for initializing global flags as we no longer use `init()` method to register the flags
 - You can now use `log_file` instead of `log_dir` for logging to a single file (See `examples/log_file/usage_log_file.go`)
 - If you want to redirect everything logged using klog somewhere else (say syslog!), you can use `klog.SetOutput()` method and supply a `io.Writer`. (See `examples/set_output/usage_set_output.go`)
 - For more logging conventions (See [Logging Conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md))
+- See our documentation on [pkg.go.dev/k8s.io](https://pkg.go.dev/k8s.io/klog).
 
 **NOTE**: please use the newer go versions that support semantic import versioning in modules, ideally go 1.11.4 or greater.
 
+### Coexisting with klog/v2
+
+See [this example](examples/coexist_klog_v1_and_v2/) to see how to coexist with both klog/v1 and klog/v2.
+
 ### Coexisting with glog
-This package can be used side by side with glog. [This example](examples/coexist_glog/coexist_glog.go) shows how to initialize and syncronize flags from the global `flag.CommandLine` FlagSet. In addition, the example makes use of stderr as combined output by setting `alsologtostderr` (or `logtostderr`) to `true`.
+This package can be used side by side with glog. [This example](examples/coexist_glog/coexist_glog.go) shows how to initialize and synchronize flags from the global `flag.CommandLine` FlagSet. In addition, the example makes use of stderr as combined output by setting `alsologtostderr` (or `logtostderr`) to `true`.
 
 ## Community, discussion, contribution, and support
 
@@ -44,7 +63,7 @@ Learn how to engage with the Kubernetes community on the [community page](http:/
 
 You can reach the maintainers of this project at:
 
-- [Slack](https://kubernetes.slack.com/messages/sig-architecture)
+- [Slack](https://kubernetes.slack.com/messages/klog)
 - [Mailing List](https://groups.google.com/forum/#!forum/kubernetes-sig-architecture)
 
 ### Code of conduct
@@ -81,7 +100,7 @@ The comment from glog.go introduces the ideas:
 
 		glog.Fatalf("Initialization failed: %s", err)
 
-	See the documentation for the V function for an explanation
+	See the documentation of the V function for an explanation
 	of these examples:
 
 		if glog.V(2) {

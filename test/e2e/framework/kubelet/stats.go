@@ -33,7 +33,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
@@ -98,7 +98,7 @@ type RuntimeOperationErrorRate struct {
 }
 
 // ProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
-func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
+func ProxyRequest(ctx context.Context, c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
 	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call. #22165
 	var result restclient.Result
 	finished := make(chan struct{}, 1)
@@ -108,7 +108,7 @@ func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restc
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", node, port)).
 			Suffix(endpoint).
-			Do(context.TODO())
+			Do(ctx)
 
 		finished <- struct{}{}
 	}()
@@ -121,12 +121,12 @@ func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restc
 }
 
 // NewRuntimeOperationMonitor returns a new RuntimeOperationMonitor.
-func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor {
+func NewRuntimeOperationMonitor(ctx context.Context, c clientset.Interface) *RuntimeOperationMonitor {
 	m := &RuntimeOperationMonitor{
 		client:          c,
 		nodesRuntimeOps: make(map[string]NodeRuntimeOperationErrorRate),
 	}
-	nodes, err := m.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := m.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
@@ -134,15 +134,15 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 		m.nodesRuntimeOps[node.Name] = make(NodeRuntimeOperationErrorRate)
 	}
 	// Initialize the runtime operation error rate
-	m.GetRuntimeOperationErrorRate()
+	m.GetRuntimeOperationErrorRate(ctx)
 	return m
 }
 
 // GetRuntimeOperationErrorRate gets runtime operation records from kubelet metrics and calculate
 // error rates of all runtime operations.
-func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate() map[string]NodeRuntimeOperationErrorRate {
+func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate(ctx context.Context) map[string]NodeRuntimeOperationErrorRate {
 	for node := range m.nodesRuntimeOps {
-		nodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
+		nodeResult, err := getNodeRuntimeOperationErrorRate(ctx, m.client, node)
 		if err != nil {
 			framework.Logf("GetRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
@@ -153,12 +153,12 @@ func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate() map[string]Node
 }
 
 // GetLatestRuntimeOperationErrorRate gets latest error rate and timeout rate from last observed RuntimeOperationErrorRate.
-func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate() map[string]NodeRuntimeOperationErrorRate {
+func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate(ctx context.Context) map[string]NodeRuntimeOperationErrorRate {
 	result := make(map[string]NodeRuntimeOperationErrorRate)
 	for node := range m.nodesRuntimeOps {
 		result[node] = make(NodeRuntimeOperationErrorRate)
 		oldNodeResult := m.nodesRuntimeOps[node]
-		curNodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
+		curNodeResult, err := getNodeRuntimeOperationErrorRate(ctx, m.client, node)
 		if err != nil {
 			framework.Logf("GetLatestRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
@@ -193,9 +193,9 @@ func FormatRuntimeOperationErrorRate(nodesResult map[string]NodeRuntimeOperation
 }
 
 // getNodeRuntimeOperationErrorRate gets runtime operation error rate from specified node.
-func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeRuntimeOperationErrorRate, error) {
+func getNodeRuntimeOperationErrorRate(ctx context.Context, c clientset.Interface, node string) (NodeRuntimeOperationErrorRate, error) {
 	result := make(NodeRuntimeOperationErrorRate)
-	ms, err := e2emetrics.GetKubeletMetrics(c, node)
+	ms, err := e2emetrics.GetKubeletMetrics(ctx, c, node)
 	if err != nil {
 		return result, err
 	}
@@ -225,8 +225,8 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 }
 
 // GetStatsSummary contacts kubelet for the container information.
-func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+func GetStatsSummary(ctx context.Context, c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
+	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
@@ -248,14 +248,14 @@ func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	return &summary, nil
 }
 
-func getNodeStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
+func getNodeStatsSummary(ctx context.Context, c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
 		Suffix("stats/summary").
 		SetHeader("Content-Type", "application/json").
-		Do(context.TODO()).Raw()
+		Do(ctx).Raw()
 
 	if err != nil {
 		return nil, err
@@ -318,8 +318,8 @@ func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerCo
 }
 
 // GetKubeletHeapStats returns stats of kubelet heap.
-func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", framework.KubeletPort)
+func GetKubeletHeapStats(ctx context.Context, c clientset.Interface, nodeName string) (string, error) {
+	client, err := ProxyRequest(ctx, c, nodeName, "debug/pprof/heap", framework.KubeletPort)
 	if err != nil {
 		return "", err
 	}
@@ -356,7 +356,7 @@ type resourceCollector struct {
 	client          clientset.Interface
 	buffers         map[string][]*ContainerResourceUsage
 	pollingInterval time.Duration
-	stopCh          chan struct{}
+	stop            func()
 }
 
 func newResourceCollector(c clientset.Interface, nodeName string, containerNames []string, pollingInterval time.Duration) *resourceCollector {
@@ -371,22 +371,23 @@ func newResourceCollector(c clientset.Interface, nodeName string, containerNames
 }
 
 // Start starts a goroutine to Poll the node every pollingInterval.
-func (r *resourceCollector) Start() {
-	r.stopCh = make(chan struct{}, 1)
+func (r *resourceCollector) Start(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	r.stop = cancel
 	// Keep the last observed stats for comparison.
 	oldStats := make(map[string]*kubeletstatsv1alpha1.ContainerStats)
-	go wait.Until(func() { r.collectStats(oldStats) }, r.pollingInterval, r.stopCh)
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { r.collectStats(ctx, oldStats) }, r.pollingInterval)
 }
 
 // Stop sends a signal to terminate the stats collecting goroutine.
 func (r *resourceCollector) Stop() {
-	close(r.stopCh)
+	r.stop()
 }
 
 // collectStats gets the latest stats from kubelet stats summary API, computes
 // the resource usage, and pushes it to the buffer.
-func (r *resourceCollector) collectStats(oldStatsMap map[string]*kubeletstatsv1alpha1.ContainerStats) {
-	summary, err := getNodeStatsSummary(r.client, r.node)
+func (r *resourceCollector) collectStats(ctx context.Context, oldStatsMap map[string]*kubeletstatsv1alpha1.ContainerStats) {
+	summary, err := getNodeStatsSummary(ctx, r.client, r.node)
 	if err != nil {
 		framework.Logf("Error getting node stats summary on %q, err: %v", r.node, err)
 		return
@@ -486,9 +487,9 @@ func NewResourceMonitor(c clientset.Interface, containerNames []string, pollingI
 }
 
 // Start starts collectors.
-func (r *ResourceMonitor) Start() {
+func (r *ResourceMonitor) Start(ctx context.Context) {
 	// It should be OK to monitor unschedulable Nodes
-	nodes, err := r.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := r.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}
@@ -496,7 +497,7 @@ func (r *ResourceMonitor) Start() {
 	for _, node := range nodes.Items {
 		collector := newResourceCollector(r.client, node.Name, r.containers, r.pollingInterval)
 		r.collectors[node.Name] = collector
-		collector.Start()
+		collector.Start(ctx)
 	}
 }
 

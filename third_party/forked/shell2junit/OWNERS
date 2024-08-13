@@ -2,11 +2,10 @@
 
 reviewers:
   - cblecker
-  - ixdy
-  - mengqiy
   - pwittrock
 approvers:
   - cblecker
+  - pwittrock
+emeritus_approvers:
   - ixdy
   - mengqiy
-  - pwittrock

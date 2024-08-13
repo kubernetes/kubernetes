@@ -17,20 +17,23 @@ limitations under the License.
 package config
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/ptr"
 )
 
 func noDefault(*core.Pod) error { return nil }
@@ -60,7 +63,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
-			SchedulerName:      core.DefaultSchedulerName,
+			SchedulerName:      v1.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
 		Status: v1.PodStatus{
@@ -107,6 +110,76 @@ func TestDecodeSinglePod(t *testing.T) {
 	}
 }
 
+func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
+	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "ctb-volume",
+						MountPath: "/var/run/ctb-volume",
+					},
+				},
+			}},
+			Volumes: []v1.Volume{
+				{
+					Name: "ctb-volume",
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+										Name: ptr.To("my-ctb"),
+										Path: "ctb-file",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, _, err = tryDecodeSinglePod(json, noDefault)
+	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
+		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
+	}
+}
+
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
@@ -133,7 +206,7 @@ func TestDecodePodList(t *testing.T) {
 				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
-			SchedulerName:      core.DefaultSchedulerName,
+			SchedulerName:      v1.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
 		Status: v1.PodStatus{
@@ -186,34 +259,6 @@ func TestDecodePodList(t *testing.T) {
 	}
 }
 
-func TestGetSelfLink(t *testing.T) {
-	var testCases = []struct {
-		desc             string
-		name             string
-		namespace        string
-		expectedSelfLink string
-	}{
-		{
-			desc:             "No namespace specified",
-			name:             "foo",
-			namespace:        "",
-			expectedSelfLink: "/api/v1/namespaces/default/pods/foo",
-		},
-		{
-			desc:             "Namespace specified",
-			name:             "foo",
-			namespace:        "bar",
-			expectedSelfLink: "/api/v1/namespaces/bar/pods/foo",
-		},
-	}
-	for _, testCase := range testCases {
-		selfLink := getSelfLink(testCase.name, testCase.namespace)
-		if testCase.expectedSelfLink != selfLink {
-			t.Errorf("%s: getSelfLink error, expected: %s, got: %s", testCase.desc, testCase.expectedSelfLink, selfLink)
-		}
-	}
-}
-
 func TestStaticPodNameGenerate(t *testing.T) {
 	testCases := []struct {
 		nodeName  types.NodeName
@@ -246,7 +291,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 	}
 	for _, c := range testCases {
 		assert.Equal(t, c.expected, generatePodName(c.podName, c.nodeName), "wrong pod name generated")
-		pod := &core.Pod{}
+		pod := podtest.MakePod("")
 		pod.Name = c.podName
 		if c.overwrite != "" {
 			pod.Name = c.overwrite

@@ -21,11 +21,13 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	clientset "k8s.io/client-go/kubernetes"
+
 	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -44,6 +46,8 @@ type Manager struct {
 	// cas contains the CAExpirationHandler related to the certificates that are controlled by this manager
 	cas map[string]*CAExpirationHandler
 }
+
+type certConfigMutatorFunc func(*certutil.Config) error
 
 // CertificateRenewHandler defines required info for renewing a certificate
 type CertificateRenewHandler struct {
@@ -65,6 +69,10 @@ type CertificateRenewHandler struct {
 
 	// readwriter defines a CertificateReadWriter to be used for certificate renewal
 	readwriter certificateReadWriter
+
+	// certConfigMutators holds the mutator functions that can be applied to the input cert config object
+	// These functions will be run in series.
+	certConfigMutators []certConfigMutatorFunc
 }
 
 // CAExpirationHandler defines required info for CA expiration check
@@ -108,17 +116,19 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		for _, cert := range certs {
 			// create a ReadWriter for certificates stored in the K8s local PKI
 			pkiReadWriter := newPKICertificateReadWriter(rm.cfg.CertificatesDir, cert.BaseName)
+			certConfigMutators := loadCertConfigMutators(cert.BaseName)
 
 			// adds the certificateRenewHandler.
 			// PKI certificates are indexed by name, that is a well know constant defined
 			// in the certsphase package and that can be reused across all the kubeadm codebase
 			rm.certificates[cert.Name] = &CertificateRenewHandler{
-				Name:       cert.Name,
-				LongName:   cert.LongName,
-				FileName:   cert.BaseName,
-				CAName:     ca.Name,
-				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
-				readwriter: pkiReadWriter,
+				Name:               cert.Name,
+				LongName:           cert.LongName,
+				FileName:           cert.BaseName,
+				CAName:             ca.Name,
+				CABaseName:         ca.BaseName, // Nb. this is a path for etcd certs (they are stored in a subfolder)
+				readwriter:         pkiReadWriter,
+				certConfigMutators: certConfigMutators,
 			}
 		}
 
@@ -139,6 +149,10 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		{
 			longName: "certificate embedded in the kubeconfig file for the admin to use and for kubeadm itself",
 			fileName: kubeadmconstants.AdminKubeConfigFileName,
+		},
+		{
+			longName: "certificate embedded in the kubeconfig file for the super-admin",
+			fileName: kubeadmconstants.SuperAdminKubeConfigFileName,
 		},
 		{
 			longName: "certificate embedded in the kubeconfig file for the controller manager to use",
@@ -165,6 +179,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			LongName:   kubeConfig.longName,
 			FileName:   kubeConfig.fileName,
 			CABaseName: kubeadmconstants.CACertAndKeyBaseName, // all certificates in kubeConfig files are signed by the Kubernetes CA
+			CAName:     kubeadmconstants.CACertAndKeyBaseName,
 			readwriter: kubeConfigReadWriter,
 		}
 	}
@@ -224,9 +239,27 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	}
 
 	// extract the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return false, err
+		}
+	}
+
 	cfg := &pkiutil.CertConfig{
-		Config:             certToConfig(cert),
-		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+		Config:              certConfig,
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+	}
+
+	startTime := kubeadmutil.StartTimeUTC()
+
+	// Backdate certificate to allow small time jumps.
+	cfg.NotBefore = startTime.Add(-kubeadmconstants.CertificateBackdate)
+
+	// Use the validity periods defined in the ClusterConfiguration.
+	// Only use CertificateValidityPeriod as CA renewal is not supported.
+	if rm.cfg.CertificateValidityPeriod != nil {
+		cfg.NotAfter = startTime.Add(rm.cfg.CertificateValidityPeriod.Duration)
 	}
 
 	// reads the CA
@@ -250,43 +283,6 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	return true, nil
 }
 
-// RenewUsingCSRAPI executes certificate renewal uses the K8s certificate API.
-// For PKI certificates, use the name defined in the certsphase package, while for certificates
-// embedded in the kubeConfig files, use the kubeConfig file name defined in the kubeadm constants package.
-// If you use the CertificateRenewHandler returned by Certificates func, handler.Name already contains the right value.
-func (rm *Manager) RenewUsingCSRAPI(name string, client clientset.Interface) error {
-	handler, ok := rm.certificates[name]
-	if !ok {
-		return errors.Errorf("%s is not a valid certificate for this cluster", name)
-	}
-
-	// reads the current certificate
-	cert, err := handler.readwriter.Read()
-	if err != nil {
-		return err
-	}
-
-	// extract the certificate config
-	cfg := &pkiutil.CertConfig{
-		Config:             certToConfig(cert),
-		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
-	}
-
-	// create a new certificate with the same config
-	newCert, newKey, err := NewAPIRenewer(client).Renew(cfg)
-	if err != nil {
-		return errors.Wrapf(err, "failed to renew certificate %s", name)
-	}
-
-	// writes the new certificate to disk
-	err = handler.readwriter.Write(newCert, newKey)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // CreateRenewCSR generates CSR request for certificate renewal.
 // For PKI certificates, use the name defined in the certsphase package, while for certificates
 // embedded in the kubeConfig files, use the kubeConfig file name defined in the kubeadm constants package.
@@ -304,9 +300,15 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 
 	// extracts the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return err
+		}
+	}
 	cfg := &pkiutil.CertConfig{
-		Config:             certToConfig(cert),
-		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+		Config:              certConfig,
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
 	// generates the CSR request and save it
@@ -332,7 +334,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCertificateExpirationInfo returns certificate expiration info.
@@ -368,7 +370,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCAExpirationInfo returns CA expiration info.
@@ -410,7 +412,11 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.EtcdCACertAndKeyBaseName:
-		return false, nil
+		externallyManaged, err := certsphase.UsingExternalEtcdCA(rm.cfg)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+		}
+		return externallyManaged, nil
 	default:
 		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
 	}
@@ -426,4 +432,8 @@ func certToConfig(cert *x509.Certificate) certutil.Config {
 		},
 		Usages: cert.ExtKeyUsage,
 	}
+}
+
+func loadCertConfigMutators(certBaseName string) []certConfigMutatorFunc {
+	return nil
 }

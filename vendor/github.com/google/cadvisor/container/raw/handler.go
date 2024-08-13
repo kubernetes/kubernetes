@@ -24,9 +24,8 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 )
 
@@ -50,20 +49,17 @@ func isRootCgroup(name string) bool {
 	return name == "/"
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.InotifyWatcher, rootFs string, includedMetrics container.MetricSet) (container.ContainerHandler, error) {
-	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
-
+func newRawContainerHandler(name string, cgroupSubsystems map[string]string, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.InotifyWatcher, rootFs string, includedMetrics container.MetricSet) (container.ContainerHandler, error) {
 	cHints, err := common.GetContainerHintsFromFile(*common.ArgContainerHints)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroupfs.Manager{
-		Cgroups: &configs.Cgroup{
-			Name: name,
-		},
-		Paths: cgroupPaths,
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems, name)
+
+	cgroupManager, err := libcontainer.NewCgroupManager(name, cgroupPaths)
+	if err != nil {
+		return nil, err
 	}
 
 	var externalMounts []common.Mount
@@ -192,13 +188,18 @@ func fsToFsStats(fs *fs.Fs) info.FsStats {
 func (h *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	var filesystems []fs.Fs
 	var err error
+	// Early exist if no disk metrics are to be collected.
+	if !h.includedMetrics.Has(container.DiskUsageMetrics) && !h.includedMetrics.Has(container.DiskIOMetrics) {
+		return nil
+	}
+
 	// Get Filesystem information only for the root cgroup.
 	if isRootCgroup(h.name) {
 		filesystems, err = h.fsInfo.GetGlobalFsInfo()
 		if err != nil {
 			return err
 		}
-	} else if h.includedMetrics.Has(container.DiskUsageMetrics) || h.includedMetrics.Has(container.DiskIOMetrics) {
+	} else {
 		if len(h.externalMounts) > 0 {
 			mountSet := make(map[string]struct{})
 			for _, mount := range h.externalMounts {
@@ -211,14 +212,14 @@ func (h *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 		}
 	}
 
-	if isRootCgroup(h.name) || h.includedMetrics.Has(container.DiskUsageMetrics) {
+	if h.includedMetrics.Has(container.DiskUsageMetrics) {
 		for i := range filesystems {
 			fs := filesystems[i]
 			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
 		}
 	}
 
-	if isRootCgroup(h.name) || h.includedMetrics.Has(container.DiskIOMetrics) {
+	if h.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats(&fsNamer{fs: filesystems, factory: h.machineInfoFactory}, &stats.DiskIo)
 
 	}
@@ -244,7 +245,11 @@ func (h *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
 }
 
 func (h *rawContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := h.cgroupPaths[resource]
+	var res string
+	if !cgroups.IsCgroup2UnifiedMode() {
+		res = resource
+	}
+	path, ok := h.cgroupPaths[res]
 	if !ok {
 		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.name)
 	}

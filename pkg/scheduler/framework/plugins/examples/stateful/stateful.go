@@ -24,16 +24,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // MultipointExample is an example plugin that is executed at multiple extension points.
 // This plugin is stateful. It receives arguments at initialization (NewMultipointPlugin)
 // and changes its state when it is executed.
 type MultipointExample struct {
-	mpState map[int]string
-	numRuns int
-	mu      sync.RWMutex
+	executionPoints []string
+	mu              sync.RWMutex
 }
 
 var _ framework.ReservePlugin = &MultipointExample{}
@@ -47,19 +46,35 @@ func (mp *MultipointExample) Name() string {
 	return Name
 }
 
-// Reserve is the functions invoked by the framework at "reserve" extension point.
+// Reserve is the function invoked by the framework at "reserve" extension
+// point. In this trivial example, the Reserve method allocates an array of
+// strings.
 func (mp *MultipointExample) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	// Reserve is not called concurrently, and so we don't need to lock.
-	mp.numRuns++
+	mp.executionPoints = append(mp.executionPoints, "reserve")
 	return nil
 }
 
-// PreBind is the functions invoked by the framework at "prebind" extension point.
+// Unreserve is the function invoked by the framework when any error happens
+// during "reserve" extension point or later. In this example, the Unreserve
+// method loses its reference to the string slice, allowing it to be garbage
+// collected, and thereby "unallocating" the reserved resources.
+func (mp *MultipointExample) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+	// Unlike Reserve, the Unreserve method may be called concurrently since
+	// there is no guarantee that there will only one unreserve operation at any
+	// given point in time (for example, during the binding cycle).
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	mp.executionPoints = nil
+}
+
+// PreBind is the function invoked by the framework at "prebind" extension
+// point.
 func (mp *MultipointExample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	// PreBind could be called concurrently for different pods.
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	mp.numRuns++
+	mp.executionPoints = append(mp.executionPoints, "pre-bind")
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod must not be nil")
 	}
@@ -67,13 +82,11 @@ func (mp *MultipointExample) PreBind(ctx context.Context, state *framework.Cycle
 }
 
 // New initializes a new plugin and returns it.
-func New(config *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(ctx context.Context, config *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	if config == nil {
-		klog.Error("MultipointExample configuration cannot be empty")
+		klog.FromContext(ctx).Error(nil, "MultipointExample configuration cannot be empty")
 		return nil, fmt.Errorf("MultipointExample configuration cannot be empty")
 	}
-	mp := MultipointExample{
-		mpState: make(map[int]string),
-	}
+	mp := MultipointExample{}
 	return &mp, nil
 }

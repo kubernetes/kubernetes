@@ -1,8 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-network-approvers
+  - sig-network-approvers
 reviewers:
-- sig-network-reviewers
+  - sig-network-reviewers
 labels:
-- sig/network
+  - sig/network
+  - area/kube-proxy

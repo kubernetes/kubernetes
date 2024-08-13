@@ -26,6 +26,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -35,28 +37,25 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
+
+var namespaceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
-		defer trace.LogIfLong(500 * time.Millisecond)
-
-		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
-			return
-		}
-
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
+		ctx, span := tracing.Start(ctx, "Create", traceFields(req)...)
+		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -74,9 +73,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
+		// timeout inside the parent context is lower than requestTimeoutUpperBound.
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
-		ctx = request.WithNamespace(ctx, namespace)
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
@@ -90,13 +90,13 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return
 		}
 
-		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
-
-		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Create)
 		if err != nil {
+			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(body)))
 
 		options := &metav1.CreateOptions{}
 		values := req.URL.Query()
@@ -114,32 +114,70 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		defaultGVK := scope.Kind
 		original := r.New()
-		trace.Step("About to convert to expected version")
+
+		validationDirective := fieldValidation(options.FieldValidation)
+		decodeSerializer := s.Serializer
+		if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
+			decodeSerializer = s.StrictSerializer
+		}
+
+		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
+		span.AddEvent("About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(scope.Typer, err, original, gvk, body)
+			strictError, isStrictError := runtime.AsStrictDecodingError(err)
+			switch {
+			case isStrictError && obj != nil && validationDirective == metav1.FieldValidationWarn:
+				addStrictDecodingWarnings(req.Context(), strictError.Errors())
+			case isStrictError && validationDirective == metav1.FieldValidationIgnore:
+				klog.Warningf("unexpected strict error when field validation is set to ignore")
+				fallthrough
+			default:
+				err = transformDecodeError(scope.Typer, err, original, gvk, body)
+				scope.err(err, w, req)
+				return
+			}
+		}
+
+		objGV := gvk.GroupVersion()
+		if !scope.AcceptsGroupVersion(objGV) {
+			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", objGV.String(), gv.String()))
 			scope.err(err, w, req)
 			return
 		}
-		if gvk.GroupVersion() != gv {
-			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Conversion done")
-
-		ae := request.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
-		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
-
-		userInfo, _ := request.UserFrom(ctx)
+		span.AddEvent("Conversion done")
 
 		// On create, get name from new object if unset
 		if len(name) == 0 {
 			_, name, _ = scope.Namer.ObjectName(obj)
 		}
+		if len(namespace) == 0 && scope.Resource == namespaceGVR {
+			namespace = name
+		}
+		ctx = request.WithNamespace(ctx, namespace)
 
-		trace.Step("About to store object in database")
+		admit = admission.WithAudit(admit)
+		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
+
+		userInfo, _ := request.UserFrom(ctx)
+
+		if objectMeta, err := meta.Accessor(obj); err == nil {
+			preserveObjectMetaSystemFields := false
+			if c, ok := r.(rest.SubresourceObjectMetaPreserver); ok && len(scope.Subresource) > 0 {
+				preserveObjectMetaSystemFields = c.PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate()
+			}
+			if !preserveObjectMetaSystemFields {
+				rest.WipeObjectMetaSystemFields(objectMeta)
+			}
+
+			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
+
+		span.AddEvent("About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
@@ -150,22 +188,23 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				options,
 			)
 		}
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			if scope.FieldManager != nil {
-				liveObj, err := scope.Creater.New(scope.Kind)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
-				}
-				obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-				if err != nil {
-					return nil, fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err)
-				}
+		// Dedup owner references before updating managed fields
+		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
+		result, err := finisher.FinishRequest(ctx, func() (runtime.Object, error) {
+			liveObj, err := scope.Creater.New(scope.Kind)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 			}
+			obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
 					return nil, err
 				}
 			}
+			// Dedup owner references again after mutating admission happens
+			dedupOwnerReferencesAndAddWarning(obj, req.Context(), true)
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.
@@ -178,18 +217,21 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return result, err
 		})
 		if err != nil {
+			span.AddEvent("Write to database call failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		span.AddEvent("Write to database call succeeded", attribute.Int("len", len(body)))
 
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)
-		if ok && err == nil && status.Code == 0 {
+		if ok && status.Code == 0 {
 			status.Code = int32(code)
 		}
 
-		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
+		span.AddEvent("About to write a response")
+		defer span.AddEvent("Writing http response done")
+		transformResponseObject(ctx, scope, req, w, code, outputMediaType, result)
 	}
 }
 

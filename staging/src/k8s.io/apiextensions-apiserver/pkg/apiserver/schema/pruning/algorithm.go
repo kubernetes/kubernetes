@@ -17,13 +17,16 @@ limitations under the License.
 package pruning
 
 import (
+	"sort"
+
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-// Prune removes object fields in obj which are not specified in s. It skips TypeMeta and ObjectMeta fields
-// if XEmbeddedResource is set to true, or for the root if isResourceRoot=true, i.e. it does not
-// prune unknown metadata fields.
-func Prune(obj interface{}, s *structuralschema.Structural, isResourceRoot bool) {
+// PruneWithOptions removes object fields in obj which are not specified in s. It skips TypeMeta
+// and ObjectMeta fields if XEmbeddedResource is set to true, or for the root if isResourceRoot=true,
+// i.e. it does not prune unknown metadata fields.
+// It returns the set of fields that it prunes if opts.TrackUnknownFieldPaths is true
+func PruneWithOptions(obj interface{}, s *structuralschema.Structural, isResourceRoot bool, opts structuralschema.UnknownFieldPathOptions) []string {
 	if isResourceRoot {
 		if s == nil {
 			s = &structuralschema.Structural{}
@@ -34,7 +37,15 @@ func Prune(obj interface{}, s *structuralschema.Structural, isResourceRoot bool)
 			s = &clone
 		}
 	}
-	prune(obj, s)
+	prune(obj, s, &opts)
+	sort.Strings(opts.UnknownFieldPaths)
+	return opts.UnknownFieldPaths
+}
+
+// Prune is equivalent to
+// PruneWithOptions(obj, s, isResourceRoot, structuralschema.UnknownFieldPathOptions{})
+func Prune(obj interface{}, s *structuralschema.Structural, isResourceRoot bool) {
+	PruneWithOptions(obj, s, isResourceRoot, structuralschema.UnknownFieldPathOptions{})
 }
 
 var metaFields = map[string]bool{
@@ -43,16 +54,21 @@ var metaFields = map[string]bool{
 	"metadata":   true,
 }
 
-func prune(x interface{}, s *structuralschema.Structural) {
+func prune(x interface{}, s *structuralschema.Structural, opts *structuralschema.UnknownFieldPathOptions) {
 	if s != nil && s.XPreserveUnknownFields {
-		skipPrune(x, s)
+		skipPrune(x, s, opts)
 		return
 	}
 
+	origPathLen := len(opts.ParentPath)
+	defer func() {
+		opts.ParentPath = opts.ParentPath[:origPathLen]
+	}()
 	switch x := x.(type) {
 	case map[string]interface{}:
 		if s == nil {
 			for k := range x {
+				opts.RecordUnknownField(k)
 				delete(x, k)
 			}
 			return
@@ -63,32 +79,47 @@ func prune(x interface{}, s *structuralschema.Structural) {
 			}
 			prop, ok := s.Properties[k]
 			if ok {
-				prune(v, &prop)
+				opts.AppendKey(k)
+				prune(v, &prop, opts)
+				opts.ParentPath = opts.ParentPath[:origPathLen]
 			} else if s.AdditionalProperties != nil {
-				prune(v, s.AdditionalProperties.Structural)
+				opts.AppendKey(k)
+				prune(v, s.AdditionalProperties.Structural, opts)
+				opts.ParentPath = opts.ParentPath[:origPathLen]
 			} else {
+				if !metaFields[k] || len(opts.ParentPath) > 0 {
+					opts.RecordUnknownField(k)
+				}
 				delete(x, k)
 			}
 		}
 	case []interface{}:
 		if s == nil {
-			for _, v := range x {
-				prune(v, nil)
+			for i, v := range x {
+				opts.AppendIndex(i)
+				prune(v, nil, opts)
+				opts.ParentPath = opts.ParentPath[:origPathLen]
 			}
 			return
 		}
-		for _, v := range x {
-			prune(v, s.Items)
+		for i, v := range x {
+			opts.AppendIndex(i)
+			prune(v, s.Items, opts)
+			opts.ParentPath = opts.ParentPath[:origPathLen]
 		}
 	default:
 		// scalars, do nothing
 	}
 }
 
-func skipPrune(x interface{}, s *structuralschema.Structural) {
+func skipPrune(x interface{}, s *structuralschema.Structural, opts *structuralschema.UnknownFieldPathOptions) {
 	if s == nil {
 		return
 	}
+	origPathLen := len(opts.ParentPath)
+	defer func() {
+		opts.ParentPath = opts.ParentPath[:origPathLen]
+	}()
 
 	switch x := x.(type) {
 	case map[string]interface{}:
@@ -97,14 +128,20 @@ func skipPrune(x interface{}, s *structuralschema.Structural) {
 				continue
 			}
 			if prop, ok := s.Properties[k]; ok {
-				prune(v, &prop)
+				opts.AppendKey(k)
+				prune(v, &prop, opts)
+				opts.ParentPath = opts.ParentPath[:origPathLen]
 			} else if s.AdditionalProperties != nil {
-				prune(v, s.AdditionalProperties.Structural)
+				opts.AppendKey(k)
+				prune(v, s.AdditionalProperties.Structural, opts)
+				opts.ParentPath = opts.ParentPath[:origPathLen]
 			}
 		}
 	case []interface{}:
-		for _, v := range x {
-			skipPrune(v, s.Items)
+		for i, v := range x {
+			opts.AppendIndex(i)
+			skipPrune(v, s.Items, opts)
+			opts.ParentPath = opts.ParentPath[:origPathLen]
 		}
 	default:
 		// scalars, do nothing

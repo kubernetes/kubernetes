@@ -8,6 +8,7 @@ package filedesc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"google.golang.org/protobuf/internal/descfmt"
@@ -142,6 +143,7 @@ type Fields struct {
 	once   sync.Once
 	byName map[protoreflect.Name]*Field        // protected by once
 	byJSON map[string]*Field                   // protected by once
+	byText map[string]*Field                   // protected by once
 	byNum  map[protoreflect.FieldNumber]*Field // protected by once
 }
 
@@ -163,6 +165,12 @@ func (p *Fields) ByJSONName(s string) protoreflect.FieldDescriptor {
 	}
 	return nil
 }
+func (p *Fields) ByTextName(s string) protoreflect.FieldDescriptor {
+	if d := p.lazyInit().byText[s]; d != nil {
+		return d
+	}
+	return nil
+}
 func (p *Fields) ByNumber(n protoreflect.FieldNumber) protoreflect.FieldDescriptor {
 	if d := p.lazyInit().byNum[n]; d != nil {
 		return d
@@ -178,6 +186,7 @@ func (p *Fields) lazyInit() *Fields {
 		if len(p.List) > 0 {
 			p.byName = make(map[protoreflect.Name]*Field, len(p.List))
 			p.byJSON = make(map[string]*Field, len(p.List))
+			p.byText = make(map[string]*Field, len(p.List))
 			p.byNum = make(map[protoreflect.FieldNumber]*Field, len(p.List))
 			for i := range p.List {
 				d := &p.List[i]
@@ -186,6 +195,19 @@ func (p *Fields) lazyInit() *Fields {
 				}
 				if _, ok := p.byJSON[d.JSONName()]; !ok {
 					p.byJSON[d.JSONName()] = d
+				}
+				if _, ok := p.byText[d.TextName()]; !ok {
+					p.byText[d.TextName()] = d
+				}
+				if isGroupLike(d) {
+					lowerJSONName := strings.ToLower(d.JSONName())
+					if _, ok := p.byJSON[lowerJSONName]; !ok {
+						p.byJSON[lowerJSONName] = d
+					}
+					lowerTextName := strings.ToLower(d.TextName())
+					if _, ok := p.byText[lowerTextName]; !ok {
+						p.byText[lowerTextName] = d
+					}
 				}
 				if _, ok := p.byNum[d.Number()]; !ok {
 					p.byNum[d.Number()] = d

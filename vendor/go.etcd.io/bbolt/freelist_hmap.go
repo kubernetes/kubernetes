@@ -4,7 +4,7 @@ import "sort"
 
 // hashmapFreeCount returns count of free pages(hashmap version)
 func (f *freelist) hashmapFreeCount() int {
-	// use the forwardmap to get the total count
+	// use the forwardMap to get the total count
 	count := 0
 	for _, size := range f.forwardMap {
 		count += int(size)
@@ -27,7 +27,7 @@ func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
 			f.allocs[pid] = txid
 
 			for i := pgid(0); i < pgid(n); i++ {
-				delete(f.cache, pid+pgid(i))
+				delete(f.cache, pid+i)
 			}
 			return pid
 		}
@@ -41,7 +41,7 @@ func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
 
 		for pid := range bm {
 			// remove the initial
-			f.delSpan(pid, uint64(size))
+			f.delSpan(pid, size)
 
 			f.allocs[pid] = txid
 
@@ -51,7 +51,7 @@ func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
 			f.addSpan(pid+pgid(n), remain)
 
 			for i := pgid(0); i < pgid(n); i++ {
-				delete(f.cache, pid+pgid(i))
+				delete(f.cache, pid+i)
 			}
 			return pid
 		}

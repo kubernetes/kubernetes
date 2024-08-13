@@ -1,0 +1,302 @@
+# See https://github.com/golangci/golangci-lint#config-file
+run:
+  issues-exit-code: 1 #Default
+  tests: true #Default
+
+linters:
+  # Disable everything by default so upgrades to not include new "default
+  # enabled" linters.
+  disable-all: true
+  # Specifically enable linters we want to use.
+  enable:
+    - depguard
+    - errcheck
+    - errorlint
+    - godot
+    - gofumpt
+    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - tenv
+    - typecheck
+    - unconvert
+    - unused
+    - unparam
+
+issues:
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  # Setting to unlimited so the linter only is run once to debug all issues.
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  # Setting to unlimited so the linter only is run once to debug all issues.
+  max-same-issues: 0
+  # Excluding configuration per-path, per-linter, per-text and per-source.
+  exclude-rules:
+    # TODO: Having appropriate comments for exported objects helps development,
+    # even for objects in internal packages. Appropriate comments for all
+    # exported objects should be added and this exclusion removed.
+    - path: '.*internal/.*'
+      text: "exported (method|function|type|const) (.+) should have comment or be unexported"
+      linters:
+        - revive
+    # Yes, they are, but it's okay in a test.
+    - path: _test\.go
+      text: "exported func.*returns unexported type.*which can be annoying to use"
+      linters:
+        - revive
+    # Example test functions should be treated like main.
+    - path: example.*_test\.go
+      text: "calls to (.+) only in main[(][)] or init[(][)] functions"
+      linters:
+        - revive
+    # It's okay to not run gosec in a test.
+    - path: _test\.go
+      linters:
+        - gosec
+    # Igonoring gosec G404: Use of weak random number generator (math/rand instead of crypto/rand)
+    # as we commonly use it in tests and examples.
+    - text: "G404:"
+      linters:
+        - gosec
+    # Igonoring gosec G402: TLS MinVersion too low
+    # as the https://pkg.go.dev/crypto/tls#Config handles MinVersion default well.
+    - text: "G402: TLS MinVersion too low."
+      linters:
+        - gosec
+  include:
+    # revive exported should have comment or be unexported.
+    - EXC0012
+    # revive package comment should be of the form ...
+    - EXC0013
+
+linters-settings:
+  depguard:
+    rules:
+      non-tests:
+        files:
+          - "!$test"
+          - "!**/*test/*.go"
+          - "!**/internal/matchers/*.go"
+        deny:
+          - pkg: "testing"
+          - pkg: "github.com/stretchr/testify"
+          - pkg: "crypto/md5"
+          - pkg: "crypto/sha1"
+          - pkg: "crypto/**/pkix"
+      otlp-internal:
+        files:
+          - "!**/exporters/otlp/internal/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/internal"
+            desc: Do not use cross-module internal packages.
+      otlptrace-internal:
+        files:
+          - "!**/exporters/otlp/otlptrace/*.go"
+          - "!**/exporters/otlp/otlptrace/internal/**.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal"
+            desc: Do not use cross-module internal packages.
+      otlpmetric-internal:
+        files:
+          - "!**/exporters/otlp/otlpmetric/internal/*.go"
+          - "!**/exporters/otlp/otlpmetric/internal/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/internal"
+            desc: Do not use cross-module internal packages.
+      otel-internal:
+        files:
+          - "**/sdk/*.go"
+          - "**/sdk/**/*.go"
+          - "**/exporters/*.go"
+          - "**/exporters/**/*.go"
+          - "**/schema/*.go"
+          - "**/schema/**/*.go"
+          - "**/metric/*.go"
+          - "**/metric/**/*.go"
+          - "**/bridge/*.go"
+          - "**/bridge/**/*.go"
+          - "**/example/*.go"
+          - "**/example/**/*.go"
+          - "**/trace/*.go"
+          - "**/trace/**/*.go"
+          - "**/log/*.go"
+          - "**/log/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/internal$"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/attribute"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/internaltest"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/matchers"
+            desc: Do not use cross-module internal packages.
+  godot:
+    exclude:
+      # Exclude links.
+      - '^ *\[[^]]+\]:'
+      # Exclude sentence fragments for lists.
+      - '^[ ]*[-•]'
+      # Exclude sentences prefixing a list.
+      - ':$'
+  goimports:
+    local-prefixes: go.opentelemetry.io
+  misspell:
+    locale: US
+    ignore-words:
+      - cancelled
+  revive:
+    # Sets the default failure confidence.
+    # This means that linting errors with less than 0.8 confidence will be ignored.
+    # Default: 0.8
+    confidence: 0.01
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#blank-imports
+      - name: blank-imports
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+      - name: bool-literal-in-expr
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#constant-logical-expr
+      - name: constant-logical-expr
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
+      # TODO (#3372) re-enable linter when it is compatible. https://github.com/golangci/golangci-lint/issues/3280
+      - name: context-as-argument
+        disabled: true
+        arguments:
+          allowTypesBefore: "*testing.T"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-keys-type
+      - name: context-keys-type
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#deep-exit
+      - name: deep-exit
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#defer
+      - name: defer
+        disabled: false
+        arguments:
+          - ["call-chain", "loop"]
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#dot-imports
+      - name: dot-imports
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#duplicated-imports
+      - name: duplicated-imports
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+      - name: early-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-block
+      - name: empty-block
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#error-naming
+      - name: error-naming
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#error-return
+      - name: error-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#error-strings
+      - name: error-strings
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#errorf
+      - name: errorf
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#exported
+      - name: exported
+        disabled: false
+        arguments:
+          - "sayRepetitiveInsteadOfStutters"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#flag-parameter
+      - name: flag-parameter
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#identical-branches
+      - name: identical-branches
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#if-return
+      - name: if-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#increment-decrement
+      - name: increment-decrement
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#indent-error-flow
+      - name: indent-error-flow
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#import-shadowing
+      - name: import-shadowing
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#package-comments
+      - name: package-comments
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#range
+      - name: range
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#range-val-in-closure
+      - name: range-val-in-closure
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#range-val-address
+      - name: range-val-address
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#redefines-builtin-id
+      - name: redefines-builtin-id
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
+      - name: string-format
+        disabled: false
+        arguments:
+          - - panic
+            - '/^[^\n]*$/'
+            - must not contain line breaks
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+      - name: struct-tag
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#superfluous-else
+      - name: superfluous-else
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#time-equal
+      - name: time-equal
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#var-naming
+      - name: var-naming
+        disabled: false
+        arguments:
+          - ["ID"] # AllowList
+          - ["Otel", "Aws", "Gcp"] # DenyList
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#var-declaration
+      - name: var-declaration
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unconditional-recursion
+      - name: unconditional-recursion
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return
+      - name: unexported-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
+      - name: unhandled-error
+        disabled: false
+        arguments:
+          - "fmt.Fprint"
+          - "fmt.Fprintf"
+          - "fmt.Fprintln"
+          - "fmt.Print"
+          - "fmt.Printf"
+          - "fmt.Println"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unnecessary-stmt
+      - name: unnecessary-stmt
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+      - name: useless-break
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#waitgroup-by-value
+      - name: waitgroup-by-value
+        disabled: false

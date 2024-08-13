@@ -114,7 +114,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 				Webhooks: []v1beta1.MutatingWebhook{{
 					ClientConfig: v1beta1.WebhookClientConfig{
 						Service: &v1beta1.ServiceReference{
-							Port: utilpointer.Int32Ptr(443), // defaulted
+							Port: utilpointer.Int32(443), // defaulted
 						},
 					},
 					FailurePolicy:           &ignore,
@@ -126,6 +126,94 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 					SideEffects:             &unknown,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			original := test.original
+			expected := test.expected
+			legacyscheme.Scheme.Default(original)
+			if !apiequality.Semantic.DeepEqual(original, expected) {
+				t.Error(cmp.Diff(expected, original))
+			}
+		})
+	}
+}
+
+func TestDefaultAdmissionPolicy(t *testing.T) {
+	fail := v1beta1.Fail
+	equivalent := v1beta1.Equivalent
+	allScopes := v1beta1.AllScopes
+
+	tests := []struct {
+		name     string
+		original runtime.Object
+		expected runtime.Object
+	}{
+		{
+			name: "ValidatingAdmissionPolicy",
+			original: &v1beta1.ValidatingAdmissionPolicy{
+				Spec: v1beta1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1beta1.MatchResources{},
+				},
+			},
+			expected: &v1beta1.ValidatingAdmissionPolicy{
+				Spec: v1beta1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1beta1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+					FailurePolicy: &fail,
+				},
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicyBinding",
+			original: &v1beta1.ValidatingAdmissionPolicyBinding{
+				Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1beta1.MatchResources{},
+				},
+			},
+			expected: &v1beta1.ValidatingAdmissionPolicyBinding{
+				Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1beta1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+				},
+			},
+		},
+		{
+			name: "scope=*",
+			original: &v1beta1.ValidatingAdmissionPolicy{
+				Spec: v1beta1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1beta1.MatchResources{
+						ResourceRules: []v1beta1.NamedRuleWithOperations{{}},
+					},
+				},
+			},
+			expected: &v1beta1.ValidatingAdmissionPolicy{
+				Spec: v1beta1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1beta1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+						ResourceRules: []v1beta1.NamedRuleWithOperations{
+							{
+								RuleWithOperations: v1beta1.RuleWithOperations{
+									Rule: v1beta1.Rule{
+										Scope: &allScopes, // defaulted
+									},
+								},
+							},
+						},
+					},
+					FailurePolicy: &fail,
+				},
 			},
 		},
 	}

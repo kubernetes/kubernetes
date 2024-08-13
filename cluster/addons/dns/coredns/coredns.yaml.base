@@ -28,11 +28,12 @@ rules:
   - list
   - watch
 - apiGroups:
-  - ""
+  - discovery.k8s.io
   resources:
-  - nodes
+  - endpointslices
   verbs:
-  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -67,13 +68,15 @@ data:
             lameduck 5s
         }
         ready
-        kubernetes __PILLAR__DNS__DOMAIN__ in-addr.arpa ip6.arpa {
+        kubernetes __DNS__DOMAIN__ in-addr.arpa ip6.arpa {
             pods insecure
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
         }
         prometheus :9153
-        forward . /etc/resolv.conf
+        forward . /etc/resolv.conf {
+            max_concurrent 1000
+        }
         cache 30
         loop
         reload
@@ -106,11 +109,23 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
@@ -118,11 +133,11 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.6.7
+        image: registry.k8s.io/coredns/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            memory: __PILLAR__DNS__MEMORY__LIMIT__
+            memory: __DNS__MEMORY__LIMIT__
           requests:
             cpu: 100m
             memory: 70Mi
@@ -161,7 +176,7 @@ spec:
             add:
             - NET_BIND_SERVICE
             drop:
-            - all
+            - ALL
           readOnlyRootFilesystem: true
       dnsPolicy: Default
       volumes:
@@ -188,7 +203,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: __PILLAR__DNS__SERVER__
+  clusterIP: __DNS__SERVER__
   ports:
   - name: dns
     port: 53

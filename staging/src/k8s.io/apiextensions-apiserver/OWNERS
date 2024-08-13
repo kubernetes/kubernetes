@@ -1,17 +1,19 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- deads2k
-- lavalamp
-- sttts
+  - deads2k
+  - sttts
+  - jpbetz
 reviewers:
-- deads2k
-- sttts
-- enisoc
-- mbohlool
-- yue9944882
-- logicalhan
-- jpbetz
-- roycaihw
+  - deads2k
+  - sttts
+  - yue9944882
+  - logicalhan
+  - jpbetz
+  - roycaihw
+  - alexzielenski
+  - jefftree
 labels:
-- sig/api-machinery
+  - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

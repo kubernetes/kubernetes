@@ -23,24 +23,33 @@ import (
 	"net/url"
 
 	"github.com/spf13/pflag"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
+	netutils "k8s.io/utils/net"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
 // CustomResourceDefinitionsServerOptions describes the runtime options of an apiextensions-apiserver.
 type CustomResourceDefinitionsServerOptions struct {
+	ServerRunOptions   *genericoptions.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
 
@@ -51,10 +60,10 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("apiextensions-apiserver", "kube-system"),
 		),
 		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
@@ -67,6 +76,7 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 
 // AddFlags adds the apiextensions-apiserver flags to the flagset.
 func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.ServerRunOptions.AddUniversalFlags(fs)
 	o.RecommendedOptions.AddFlags(fs)
 	o.APIEnablement.AddFlags(fs)
 }
@@ -74,6 +84,7 @@ func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate validates the apiextensions-apiserver options.
 func (o CustomResourceDefinitionsServerOptions) Validate() error {
 	errors := []error{}
+	errors = append(errors, o.ServerRunOptions.Validate()...)
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	errors = append(errors, o.APIEnablement.Validate(apiserver.Scheme)...)
 	return utilerrors.NewAggregate(errors)
@@ -81,17 +92,20 @@ func (o CustomResourceDefinitionsServerOptions) Validate() error {
 
 // Complete fills in missing options.
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // Config returns an apiextensions-apiserver configuration.
 func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
+		return nil, err
+	}
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
@@ -99,31 +113,29 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions), openapinamer.NewDefinitionNamer(apiserver.Scheme, scheme.Scheme))
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd, serverConfig.ResourceTransformers, serverConfig.StorageObjectCountTracker),
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig),
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, noopoteltrace.NewTracerProvider()),
 		},
 	}
 	return config, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
-	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:           etcdOptions.StorageConfig,
-		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:        etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
-		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
-		CountMetricPollPeriod:   etcdOptions.StorageConfig.CountMetricPollPeriod,
-	}
-	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+//
+// Avoid messing with anything outside of changes to StorageConfig as that
+// may lead to unexpected behavior when the options are applied.
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, resourceTransformers storagevalue.ResourceTransformers, tracker flowcontrolrequest.StorageObjectCountTracker) genericregistry.RESTOptionsGetter {
+	etcdOptionsCopy := etcdOptions
+	etcdOptionsCopy.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	etcdOptionsCopy.StorageConfig.StorageObjectCountTracker = tracker
+	etcdOptionsCopy.WatchCacheSizes = nil // this control is not provided for custom resources
 
-	return ret
+	return etcdOptions.CreateRESTOptionsGetter(&genericoptions.SimpleStorageFactory{StorageConfig: etcdOptionsCopy.StorageConfig}, resourceTransformers)
 }
 
 type serviceResolver struct {

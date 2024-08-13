@@ -32,22 +32,17 @@ type Config struct {
 	// LoopbackClientConfig is a config for a privileged loopback connection
 	LoopbackClientConfig *restclient.Config
 
-	// TODO: remove deprecated insecure serving
-	InsecureServing *apiserver.DeprecatedInsecureServingInfo
-	Authentication  apiserver.AuthenticationInfo
-	Authorization   apiserver.AuthorizationInfo
+	Authentication apiserver.AuthenticationInfo
+	Authorization  apiserver.AuthorizationInfo
 
 	// the general kube client
 	Client *clientset.Clientset
 
-	// the client only used for leader election
-	LeaderElectionClient *clientset.Clientset
-
 	// the rest config for the master
 	Kubeconfig *restclient.Config
 
-	// the event sink
-	EventRecorder record.EventRecorder
+	EventBroadcaster record.EventBroadcaster
+	EventRecorder    record.EventRecorder
 }
 
 type completedConfig struct {

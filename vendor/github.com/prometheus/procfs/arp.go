@@ -15,9 +15,26 @@ package procfs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
+	"strconv"
 	"strings"
+)
+
+// Learned from include/uapi/linux/if_arp.h.
+const (
+	// completed entry (ha valid).
+	ATFComplete = 0x02
+	// permanent entry.
+	ATFPermanent = 0x04
+	// Publish entry.
+	ATFPublish = 0x08
+	// Has requested trailers.
+	ATFUseTrailers = 0x10
+	// Obsoleted: Want to use a netmask (only for proxy entries).
+	ATFNetmask = 0x20
+	// Don't answer this addresses.
+	ATFDontPublish = 0x40
 )
 
 // ARPEntry contains a single row of the columnar data represented in
@@ -29,14 +46,16 @@ type ARPEntry struct {
 	HWAddr net.HardwareAddr
 	// Name of the device
 	Device string
+	// Flags
+	Flags byte
 }
 
 // GatherARPEntries retrieves all the ARP entries, parse the relevant columns,
 // and then return a slice of ARPEntry's.
 func (fs FS) GatherARPEntries() ([]ARPEntry, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("net/arp"))
+	data, err := os.ReadFile(fs.proc.Path("net/arp"))
 	if err != nil {
-		return nil, fmt.Errorf("error reading arp %s: %s", fs.proc.Path("net/arp"), err)
+		return nil, fmt.Errorf("%w: error reading arp %s: %w", ErrFileRead, fs.proc.Path("net/arp"), err)
 	}
 
 	return parseARPEntries(data)
@@ -59,11 +78,11 @@ func parseARPEntries(data []byte) ([]ARPEntry, error) {
 		} else if width == expectedDataWidth {
 			entry, err := parseARPEntry(columns)
 			if err != nil {
-				return []ARPEntry{}, fmt.Errorf("failed to parse ARP entry: %s", err)
+				return []ARPEntry{}, fmt.Errorf("%w: Failed to parse ARP entry: %v: %w", ErrFileParse, entry, err)
 			}
 			entries = append(entries, entry)
 		} else {
-			return []ARPEntry{}, fmt.Errorf("%d columns were detected, but %d were expected", width, expectedDataWidth)
+			return []ARPEntry{}, fmt.Errorf("%w: %d columns found, but expected %d: %w", ErrFileParse, width, expectedDataWidth, err)
 		}
 
 	}
@@ -72,14 +91,26 @@ func parseARPEntries(data []byte) ([]ARPEntry, error) {
 }
 
 func parseARPEntry(columns []string) (ARPEntry, error) {
+	entry := ARPEntry{Device: columns[5]}
 	ip := net.ParseIP(columns[0])
-	mac := net.HardwareAddr(columns[3])
+	entry.IPAddr = ip
 
-	entry := ARPEntry{
-		IPAddr: ip,
-		HWAddr: mac,
-		Device: columns[5],
+	if mac, err := net.ParseMAC(columns[3]); err == nil {
+		entry.HWAddr = mac
+	} else {
+		return ARPEntry{}, err
+	}
+
+	if flags, err := strconv.ParseUint(columns[2], 0, 8); err == nil {
+		entry.Flags = byte(flags)
+	} else {
+		return ARPEntry{}, err
 	}
 
 	return entry, nil
+}
+
+// IsComplete returns true if ARP entry is marked with complete flag.
+func (entry *ARPEntry) IsComplete() bool {
+	return entry.Flags&ATFComplete != 0
 }

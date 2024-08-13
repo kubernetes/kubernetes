@@ -17,14 +17,12 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
+	"sort"
 	"strings"
-
-	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/encoding"
-	"gonum.org/v1/gonum/graph/encoding/dot"
-	"gonum.org/v1/gonum/graph/simple"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,7 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-type gonumVertex struct {
+type dotVertex struct {
 	uid                types.UID
 	gvk                schema.GroupVersionKind
 	namespace          string
@@ -41,14 +39,25 @@ type gonumVertex struct {
 	beingDeleted       bool
 	deletingDependents bool
 	virtual            bool
-	vertexID           int64
 }
 
-func (v *gonumVertex) ID() int64 {
-	return v.vertexID
+func (v *dotVertex) MarshalDOT(w io.Writer) error {
+	attrs := v.Attributes()
+	if _, err := fmt.Fprintf(w, "  %q [\n", v.uid); err != nil {
+		return err
+	}
+	for _, a := range attrs {
+		if _, err := fmt.Fprintf(w, "    %s=%q\n", a.Key, a.Value); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "  ];\n"); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (v *gonumVertex) String() string {
+func (v *dotVertex) String() string {
 	kind := v.gvk.Kind + "." + v.gvk.Version
 	if len(v.gvk.Group) > 0 {
 		kind = kind + "." + v.gvk.Group
@@ -72,7 +81,12 @@ func (v *gonumVertex) String() string {
 	return fmt.Sprintf(`%s/%s[%s]-%v%s%s%s%s`, kind, v.name, v.namespace, v.uid, missing, deleting, deletingDependents, virtual)
 }
 
-func (v *gonumVertex) Attributes() []encoding.Attribute {
+type attribute struct {
+	Key   string
+	Value string
+}
+
+func (v *dotVertex) Attributes() []attribute {
 	kubectlString := v.gvk.Kind + "." + v.gvk.Version
 	if len(v.gvk.Group) > 0 {
 		kubectlString = kubectlString + "." + v.gvk.Group
@@ -106,30 +120,30 @@ namespace=%v
 		label = label + conditionString + "\n"
 	}
 
-	return []encoding.Attribute{
-		{Key: "label", Value: fmt.Sprintf(`"%v"`, label)},
+	return []attribute{
+		{Key: "label", Value: label},
 		// these place metadata in the correct location, but don't conform to any normal attribute for rendering
-		{Key: "group", Value: fmt.Sprintf(`"%v"`, v.gvk.Group)},
-		{Key: "version", Value: fmt.Sprintf(`"%v"`, v.gvk.Version)},
-		{Key: "kind", Value: fmt.Sprintf(`"%v"`, v.gvk.Kind)},
-		{Key: "namespace", Value: fmt.Sprintf(`"%v"`, v.namespace)},
-		{Key: "name", Value: fmt.Sprintf(`"%v"`, v.name)},
-		{Key: "uid", Value: fmt.Sprintf(`"%v"`, v.uid)},
-		{Key: "missing", Value: fmt.Sprintf(`"%v"`, v.missingFromGraph)},
-		{Key: "beingDeleted", Value: fmt.Sprintf(`"%v"`, v.beingDeleted)},
-		{Key: "deletingDependents", Value: fmt.Sprintf(`"%v"`, v.deletingDependents)},
-		{Key: "virtual", Value: fmt.Sprintf(`"%v"`, v.virtual)},
+		{Key: "group", Value: v.gvk.Group},
+		{Key: "version", Value: v.gvk.Version},
+		{Key: "kind", Value: v.gvk.Kind},
+		{Key: "namespace", Value: v.namespace},
+		{Key: "name", Value: v.name},
+		{Key: "uid", Value: string(v.uid)},
+		{Key: "missing", Value: fmt.Sprintf(`%v`, v.missingFromGraph)},
+		{Key: "beingDeleted", Value: fmt.Sprintf(`%v`, v.beingDeleted)},
+		{Key: "deletingDependents", Value: fmt.Sprintf(`%v`, v.deletingDependents)},
+		{Key: "virtual", Value: fmt.Sprintf(`%v`, v.virtual)},
 	}
 }
 
-// NewGonumVertex creates a new gonumVertex.
-func NewGonumVertex(node *node, nodeID int64) *gonumVertex {
+// NewDOTVertex creates a new dotVertex.
+func NewDOTVertex(node *node) *dotVertex {
 	gv, err := schema.ParseGroupVersion(node.identity.APIVersion)
 	if err != nil {
 		// this indicates a bad data serialization that should be prevented during storage of the API
 		utilruntime.HandleError(err)
 	}
-	return &gonumVertex{
+	return &dotVertex{
 		uid:                node.identity.UID,
 		gvk:                gv.WithKind(node.identity.Kind),
 		namespace:          node.identity.Namespace,
@@ -137,36 +151,46 @@ func NewGonumVertex(node *node, nodeID int64) *gonumVertex {
 		beingDeleted:       node.beingDeleted,
 		deletingDependents: node.deletingDependents,
 		virtual:            node.virtual,
-		vertexID:           nodeID,
 	}
 }
 
-// NewMissingGonumVertex creates a new gonumVertex.
-func NewMissingGonumVertex(ownerRef metav1.OwnerReference, nodeID int64) *gonumVertex {
+// NewMissingdotVertex creates a new dotVertex.
+func NewMissingdotVertex(ownerRef metav1.OwnerReference) *dotVertex {
 	gv, err := schema.ParseGroupVersion(ownerRef.APIVersion)
 	if err != nil {
 		// this indicates a bad data serialization that should be prevented during storage of the API
 		utilruntime.HandleError(err)
 	}
-	return &gonumVertex{
+	return &dotVertex{
 		uid:              ownerRef.UID,
 		gvk:              gv.WithKind(ownerRef.Kind),
 		name:             ownerRef.Name,
 		missingFromGraph: true,
-		vertexID:         nodeID,
 	}
 }
 
-func (m *concurrentUIDToNode) ToGonumGraph() graph.Directed {
+func (m *concurrentUIDToNode) ToDOTNodesAndEdges() ([]*dotVertex, []dotEdge) {
 	m.uidToNodeLock.Lock()
 	defer m.uidToNodeLock.Unlock()
 
-	return toGonumGraph(m.uidToNode)
+	return toDOTNodesAndEdges(m.uidToNode)
 }
 
-func toGonumGraph(uidToNode map[types.UID]*node) graph.Directed {
-	uidToVertex := map[types.UID]*gonumVertex{}
-	graphBuilder := simple.NewDirectedGraph()
+type dotEdge struct {
+	F types.UID
+	T types.UID
+}
+
+func (e dotEdge) MarshalDOT(w io.Writer) error {
+	_, err := fmt.Fprintf(w, "  %q -> %q;\n", e.F, e.T)
+	return err
+}
+
+func toDOTNodesAndEdges(uidToNode map[types.UID]*node) ([]*dotVertex, []dotEdge) {
+	nodes := []*dotVertex{}
+	edges := []dotEdge{}
+
+	uidToVertex := map[types.UID]*dotVertex{}
 
 	// add the vertices first, then edges.  That avoids having to deal with missing refs.
 	for _, node := range uidToNode {
@@ -174,38 +198,42 @@ func toGonumGraph(uidToNode map[types.UID]*node) graph.Directed {
 		if len(node.dependents) == 0 && len(node.owners) == 0 {
 			continue
 		}
-		vertex := NewGonumVertex(node, graphBuilder.NewNode().ID())
+		vertex := NewDOTVertex(node)
 		uidToVertex[node.identity.UID] = vertex
-		graphBuilder.AddNode(vertex)
+		nodes = append(nodes, vertex)
 	}
 	for _, node := range uidToNode {
 		currVertex := uidToVertex[node.identity.UID]
 		for _, ownerRef := range node.owners {
 			currOwnerVertex, ok := uidToVertex[ownerRef.UID]
 			if !ok {
-				currOwnerVertex = NewMissingGonumVertex(ownerRef, graphBuilder.NewNode().ID())
+				currOwnerVertex = NewMissingdotVertex(ownerRef)
 				uidToVertex[node.identity.UID] = currOwnerVertex
-				graphBuilder.AddNode(currOwnerVertex)
+				nodes = append(nodes, currOwnerVertex)
 			}
-			graphBuilder.SetEdge(simple.Edge{
-				F: currVertex,
-				T: currOwnerVertex,
-			})
-
+			edges = append(edges, dotEdge{F: currVertex.uid, T: currOwnerVertex.uid})
 		}
 	}
 
-	return graphBuilder
+	sort.SliceStable(nodes, func(i, j int) bool { return nodes[i].uid < nodes[j].uid })
+	sort.SliceStable(edges, func(i, j int) bool {
+		if edges[i].F != edges[j].F {
+			return edges[i].F < edges[j].F
+		}
+		return edges[i].T < edges[j].T
+	})
+
+	return nodes, edges
 }
 
-func (m *concurrentUIDToNode) ToGonumGraphForObj(uids ...types.UID) graph.Directed {
+func (m *concurrentUIDToNode) ToDOTNodesAndEdgesForObj(uids ...types.UID) ([]*dotVertex, []dotEdge) {
 	m.uidToNodeLock.Lock()
 	defer m.uidToNodeLock.Unlock()
 
-	return toGonumGraphForObj(m.uidToNode, uids...)
+	return toDOTNodesAndEdgesForObj(m.uidToNode, uids...)
 }
 
-func toGonumGraphForObj(uidToNode map[types.UID]*node, uids ...types.UID) graph.Directed {
+func toDOTNodesAndEdgesForObj(uidToNode map[types.UID]*node, uids ...types.UID) ([]*dotVertex, []dotEdge) {
 	uidsToCheck := append([]types.UID{}, uids...)
 	interestingNodes := map[types.UID]*node{}
 
@@ -241,7 +269,7 @@ func toGonumGraphForObj(uidToNode map[types.UID]*node, uids ...types.UID) graph.
 		}
 	}
 
-	return toGonumGraph(interestingNodes)
+	return toDOTNodesAndEdges(interestingNodes)
 }
 
 // NewDebugHandler creates a new debugHTTPHandler.
@@ -253,31 +281,67 @@ type debugHTTPHandler struct {
 	controller *GarbageCollector
 }
 
+func marshalDOT(w io.Writer, nodes []*dotVertex, edges []dotEdge) error {
+	if _, err := w.Write([]byte("strict digraph full {\n")); err != nil {
+		return err
+	}
+	if len(nodes) > 0 {
+		if _, err := w.Write([]byte("  // Node definitions.\n")); err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			if err := node.MarshalDOT(w); err != nil {
+				return err
+			}
+		}
+	}
+	if len(edges) > 0 {
+		if _, err := w.Write([]byte("  // Edge definitions.\n")); err != nil {
+			return err
+		}
+		for _, edge := range edges {
+			if err := edge.MarshalDOT(w); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := w.Write([]byte("}\n")); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path != "/graph" {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 
-	var graph graph.Directed
+	var nodes []*dotVertex
+	var edges []dotEdge
 	if uidStrings := req.URL.Query()["uid"]; len(uidStrings) > 0 {
 		uids := []types.UID{}
 		for _, uidString := range uidStrings {
 			uids = append(uids, types.UID(uidString))
 		}
-		graph = h.controller.dependencyGraphBuilder.uidToNode.ToGonumGraphForObj(uids...)
+		nodes, edges = h.controller.dependencyGraphBuilder.uidToNode.ToDOTNodesAndEdgesForObj(uids...)
 
 	} else {
-		graph = h.controller.dependencyGraphBuilder.uidToNode.ToGonumGraph()
+		nodes, edges = h.controller.dependencyGraphBuilder.uidToNode.ToDOTNodesAndEdges()
 	}
 
-	data, err := dot.Marshal(graph, "full", "", "  ")
-	if err != nil {
+	b := bytes.NewBuffer(nil)
+	if err := marshalDOT(b, nodes, edges); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/vnd.graphviz")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Write(data)
+	w.Write(b.Bytes())
 	w.WriteHeader(http.StatusOK)
+}
+
+func (gc *GarbageCollector) DebuggingHandler() http.Handler {
+	return NewDebugHandler(gc)
 }

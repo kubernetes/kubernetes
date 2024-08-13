@@ -22,13 +22,19 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/cri-client/pkg/util"
+	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
-// GetClient returns a client for the PodResourcesLister grpc service
-func GetClient(socket string, connectionTimeout time.Duration, maxMsgSize int) (podresourcesapi.PodResourcesListerClient, *grpc.ClientConn, error) {
+// Note: Consumers of the pod resources API should not be importing this package.
+// They should copy paste the function in their project.
+
+// GetV1alpha1Client returns a client for the PodResourcesLister grpc service
+// Note: This is deprecated
+func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSize int) (v1alpha1.PodResourcesListerClient, *grpc.ClientConn, error) {
 	addr, dialer, err := util.GetAddressAndDialer(socket)
 	if err != nil {
 		return nil, nil, err
@@ -36,9 +42,31 @@ func GetClient(socket string, connectionTimeout time.Duration, maxMsgSize int) (
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
 	}
-	return podresourcesapi.NewPodResourcesListerClient(conn), conn, nil
+	return v1alpha1.NewPodResourcesListerClient(conn), conn, nil
+}
+
+// GetV1Client returns a client for the PodResourcesLister grpc service
+func GetV1Client(socket string, connectionTimeout time.Duration, maxMsgSize int) (v1.PodResourcesListerClient, *grpc.ClientConn, error) {
+	addr, dialer, err := util.GetAddressAndDialer(socket)
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
+	}
+	return v1.NewPodResourcesListerClient(conn), conn, nil
 }

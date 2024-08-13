@@ -19,7 +19,7 @@ package flowcontrol
 import (
 	"strings"
 
-	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -27,7 +27,7 @@ import (
 
 // Tests whether a given request and FlowSchema match.  Nobody mutates
 // either input.
-func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema) bool {
+func matchesFlowSchema(digest RequestDigest, flowSchema *flowcontrol.FlowSchema) bool {
 	for _, policyRule := range flowSchema.Spec.Rules {
 		if matchesPolicyRule(digest, &policyRule) {
 			return true
@@ -36,7 +36,7 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema)
 	return false
 }
 
-func matchesPolicyRule(digest RequestDigest, policyRule *fctypesv1a1.PolicyRulesWithSubjects) bool {
+func matchesPolicyRule(digest RequestDigest, policyRule *flowcontrol.PolicyRulesWithSubjects) bool {
 	if !matchesASubject(digest.User, policyRule.Subjects) {
 		return false
 	}
@@ -46,7 +46,7 @@ func matchesPolicyRule(digest RequestDigest, policyRule *fctypesv1a1.PolicyRules
 	return matchesANonResourceRule(digest.RequestInfo, policyRule.NonResourceRules)
 }
 
-func matchesASubject(user user.Info, subjects []fctypesv1a1.Subject) bool {
+func matchesASubject(user user.Info, subjects []flowcontrol.Subject) bool {
 	for _, subject := range subjects {
 		if matchesSubject(user, subject) {
 			return true
@@ -55,11 +55,11 @@ func matchesASubject(user user.Info, subjects []fctypesv1a1.Subject) bool {
 	return false
 }
 
-func matchesSubject(user user.Info, subject fctypesv1a1.Subject) bool {
+func matchesSubject(user user.Info, subject flowcontrol.Subject) bool {
 	switch subject.Kind {
-	case fctypesv1a1.SubjectKindUser:
-		return subject.User != nil && (subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName())
-	case fctypesv1a1.SubjectKindGroup:
+	case flowcontrol.SubjectKindUser:
+		return subject.User != nil && (subject.User.Name == flowcontrol.NameAll || subject.User.Name == user.GetName())
+	case flowcontrol.SubjectKindGroup:
 		if subject.Group == nil {
 			return false
 		}
@@ -73,11 +73,11 @@ func matchesSubject(user user.Info, subject fctypesv1a1.Subject) bool {
 			}
 		}
 		return false
-	case fctypesv1a1.SubjectKindServiceAccount:
+	case flowcontrol.SubjectKindServiceAccount:
 		if subject.ServiceAccount == nil {
 			return false
 		}
-		if subject.ServiceAccount.Name == fctypesv1a1.NameAll {
+		if subject.ServiceAccount.Name == flowcontrol.NameAll {
 			return serviceAccountMatchesNamespace(subject.ServiceAccount.Namespace, user.GetName())
 		}
 		return serviceaccount.MatchesUsername(subject.ServiceAccount.Namespace, subject.ServiceAccount.Name, user.GetName())
@@ -107,7 +107,7 @@ func serviceAccountMatchesNamespace(namespace string, username string) bool {
 	return strings.HasPrefix(username, ServiceAccountUsernameSeparator)
 }
 
-func matchesAResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.ResourcePolicyRule) bool {
+func matchesAResourceRule(ri *request.RequestInfo, rules []flowcontrol.ResourcePolicyRule) bool {
 	for _, rr := range rules {
 		if matchesResourcePolicyRule(ri, rr) {
 			return true
@@ -116,7 +116,7 @@ func matchesAResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.ResourceP
 	return false
 }
 
-func matchesResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a1.ResourcePolicyRule) bool {
+func matchesResourcePolicyRule(ri *request.RequestInfo, policyRule flowcontrol.ResourcePolicyRule) bool {
 	if !matchPolicyRuleVerb(policyRule.Verbs, ri.Verb) {
 		return false
 	}
@@ -129,10 +129,10 @@ func matchesResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a1.R
 	if len(ri.Namespace) == 0 {
 		return policyRule.ClusterScope
 	}
-	return containsString(ri.Namespace, policyRule.Namespaces, fctypesv1a1.NamespaceEvery)
+	return containsString(ri.Namespace, policyRule.Namespaces, flowcontrol.NamespaceEvery)
 }
 
-func matchesANonResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.NonResourcePolicyRule) bool {
+func matchesANonResourceRule(ri *request.RequestInfo, rules []flowcontrol.NonResourcePolicyRule) bool {
 	for _, rr := range rules {
 		if matchesNonResourcePolicyRule(ri, rr) {
 			return true
@@ -141,7 +141,7 @@ func matchesANonResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.NonRes
 	return false
 }
 
-func matchesNonResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a1.NonResourcePolicyRule) bool {
+func matchesNonResourcePolicyRule(ri *request.RequestInfo, policyRule flowcontrol.NonResourcePolicyRule) bool {
 	if !matchPolicyRuleVerb(policyRule.Verbs, ri.Verb) {
 		return false
 	}
@@ -149,12 +149,12 @@ func matchesNonResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a
 }
 
 func matchPolicyRuleVerb(policyRuleVerbs []string, requestVerb string) bool {
-	return containsString(requestVerb, policyRuleVerbs, fctypesv1a1.VerbAll)
+	return containsString(requestVerb, policyRuleVerbs, flowcontrol.VerbAll)
 }
 
 func matchPolicyRuleNonResourceURL(policyRuleRequestURLs []string, requestPath string) bool {
 	for _, rulePath := range policyRuleRequestURLs {
-		if rulePath == fctypesv1a1.NonResourceAll || rulePath == requestPath {
+		if rulePath == flowcontrol.NonResourceAll || rulePath == requestPath {
 			return true
 		}
 		rulePrefix := strings.TrimSuffix(rulePath, "*")
@@ -169,7 +169,7 @@ func matchPolicyRuleNonResourceURL(policyRuleRequestURLs []string, requestPath s
 }
 
 func matchPolicyRuleAPIGroup(policyRuleAPIGroups []string, requestAPIGroup string) bool {
-	return containsString(requestAPIGroup, policyRuleAPIGroups, fctypesv1a1.APIGroupAll)
+	return containsString(requestAPIGroup, policyRuleAPIGroups, flowcontrol.APIGroupAll)
 }
 
 func rsJoin(requestResource, requestSubresource string) string {
@@ -181,7 +181,7 @@ func rsJoin(requestResource, requestSubresource string) string {
 }
 
 func matchPolicyRuleResource(policyRuleRequestResources []string, requestResource, requestSubresource string) bool {
-	return containsString(rsJoin(requestResource, requestSubresource), policyRuleRequestResources, fctypesv1a1.ResourceAll)
+	return containsString(rsJoin(requestResource, requestSubresource), policyRuleRequestResources, flowcontrol.ResourceAll)
 }
 
 // containsString returns true if either `x` or `wildcard` is in

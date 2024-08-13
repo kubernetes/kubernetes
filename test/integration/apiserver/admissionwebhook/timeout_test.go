@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -32,11 +32,11 @@ import (
 	"time"
 
 	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -68,7 +68,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 	type testWebhook struct {
 		path           string
 		timeoutSeconds int32
-		policy         admissionv1beta1.FailurePolicyType
+		policy         admissionregistrationv1.FailurePolicyType
 		objectSelector *metav1.LabelSelector
 	}
 
@@ -79,18 +79,18 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		validatingWebhooks []testWebhook
 		expectInvocations  []invocation
 		expectError        bool
-		errorContains      string
+		errorContainsAnyOf []string
 	}{
 		{
 			name:           "minimum of request timeout or webhook timeout propagated",
 			timeoutSeconds: 10,
 			mutatingWebhooks: []testWebhook{
-				{path: "/mutating/1/0s", policy: admissionv1beta1.Fail, timeoutSeconds: 20},
-				{path: "/mutating/2/0s", policy: admissionv1beta1.Fail, timeoutSeconds: 5},
+				{path: "/mutating/1/0s", policy: admissionregistrationv1.Fail, timeoutSeconds: 20},
+				{path: "/mutating/2/0s", policy: admissionregistrationv1.Fail, timeoutSeconds: 5},
 			},
 			validatingWebhooks: []testWebhook{
-				{path: "/validating/3/0s", policy: admissionv1beta1.Fail, timeoutSeconds: 20},
-				{path: "/validating/4/0s", policy: admissionv1beta1.Fail, timeoutSeconds: 5},
+				{path: "/validating/3/0s", policy: admissionregistrationv1.Fail, timeoutSeconds: 20},
+				{path: "/validating/4/0s", policy: admissionregistrationv1.Fail, timeoutSeconds: 5},
 			},
 			expectInvocations: []invocation{
 				{path: "/mutating/1/0s", timeoutSeconds: 10},   // from request
@@ -103,14 +103,14 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			name:           "webhooks consume client timeout available, not webhook timeout",
 			timeoutSeconds: 10,
 			mutatingWebhooks: []testWebhook{
-				{path: "/mutating/1/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 20},
-				{path: "/mutating/2/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 5},
-				{path: "/mutating/3/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 20},
+				{path: "/mutating/1/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 20},
+				{path: "/mutating/2/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 5},
+				{path: "/mutating/3/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 20},
 			},
 			validatingWebhooks: []testWebhook{
-				{path: "/validating/4/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 5},
-				{path: "/validating/5/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 10},
-				{path: "/validating/6/1s", policy: admissionv1beta1.Fail, timeoutSeconds: 20},
+				{path: "/validating/4/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 5},
+				{path: "/validating/5/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 10},
+				{path: "/validating/6/1s", policy: admissionregistrationv1.Fail, timeoutSeconds: 20},
 			},
 			expectInvocations: []invocation{
 				{path: "/mutating/1/1s", timeoutSeconds: 10},  // from request
@@ -125,15 +125,20 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			name:           "timed out client requests skip later mutating webhooks (regardless of failure policy) and fail",
 			timeoutSeconds: 3,
 			mutatingWebhooks: []testWebhook{
-				{path: "/mutating/1/5s", policy: admissionv1beta1.Ignore, timeoutSeconds: 4},
-				{path: "/mutating/2/1s", policy: admissionv1beta1.Ignore, timeoutSeconds: 5},
-				{path: "/mutating/3/1s", policy: admissionv1beta1.Ignore, timeoutSeconds: 5},
+				{path: "/mutating/1/5s", policy: admissionregistrationv1.Ignore, timeoutSeconds: 4},
+				{path: "/mutating/2/1s", policy: admissionregistrationv1.Ignore, timeoutSeconds: 5},
+				{path: "/mutating/3/1s", policy: admissionregistrationv1.Ignore, timeoutSeconds: 5},
 			},
 			expectInvocations: []invocation{
 				{path: "/mutating/1/5s", timeoutSeconds: 3}, // from request
 			},
-			expectError:   true,
-			errorContains: "request did not complete within requested timeout",
+			expectError: true,
+			errorContainsAnyOf: []string{
+				// refer to https://github.com/kubernetes/kubernetes/issues/98606#issuecomment-774832633
+				// for the reason for triggering this scenario
+				"stream error",
+				"the server was unable to return a response in the time allotted",
+			},
 		},
 	}
 
@@ -146,7 +151,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Fatalf("Failed to build cert with error: %+v", err)
 	}
 
-	recorder := &timeoutRecorder{invocations: []invocation{}}
+	recorder := &timeoutRecorder{invocations: []invocation{}, markers: sets.NewString()}
 	webhookServer := httptest.NewUnstartedServer(newTimeoutWebhookHandler(recorder))
 	webhookServer.TLS = &tls.Config{
 
@@ -182,34 +187,35 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 	for i, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			upCh := recorder.Reset()
+			recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			mutatingWebhooks := []admissionv1beta1.MutatingWebhook{}
+			mutatingWebhooks := []admissionregistrationv1.MutatingWebhook{}
 			for j, webhook := range tt.mutatingWebhooks {
 				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.Replace(strings.TrimPrefix(webhook.path, "/"), "/", "-", -1))
 				endpoint := webhookServer.URL + webhook.path
-				mutatingWebhooks = append(mutatingWebhooks, admissionv1beta1.MutatingWebhook{
+				mutatingWebhooks = append(mutatingWebhooks, admissionregistrationv1.MutatingWebhook{
 					Name: name,
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						URL:      &endpoint,
 						CABundle: localhostCert,
 					},
-					Rules: []admissionv1beta1.RuleWithOperations{{
-						Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-						Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+					Rules: []admissionregistrationv1.RuleWithOperations{{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 					}},
 					ObjectSelector:          webhook.objectSelector,
 					FailurePolicy:           &tt.mutatingWebhooks[j].policy,
 					TimeoutSeconds:          &tt.mutatingWebhooks[j].timeoutSeconds,
 					AdmissionReviewVersions: []string{"v1beta1"},
+					SideEffects:             &noSideEffects,
 				})
 			}
-			mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+			mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   mutatingWebhooks,
 			}, metav1.CreateOptions{})
@@ -217,33 +223,34 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
 			}()
 
-			validatingWebhooks := []admissionv1beta1.ValidatingWebhook{}
+			validatingWebhooks := []admissionregistrationv1.ValidatingWebhook{}
 			for j, webhook := range tt.validatingWebhooks {
 				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.Replace(strings.TrimPrefix(webhook.path, "/"), "/", "-", -1))
 				endpoint := webhookServer.URL + webhook.path
-				validatingWebhooks = append(validatingWebhooks, admissionv1beta1.ValidatingWebhook{
+				validatingWebhooks = append(validatingWebhooks, admissionregistrationv1.ValidatingWebhook{
 					Name: name,
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						URL:      &endpoint,
 						CABundle: localhostCert,
 					},
-					Rules: []admissionv1beta1.RuleWithOperations{{
-						Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-						Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+					Rules: []admissionregistrationv1.RuleWithOperations{{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 					}},
 					ObjectSelector:          webhook.objectSelector,
 					FailurePolicy:           &tt.validatingWebhooks[j].policy,
 					TimeoutSeconds:          &tt.validatingWebhooks[j].timeoutSeconds,
 					AdmissionReviewVersions: []string{"v1beta1"},
+					SideEffects:             &noSideEffects,
 				})
 			}
-			validatingCfg, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
+			validatingCfg, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   validatingWebhooks,
 			}, metav1.CreateOptions{})
@@ -251,7 +258,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingCfg.GetName(), metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingCfg.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -260,13 +267,16 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
 				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-				select {
-				case <-upCh:
-					return true, nil
-				default:
-					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+				received := recorder.MarkerReceived()
+				if len(tt.mutatingWebhooks) > 0 && !received.Has("mutating") {
+					t.Logf("Waiting for mutating webhooks to become effective, getting marker object: %v", err)
 					return false, nil
 				}
+				if len(tt.validatingWebhooks) > 0 && !received.Has("validating") {
+					t.Logf("Waiting for validating webhooks to become effective, getting marker object: %v", err)
+					return false, nil
+				}
+				return true, nil
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -279,7 +289,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 					Labels:    map[string]string{"x": "true"},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []v1.Container{{
+					Containers: []corev1.Container{{
 						Name:  "fake-name",
 						Image: "fakeimage",
 					}},
@@ -299,10 +309,18 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				if err == nil {
 					t.Fatalf("expected error but got none")
 				}
-				if tt.errorContains != "" {
-					if !strings.Contains(err.Error(), tt.errorContains) {
-						t.Errorf("expected an error saying %q, but got: %v", tt.errorContains, err)
+
+				expected := false
+				if len(tt.errorContainsAnyOf) != 0 {
+					for _, errStr := range tt.errorContainsAnyOf {
+						if strings.Contains(err.Error(), errStr) {
+							expected = true
+							break
+						}
 					}
+				}
+				if !expected {
+					t.Errorf("expected the error to be any of %q, but got: %v", tt.errorContainsAnyOf, err)
 				}
 				return
 			}
@@ -340,28 +358,24 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 type timeoutRecorder struct {
 	mu          sync.Mutex
-	upCh        chan struct{}
-	upOnce      sync.Once
+	markers     sets.String
 	invocations []invocation
 }
 
-// Reset zeros out all counts and returns a channel that is closed when the first admission of the
-// marker object is received.
-func (i *timeoutRecorder) Reset() chan struct{} {
+// Reset zeros out all counts
+func (i *timeoutRecorder) Reset() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.invocations = []invocation{}
-	i.upCh = make(chan struct{})
-	i.upOnce = sync.Once{}
-	return i.upCh
+	i.markers = sets.NewString()
 }
 
-func (i *timeoutRecorder) MarkerReceived() {
+// MarkerReceived records the specified markers were received and returns the set of received markers
+func (i *timeoutRecorder) MarkerReceived(markers ...string) sets.String {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.upOnce.Do(func() {
-		close(i.upCh)
-	})
+	i.markers.Insert(markers...)
+	return i.markers.Union(nil)
 }
 
 func (i *timeoutRecorder) RecordInvocation(call invocation) {
@@ -398,7 +412,7 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}
@@ -423,7 +437,12 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 		// When resetting between tests, a marker object is patched until this webhook
 		// observes it, at which point it is considered ready.
 		if pod.Namespace == timeoutMarkerFixture.Namespace && pod.Name == timeoutMarkerFixture.Name {
-			recorder.MarkerReceived()
+			if strings.HasPrefix(r.URL.Path, "/mutating/") {
+				recorder.MarkerReceived("mutating")
+			}
+			if strings.HasPrefix(r.URL.Path, "/validating/") {
+				recorder.MarkerReceived("validating")
+			}
 			allow(w)
 			return
 		}
@@ -456,7 +475,7 @@ var timeoutMarkerFixture = &corev1.Pod{
 		Name:      "marker",
 	},
 	Spec: corev1.PodSpec{
-		Containers: []v1.Container{{
+		Containers: []corev1.Container{{
 			Name:  "fake-name",
 			Image: "fakeimage",
 		}},

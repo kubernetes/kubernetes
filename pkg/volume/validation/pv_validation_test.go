@@ -103,7 +103,7 @@ func TestValidatePathNoBacksteps(t *testing.T) {
 		err := ValidatePathNoBacksteps(tc.path)
 
 		if err == nil && tc.expectedErr {
-			t.Fatalf("expected test `%s` to return an error but it didnt", name)
+			t.Fatalf("expected test `%s` to return an error but it didn't", name)
 		}
 
 		if err != nil && !tc.expectedErr {

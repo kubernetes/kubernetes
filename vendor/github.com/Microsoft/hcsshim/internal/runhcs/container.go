@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 )
 
 // ContainerState represents the platform agnostic pieces relating to a
@@ -51,7 +51,7 @@ func GetErrorFromPipe(pipe io.Reader, p *os.Process) error {
 
 	extra := ""
 	if p != nil {
-		p.Kill()
+		_ = p.Kill()
 		state, err := p.Wait()
 		if err != nil {
 			panic(err)

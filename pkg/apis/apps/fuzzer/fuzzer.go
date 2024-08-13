@@ -22,6 +22,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -30,6 +31,11 @@ import (
 // Funcs returns the fuzzer functions for the apps api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(r *apps.ControllerRevision, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// match the fuzzer default content for runtime.Object
+			r.Data = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
+		},
 		func(s *apps.StatefulSet, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 
@@ -39,6 +45,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if len(s.Spec.UpdateStrategy.Type) == 0 {
 				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			}
+			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+			}
+			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
+			}
+			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
 			}
 			if s.Spec.RevisionHistoryLimit == nil {
 				s.Spec.RevisionHistoryLimit = new(int32)
@@ -85,8 +100,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				rollingUpdate := apps.RollingUpdateDeployment{}
 				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
-					rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
+					rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
+					rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
 				} else {
 					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 				}
@@ -118,11 +133,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				rollingUpdate := apps.RollingUpdateDaemonSet{}
 				if c.RandBool() {
 					if c.RandBool() {
-						rollingUpdate.MaxUnavailable = intstr.FromInt(1 + int(c.Rand.Int31()))
+						rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
+						rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
 					} else {
-						rollingUpdate.MaxUnavailable = intstr.FromString(fmt.Sprintf("%d%%", 1+c.Rand.Int31()))
+						rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 					}
 				}
+
 				j.RollingUpdate = &rollingUpdate
 			}
 		},

@@ -15,11 +15,11 @@ clean up the tests.
 Example:
 ```
 /*
-  Release : v1.13
+  Release: v1.13
   Testname: Kubelet, log output, default
   Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 */
-framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
+framework.ConformanceIt("should print the output to logs [NodeConformance]", func(ctx context.Context) {
 ```
 
 would generate the following documentation for the test. Note that the "TestName" from the Documentation above will
@@ -27,7 +27,7 @@ be used to document the test which make it more human readable. The "Description
 documentation for that test.
 
 ### **Output:**
-## [Kubelet, log output, default](https://github.com/kubernetes/kubernetes/tree/master/test/e2e/common/kubelet.go#L48)
+## [Kubelet, log output, default](https://github.com/kubernetes/kubernetes/tree/master/test/e2e/common/node/kubelet.go#L49)
 
 - Added to conformance in release v1.13
 - Defined in code as: [k8s.io] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]

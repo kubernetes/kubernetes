@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/gofuzz"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
@@ -131,6 +131,25 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (t *MicroTime) UnmarshalCBOR(b []byte) error {
+	var s *string
+	if err := cbor.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == nil {
+		t.Time = time.Time{}
+		return nil
+	}
+
+	parsed, err := time.Parse(RFC3339Micro, *s)
+	if err != nil {
+		return err
+	}
+
+	t.Time = parsed.Local()
+	return nil
+}
+
 // UnmarshalQueryParameter converts from a URL query parameter value to an object
 func (t *MicroTime) UnmarshalQueryParameter(str string) error {
 	if len(str) == 0 {
@@ -162,6 +181,13 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.UTC().Format(RFC3339Micro))
 }
 
+func (t MicroTime) MarshalCBOR() ([]byte, error) {
+	if t.IsZero() {
+		return cbor.Marshal(nil)
+	}
+	return cbor.Marshal(t.UTC().Format(RFC3339Micro))
+}
+
 // OpenAPISchemaType is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
 //
@@ -181,16 +207,3 @@ func (t MicroTime) MarshalQueryParameter() (string, error) {
 
 	return t.UTC().Format(RFC3339Micro), nil
 }
-
-// Fuzz satisfies fuzz.Interface.
-func (t *MicroTime) Fuzz(c fuzz.Continue) {
-	if t == nil {
-		return
-	}
-	// Allow for about 1000 years of randomness. Accurate to a tenth of
-	// micro second. Leave off nanoseconds because JSON doesn't
-	// represent them so they can't round-trip properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 1000*c.Rand.Int63n(1000000))
-}
-
-var _ fuzz.Interface = &MicroTime{}

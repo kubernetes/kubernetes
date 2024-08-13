@@ -20,11 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -38,9 +41,10 @@ var (
 	// flags for the command line. See usage args below for
 	// descriptions.
 	flags struct {
-		Serve   string
-		Runner  string
-		Options string
+		Serve         string
+		Runner        string
+		Options       string
+		DelayShutdown int
 	}
 	// runners is a map from runner name to runner instance.
 	runners = makeRunnerMap()
@@ -79,11 +83,23 @@ func init() {
 			"HTTP requests.")
 	CmdNet.Flags().StringVar(&flags.Runner, "runner", "", "Runner to execute (available:"+legalRunners+")")
 	CmdNet.Flags().StringVar(&flags.Options, "options", "", "JSON options to the Runner")
+	CmdNet.Flags().IntVar(&flags.DelayShutdown, "delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
 }
 
 func main(cmd *cobra.Command, args []string) {
 	if flags.Runner == "" && flags.Serve == "" {
 		log.Fatalf("Must set either --runner or --serve, see --help")
+	}
+
+	if flags.DelayShutdown > 0 {
+		termCh := make(chan os.Signal, 1)
+		signal.Notify(termCh, syscall.SIGTERM)
+		go func() {
+			<-termCh
+			log.Printf("Sleeping %d seconds before terminating...", flags.DelayShutdown)
+			time.Sleep(time.Duration(flags.DelayShutdown) * time.Second)
+			os.Exit(0)
+		}()
 	}
 
 	log.SetFlags(log.Flags() | log.Lshortfile)
@@ -143,12 +159,12 @@ func handleRunRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	runner := urlParts[2]
-	if r.Body == nil {
+	if r.Body == nil || r.Body == http.NoBody {
 		http.Error(w, "Missing request body", 400)
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error reading body: %v", err), 400)
 		return

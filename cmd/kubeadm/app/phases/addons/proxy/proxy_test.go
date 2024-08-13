@@ -17,78 +17,28 @@ limitations under the License.
 package proxy
 
 import (
+	"bytes"
+	"context"
+	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/lithammer/dedent"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
-
-func TestCreateServiceAccount(t *testing.T) {
-	tests := []struct {
-		name      string
-		createErr error
-		expectErr bool
-	}{
-		{
-			"error-free case",
-			nil,
-			false,
-		},
-		{
-			"duplication errors should be ignored",
-			apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
-			false,
-		},
-		{
-			"unexpected errors should be returned",
-			apierrors.NewUnauthorized(""),
-			true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			if tc.createErr != nil {
-				client.PrependReactor("create", "serviceaccounts", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, tc.createErr
-				})
-			}
-
-			err := CreateServiceAccount(client)
-			if tc.expectErr {
-				if err == nil {
-					t.Errorf("CreateServiceAccounts(%s) wanted err, got nil", tc.name)
-				}
-				return
-			} else if !tc.expectErr && err != nil {
-				t.Errorf("CreateServiceAccounts(%s) returned unexpected err: %v", tc.name, err)
-			}
-
-			wantResourcesCreated := 1
-			if len(client.Actions()) != wantResourcesCreated {
-				t.Errorf("CreateServiceAccounts(%s) should have made %d actions, but made %d", tc.name, wantResourcesCreated, len(client.Actions()))
-			}
-
-			for _, action := range client.Actions() {
-				if action.GetVerb() != "create" || action.GetResource().Resource != "serviceaccounts" {
-					t.Errorf("CreateServiceAccounts(%s) called [%v %v], but wanted [create serviceaccounts]",
-						tc.name, action.GetVerb(), action.GetResource().Resource)
-				}
-			}
-		})
-	}
-}
 
 func TestCompileManifests(t *testing.T) {
 	var tests = []struct {
@@ -165,24 +115,33 @@ func TestEnsureProxyAddon(t *testing.T) {
 		},
 	}
 
+	// Override the default timeouts to be shorter
+	defaultTimeouts := kubeadmapi.GetActiveTimeouts()
+	defaultAPICallTimeout := defaultTimeouts.KubernetesAPICall
+	defaultTimeouts.KubernetesAPICall = &metav1.Duration{Duration: time.Microsecond * 500}
+	defer func() {
+		defaultTimeouts.KubernetesAPICall = defaultAPICallTimeout
+	}()
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fake client and set up default test configuration
 			client := clientsetfake.NewSimpleClientset()
+
 			// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-			controlPlaneConfig := &kubeadmapiv1beta2.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
+			initConfiguration, err := configutil.DefaultedStaticInitConfiguration()
+			if err != nil {
+				t.Errorf("test failed to convert external to internal version: %v", err)
+				return
 			}
-			controlPlaneClusterConfig := &kubeadmapiv1beta2.ClusterConfiguration{
-				Networking: kubeadmapiv1beta2.Networking{
-					PodSubnet: "5.6.7.8/24",
-				},
-				ImageRepository:   "someRepo",
-				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+
+			initConfiguration.LocalAPIEndpoint = kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "1.2.3.4",
+				BindPort:         1234,
 			}
+
+			initConfiguration.ClusterConfiguration.Networking.PodSubnet = "5.6.7.8/24"
+			initConfiguration.ClusterConfiguration.ImageRepository = "someRepo"
 
 			// Simulate an error if necessary
 			switch tc.simError {
@@ -191,18 +150,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 					return true, nil, apierrors.NewUnauthorized("")
 				})
 			case InvalidControlPlaneEndpoint:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 			case IPv6SetBindAddress:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/96"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
+				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig, controlPlaneClusterConfig)
-			if err != nil {
-				t.Errorf("test failed to convert external to internal version")
-				return
-			}
-			err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)
+			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, os.Stdout, false)
 
 			// Compare actual to expected errors
 			actErr := "No error"
@@ -252,4 +206,120 @@ func TestDaemonSetsHaveSystemNodeCriticalPriorityClassName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrintOrCreateKubeProxyObjects(t *testing.T) {
+	tests := []struct {
+		name          string
+		printManifest bool
+		wantOut       string
+		wantErr       bool
+	}{
+		{
+			name:          "do not print manifest",
+			printManifest: false,
+			wantOut:       "[addons] Applied essential addon: kube-proxy\n",
+			wantErr:       false,
+		},
+		{
+			name:          "print manifest",
+			printManifest: true,
+			wantOut: dedent.Dedent(`---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  name: kube-proxy
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: kubeadm:node-proxier
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:node-proxier
+subjects:
+- kind: ServiceAccount
+  name: kube-proxy
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: kube-proxy
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - kube-proxy
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: kube-proxy
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kube-proxy
+subjects:
+- kind: Group
+  name: system:bootstrappers:kubeadm:default-node-token
+---
+foo
+---
+bar
+`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			client := newMockClientForTest(t)
+			cmByte := []byte{'\n', 'f', 'o', 'o', '\n'}
+			dsByte := []byte{'\n', 'b', 'a', 'r', '\n'}
+			if err := printOrCreateKubeProxyObjects(cmByte, dsByte, client, out, tt.printManifest); (err != nil) != tt.wantErr {
+				t.Fatalf("printOrCreateKubeProxyObjects() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if gotOut := out.String(); gotOut != tt.wantOut {
+				t.Fatalf("printOrCreateKubeProxyObjects() = %v, want %v", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
+	client := clientsetfake.NewSimpleClientset()
+	_, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Create(context.TODO(), &apps.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-proxy",
+			Namespace: metav1.NamespaceSystem,
+			Labels: map[string]string{
+				"k8s-app": "kube-proxy",
+			},
+		},
+		Spec: apps.DaemonSetSpec{
+			Template: v1.PodTemplateSpec{},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("error creating Daemonset: %v", err)
+	}
+
+	return client
 }

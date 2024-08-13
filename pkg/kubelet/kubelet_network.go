@@ -17,27 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	v1 "k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-)
-
-const (
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	// TODO: clean up this logic in kube-proxy
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
-
-	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
-	// KubePostroutingChain is kubernetes postrouting rules
-	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
-
-	// KubeFirewallChain is kubernetes firewall rules
-	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
@@ -56,7 +41,7 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR. Return true if pod CIDR is actually changed.
-func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
+func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error) {
 	kl.updatePodCIDRMux.Lock()
 	defer kl.updatePodCIDRMux.Unlock()
 
@@ -68,13 +53,12 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 
 	// kubelet -> generic runtime -> runtime shim -> network plugin
 	// docker/non-cri implementations have a passthrough UpdatePodCIDR
-	if err := kl.getRuntime().UpdatePodCIDR(cidr); err != nil {
+	if err := kl.getRuntime().UpdatePodCIDR(ctx, cidr); err != nil {
 		// If updatePodCIDR would fail, theoretically pod CIDR could not change.
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
-
-	klog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }

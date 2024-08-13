@@ -1,10 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- lavalamp
-- wojtek-t
-- caesarxuchao
+  - wojtek-t
+  - caesarxuchao
 reviewers:
-- lavalamp
-- wojtek-t
-- caesarxuchao
+  - wojtek-t
+  - caesarxuchao
+  - jpbetz
+emeritus_approvers:
+  - lavalamp

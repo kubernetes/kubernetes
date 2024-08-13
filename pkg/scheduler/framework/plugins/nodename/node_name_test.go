@@ -17,13 +17,13 @@ limitations under the License.
 package nodename
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNodeName(t *testing.T) {
@@ -39,29 +39,13 @@ func TestNodeName(t *testing.T) {
 			name: "no host specified",
 		},
 		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeName: "foo",
-				},
-			},
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
+			pod:  st.MakePod().Node("foo").Obj(),
+			node: st.MakeNode().Name("foo").Obj(),
 			name: "host matches",
 		},
 		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeName: "bar",
-				},
-			},
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
+			pod:        st.MakePod().Node("bar").Obj(),
+			node:       st.MakeNode().Name("foo").Obj(),
 			name:       "host doesn't match",
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
 		},
@@ -71,9 +55,12 @@ func TestNodeName(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-
-			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
+			_, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

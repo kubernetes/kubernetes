@@ -25,6 +25,8 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
@@ -79,7 +80,7 @@ func TestAllFieldsHaveTags(t *testing.T) {
 
 func fieldsHaveProtobufTags(obj reflect.Type) error {
 	switch obj.Kind() {
-	case reflect.Slice, reflect.Map, reflect.Ptr, reflect.Array:
+	case reflect.Slice, reflect.Map, reflect.Pointer, reflect.Array:
 		return fieldsHaveProtobufTags(obj.Elem())
 	case reflect.Struct:
 		for i := 0; i < obj.NumField(); i++ {
@@ -112,7 +113,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	}
 	if !apiequality.Semantic.Equalities.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
-		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintDiff(out, obj))
+		t.Fatalf("Unmarshal is unequal\n%s", cmp.Diff(out, obj))
 	}
 }
 

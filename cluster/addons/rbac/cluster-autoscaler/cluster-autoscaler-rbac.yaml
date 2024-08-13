@@ -13,14 +13,6 @@ rules:
     resources: ["leases"]
     resourceNames: ["cluster-autoscaler"]
     verbs: ["get", "update", "patch", "delete"]
-  # TODO: remove in 1.18; CA uses lease objects for leader election since 1.17
-  - apiGroups: [""]
-    resources: ["endpoints"]
-    verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["endpoints"]
-    resourceNames: ["cluster-autoscaler"]
-    verbs: ["get", "update", "patch", "delete"]
   # accessing & modifying cluster state (nodes & pods)
   - apiGroups: [""]
     resources: ["nodes"]

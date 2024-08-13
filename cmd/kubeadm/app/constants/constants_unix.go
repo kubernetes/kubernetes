@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -19,9 +20,13 @@ limitations under the License.
 package constants
 
 const (
-	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "/var/run/dockershim.sock"
+	// CRISocketContainerd is the containerd CRI endpoint
+	CRISocketContainerd = "unix:///var/run/containerd/containerd.sock"
+	// CRISocketCRIO is the cri-o CRI endpoint
+	CRISocketCRIO = "unix:///var/run/crio/crio.sock"
+	// CRISocketDocker is the cri-dockerd CRI endpoint
+	CRISocketDocker = "unix:///var/run/cri-dockerd.sock"
 
-	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.2"
+	// DefaultCRISocket defines the default CRI socket
+	DefaultCRISocket = CRISocketContainerd
 )

@@ -35,13 +35,13 @@ func TestDefault(t *testing.T) {
 		{"empty", "null", nil, "null"},
 		{"scalar", "4", &structuralschema.Structural{
 			Generic: structuralschema.Generic{
-				Default: structuralschema.JSON{"foo"},
+				Default: structuralschema.JSON{Object: "foo"},
 			},
 		}, "4"},
 		{"scalar array", "[1,2]", &structuralschema.Structural{
 			Items: &structuralschema.Structural{
 				Generic: structuralschema.Generic{
-					Default: structuralschema.JSON{"foo"},
+					Default: structuralschema.JSON{Object: "foo"},
 				},
 			},
 		}, "[1,2]"},
@@ -50,17 +50,17 @@ func TestDefault(t *testing.T) {
 				Properties: map[string]structuralschema.Structural{
 					"a": {
 						Generic: structuralschema.Generic{
-							Default: structuralschema.JSON{"A"},
+							Default: structuralschema.JSON{Object: "A"},
 						},
 					},
 					"b": {
 						Generic: structuralschema.Generic{
-							Default: structuralschema.JSON{"B"},
+							Default: structuralschema.JSON{Object: "B"},
 						},
 					},
 					"c": {
 						Generic: structuralschema.Generic{
-							Default: structuralschema.JSON{"C"},
+							Default: structuralschema.JSON{Object: "C"},
 						},
 					},
 				},
@@ -73,12 +73,12 @@ func TestDefault(t *testing.T) {
 						Properties: map[string]structuralschema.Structural{
 							"a": {
 								Generic: structuralschema.Generic{
-									Default: structuralschema.JSON{"A"},
+									Default: structuralschema.JSON{Object: "A"},
 								},
 							},
 							"b": {
 								Generic: structuralschema.Generic{
-									Default: structuralschema.JSON{"B"},
+									Default: structuralschema.JSON{Object: "B"},
 								},
 							},
 						},
@@ -88,30 +88,28 @@ func TestDefault(t *testing.T) {
 					Properties: map[string]structuralschema.Structural{
 						"a": {
 							Generic: structuralschema.Generic{
-								Default: structuralschema.JSON{"N"},
+								Default: structuralschema.JSON{Object: "N"},
 							},
 						},
 						"b": {
 							Generic: structuralschema.Generic{
-								Default: structuralschema.JSON{"O"},
+								Default: structuralschema.JSON{Object: "O"},
 							},
 						},
 					},
 				},
 				"additionalProperties": {
-					Generic: structuralschema.Generic{
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Structural: &structuralschema.Structural{
-								Properties: map[string]structuralschema.Structural{
-									"a": {
-										Generic: structuralschema.Generic{
-											Default: structuralschema.JSON{"alpha"},
-										},
+					AdditionalProperties: &structuralschema.StructuralOrBool{
+						Structural: &structuralschema.Structural{
+							Properties: map[string]structuralschema.Structural{
+								"a": {
+									Generic: structuralschema.Generic{
+										Default: structuralschema.JSON{Object: "alpha"},
 									},
-									"b": {
-										Generic: structuralschema.Generic{
-											Default: structuralschema.JSON{"beta"},
-										},
+								},
+								"b": {
+									Generic: structuralschema.Generic{
+										Default: structuralschema.JSON{Object: "beta"},
 									},
 								},
 							},
@@ -120,7 +118,7 @@ func TestDefault(t *testing.T) {
 				},
 				"foo": {
 					Generic: structuralschema.Generic{
-						Default: structuralschema.JSON{"bar"},
+						Default: structuralschema.JSON{Object: "bar"},
 					},
 				},
 			},
@@ -130,12 +128,82 @@ func TestDefault(t *testing.T) {
 				Properties: map[string]structuralschema.Structural{
 					"a": {
 						Generic: structuralschema.Generic{
-							Default: structuralschema.JSON{"A"},
+							Default: structuralschema.JSON{Object: "A"},
 						},
 					},
 				},
 			},
-		}, `[{"a":"A"},{"a":1},{"a":0},{"a":0.0},{"a":""},{"a":null},{"a":[]},{"a":{}}]`},
+		}, `[{"a":"A"},{"a":1},{"a":0},{"a":0.0},{"a":""},{"a":"A"},{"a":[]},{"a":{}}]`},
+		{"null in nullable list", `[null]`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				Nullable: true,
+			},
+			Items: &structuralschema.Structural{
+				Properties: map[string]structuralschema.Structural{
+					"a": {
+						Generic: structuralschema.Generic{
+							Default: structuralschema.JSON{Object: "A"},
+						},
+					},
+				},
+			},
+		}, `[null]`},
+		{"null in non-nullable list", `[null]`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				Nullable: false,
+			},
+			Items: &structuralschema.Structural{
+				Generic: structuralschema.Generic{
+					Default: structuralschema.JSON{Object: "A"},
+				},
+			},
+		}, `["A"]`},
+		{"null in nullable object", `{"a": null}`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{},
+			Properties: map[string]structuralschema.Structural{
+				"a": {
+					Generic: structuralschema.Generic{
+						Nullable: true,
+						Default:  structuralschema.JSON{Object: "A"},
+					},
+				},
+			},
+		}, `{"a": null}`},
+		{"null in non-nullable object", `{"a": null}`, &structuralschema.Structural{
+			Properties: map[string]structuralschema.Structural{
+				"a": {
+					Generic: structuralschema.Generic{
+						Nullable: false,
+						Default:  structuralschema.JSON{Object: "A"},
+					},
+				},
+			},
+		}, `{"a": "A"}`},
+		{"null in nullable object with additionalProperties", `{"a": null}`, &structuralschema.Structural{
+			AdditionalProperties: &structuralschema.StructuralOrBool{
+				Structural: &structuralschema.Structural{
+					Generic: structuralschema.Generic{
+						Nullable: true,
+						Default:  structuralschema.JSON{Object: "A"},
+					},
+				},
+			},
+		}, `{"a": null}`},
+		{"null in non-nullable object with additionalProperties", `{"a": null}`, &structuralschema.Structural{
+			AdditionalProperties: &structuralschema.StructuralOrBool{
+				Structural: &structuralschema.Structural{
+					Generic: structuralschema.Generic{
+						Nullable: false,
+						Default:  structuralschema.JSON{Object: "A"},
+					},
+				},
+			},
+		}, `{"a": "A"}`},
+		{"null unknown field", `{"a": null}`, &structuralschema.Structural{
+			AdditionalProperties: &structuralschema.StructuralOrBool{
+				Bool: true,
+			},
+		}, `{"a": null}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

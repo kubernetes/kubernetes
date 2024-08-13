@@ -18,15 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-run_cluster_management_tests() {
-  set -o nounset
-  set -o errexit
-
-  create_and_use_new_namespace
-  kube::log::status "Testing cluster-management commands"
-
-  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
-
+create_test_pods(){
   # create test pods we can work with
   kubectl create -f - "${kube_flags[@]:?}" << __EOF__
 {
@@ -35,10 +27,12 @@ run_cluster_management_tests() {
   "metadata": {
     "name": "test-pod-1",
     "labels": {
-      "e": "f"
+      "e": "f",
+      "type": "test-pod"
     }
   },
   "spec": {
+    "nodeName": "127.0.0.1",
     "containers": [
       {
         "name": "container-1",
@@ -57,10 +51,12 @@ __EOF__
   "metadata": {
     "name": "test-pod-2",
     "labels": {
-      "c": "d"
+      "c": "d",
+      "type": "test-pod"
     }
   },
   "spec": {
+    "nodeName": "127.0.0.1",
     "containers": [
       {
         "name": "container-1",
@@ -71,33 +67,51 @@ __EOF__
   }
 }
 __EOF__
+}
+
+delete_test_pods() {
+  # need to use --force because node is unready
+  kubectl delete pod/test-pod-1 --force --ignore-not-found
+  kubectl delete pod/test-pod-2 --force --ignore-not-found
+}
+
+run_cluster_management_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing cluster-management commands"
+
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+
+  create_test_pods
 
   # taint/untaint
   # Pre-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
   # Dry-run
   kubectl taint node 127.0.0.1 --dry-run=client dedicated=foo:PreferNoSchedule
   kubectl taint node 127.0.0.1 --dry-run=server dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
   # taint can add a taint (<key>=<value>:<effect>)
   kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=foo:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
   # taint can add a taint (<key>:<effect>)
   kubectl taint node 127.0.0.1 dedicated:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=<no value>:PreferNoSchedule"
   # Node has field manager for kubectl taint
-  output_message=$(kubectl get node 127.0.0.1 -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get node 127.0.0.1 --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-taint'
   # Dry-run remove a taint
   kubectl taint node 127.0.0.1 --dry-run=client dedicated-
   kubectl taint node 127.0.0.1 --dry-run=server dedicated-
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=<no value>:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
   # Post-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
 
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
@@ -109,8 +123,8 @@ __EOF__
   ### kubectl drain update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl drain "127.0.0.1" --dry-run=client
-  kubectl drain "127.0.0.1" --dry-run=server
+  kubectl drain "127.0.0.1" --dry-run=client --force
+  kubectl drain "127.0.0.1" --dry-run=server --force
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -121,15 +135,17 @@ __EOF__
   # Pre-condition: test-pod-1 and test-pod-2 exist
   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
   # dry-run command
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=client
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=server
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=client --force
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=server --force
   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
-  # command
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)'
-  # only "test-pod-1" should have been matched and deleted - test-pod-2 should still exist
-  kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.name}}" 'test-pod-2'
-  # delete pod no longer in use
-  kubectl delete pod/test-pod-2
+  # command - need --force because pod is unmanaged and --skip-wait-for-delete-timeout because node is unready
+  response=$(kubectl drain "127.0.0.1" --force --pod-selector 'e in (f)' --skip-wait-for-delete-timeout=1)
+  kube::test::if_has_string "${response}" "evicting pod .*/test-pod-1"
+  # only "test-pod-1" should have been matched and deleted - test-pod-2 should not have a deletion timestamp
+  kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.deletionTimestamp}}" '<no value>'
+  # Post-condition: recreate test pods -- they have deletionTimestamp set but will not go away because node is unready
+  delete_test_pods
+  create_test_pods
   # Post-condition: node is schedulable
   kubectl uncordon "127.0.0.1"
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -151,6 +167,32 @@ __EOF__
   response=$(! kubectl drain "127.0.0.1" --selector test=label 2>&1)
   kube::test::if_has_string "${response}" 'cannot specify both a node name'
 
+   ### Test kubectl drain chunk size
+   # Pre-condition: node exists and contains label test=label
+   kube::test::get_object_assert "nodes 127.0.0.1" '{{.metadata.labels.test}}' 'label'
+   # Pre-condition: node is schedulable
+   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+   # Pre-condition: test-pod-1 and test-pod-2 exist
+   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+   # command - need to use force because pods are unmanaged, dry run (or skip-wait) because node is unready
+   output_message=$(kubectl --v=6 drain --force --pod-selector type=test-pod --selector test=label --chunk-size=1 --dry-run=client 2>&1 "${kube_flags[@]}")
+   # Post-condition: Check if we get a limit on node, and both limit and continue on pods
+   kube::test::if_has_string "${output_message}" "/v1/nodes?labelSelector=test%3Dlabel&limit=1 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&labelSelector=type%3Dtest-pod&limit=1 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?continue=.*&fieldSelector=spec.nodeName%3D127.0.0.1&labelSelector=type%3Dtest-pod&limit=1 200 OK"
+   # Post-condition: Check we evict multiple pages worth of pods
+   kube::test::if_has_string "${output_message}" "evicting pod .*/test-pod-1"
+   kube::test::if_has_string "${output_message}" "evicting pod .*/test-pod-2"
+   # Post-condition: node is schedulable
+   kubectl uncordon "127.0.0.1"
+   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+
+   ### Test kubectl drain chunk size defaults to 500
+   output_message=$(kubectl --v=6 drain --force --selector test=label --dry-run=client 2>&1 "${kube_flags[@]}")
+   # Post-condition: Check if we get a limit
+   kube::test::if_has_string "${output_message}" "/v1/nodes?labelSelector=test%3Dlabel&limit=500 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&limit=500 200 OK"
+
   ### kubectl cordon command fails when no arguments are passed
   # Pre-condition: node exists
   response=$(! kubectl cordon 2>&1)
@@ -169,6 +211,9 @@ __EOF__
   kube::test::if_has_not_string "${response}" 'cordoned'
   # Post-condition: node "127.0.0.1" is cordoned
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
+
+  # Clean up test pods
+  delete_test_pods
 
   set +o nounset
   set +o errexit

@@ -1,44 +1,96 @@
-// +build linux
-
 package fs2
 
 import (
 	"bufio"
+	"bytes"
+	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-func setIo(dirPath string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.BlkioWeight != 0 {
-		filename := "io.bfq.weight"
-		if err := fscommon.WriteFile(dirPath, filename, strconv.FormatUint(uint64(cgroup.Resources.BlkioWeight), 10)); err != nil {
+func isIoSet(r *configs.Resources) bool {
+	return r.BlkioWeight != 0 ||
+		len(r.BlkioWeightDevice) > 0 ||
+		len(r.BlkioThrottleReadBpsDevice) > 0 ||
+		len(r.BlkioThrottleWriteBpsDevice) > 0 ||
+		len(r.BlkioThrottleReadIOPSDevice) > 0 ||
+		len(r.BlkioThrottleWriteIOPSDevice) > 0
+}
+
+// bfqDeviceWeightSupported checks for per-device BFQ weight support (added
+// in kernel v5.4, commit 795fe54c2a8) by reading from "io.bfq.weight".
+func bfqDeviceWeightSupported(bfq *os.File) bool {
+	if bfq == nil {
+		return false
+	}
+	_, _ = bfq.Seek(0, 0)
+	buf := make([]byte, 32)
+	_, _ = bfq.Read(buf)
+	// If only a single number (default weight) if read back, we have older kernel.
+	_, err := strconv.ParseInt(string(bytes.TrimSpace(buf)), 10, 64)
+	return err != nil
+}
+
+func setIo(dirPath string, r *configs.Resources) error {
+	if !isIoSet(r) {
+		return nil
+	}
+
+	// If BFQ IO scheduler is available, use it.
+	var bfq *os.File
+	if r.BlkioWeight != 0 || len(r.BlkioWeightDevice) > 0 {
+		var err error
+		bfq, err = cgroups.OpenFile(dirPath, "io.bfq.weight", os.O_RDWR)
+		if err == nil {
+			defer bfq.Close()
+		} else if !os.IsNotExist(err) {
 			return err
 		}
 	}
 
-	for _, td := range cgroup.Resources.BlkioThrottleReadBpsDevice {
-		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("rbps")); err != nil {
+	if r.BlkioWeight != 0 {
+		if bfq != nil { // Use BFQ.
+			if _, err := bfq.WriteString(strconv.FormatUint(uint64(r.BlkioWeight), 10)); err != nil {
+				return err
+			}
+		} else {
+			// Fallback to io.weight with a conversion scheme.
+			v := cgroups.ConvertBlkIOToIOWeightValue(r.BlkioWeight)
+			if err := cgroups.WriteFile(dirPath, "io.weight", strconv.FormatUint(v, 10)); err != nil {
+				return err
+			}
+		}
+	}
+	if bfqDeviceWeightSupported(bfq) {
+		for _, wd := range r.BlkioWeightDevice {
+			if _, err := bfq.WriteString(wd.WeightString() + "\n"); err != nil {
+				return fmt.Errorf("setting device weight %q: %w", wd.WeightString(), err)
+			}
+		}
+	}
+	for _, td := range r.BlkioThrottleReadBpsDevice {
+		if err := cgroups.WriteFile(dirPath, "io.max", td.StringName("rbps")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleWriteBpsDevice {
-		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("wbps")); err != nil {
+	for _, td := range r.BlkioThrottleWriteBpsDevice {
+		if err := cgroups.WriteFile(dirPath, "io.max", td.StringName("wbps")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleReadIOPSDevice {
-		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("riops")); err != nil {
+	for _, td := range r.BlkioThrottleReadIOPSDevice {
+		if err := cgroups.WriteFile(dirPath, "io.max", td.StringName("riops")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleWriteIOPSDevice {
-		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("wiops")); err != nil {
+	for _, td := range r.BlkioThrottleWriteIOPSDevice {
+		if err := cgroups.WriteFile(dirPath, "io.max", td.StringName("wiops")); err != nil {
 			return err
 		}
 	}
@@ -48,8 +100,7 @@ func setIo(dirPath string, cgroup *configs.Cgroup) error {
 
 func readCgroup2MapFile(dirPath string, name string) (map[string][]string, error) {
 	ret := map[string][]string{}
-	p := filepath.Join(dirPath, name)
-	f, err := os.Open(p)
+	f, err := cgroups.OpenFile(dirPath, name, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -64,30 +115,31 @@ func readCgroup2MapFile(dirPath string, name string) (map[string][]string, error
 		ret[parts[0]] = parts[1:]
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, &parseError{Path: dirPath, File: name, Err: err}
 	}
 	return ret, nil
 }
 
 func statIo(dirPath string, stats *cgroups.Stats) error {
-	// more details on the io.stat file format: https://www.kernel.org/doc/Documentation/cgroup-v2.txt
-	var ioServiceBytesRecursive []cgroups.BlkioStatEntry
-	values, err := readCgroup2MapFile(dirPath, "io.stat")
+	const file = "io.stat"
+	values, err := readCgroup2MapFile(dirPath, file)
 	if err != nil {
 		return err
 	}
+	// more details on the io.stat file format: https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+	var parsedStats cgroups.BlkioStats
 	for k, v := range values {
 		d := strings.Split(k, ":")
 		if len(d) != 2 {
 			continue
 		}
-		minor, err := strconv.ParseUint(d[0], 10, 0)
+		major, err := strconv.ParseUint(d[0], 10, 64)
 		if err != nil {
-			return err
+			return &parseError{Path: dirPath, File: file, Err: err}
 		}
-		major, err := strconv.ParseUint(d[1], 10, 0)
+		minor, err := strconv.ParseUint(d[1], 10, 64)
 		if err != nil {
-			return err
+			return &parseError{Path: dirPath, File: file, Err: err}
 		}
 
 		for _, item := range v {
@@ -97,17 +149,34 @@ func statIo(dirPath string, stats *cgroups.Stats) error {
 			}
 			op := d[0]
 
-			// Accommodate the cgroup v1 naming
+			// Map to the cgroupv1 naming and layout (in separate tables).
+			var targetTable *[]cgroups.BlkioStatEntry
 			switch op {
+			// Equivalent to cgroupv1's blkio.io_service_bytes.
 			case "rbytes":
-				op = "read"
+				op = "Read"
+				targetTable = &parsedStats.IoServiceBytesRecursive
 			case "wbytes":
-				op = "write"
+				op = "Write"
+				targetTable = &parsedStats.IoServiceBytesRecursive
+			// Equivalent to cgroupv1's blkio.io_serviced.
+			case "rios":
+				op = "Read"
+				targetTable = &parsedStats.IoServicedRecursive
+			case "wios":
+				op = "Write"
+				targetTable = &parsedStats.IoServicedRecursive
+			default:
+				// Skip over entries we cannot map to cgroupv1 stats for now.
+				// In the future we should expand the stats struct to include
+				// them.
+				logrus.Debugf("cgroupv2 io stats: skipping over unmappable %s entry", item)
+				continue
 			}
 
-			value, err := strconv.ParseUint(d[1], 10, 0)
+			value, err := strconv.ParseUint(d[1], 10, 64)
 			if err != nil {
-				return err
+				return &parseError{Path: dirPath, File: file, Err: err}
 			}
 
 			entry := cgroups.BlkioStatEntry{
@@ -116,9 +185,9 @@ func statIo(dirPath string, stats *cgroups.Stats) error {
 				Minor: minor,
 				Value: value,
 			}
-			ioServiceBytesRecursive = append(ioServiceBytesRecursive, entry)
+			*targetTable = append(*targetTable, entry)
 		}
 	}
-	stats.BlkioStats = cgroups.BlkioStats{IoServiceBytesRecursive: ioServiceBytesRecursive}
+	stats.BlkioStats = parsedStats
 	return nil
 }

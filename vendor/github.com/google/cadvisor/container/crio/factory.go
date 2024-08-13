@@ -32,6 +32,12 @@ import (
 // The namespace under which crio aliases are unique.
 const CrioNamespace = "crio"
 
+// The namespace suffix under which crio aliases are unique.
+const CrioNamespaceSuffix = ".scope"
+
+// The namespace systemd runs components under.
+const SystemdNamespace = "system-systemd"
+
 // Regexp that identifies CRI-O cgroups
 var crioCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
@@ -50,7 +56,7 @@ type crioFactory struct {
 	storageDir    string
 
 	// Information about the mounted cgroup subsystems.
-	cgroupSubsystems libcontainer.CgroupSubsystems
+	cgroupSubsystems map[string]string
 
 	// Information about mounted filesystems.
 	fsInfo fs.FsInfo
@@ -64,13 +70,11 @@ func (f *crioFactory) String() string {
 	return CrioNamespace
 }
 
-func (f *crioFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *crioFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client()
 	if err != nil {
 		return
 	}
-	// TODO are there any env vars we need to white list, if so, do it here...
-	metadataEnvs := []string{}
 	handler, err = newCrioContainerHandler(
 		client,
 		name,
@@ -78,9 +82,9 @@ func (f *crioFactory) NewContainerHandler(name string, inHostNamespace bool) (ha
 		f.fsInfo,
 		f.storageDriver,
 		f.storageDir,
-		&f.cgroupSubsystems,
+		f.cgroupSubsystems,
 		inHostNamespace,
-		metadataEnvs,
+		metadataEnvAllowList,
 		f.includedMetrics,
 	)
 	return
@@ -113,12 +117,20 @@ func (f *crioFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 		// TODO(runcom): should we include crio-conmon cgroups?
 		return false, false, nil
 	}
+	if strings.HasPrefix(path.Base(name), SystemdNamespace) {
+		return true, false, nil
+	}
 	if !strings.HasPrefix(path.Base(name), CrioNamespace) {
 		return false, false, nil
 	}
 	// if the container is not associated with CRI-O, we can't handle it or accept it.
 	if !isContainerName(name) {
 		return false, false, nil
+	}
+
+	if !strings.HasSuffix(path.Base(name), CrioNamespaceSuffix) {
+		// this mean it's a sandbox container
+		return true, false, nil
 	}
 	return true, true, nil
 }

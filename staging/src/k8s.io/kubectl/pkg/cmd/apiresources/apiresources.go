@@ -29,20 +29,23 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	apiresourcesExample = templates.Examples(`
-		# Print the supported API Resources
+		# Print the supported API resources
 		kubectl api-resources
 
-		# Print the supported API Resources with more information
+		# Print the supported API resources with more information
 		kubectl api-resources -o wide
 
-		# Print the supported API Resources sorted by a column
+		# Print the supported API resources sorted by a column
 		kubectl api-resources --sort-by=name
 
 		# Print the supported namespaced resources
@@ -51,8 +54,8 @@ var (
 		# Print the supported non-namespaced resources
 		kubectl api-resources --namespaced=false
 
-		# Print the supported API Resources with specific APIGroup
-		kubectl api-resources --api-group=extensions`)
+		# Print the supported API resources with a specific APIGroup
+		kubectl api-resources --api-group=rbac.authorization.k8s.io`)
 )
 
 // APIResourceOptions is the start of the data required to perform the operation.
@@ -65,18 +68,25 @@ type APIResourceOptions struct {
 	Verbs      []string
 	NoHeaders  bool
 	Cached     bool
+	Categories []string
 
-	genericclioptions.IOStreams
+	groupChanged bool
+	nsChanged    bool
+
+	discoveryClient discovery.CachedDiscoveryInterface
+
+	genericiooptions.IOStreams
 }
 
 // groupResource contains the APIGroup and APIResource
 type groupResource struct {
-	APIGroup    string
-	APIResource metav1.APIResource
+	APIGroup        string
+	APIGroupVersion string
+	APIResource     metav1.APIResource
 }
 
 // NewAPIResourceOptions creates the options for APIResource
-func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOptions {
+func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOptions {
 	return &APIResourceOptions{
 		IOStreams:  ioStreams,
 		Namespaced: true,
@@ -84,29 +94,30 @@ func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOp
 }
 
 // NewCmdAPIResources creates the `api-resources` command
-func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
-		Short:   "Print the supported API resources on the server",
-		Long:    "Print the supported API resources on the server",
+		Short:   i18n.T("Print the supported API resources on the server"),
+		Long:    i18n.T("Print the supported API resources on the server."),
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd, args))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunAPIResources(cmd, f))
+			cmdutil.CheckErr(o.RunAPIResources())
 		},
 	}
 
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: wide|name.")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, `Output format. One of: (wide, name).`)
 
 	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort nodes list using specified field. The field can be either 'name' or 'kind'.")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
 	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
+	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong to the specified categories.")
 	return cmd
 }
 
@@ -126,38 +137,40 @@ func (o *APIResourceOptions) Validate() error {
 }
 
 // Complete adapts from the command line args and validates them
-func (o *APIResourceOptions) Complete(cmd *cobra.Command, args []string) error {
+func (o *APIResourceOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
+
+	discoveryClient, err := restClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.discoveryClient = discoveryClient
+
+	o.groupChanged = cmd.Flags().Changed("api-group")
+	o.nsChanged = cmd.Flags().Changed("namespaced")
+
 	return nil
 }
 
 // RunAPIResources does the work
-func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Factory) error {
+func (o *APIResourceOptions) RunAPIResources() error {
 	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
-	discoveryclient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
 	if !o.Cached {
 		// Always request fresh data from the server
-		discoveryclient.Invalidate()
+		o.discoveryClient.Invalidate()
 	}
 
 	errs := []error{}
-	lists, err := discoveryclient.ServerPreferredResources()
+	lists, err := o.discoveryClient.ServerPreferredResources()
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	resources := []groupResource{}
-
-	groupChanged := cmd.Flags().Changed("api-group")
-	nsChanged := cmd.Flags().Changed("namespaced")
 
 	for _, list := range lists {
 		if len(list.APIResources) == 0 {
@@ -172,20 +185,25 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 				continue
 			}
 			// filter apiGroup
-			if groupChanged && o.APIGroup != gv.Group {
+			if o.groupChanged && o.APIGroup != gv.Group {
 				continue
 			}
 			// filter namespaced
-			if nsChanged && o.Namespaced != resource.Namespaced {
+			if o.nsChanged && o.Namespaced != resource.Namespaced {
 				continue
 			}
 			// filter to resources that support the specified verbs
 			if len(o.Verbs) > 0 && !sets.NewString(resource.Verbs...).HasAll(o.Verbs...) {
 				continue
 			}
+			// filter to resources that belong to the specified categories
+			if len(o.Categories) > 0 && !sets.NewString(resource.Categories...).HasAll(o.Categories...) {
+				continue
+			}
 			resources = append(resources, groupResource{
-				APIGroup:    gv.Group,
-				APIResource: resource,
+				APIGroup:        gv.Group,
+				APIGroupVersion: gv.String(),
+				APIResource:     resource,
 			})
 		}
 	}
@@ -208,20 +226,21 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 				errs = append(errs, err)
 			}
 		case "wide":
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\t%v\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
-				r.APIGroup,
+				r.APIGroupVersion,
 				r.APIResource.Namespaced,
 				r.APIResource.Kind,
-				r.APIResource.Verbs); err != nil {
+				strings.Join(r.APIResource.Verbs, ","),
+				strings.Join(r.APIResource.Categories, ",")); err != nil {
 				errs = append(errs, err)
 			}
 		case "":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
-				r.APIGroup,
+				r.APIGroupVersion,
 				r.APIResource.Namespaced,
 				r.APIResource.Kind); err != nil {
 				errs = append(errs, err)
@@ -236,9 +255,9 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 }
 
 func printContextHeaders(out io.Writer, output string) error {
-	columnNames := []string{"NAME", "SHORTNAMES", "APIGROUP", "NAMESPACED", "KIND"}
+	columnNames := []string{"NAME", "SHORTNAMES", "APIVERSION", "NAMESPACED", "KIND"}
 	if output == "wide" {
-		columnNames = append(columnNames, "VERBS")
+		columnNames = append(columnNames, "VERBS", "CATEGORIES")
 	}
 	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
 	return err

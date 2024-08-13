@@ -3,19 +3,22 @@
 "kind": "Pod",
 "metadata": {
   "name":"etcd-server{{ suffix }}",
-  "namespace": "kube-system",
-  "annotations": {
-    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
-  }
+  "namespace": "kube-system"
 },
 "spec":{
+"securityContext": {
+    "seccompProfile": {
+        "type": "RuntimeDefault"
+    }
+},
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
 "hostNetwork": true,
 "containers":[
     {
     "name": "etcd-container",
-    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.7-0') }}",
+    {{security_context}}
+    "image": "{{ pillar.get('etcd_docker_repository', 'registry.k8s.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.5.15-0') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -31,7 +34,11 @@
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.4.7') }}"
+        "value": "{{ pillar.get('etcd_version', '3.5.15') }}"
+      },
+      {
+        "name": "DO_NOT_MOVE_BINARIES",
+        "value": "true"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
@@ -53,16 +60,27 @@
       },
       { "name": "ETCD_SNAPSHOT_COUNT",
         "value": "10000"
+      },
+      { "name": "ETCD_HOSTNAME",
+        "value": "{{ hostname }}"
+      },
+      {
+        "name": "ETCDCTL_API",
+        "value": "3"
       }
         ],
     "livenessProbe": {
-      "httpGet": {
-        "host": "127.0.0.1",
-        "port": {{ etcd_livenessprobe_port }},
-        "path": "/health"
+      "exec": {
+        "command": [
+          "/bin/sh",
+          "-c",
+          "set -x; exec /usr/local/bin/etcdctl --endpoints=127.0.0.1:{{ port }} {{ etcdctl_certs }} --command-timeout=15s endpoint health"
+        ]
       },
       "initialDelaySeconds": {{ liveness_probe_initial_delay }},
-      "timeoutSeconds": 15
+      "timeoutSeconds": 15,
+      "periodSeconds": 5,
+      "failureThreshold": 5
     },
     "ports": [
       { "name": "serverport",

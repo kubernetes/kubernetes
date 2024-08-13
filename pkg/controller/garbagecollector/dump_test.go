@@ -17,15 +17,16 @@ limitations under the License.
 package garbagecollector
 
 import (
-	"sort"
+	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/simple"
+	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 var (
@@ -116,11 +117,12 @@ var (
 	}
 )
 
-func TestToGonumGraph(t *testing.T) {
+func TestToDOTGraph(t *testing.T) {
 	tests := []struct {
-		name      string
-		uidToNode map[types.UID]*node
-		expect    graph.Directed
+		name        string
+		uidToNode   map[types.UID]*node
+		expectNodes []*dotVertex
+		expectEdges []dotEdge
 	}{
 		{
 			name: "simple",
@@ -129,24 +131,15 @@ func TestToGonumGraph(t *testing.T) {
 				types.UID("bravo"):   bravoNode(),
 				types.UID("charlie"): charlieNode(),
 			},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+			},
 		},
 		{
 			name: "missing", // synthetic vertex created
@@ -154,24 +147,15 @@ func TestToGonumGraph(t *testing.T) {
 				types.UID("alpha"):   alphaNode(),
 				types.UID("charlie"): charlieNode(),
 			},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+			},
 		},
 		{
 			name: "drop-no-ref",
@@ -181,24 +165,15 @@ func TestToGonumGraph(t *testing.T) {
 				types.UID("charlie"): charlieNode(),
 				types.UID("echo"):    echoNode(),
 			},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+			},
 		},
 		{
 			name: "two-chains",
@@ -210,59 +185,38 @@ func TestToGonumGraph(t *testing.T) {
 				types.UID("foxtrot"): foxtrotNode(),
 				types.UID("golf"):    golfNode(),
 			},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-
-				deltaVertex := NewGonumVertex(deltaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(deltaVertex)
-				foxtrotVertex := NewGonumVertex(foxtrotNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(foxtrotVertex)
-				golfVertex := NewGonumVertex(golfNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(golfVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: deltaVertex,
-					T: foxtrotVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: foxtrotVertex,
-					T: golfVertex,
-				})
-
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+				NewDOTVertex(deltaNode()),
+				NewDOTVertex(foxtrotNode()),
+				NewDOTVertex(golfNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+				{F: types.UID("delta"), T: types.UID("foxtrot")},
+				{F: types.UID("foxtrot"), T: types.UID("golf")},
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := toGonumGraph(test.uidToNode)
-
-			compareGraphs(test.expect, actual, t)
+			actualNodes, actualEdges := toDOTNodesAndEdges(test.uidToNode)
+			compareGraphs(test.expectNodes, actualNodes, test.expectEdges, actualEdges, t)
 		})
 	}
-
 }
 
-func TestToGonumGraphObj(t *testing.T) {
+func TestToDOTGraphObj(t *testing.T) {
 	tests := []struct {
-		name      string
-		uidToNode map[types.UID]*node
-		uids      []types.UID
-		expect    graph.Directed
+		name        string
+		uidToNode   map[types.UID]*node
+		uids        []types.UID
+		expectNodes []*dotVertex
+		expectEdges []dotEdge
 	}{
 		{
 			name: "simple",
@@ -272,24 +226,15 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("charlie"): charlieNode(),
 			},
 			uids: []types.UID{types.UID("bravo")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+			},
 		},
 		{
 			name: "missing", // synthetic vertex created
@@ -297,11 +242,9 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("alpha"):   alphaNode(),
 				types.UID("charlie"): charlieNode(),
 			},
-			uids: []types.UID{types.UID("bravo")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				return graphBuilder
-			}(),
+			uids:        []types.UID{types.UID("bravo")},
+			expectNodes: []*dotVertex{},
+			expectEdges: []dotEdge{},
 		},
 		{
 			name: "drop-no-ref",
@@ -311,11 +254,9 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("charlie"): charlieNode(),
 				types.UID("echo"):    echoNode(),
 			},
-			uids: []types.UID{types.UID("echo")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				return graphBuilder
-			}(),
+			uids:        []types.UID{types.UID("echo")},
+			expectNodes: []*dotVertex{},
+			expectEdges: []dotEdge{},
 		},
 		{
 			name: "two-chains-from-owner",
@@ -328,25 +269,15 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("golf"):    golfNode(),
 			},
 			uids: []types.UID{types.UID("golf")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				deltaVertex := NewGonumVertex(deltaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(deltaVertex)
-				foxtrotVertex := NewGonumVertex(foxtrotNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(foxtrotVertex)
-				golfVertex := NewGonumVertex(golfNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(golfVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: deltaVertex,
-					T: foxtrotVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: foxtrotVertex,
-					T: golfVertex,
-				})
-
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(deltaNode()),
+				NewDOTVertex(foxtrotNode()),
+				NewDOTVertex(golfNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("delta"), T: types.UID("foxtrot")},
+				{F: types.UID("foxtrot"), T: types.UID("golf")},
+			},
 		},
 		{
 			name: "two-chains-from-child",
@@ -359,25 +290,15 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("golf"):    golfNode(),
 			},
 			uids: []types.UID{types.UID("delta")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				deltaVertex := NewGonumVertex(deltaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(deltaVertex)
-				foxtrotVertex := NewGonumVertex(foxtrotNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(foxtrotVertex)
-				golfVertex := NewGonumVertex(golfNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(golfVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: deltaVertex,
-					T: foxtrotVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: foxtrotVertex,
-					T: golfVertex,
-				})
-
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(deltaNode()),
+				NewDOTVertex(foxtrotNode()),
+				NewDOTVertex(golfNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("delta"), T: types.UID("foxtrot")},
+				{F: types.UID("foxtrot"), T: types.UID("golf")},
+			},
 		},
 		{
 			name: "two-chains-choose-both",
@@ -390,98 +311,125 @@ func TestToGonumGraphObj(t *testing.T) {
 				types.UID("golf"):    golfNode(),
 			},
 			uids: []types.UID{types.UID("delta"), types.UID("charlie")},
-			expect: func() graph.Directed {
-				graphBuilder := simple.NewDirectedGraph()
-				alphaVertex := NewGonumVertex(alphaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(alphaVertex)
-				bravoVertex := NewGonumVertex(bravoNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(bravoVertex)
-				charlieVertex := NewGonumVertex(charlieNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(charlieVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: bravoVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: alphaVertex,
-					T: charlieVertex,
-				})
-
-				deltaVertex := NewGonumVertex(deltaNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(deltaVertex)
-				foxtrotVertex := NewGonumVertex(foxtrotNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(foxtrotVertex)
-				golfVertex := NewGonumVertex(golfNode(), graphBuilder.NewNode().ID())
-				graphBuilder.AddNode(golfVertex)
-				graphBuilder.SetEdge(simple.Edge{
-					F: deltaVertex,
-					T: foxtrotVertex,
-				})
-				graphBuilder.SetEdge(simple.Edge{
-					F: foxtrotVertex,
-					T: golfVertex,
-				})
-
-				return graphBuilder
-			}(),
+			expectNodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+				NewDOTVertex(deltaNode()),
+				NewDOTVertex(foxtrotNode()),
+				NewDOTVertex(golfNode()),
+			},
+			expectEdges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+				{F: types.UID("delta"), T: types.UID("foxtrot")},
+				{F: types.UID("foxtrot"), T: types.UID("golf")},
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := toGonumGraphForObj(test.uidToNode, test.uids...)
-
-			compareGraphs(test.expect, actual, t)
+			actualNodes, actualEdges := toDOTNodesAndEdgesForObj(test.uidToNode, test.uids...)
+			compareGraphs(test.expectNodes, actualNodes, test.expectEdges, actualEdges, t)
 		})
 	}
 }
 
-func compareGraphs(expected, actual graph.Directed, t *testing.T) {
-	// sort the edges by from ID, then to ID
-	// (the slices we get back are from map iteration, where order is not guaranteed)
-	expectedNodes := expected.Nodes().(graph.NodeSlicer).NodeSlice()
-	actualNodes := actual.Nodes().(graph.NodeSlicer).NodeSlice()
-	sort.Sort(gonumByUID(expectedNodes))
-	sort.Sort(gonumByUID(actualNodes))
-
+func compareGraphs(expectedNodes, actualNodes []*dotVertex, expectedEdges, actualEdges []dotEdge, t *testing.T) {
 	if len(expectedNodes) != len(actualNodes) {
-		t.Fatal(spew.Sdump(actual))
+		t.Fatal(dump.Pretty(actualNodes))
 	}
-
 	for i := range expectedNodes {
-		currExpected := *expectedNodes[i].(*gonumVertex)
-		currActual := *actualNodes[i].(*gonumVertex)
+		currExpected := expectedNodes[i]
+		currActual := actualNodes[i]
 		if currExpected.uid != currActual.uid {
-			t.Errorf("expected %v, got %v", spew.Sdump(currExpected), spew.Sdump(currActual))
+			t.Errorf("expected %v, got %v", dump.Pretty(currExpected), dump.Pretty(currActual))
 		}
-
-		expectedFrom := append([]graph.Node{}, expected.From(expectedNodes[i].ID()).(graph.NodeSlicer).NodeSlice()...)
-		actualFrom := append([]graph.Node{}, actual.From(actualNodes[i].ID()).(graph.NodeSlicer).NodeSlice()...)
-		sort.Sort(gonumByUID(expectedFrom))
-		sort.Sort(gonumByUID(actualFrom))
-		if len(expectedFrom) != len(actualFrom) {
-			t.Errorf("%q: expected %v, got %v", currExpected.uid, spew.Sdump(expectedFrom), spew.Sdump(actualFrom))
-		}
-		for i := range expectedFrom {
-			currExpectedFrom := *expectedFrom[i].(*gonumVertex)
-			currActualFrom := *actualFrom[i].(*gonumVertex)
-			if currExpectedFrom.uid != currActualFrom.uid {
-				t.Errorf("expected %v, got %v", spew.Sdump(currExpectedFrom), spew.Sdump(currActualFrom))
-			}
+	}
+	if len(expectedEdges) != len(actualEdges) {
+		t.Fatal(dump.Pretty(actualEdges))
+	}
+	for i := range expectedEdges {
+		currExpected := expectedEdges[i]
+		currActual := actualEdges[i]
+		if currExpected != currActual {
+			t.Errorf("expected %v, got %v", dump.Pretty(currExpected), dump.Pretty(currActual))
 		}
 	}
 }
 
-type gonumByUID []graph.Node
+func TestMarshalDOT(t *testing.T) {
+	ref1 := objectReference{
+		OwnerReference: metav1.OwnerReference{
+			UID:        types.UID("ref1-[]\"\\Iñtërnâtiônàlizætiøn,🐹"),
+			Name:       "ref1name-Iñtërnâtiônàlizætiøn,🐹",
+			Kind:       "ref1kind-Iñtërnâtiônàlizætiøn,🐹",
+			APIVersion: "ref1group/version",
+		},
+		Namespace: "ref1ns",
+	}
+	ref2 := objectReference{
+		OwnerReference: metav1.OwnerReference{
+			UID:        types.UID("ref2-"),
+			Name:       "ref2name-",
+			Kind:       "ref2kind-",
+			APIVersion: "ref2group/version",
+		},
+		Namespace: "ref2ns",
+	}
+	testcases := []struct {
+		file  string
+		nodes []*dotVertex
+		edges []dotEdge
+	}{
+		{
+			file: "empty.dot",
+		},
+		{
+			file: "simple.dot",
+			nodes: []*dotVertex{
+				NewDOTVertex(alphaNode()),
+				NewDOTVertex(bravoNode()),
+				NewDOTVertex(charlieNode()),
+				NewDOTVertex(deltaNode()),
+				NewDOTVertex(foxtrotNode()),
+				NewDOTVertex(golfNode()),
+			},
+			edges: []dotEdge{
+				{F: types.UID("alpha"), T: types.UID("bravo")},
+				{F: types.UID("alpha"), T: types.UID("charlie")},
+				{F: types.UID("delta"), T: types.UID("foxtrot")},
+				{F: types.UID("foxtrot"), T: types.UID("golf")},
+			},
+		},
+		{
+			file: "escaping.dot",
+			nodes: []*dotVertex{
+				NewDOTVertex(makeNode(ref1, withOwners(ref2))),
+				NewDOTVertex(makeNode(ref2)),
+			},
+			edges: []dotEdge{
+				{F: types.UID(ref1.UID), T: types.UID(ref2.UID)},
+			},
+		},
+	}
 
-func (s gonumByUID) Len() int      { return len(s) }
-func (s gonumByUID) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+	for _, tc := range testcases {
+		t.Run(tc.file, func(t *testing.T) {
+			goldenData, err := os.ReadFile(filepath.Join("testdata", tc.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b := bytes.NewBuffer(nil)
+			if err := marshalDOT(b, tc.nodes, tc.edges); err != nil {
+				t.Fatal(err)
+			}
 
-func (s gonumByUID) Less(i, j int) bool {
-	lhs := s[i].(*gonumVertex)
-	lhsUID := string(lhs.uid)
-	rhs := s[j].(*gonumVertex)
-	rhsUID := string(rhs.uid)
-
-	return lhsUID < rhsUID
+			if e, a := string(goldenData), string(b.Bytes()); cmp.Diff(e, a) != "" {
+				t.Logf("got\n%s", string(a))
+				t.Fatalf("unexpected diff:\n%s", cmp.Diff(e, a))
+			}
+		})
+	}
 }

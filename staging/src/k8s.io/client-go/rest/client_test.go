@@ -23,7 +23,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -34,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
 
@@ -120,7 +118,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	actual := ss.Status()
 	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+		t.Errorf("Unexpected mis-match: %s", cmp.Diff(status, &actual))
 	}
 }
 
@@ -160,7 +158,7 @@ func TestDoRawRequestFailed(t *testing.T) {
 	}
 	actual := ss.Status()
 	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+		t.Errorf("Unexpected mis-match: %s", cmp.Diff(status, &actual))
 	}
 }
 
@@ -341,8 +339,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	theUrl, _ := url.Parse("http://localhost")
 
 	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
-	os.Setenv(envBackoffBase, "1")
-	os.Setenv(envBackoffDuration, "2")
+	t.Setenv(envBackoffBase, "1")
+	t.Setenv(envBackoffDuration, "2")
 	backoff := readExpBackoffConfig()
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)
@@ -351,8 +349,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	}
 
 	// 0 duration -> no backoff.
-	os.Setenv(envBackoffBase, "1")
-	os.Setenv(envBackoffDuration, "0")
+	t.Setenv(envBackoffBase, "1")
+	t.Setenv(envBackoffDuration, "0")
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff = readExpBackoffConfig()
@@ -361,8 +359,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	}
 
 	// No env -> No backoff.
-	os.Setenv(envBackoffBase, "")
-	os.Setenv(envBackoffDuration, "")
+	t.Setenv(envBackoffBase, "")
+	t.Setenv(envBackoffDuration, "")
 	backoff = readExpBackoffConfig()
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)

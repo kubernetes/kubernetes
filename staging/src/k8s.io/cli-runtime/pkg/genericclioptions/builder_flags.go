@@ -52,6 +52,9 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 	}
 }
 
+// WithFile sets the FileNameFlags.
+// If recurse is set, it will process directory recursively. Useful when you want to manage related manifests
+// organized within the same directory.
 func (o *ResourceBuilderFlags) WithFile(recurse bool, files ...string) *ResourceBuilderFlags {
 	o.FileNameFlags = &FileNameFlags{
 		Usage:     "identifying the resource.",
@@ -62,41 +65,49 @@ func (o *ResourceBuilderFlags) WithFile(recurse bool, files ...string) *Resource
 	return o
 }
 
+// WithLabelSelector sets the LabelSelector flag
 func (o *ResourceBuilderFlags) WithLabelSelector(selector string) *ResourceBuilderFlags {
 	o.LabelSelector = &selector
 	return o
 }
 
+// WithFieldSelector sets the FieldSelector flag
 func (o *ResourceBuilderFlags) WithFieldSelector(selector string) *ResourceBuilderFlags {
 	o.FieldSelector = &selector
 	return o
 }
 
+// WithAllNamespaces sets the AllNamespaces flag
 func (o *ResourceBuilderFlags) WithAllNamespaces(defaultVal bool) *ResourceBuilderFlags {
 	o.AllNamespaces = &defaultVal
 	return o
 }
 
+// WithAll sets the All flag
 func (o *ResourceBuilderFlags) WithAll(defaultVal bool) *ResourceBuilderFlags {
 	o.All = &defaultVal
 	return o
 }
 
+// WithLocal sets the Local flag
 func (o *ResourceBuilderFlags) WithLocal(defaultVal bool) *ResourceBuilderFlags {
 	o.Local = &defaultVal
 	return o
 }
 
+// WithScheme sets the Scheme flag
 func (o *ResourceBuilderFlags) WithScheme(scheme *runtime.Scheme) *ResourceBuilderFlags {
 	o.Scheme = scheme
 	return o
 }
 
+// WithLatest sets the Latest flag
 func (o *ResourceBuilderFlags) WithLatest() *ResourceBuilderFlags {
 	o.Latest = true
 	return o
 }
 
+// StopOnError sets the StopOnFirstError flag
 func (o *ResourceBuilderFlags) StopOnError() *ResourceBuilderFlags {
 	o.StopOnFirstError = true
 	return o

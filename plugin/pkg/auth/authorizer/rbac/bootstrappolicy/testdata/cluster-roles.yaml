@@ -127,8 +127,14 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/eviction
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - configmaps
-    - endpoints
+    - events
     - persistentvolumeclaims
     - replicationcontrollers
     - replicationcontrollers/scale
@@ -142,6 +148,12 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
   - apiGroups:
     - apps
     resources:
@@ -219,6 +231,19 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -267,6 +292,14 @@ items:
     - ""
     resources:
     - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
     verbs:
     - get
     - list
@@ -385,6 +418,12 @@ items:
     resources:
     - selfsubjectaccessreviews
     - selfsubjectrulesreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - selfsubjectreviews
     verbs:
     - create
 - apiVersion: rbac.authorization.k8s.io/v1
@@ -600,21 +639,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-controller-manager
-    resources:
-    - endpoints
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
     - secrets
     - serviceaccounts
     verbs:
@@ -717,22 +741,22 @@ items:
     - leases
     verbs:
     - get
+    - list
     - update
+    - watch
   - apiGroups:
-    - ""
+    - coordination.k8s.io
     resources:
-    - endpoints
+    - leasecandidates
     verbs:
     - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - endpoints
-    verbs:
+    - delete
+    - deletecollection
     - get
+    - list
+    - patch
     - update
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -827,6 +851,30 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csistoragecapacities
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -857,10 +905,30 @@ items:
     - nodes/log
     - nodes/metrics
     - nodes/proxy
-    - nodes/spec
     - nodes/stats
     verbs:
     - '*'
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:monitoring
+  rules:
+  - nonResourceURLs:
+    - /healthz
+    - /healthz/*
+    - /livez
+    - /livez/*
+    - /metrics
+    - /metrics/slis
+    - /readyz
+    - /readyz/*
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1001,17 +1069,17 @@ items:
   - apiGroups:
     - ""
     resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - persistentvolumeclaims/status
     verbs:
     - get
     - patch
     - update
-  - apiGroups:
-    - ""
-    resources:
-    - serviceaccounts/token
-    verbs:
-    - create
   - apiGroups:
     - storage.k8s.io
     resources:
@@ -1198,6 +1266,23 @@ items:
     - /readyz
     - /version
     - /version/
+    verbs:
+    - get
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:service-account-issuer-discovery
+  rules:
+  - nonResourceURLs:
+    - /.well-known/openid-configuration
+    - /.well-known/openid-configuration/
+    - /openid/v1/jwks
+    - /openid/v1/jwks/
     verbs:
     - get
 - apiVersion: rbac.authorization.k8s.io/v1

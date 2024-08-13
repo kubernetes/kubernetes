@@ -1,0 +1,44 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+# Enable CDI as described in
+# https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_cdi = true
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    scheduler:
+        extraArgs:
+          v: "5"
+          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+    controllerManager:
+        extraArgs:
+          v: "5"
+    apiServer:
+        extraArgs:
+          runtime-config: "resource.k8s.io/v1alpha3=true"
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+featureGates:
+  DynamicResourceAllocation: true

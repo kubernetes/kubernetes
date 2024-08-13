@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type testMetrics struct {
@@ -40,8 +40,8 @@ func TestMetricShutdown(t *testing.T) {
 	m := &testMetrics{
 		updateCalled: ch,
 	}
-	c := clock.NewFakeClock(time.Now())
-	q := newQueue(c, m, time.Millisecond)
+	c := testingclock.NewFakeClock(time.Now())
+	q := newQueue[any](c, DefaultQueue[any](), m, time.Millisecond)
 	for !c.HasWaiters() {
 		// Wait for the go routine to call NewTicker()
 		time.Sleep(time.Millisecond)
@@ -170,10 +170,13 @@ func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 func TestMetrics(t *testing.T) {
 	mp := testMetricsProvider{}
 	t0 := time.Unix(0, 0)
-	c := clock.NewFakeClock(t0)
-	mf := queueMetricsFactory{metricsProvider: &mp}
-	m := mf.newQueueMetrics("test", c)
-	q := newQueue(c, m, time.Millisecond)
+	c := testingclock.NewFakeClock(t0)
+	config := QueueConfig{
+		Name:            "test",
+		Clock:           c,
+		MetricsProvider: &mp,
+	}
+	q := newQueueWithConfig[any](config, time.Millisecond)
 	defer q.ShutDown()
 	for !c.HasWaiters() {
 		// Wait for the go routine to call NewTicker()
@@ -252,13 +255,17 @@ func TestMetrics(t *testing.T) {
 	// use a channel to ensure we don't look at the metric before it's
 	// been set.
 	ch := make(chan struct{}, 1)
+	longestCh := make(chan struct{}, 1)
 	mp.unfinished.notifyCh = ch
+	mp.longest.notifyCh = longestCh
 	c.Step(time.Millisecond)
 	<-ch
 	mp.unfinished.notifyCh = nil
 	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	<-longestCh
+	mp.longest.notifyCh = nil
 	if e, a := .001, mp.longest.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}

@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -118,6 +118,25 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (t *Time) UnmarshalCBOR(b []byte) error {
+	var s *string
+	if err := cbor.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == nil {
+		t.Time = time.Time{}
+		return nil
+	}
+
+	parsed, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return err
+	}
+
+	t.Time = parsed.Local()
+	return nil
+}
+
 // UnmarshalQueryParameter converts from a URL query parameter value to an object
 func (t *Time) UnmarshalQueryParameter(str string) error {
 	if len(str) == 0 {
@@ -153,6 +172,14 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
+func (t Time) MarshalCBOR() ([]byte, error) {
+	if t.IsZero() {
+		return cbor.Marshal(nil)
+	}
+
+	return cbor.Marshal(t.UTC().Format(time.RFC3339))
+}
+
 // ToUnstructured implements the value.UnstructuredConverter interface.
 func (t Time) ToUnstructured() interface{} {
 	if t.IsZero() {
@@ -182,16 +209,3 @@ func (t Time) MarshalQueryParameter() (string, error) {
 
 	return t.UTC().Format(time.RFC3339), nil
 }
-
-// Fuzz satisfies fuzz.Interface.
-func (t *Time) Fuzz(c fuzz.Continue) {
-	if t == nil {
-		return
-	}
-	// Allow for about 1000 years of randomness.  Leave off nanoseconds
-	// because JSON doesn't represent them so they can't round-trip
-	// properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 0)
-}
-
-var _ fuzz.Interface = &Time{}

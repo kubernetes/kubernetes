@@ -1,79 +1,107 @@
-// +build linux
-
 package fs
 
 import (
+	"bytes"
+	"errors"
+	"reflect"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	cgroupdevices "github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/devices"
+	"github.com/opencontainers/runc/libcontainer/userns"
 )
 
 type DevicesGroup struct {
+	TestingSkipFinalCheck bool
 }
 
 func (s *DevicesGroup) Name() string {
 	return "devices"
 }
 
-func (s *DevicesGroup) Apply(d *cgroupData) error {
-	_, err := d.join("devices")
+func (s *DevicesGroup) Apply(path string, r *configs.Resources, pid int) error {
+	if r.SkipDevices {
+		return nil
+	}
+	if path == "" {
+		// Return error here, since devices cgroup
+		// is a hard requirement for container's security.
+		return errSubsystemDoesNotExist
+	}
+
+	return apply(path, pid)
+}
+
+func loadEmulator(path string) (*cgroupdevices.Emulator, error) {
+	list, err := cgroups.ReadFile(path, "devices.list")
 	if err != nil {
-		// We will return error even it's `not found` error, devices
-		// cgroup is hard requirement for container's security.
+		return nil, err
+	}
+	return cgroupdevices.EmulatorFromList(bytes.NewBufferString(list))
+}
+
+func buildEmulator(rules []*devices.Rule) (*cgroupdevices.Emulator, error) {
+	// This defaults to a white-list -- which is what we want!
+	emu := &cgroupdevices.Emulator{}
+	for _, rule := range rules {
+		if err := emu.Apply(*rule); err != nil {
+			return nil, err
+		}
+	}
+	return emu, nil
+}
+
+func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
+	if userns.RunningInUserNS() || r.SkipDevices {
+		return nil
+	}
+
+	// Generate two emulators, one for the current state of the cgroup and one
+	// for the requested state by the user.
+	current, err := loadEmulator(path)
+	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if system.RunningInUserNS() {
-		return nil
+	target, err := buildEmulator(r.Devices)
+	if err != nil {
+		return err
 	}
 
-	devices := cgroup.Resources.Devices
-	if len(devices) > 0 {
-		for _, dev := range devices {
-			file := "devices.deny"
-			if dev.Allow {
-				file = "devices.allow"
-			}
-			if err := fscommon.WriteFile(path, file, dev.CgroupString()); err != nil {
-				return err
-			}
-		}
-		return nil
+	// Compute the minimal set of transition rules needed to achieve the
+	// requested state.
+	transitionRules, err := current.Transition(target)
+	if err != nil {
+		return err
 	}
-	if cgroup.Resources.AllowAllDevices != nil {
-		if *cgroup.Resources.AllowAllDevices == false {
-			if err := fscommon.WriteFile(path, "devices.deny", "a"); err != nil {
-				return err
-			}
-
-			for _, dev := range cgroup.Resources.AllowedDevices {
-				if err := fscommon.WriteFile(path, "devices.allow", dev.CgroupString()); err != nil {
-					return err
-				}
-			}
-			return nil
+	for _, rule := range transitionRules {
+		file := "devices.deny"
+		if rule.Allow {
+			file = "devices.allow"
 		}
-
-		if err := fscommon.WriteFile(path, "devices.allow", "a"); err != nil {
+		if err := cgroups.WriteFile(path, file, rule.CgroupString()); err != nil {
 			return err
 		}
 	}
 
-	for _, dev := range cgroup.Resources.DeniedDevices {
-		if err := fscommon.WriteFile(path, "devices.deny", dev.CgroupString()); err != nil {
+	// Final safety check -- ensure that the resulting state is what was
+	// requested. This is only really correct for white-lists, but for
+	// black-lists we can at least check that the cgroup is in the right mode.
+	//
+	// This safety-check is skipped for the unit tests because we cannot
+	// currently mock devices.list correctly.
+	if !s.TestingSkipFinalCheck {
+		currentAfter, err := loadEmulator(path)
+		if err != nil {
 			return err
 		}
+		if !target.IsBlacklist() && !reflect.DeepEqual(currentAfter, target) {
+			return errors.New("resulting devices cgroup doesn't precisely match target")
+		} else if target.IsBlacklist() != currentAfter.IsBlacklist() {
+			return errors.New("resulting devices cgroup doesn't match target mode")
+		}
 	}
-
 	return nil
-}
-
-func (s *DevicesGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("devices"))
 }
 
 func (s *DevicesGroup) GetStats(path string, stats *cgroups.Stats) error {

@@ -17,22 +17,24 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 )
 
 // ErrVersionConflict is the error returned when resource version of requested
@@ -41,21 +43,21 @@ var ErrVersionConflict = errors.New("VersionError")
 
 // VolumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
-// - Latest version of claims volumes saved by the controller.
-// - Queue of all saves (to simulate "volume/claim updated" events). This queue
-//   contains all intermediate state of an object - e.g. a claim.VolumeName
-//   is updated first and claim.Phase second. This queue will then contain both
-//   updates as separate entries.
-// - Number of changes since the last call to VolumeReactor.syncAll().
-// - Optionally, volume and claim fake watchers which should be the same ones
-//   used by the controller. Any time an event function like deleteVolumeEvent
-//   is called to simulate an event, the reactor's stores are updated and the
-//   controller is sent the event via the fake watcher.
-// - Optionally, list of error that should be returned by reactor, simulating
-//   etcd / API server failures. These errors are evaluated in order and every
-//   error is returned only once. I.e. when the reactor finds matching
-//   ReactorError, it return appropriate error and removes the ReactorError from
-//   the list.
+//   - Latest version of claims volumes saved by the controller.
+//   - Queue of all saves (to simulate "volume/claim updated" events). This queue
+//     contains all intermediate state of an object - e.g. a claim.VolumeName
+//     is updated first and claim.Phase second. This queue will then contain both
+//     updates as separate entries.
+//   - Number of changes since the last call to VolumeReactor.syncAll().
+//   - Optionally, volume and claim fake watchers which should be the same ones
+//     used by the controller. Any time an event function like deleteVolumeEvent
+//     is called to simulate an event, the reactor's stores are updated and the
+//     controller is sent the event via the fake watcher.
+//   - Optionally, list of error that should be returned by reactor, simulating
+//     etcd / API server failures. These errors are evaluated in order and every
+//     error is returned only once. I.e. when the reactor finds matching
+//     ReactorError, it return appropriate error and removes the ReactorError from
+//     the list.
 type VolumeReactor struct {
 	volumes              map[string]*v1.PersistentVolume
 	claims               map[string]*v1.PersistentVolumeClaim
@@ -87,14 +89,14 @@ type ReactorError struct {
 // to evaluate test results.
 // All updated objects are also inserted into changedObjects queue and
 // optionally sent back to the controller via its watchers.
-func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Object, err error) {
+func (r *VolumeReactor) React(ctx context.Context, action core.Action) (handled bool, ret runtime.Object, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
-	klog.V(4).Infof("reactor got operation %q on %q", action.GetVerb(), action.GetResource())
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reactor got operation", "resource", action.GetResource(), "verb", action.GetVerb())
 
 	// Inject error when requested
-	err = r.injectReactError(action)
+	err = r.injectReactError(ctx, action)
 	if err != nil {
 		return true, nil, err
 	}
@@ -108,7 +110,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		// check the volume does not exist
 		_, found := r.volumes[volume.Name]
 		if found {
-			return true, nil, fmt.Errorf("Cannot create volume %s: volume already exists", volume.Name)
+			return true, nil, fmt.Errorf("cannot create volume %s: volume already exists", volume.Name)
 		}
 
 		// mimic apiserver defaulting
@@ -124,7 +126,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("created volume %s", volume.Name)
+		logger.V(4).Info("Created volume", "volumeName", volume.Name)
 		return true, volume, nil
 
 	case action.Matches("create", "persistentvolumeclaims"):
@@ -134,7 +136,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		// check the claim does not exist
 		_, found := r.claims[claim.Name]
 		if found {
-			return true, nil, fmt.Errorf("Cannot create claim %s: claim already exists", claim.Name)
+			return true, nil, fmt.Errorf("cannot create claim %s: claim already exists", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -144,7 +146,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 		r.changedObjects = append(r.changedObjects, claim)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("created claim %s", claim.Name)
+		logger.V(4).Info("Created claim", "PVC", klog.KObj(claim))
 		return true, claim, nil
 
 	case action.Matches("update", "persistentvolumes"):
@@ -160,14 +162,14 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedVolume, volume) {
-				klog.V(4).Infof("nothing updated volume %s", volume.Name)
+				logger.V(4).Info("Nothing updated volume", "volumeName", volume.Name)
 				return true, volume, nil
 			}
 			// Don't modify the existing object
 			volume = volume.DeepCopy()
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
+			return true, nil, fmt.Errorf("cannot update volume %s: volume not found", volume.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -177,7 +179,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		r.volumes[volume.Name] = volume
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("saved updated volume %s", volume.Name)
+		logger.V(4).Info("Saved updated volume", "volumeName", volume.Name)
 		return true, volume, nil
 
 	case action.Matches("update", "persistentvolumeclaims"):
@@ -193,14 +195,14 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedClaim, claim) {
-				klog.V(4).Infof("nothing updated claim %s", claim.Name)
+				logger.V(4).Info("Nothing updated claim", "PVC", klog.KObj(claim))
 				return true, claim, nil
 			}
 			// Don't modify the existing object
 			claim = claim.DeepCopy()
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
+			return true, nil, fmt.Errorf("cannot update claim %s: claim not found", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -210,32 +212,33 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		r.claims[claim.Name] = claim
 		r.changedObjects = append(r.changedObjects, claim)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("saved updated claim %s", claim.Name)
+		logger.V(4).Info("Saved updated claim", "PVC", klog.KObj(claim))
 		return true, claim, nil
 
 	case action.Matches("get", "persistentvolumes"):
 		name := action.(core.GetAction).GetName()
 		volume, found := r.volumes[name]
 		if found {
-			klog.V(4).Infof("GetVolume: found %s", volume.Name)
+			logger.V(4).Info("GetVolume: found volume", "volumeName", volume.Name)
 			return true, volume.DeepCopy(), nil
 		}
-		klog.V(4).Infof("GetVolume: volume %s not found", name)
+		logger.V(4).Info("GetVolume: volume not found", "volumeName", name)
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
+		nameSpace := action.(core.GetAction).GetNamespace()
 		claim, found := r.claims[name]
 		if found {
-			klog.V(4).Infof("GetClaim: found %s", claim.Name)
+			logger.V(4).Info("GetClaim: found claim", "PVC", klog.KObj(claim))
 			return true, claim.DeepCopy(), nil
 		}
-		klog.V(4).Infof("GetClaim: claim %s not found", name)
+		logger.V(4).Info("GetClaim: claim not found", "PVC", klog.KRef(nameSpace, name))
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("delete", "persistentvolumes"):
 		name := action.(core.DeleteAction).GetName()
-		klog.V(4).Infof("deleted volume %s", name)
+		logger.V(4).Info("Deleted volume", "volumeName", name)
 		obj, found := r.volumes[name]
 		if found {
 			delete(r.volumes, name)
@@ -245,11 +248,12 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		}
-		return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
+		return true, nil, fmt.Errorf("cannot delete volume %s: not found", name)
 
 	case action.Matches("delete", "persistentvolumeclaims"):
 		name := action.(core.DeleteAction).GetName()
-		klog.V(4).Infof("deleted claim %s", name)
+		nameSpace := action.(core.DeleteAction).GetNamespace()
+		logger.V(4).Info("Deleted claim", "PVC", klog.KRef(nameSpace, name))
 		obj, found := r.claims[name]
 		if found {
 			delete(r.claims, name)
@@ -259,7 +263,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		}
-		return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
+		return true, nil, fmt.Errorf("cannot delete claim %s: not found", name)
 	}
 
 	return false, nil, nil
@@ -297,18 +301,18 @@ func (r *VolumeReactor) getWatches(gvr schema.GroupVersionResource, ns string) [
 
 // injectReactError returns an error when the test requested given action to
 // fail. nil is returned otherwise.
-func (r *VolumeReactor) injectReactError(action core.Action) error {
+func (r *VolumeReactor) injectReactError(ctx context.Context, action core.Action) error {
 	if len(r.errors) == 0 {
 		// No more errors to inject, everything should succeed.
 		return nil
 	}
-
+	logger := klog.FromContext(ctx)
 	for i, expected := range r.errors {
-		klog.V(4).Infof("trying to match %q %q with %q %q", expected.Verb, expected.Resource, action.GetVerb(), action.GetResource())
+		logger.V(4).Info("Trying to match resource verb", "resource", action.GetResource(), "verb", action.GetVerb(), "expectedResource", expected.Resource, "expectedVerb", expected.Verb)
 		if action.Matches(expected.Verb, expected.Resource) {
 			// That's the action we're waiting for, remove it from injectedErrors
 			r.errors = append(r.errors[:i], r.errors[i+1:]...)
-			klog.V(4).Infof("reactor found matching error at index %d: %q %q, returning %v", i, expected.Verb, expected.Resource, expected.Error)
+			logger.V(4).Info("Reactor found matching error", "index", i, "expectedResource", expected.Resource, "expectedVerb", expected.Verb, "err", expected.Error)
 			return expected.Error
 		}
 	}
@@ -346,7 +350,7 @@ func (r *VolumeReactor) CheckVolumes(expectedVolumes []*v1.PersistentVolume) err
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Volume check failed [A-expected, B-got]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("Volume check failed [A-expected, B-got]: %s", cmp.Diff(expectedMap, gotMap))
 	}
 	return nil
 }
@@ -375,14 +379,14 @@ func (r *VolumeReactor) CheckClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Claim check failed [A-expected, B-got result]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("Claim check failed [A-expected, B-got result]: %s", cmp.Diff(expectedMap, gotMap))
 	}
 	return nil
 }
 
 // PopChange returns one recorded updated object, either *v1.PersistentVolume
 // or *v1.PersistentVolumeClaim. Returns nil when there are no changes.
-func (r *VolumeReactor) PopChange() interface{} {
+func (r *VolumeReactor) PopChange(ctx context.Context) interface{} {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -391,14 +395,15 @@ func (r *VolumeReactor) PopChange() interface{} {
 	}
 
 	// For debugging purposes, print the queue
+	logger := klog.FromContext(ctx)
 	for _, obj := range r.changedObjects {
 		switch obj.(type) {
 		case *v1.PersistentVolume:
 			vol, _ := obj.(*v1.PersistentVolume)
-			klog.V(4).Infof("reactor queue: %s", vol.Name)
+			logger.V(4).Info("Reactor queue", "volumeName", vol.Name)
 		case *v1.PersistentVolumeClaim:
 			claim, _ := obj.(*v1.PersistentVolumeClaim)
-			klog.V(4).Infof("reactor queue: %s", claim.Name)
+			logger.V(4).Info("Reactor queue", "PVC", klog.KObj(claim))
 		}
 	}
 
@@ -539,7 +544,7 @@ func (r *VolumeReactor) MarkVolumeAvailable(name string) {
 }
 
 // NewVolumeReactor creates a volume reactor.
-func NewVolumeReactor(client *fake.Clientset, fakeVolumeWatch, fakeClaimWatch *watch.FakeWatcher, errors []ReactorError) *VolumeReactor {
+func NewVolumeReactor(ctx context.Context, client *fake.Clientset, fakeVolumeWatch, fakeClaimWatch *watch.FakeWatcher, errors []ReactorError) *VolumeReactor {
 	reactor := &VolumeReactor{
 		volumes:         make(map[string]*v1.PersistentVolume),
 		claims:          make(map[string]*v1.PersistentVolumeClaim),
@@ -548,13 +553,30 @@ func NewVolumeReactor(client *fake.Clientset, fakeVolumeWatch, fakeClaimWatch *w
 		errors:          errors,
 		watchers:        make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
-	client.AddReactor("create", "persistentvolumes", reactor.React)
-	client.AddReactor("create", "persistentvolumeclaims", reactor.React)
-	client.AddReactor("update", "persistentvolumes", reactor.React)
-	client.AddReactor("update", "persistentvolumeclaims", reactor.React)
-	client.AddReactor("get", "persistentvolumes", reactor.React)
-	client.AddReactor("get", "persistentvolumeclaims", reactor.React)
-	client.AddReactor("delete", "persistentvolumes", reactor.React)
-	client.AddReactor("delete", "persistentvolumeclaims", reactor.React)
+	client.AddReactor("create", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+
+	client.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("update", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("update", "persistentvolumeclaims", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("get", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("delete", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
+	client.AddReactor("delete", "persistentvolumeclaims", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return reactor.React(ctx, action)
+	})
 	return reactor
 }

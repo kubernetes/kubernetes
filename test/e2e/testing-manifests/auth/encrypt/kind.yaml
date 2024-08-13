@@ -1,0 +1,48 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# this containerd config patch sets the registry to the local registry where we push mock kms provider
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+    endpoint = ["http://kind-registry:5000"]
+nodes:
+- role: control-plane
+  extraMounts:
+  - containerPath: /etc/kubernetes/encryption-config.yaml
+    hostPath: test/e2e/testing-manifests/auth/encrypt/encryption-config.yaml
+    readOnly: true
+    propagation: None
+  - containerPath: /etc/kubernetes/manifests/kubernetes-kms.yaml
+    hostPath: staging/src/k8s.io/kms/internal/plugins/_mock/kms.yaml
+    readOnly: true
+    propagation: None
+  - containerPath: /etc/softhsm-config.json
+    hostPath: test/e2e/testing-manifests/auth/encrypt/softhsm-config.json
+    readOnly: true
+    propagation: None
+  kubeadmConfigPatches:
+    - |
+      kind: ClusterConfiguration
+      apiServer:
+        extraArgs:
+          encryption-provider-config: "/etc/kubernetes/encryption-config.yaml"
+          feature-gates: "KMSv2=true"
+          v: "5"
+        extraVolumes:
+        - name: encryption-config
+          hostPath: "/etc/kubernetes/encryption-config.yaml"
+          mountPath: "/etc/kubernetes/encryption-config.yaml"
+          readOnly: true
+          pathType: File
+        - name: sock-path
+          hostPath: "/tmp"
+          mountPath: "/tmp"
+      scheduler:
+        extraArgs:
+          v: "5"
+      controllerManager:
+        extraArgs:
+          v: "5"
+- role: worker
+- role: worker
+- role: worker

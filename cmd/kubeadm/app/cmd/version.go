@@ -23,11 +23,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 // Version provides the version information of kubeadm.
@@ -35,14 +35,15 @@ type Version struct {
 	ClientVersion *apimachineryversion.Info `json:"clientVersion"`
 }
 
-// NewCmdVersion provides the version information of kubeadm.
-func NewCmdVersion(out io.Writer) *cobra.Command {
+// newCmdVersion provides the version information of kubeadm.
+func newCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version of kubeadm",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunVersion(out, cmd)
 		},
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringP("output", "o", "", "Output format; available options are 'yaml', 'json' and 'short'")
 	return cmd

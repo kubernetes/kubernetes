@@ -20,30 +20,41 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
-// NewSimpleResourceFinder builds a super simple ResourceFinder that just iterates over the objects you provided
-func NewSimpleFakeResourceFinder(infos ...*resource.Info) ResourceFinder {
-	return &fakeResourceFinder{
+// NewSimpleFakeResourceFinder builds a super simple ResourceFinder that just iterates over the objects you provided
+func NewSimpleFakeResourceFinder(infos ...*resource.Info) *FakeResourceFinder {
+	return &FakeResourceFinder{
 		Infos: infos,
 	}
 }
 
-type fakeResourceFinder struct {
+func (f *FakeResourceFinder) WithError(err error) *FakeResourceFinder {
+	f.err = err
+	return f
+}
+
+type FakeResourceFinder struct {
 	Infos []*resource.Info
+	err   error
 }
 
 // Do implements the interface
-func (f *fakeResourceFinder) Do() resource.Visitor {
+func (f *FakeResourceFinder) Do() resource.Visitor {
 	return &fakeResourceResult{
 		Infos: f.Infos,
+		err:   f.err,
 	}
 }
 
 type fakeResourceResult struct {
 	Infos []*resource.Info
+	err   error
 }
 
 // Visit just iterates over info
 func (r *fakeResourceResult) Visit(fn resource.VisitorFunc) error {
+	if r.err != nil {
+		return r.err
+	}
 	for _, info := range r.Infos {
 		err := fn(info, nil)
 		if err != nil {

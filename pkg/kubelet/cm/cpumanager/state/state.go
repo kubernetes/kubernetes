@@ -17,7 +17,7 @@ limitations under the License.
 package state
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 // ContainerCPUAssignments type used in cpu manager state
@@ -25,9 +25,9 @@ type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
 
 // Clone returns a copy of ContainerCPUAssignments
 func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
-	ret := make(ContainerCPUAssignments)
+	ret := make(ContainerCPUAssignments, len(as))
 	for pod := range as {
-		ret[pod] = make(map[string]cpuset.CPUSet)
+		ret[pod] = make(map[string]cpuset.CPUSet, len(as[pod]))
 		for container, cset := range as[pod] {
 			ret[pod][container] = cset
 		}

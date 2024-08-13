@@ -24,18 +24,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/clock"
 )
 
 func createLockObject(t *testing.T, objectType, namespace, name string, record *rl.LeaderElectionRecord) (obj runtime.Object) {
@@ -66,11 +68,6 @@ func createLockObject(t *testing.T, objectType, namespace, name string, record *
 	return
 }
 
-// Will test leader election using endpoints as the resource
-func TestTryAcquireOrRenewEndpoints(t *testing.T) {
-	testTryAcquireOrRenew(t, "endpoints")
-}
-
 type Reactor struct {
 	verb       string
 	objectType string
@@ -78,14 +75,17 @@ type Reactor struct {
 }
 
 func testTryAcquireOrRenew(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+	past := clock.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
+		retryAfter     time.Duration
 		reactors       []Reactor
+		expectedEvents []string
 
 		expectSuccess    bool
 		transitionLeader bool
@@ -126,6 +126,33 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+		},
+		{
+			name: "acquire from led object with the lease duration seconds",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			retryAfter:       3 * time.Second,
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
@@ -245,9 +272,10 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			var lock rl.Interface
 
 			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
@@ -259,24 +287,332 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			})
 
 			switch objectType {
-			case "endpoints":
-				lock = &rl.EndpointsLock{
-					EndpointsMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
-			case "configmaps":
-				lock = &rl.ConfigMapLock{
-					ConfigMapMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
 			case "leases":
 				lock = &rl.LeaseLock{
 					LeaseMeta:  objectMeta,
 					LockConfig: resourceLockConfig,
 					Client:     c.CoordinationV1(),
 				}
+			default:
+				t.Fatalf("Unknown objectType: %v", objectType)
+			}
+
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 10 * time.Second,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader: func(l string) {
+						defer wg.Done()
+						reportedLeader = l
+					},
+				},
+			}
+			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
+			le := &LeaderElector{
+				config:            lec,
+				observedRecord:    test.observedRecord,
+				observedRawRecord: observedRawRecord,
+				observedTime:      test.observedTime,
+				clock:             clock,
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
+			}
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+				if test.retryAfter != 0 {
+					time.Sleep(test.retryAfter)
+					if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+						t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+					}
+				} else {
+					t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				}
+			}
+
+			le.observedRecord.AcquireTime = metav1.Time{}
+			le.observedRecord.RenewTime = metav1.Time{}
+			if le.observedRecord.HolderIdentity != test.outHolder {
+				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
+			}
+			if len(test.reactors) != len(c.Actions()) {
+				t.Errorf("wrong number of api interactions")
+			}
+			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+				t.Errorf("leader should have transitioned but did not")
+			}
+			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+				t.Errorf("leader should not have transitioned but did")
+			}
+
+			le.maybeReportTransition()
+			wg.Wait()
+			if reportedLeader != test.outHolder {
+				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
+			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
+		})
+	}
+}
+
+func TestTryCoordinatedRenew(t *testing.T) {
+	objectType := "leases"
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+
+	tests := []struct {
+		name           string
+		observedRecord rl.LeaderElectionRecord
+		observedTime   time.Time
+		retryAfter     time.Duration
+		reactors       []Reactor
+		expectedEvents []string
+
+		expectSuccess    bool
+		transitionLeader bool
+		outHolder        string
+	}{
+		{
+			name: "don't acquire from led, acked object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			expectSuccess: false,
+			outHolder:     "bing",
+		},
+		{
+			name: "renew already acquired object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedTime:   future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
+
+			expectSuccess: true,
+			outHolder:     "baz",
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			// OnNewLeader is called async so we have to wait for it.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			var reportedLeader string
+			var lock rl.Interface
+
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: recorder,
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
+			}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
+
+			lock = &rl.LeaseLock{
+				LeaseMeta:  objectMeta,
+				LockConfig: resourceLockConfig,
+				Client:     c.CoordinationV1(),
+			}
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 10 * time.Second,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader: func(l string) {
+						defer wg.Done()
+						reportedLeader = l
+					},
+				},
+				Coordinated: true,
+			}
+			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
+			le := &LeaderElector{
+				config:            lec,
+				observedRecord:    test.observedRecord,
+				observedRawRecord: observedRawRecord,
+				observedTime:      test.observedTime,
+				clock:             clock,
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
+			}
+			if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+				if test.retryAfter != 0 {
+					time.Sleep(test.retryAfter)
+					if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+						t.Errorf("unexpected result of tryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
+					}
+				} else {
+					t.Errorf("unexpected result of gryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
+				}
+			}
+
+			le.observedRecord.AcquireTime = metav1.Time{}
+			le.observedRecord.RenewTime = metav1.Time{}
+			if le.observedRecord.HolderIdentity != test.outHolder {
+				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
+			}
+			if len(test.reactors) != len(c.Actions()) {
+				t.Errorf("wrong number of api interactions")
+			}
+			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+				t.Errorf("leader should have transitioned but did not")
+			}
+			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+				t.Errorf("leader should not have transitioned but did")
+			}
+
+			le.maybeReportTransition()
+			wg.Wait()
+			if reportedLeader != test.outHolder {
+				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
+			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
+		})
+	}
+}
+
+// Will test leader election using lease as the resource
+func TestTryAcquireOrRenewLeases(t *testing.T) {
+	testTryAcquireOrRenew(t, "leases")
+}
+
+func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
+	holderIdentity := "foo"
+	leaseDurationSeconds := int32(10)
+	leaseTransitions := int32(1)
+	oldSpec := coordinationv1.LeaseSpec{
+		HolderIdentity:       &holderIdentity,
+		LeaseDurationSeconds: &leaseDurationSeconds,
+		AcquireTime:          &metav1.MicroTime{Time: time.Now()},
+		RenewTime:            &metav1.MicroTime{Time: time.Now()},
+		LeaseTransitions:     &leaseTransitions,
+	}
+
+	oldRecord := rl.LeaseSpecToLeaderElectionRecord(&oldSpec)
+	newSpec := rl.LeaderElectionRecordToLeaseSpec(oldRecord)
+
+	if !equality.Semantic.DeepEqual(oldSpec, newSpec) {
+		t.Errorf("diff: %v", cmp.Diff(oldSpec, newSpec))
+	}
+
+	newRecord := rl.LeaseSpecToLeaderElectionRecord(&newSpec)
+
+	if !equality.Semantic.DeepEqual(oldRecord, newRecord) {
+		t.Errorf("diff: %v", cmp.Diff(oldRecord, newRecord))
+	}
+}
+
+func GetRawRecordOrDie(t *testing.T, objectType string, ler rl.LeaderElectionRecord) (ret []byte) {
+	var err error
+	switch objectType {
+	case "leases":
+		ret, err = json.Marshal(ler)
+		if err != nil {
+			t.Fatalf("lock %s get raw record %v failed: %v", objectType, ler, err)
+		}
+	default:
+		t.Fatal("unexpected objType:" + objectType)
+	}
+	return
+}
+
+func testReleaseLease(t *testing.T, objectType string) {
+	tests := []struct {
+		name           string
+		observedRecord rl.LeaderElectionRecord
+		observedTime   time.Time
+		reactors       []Reactor
+		expectedEvents []string
+
+		expectSuccess    bool
+		transitionLeader bool
+		outHolder        string
+	}{
+		{
+			name: "release acquired lock from no object",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+				{
+					verb:       "create",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.UpdateAction).GetObject(), nil
+					},
+				},
+			},
+			expectSuccess: true,
+			outHolder:     "",
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			// OnNewLeader is called async so we have to wait for it.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			var reportedLeader string
+			var lock rl.Interface
+
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: recorder,
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
+			}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
+
+			switch objectType {
+			case "leases":
+				lock = &rl.LeaseLock{
+					LeaseMeta:  objectMeta,
+					LockConfig: resourceLockConfig,
+					Client:     c.CoordinationV1(),
+				}
+			default:
+				t.Fatalf("Unknown objectType: %v", objectType)
 			}
 
 			lec := LeaderElectionConfig{
@@ -296,9 +632,20 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedRawRecord: observedRawRecord,
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
-				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+			if !le.tryAcquireOrRenew(context.Background()) {
+				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", true)
+			}
+
+			le.maybeReportTransition()
+
+			// Wait for a response to the leader transition, and add 1 so that we can track the final transition.
+			wg.Wait()
+			wg.Add(1)
+
+			if test.expectSuccess != le.release() {
+				t.Errorf("unexpected result of release: [succeeded=%v]", !test.expectSuccess)
 			}
 
 			le.observedRecord.AcquireTime = metav1.Time{}
@@ -315,605 +662,457 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
 				t.Errorf("leader should not have transitioned but did")
 			}
-
 			le.maybeReportTransition()
 			wg.Wait()
 			if reportedLeader != test.outHolder {
 				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
 			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
 }
 
-// Will test leader election using configmap as the resource
-func TestTryAcquireOrRenewConfigMaps(t *testing.T) {
-	testTryAcquireOrRenew(t, "configmaps")
+// Will test leader election using endpoints as the resource
+func TestReleaseLeaseLeases(t *testing.T) {
+	testReleaseLease(t, "leases")
 }
 
-// Will test leader election using lease as the resource
-func TestTryAcquireOrRenewLeases(t *testing.T) {
-	testTryAcquireOrRenew(t, "leases")
+func TestReleaseOnCancellation_Leases(t *testing.T) {
+	testReleaseOnCancellation(t, "leases")
 }
 
-func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
-	holderIdentity := "foo"
-	leaseDurationSeconds := int32(10)
-	leaseTransitions := int32(1)
-	oldSpec := coordinationv1.LeaseSpec{
-		HolderIdentity:       &holderIdentity,
-		LeaseDurationSeconds: &leaseDurationSeconds,
-		AcquireTime:          &metav1.MicroTime{time.Now()},
-		RenewTime:            &metav1.MicroTime{time.Now()},
-		LeaseTransitions:     &leaseTransitions,
+func testReleaseOnCancellation(t *testing.T, objectType string) {
+	var (
+		onNewLeader   = make(chan struct{})
+		onRenewCalled = make(chan struct{})
+		onRenewResume = make(chan struct{})
+		onRelease     = make(chan struct{})
+
+		lockObj runtime.Object
+		gets    int
+		updates int
+		wg      sync.WaitGroup
+	)
+	resetVars := func() {
+		onNewLeader = make(chan struct{})
+		onRenewCalled = make(chan struct{})
+		onRenewResume = make(chan struct{})
+		onRelease = make(chan struct{})
+
+		lockObj = nil
+		gets = 0
+		updates = 0
+	}
+	lec := LeaderElectionConfig{
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+
+		// This is what we're testing
+		ReleaseOnCancel: true,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {
+				close(onNewLeader)
+			},
+		},
 	}
 
-	oldRecord := rl.LeaseSpecToLeaderElectionRecord(&oldSpec)
-	newSpec := rl.LeaderElectionRecordToLeaseSpec(oldRecord)
-
-	if !equality.Semantic.DeepEqual(oldSpec, newSpec) {
-		t.Errorf("diff: %v", diff.ObjectReflectDiff(oldSpec, newSpec))
-	}
-
-	newRecord := rl.LeaseSpecToLeaderElectionRecord(&newSpec)
-
-	if !equality.Semantic.DeepEqual(oldRecord, newRecord) {
-		t.Errorf("diff: %v", diff.ObjectReflectDiff(oldRecord, newRecord))
-	}
-}
-
-func multiLockType(t *testing.T, objectType string) (primaryType, secondaryType string) {
-	switch objectType {
-	case rl.EndpointsLeasesResourceLock:
-		return rl.EndpointsResourceLock, rl.LeasesResourceLock
-	case rl.ConfigMapsLeasesResourceLock:
-		return rl.ConfigMapsResourceLock, rl.LeasesResourceLock
-	default:
-		t.Fatal("unexpected objType:" + objectType)
-	}
-	return
-}
-
-func GetRawRecordOrDie(t *testing.T, objectType string, ler rl.LeaderElectionRecord) (ret []byte) {
-	var err error
-	switch objectType {
-	case "endpoints", "configmaps", "leases":
-		ret, err = json.Marshal(ler)
-		if err != nil {
-			t.Fatalf("lock %s get raw record %v failed: %v", objectType, ler, err)
-		}
-	case "endpointsleases", "configmapsleases":
-		recordBytes, err := json.Marshal(ler)
-		if err != nil {
-			t.Fatalf("lock %s get raw record %v failed: %v", objectType, ler, err)
-		}
-		ret = rl.ConcatRawRecord(recordBytes, recordBytes)
-	default:
-		t.Fatal("unexpected objType:" + objectType)
-	}
-	return
-}
-
-func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
-	primaryType, secondaryType := multiLockType(t, objectType)
 	tests := []struct {
-		name              string
-		observedRecord    rl.LeaderElectionRecord
-		observedRawRecord []byte
-		observedTime      time.Time
-		reactors          []Reactor
-
-		expectSuccess    bool
-		transitionLeader bool
-		outHolder        string
+		name           string
+		reactors       []Reactor
+		expectedEvents []string
 	}{
 		{
-			name: "acquire from no object",
+			name: "release acquired lock on cancellation of update",
 			reactors: []Reactor{
 				{
 					verb:       "get",
-					objectType: primaryType,
+					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						gets++
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
 						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
 					},
 				},
 				{
 					verb:       "create",
-					objectType: primaryType,
+					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.CreateAction).GetObject(), nil
+						lockObj = action.(fakeclient.CreateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						// Skip initial two fast path renews
+						if updates%2 == 1 && updates < 5 {
+							return true, nil, context.Canceled
+						}
+
+						// Second update (first renew) should return our canceled error
+						// FakeClient doesn't do anything with the context so we're doing this ourselves
+						if updates == 4 {
+							close(onRenewCalled)
+							<-onRenewResume
+							return true, nil, context.Canceled
+						} else if updates == 5 {
+							// We update the lock after the cancellation to release it
+							// This wg is to avoid the data race on lockObj
+							defer wg.Done()
+							close(onRelease)
+						}
+
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			expectedEvents: []string{
+				"Normal LeaderElection baz became leader",
+				"Normal LeaderElection baz stopped leading",
+			},
+		},
+		{
+			name: "release acquired lock on cancellation of get",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						gets++
+						if lockObj != nil {
+							// Third and more get (first create, second renew) should return our canceled error
+							// FakeClient doesn't do anything with the context so we're doing this ourselves
+							if gets >= 3 {
+								close(onRenewCalled)
+								<-onRenewResume
+								return true, nil, context.Canceled
+							}
+							return true, lockObj, nil
+						}
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
 					},
 				},
 				{
 					verb:       "create",
-					objectType: secondaryType,
+					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.CreateAction).GetObject(), nil
-					},
-				},
-			},
-			expectSuccess: true,
-			outHolder:     "baz",
-		},
-		{
-			name: "acquire from unled old object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+						lockObj = action.(fakeclient.CreateAction).GetObject()
+						return true, lockObj, nil
 					},
 				},
 				{
 					verb:       "update",
-					objectType: primaryType,
+					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
-					},
-				},
-				{
-					verb:       "create",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.CreateAction).GetObject(), nil
-					},
-				},
-			},
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "acquire from unled transition object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-			},
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "acquire from led, unack old object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
-					},
-				},
-				{
-					verb:       "update",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "create",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.CreateAction).GetObject(), nil
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, primaryType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      past,
+						updates++
+						// Always skip fast path renew
+						if updates%2 == 1 {
+							return true, nil, context.Canceled
+						}
+						// Second update (first renew) should release the lock
+						if updates == 4 {
+							// We update the lock after the cancellation to release it
+							// This wg is to avoid the data race on lockObj
+							defer wg.Done()
+							close(onRelease)
+						}
 
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "acquire from led, unack transition object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
 					},
 				},
 			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      past,
-
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "acquire from conflict led, ack transition object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
-					},
-				},
+			expectedEvents: []string{
+				"Normal LeaderElection baz became leader",
+				"Normal LeaderElection baz stopped leading",
 			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      future,
-
-			expectSuccess: false,
-			outHolder:     rl.UnknownLeader,
-		},
-		{
-			name: "acquire from led, unack unknown object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: rl.UnknownLeader}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: rl.UnknownLeader}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: rl.UnknownLeader}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: rl.UnknownLeader},
-			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: rl.UnknownLeader}),
-			observedTime:      past,
-
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "don't acquire from led, ack old object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, primaryType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      future,
-
-			expectSuccess: false,
-			outHolder:     "bing",
-		},
-		{
-			name: "don't acquire from led, acked new object, observe new record",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, secondaryType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      future,
-
-			expectSuccess: false,
-			outHolder:     rl.UnknownLeader,
-		},
-		{
-			name: "don't acquire from led, acked new object, observe transition record",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "bing"}),
-			observedTime:      future,
-
-			expectSuccess: false,
-			outHolder:     "bing",
-		},
-		{
-			name: "renew already required object",
-			reactors: []Reactor{
-				{
-					verb:       "get",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, primaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: primaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-				{
-					verb:       "get",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, secondaryType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
-					},
-				},
-				{
-					verb:       "update",
-					objectType: secondaryType,
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.UpdateAction).GetObject(), nil
-					},
-				},
-			},
-			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
-			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"}),
-			observedTime:      future,
-
-			expectSuccess: true,
-			outHolder:     "baz",
 		},
 	}
 
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			// OnNewLeader is called async so we have to wait for it.
-			var wg sync.WaitGroup
 			wg.Add(1)
-			var reportedLeader string
-			var lock rl.Interface
+			resetVars()
 
-			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
-				c.AddReactor(reactor.verb, reactor.objectType, reactor.reaction)
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
 			}
 			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
 				t.Errorf("unreachable action. testclient called too many times: %+v", action)
 				return true, nil, fmt.Errorf("unreachable action")
 			})
-
-			switch objectType {
-			case rl.EndpointsLeasesResourceLock:
-				lock = &rl.MultiLock{
-					Primary: &rl.EndpointsLock{
-						EndpointsMeta: objectMeta,
-						LockConfig:    resourceLockConfig,
-						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
-						LeaseMeta:  objectMeta,
-						LockConfig: resourceLockConfig,
-						Client:     c.CoordinationV1(),
-					},
-				}
-			case rl.ConfigMapsLeasesResourceLock:
-				lock = &rl.MultiLock{
-					Primary: &rl.ConfigMapLock{
-						ConfigMapMeta: objectMeta,
-						LockConfig:    resourceLockConfig,
-						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
-						LeaseMeta:  objectMeta,
-						LockConfig: resourceLockConfig,
-						Client:     c.CoordinationV1(),
-					},
-				}
+			lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			if err != nil {
+				t.Fatal("resourcelock.New() = ", err)
 			}
 
-			lec := LeaderElectionConfig{
-				Lock:          lock,
-				LeaseDuration: 10 * time.Second,
-				Callbacks: LeaderCallbacks{
-					OnNewLeader: func(l string) {
-						defer wg.Done()
-						reportedLeader = l
-					},
-				},
-			}
-			le := &LeaderElector{
-				config:            lec,
-				observedRecord:    test.observedRecord,
-				observedRawRecord: test.observedRawRecord,
-				observedTime:      test.observedTime,
-				clock:             clock.RealClock{},
-			}
-			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
-				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+			lec.Lock = lock
+			elector, err := NewLeaderElector(lec)
+			if err != nil {
+				t.Fatal("Failed to create leader elector: ", err)
 			}
 
-			le.observedRecord.AcquireTime = metav1.Time{}
-			le.observedRecord.RenewTime = metav1.Time{}
-			if le.observedRecord.HolderIdentity != test.outHolder {
-				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
-			}
-			if len(test.reactors) != len(c.Actions()) {
-				t.Errorf("wrong number of api interactions")
-			}
-			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
-				t.Errorf("leader should have transitioned but did not")
-			}
-			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
-				t.Errorf("leader should not have transitioned but did")
+			ctx, cancel := context.WithCancel(context.Background())
+
+			go elector.Run(ctx)
+
+			// Wait for us to become the leader
+			select {
+			case <-onNewLeader:
+			case <-time.After(10 * time.Second):
+				t.Fatal("failed to become the leader")
 			}
 
-			le.maybeReportTransition()
+			// Wait for renew (update) to be invoked
+			select {
+			case <-onRenewCalled:
+			case <-time.After(10 * time.Second):
+				t.Fatal("the elector failed to renew the lock")
+			}
+
+			// Cancel the context - stopping the elector while
+			// it's running
+			cancel()
+
+			// Resume the tryAcquireOrRenew call to return the cancellation
+			// which should trigger the release flow
+			close(onRenewResume)
+
+			select {
+			case <-onRelease:
+			case <-time.After(10 * time.Second):
+				t.Fatal("the lock was not released")
+			}
 			wg.Wait()
-			if reportedLeader != test.outHolder {
-				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
-			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
 }
 
-// Will test leader election using endpointsleases as the resource
-func TestTryAcquireOrRenewEndpointsLeases(t *testing.T) {
-	testTryAcquireOrRenewMultiLock(t, "endpointsleases")
+func TestLeaderElectionConfigValidation(t *testing.T) {
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity: "baz",
+	}
+
+	lock := &rl.LeaseLock{
+		LockConfig: resourceLockConfig,
+	}
+
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+
+		ReleaseOnCancel: true,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {},
+		},
+	}
+
+	_, err := NewLeaderElector(lec)
+	assert.NoError(t, err)
+
+	// Invalid lock identity
+	resourceLockConfig.Identity = ""
+	lock.LockConfig = resourceLockConfig
+	lec.Lock = lock
+	_, err = NewLeaderElector(lec)
+	assert.Error(t, err, fmt.Errorf("Lock identity is empty"))
 }
 
-// Will test leader election using configmapsleases as the resource
-func TestTryAcquireOrRenewConfigMapsLeases(t *testing.T) {
-	testTryAcquireOrRenewMultiLock(t, "configmapsleases")
+func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
+	c := time.After(wait.ForeverTestTimeout)
+	for _, e := range expected {
+		select {
+		case a := <-actual:
+			if e != a {
+				t.Errorf("Expected event %q, got %q", e, a)
+				return
+			}
+		case <-c:
+			t.Errorf("Expected event %q, got nothing", e)
+			// continue iterating to print all expected events
+		}
+	}
+	for {
+		select {
+		case a := <-actual:
+			t.Errorf("Unexpected event: %q", a)
+		default:
+			return // No more events, as expected.
+		}
+	}
+}
+
+func TestFastPathLeaderElection(t *testing.T) {
+	objectType := "leases"
+	var (
+		lockObj    runtime.Object
+		updates    int
+		lockOps    []string
+		cancelFunc func()
+	)
+	resetVars := func() {
+		lockObj = nil
+		updates = 0
+		lockOps = []string{}
+		cancelFunc = nil
+	}
+	lec := LeaderElectionConfig{
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		reactors        []Reactor
+		expectedLockOps []string
+	}{
+		{
+			name: "Exercise fast path after lock acquired",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+				{
+					verb:       "create",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "create")
+						lockObj = action.(fakeclient.CreateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						if updates == 2 {
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			expectedLockOps: []string{"get", "create", "update", "update"},
+		},
+		{
+			name: "Fallback to slow path after fast path fails",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+				{
+					verb:       "create",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "create")
+						lockObj = action.(fakeclient.CreateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						switch updates {
+						case 2:
+							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "fake conflict", nil)
+						case 4:
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			expectedLockOps: []string{"get", "create", "update", "update", "get", "update", "update"},
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			resetVars()
+
+			recorder := record.NewFakeRecorder(100)
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: recorder,
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
+			}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
+			lock, err := rl.New("leases", "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			if err != nil {
+				t.Fatal("resourcelock.New() = ", err)
+			}
+
+			lec.Lock = lock
+			elector, err := NewLeaderElector(lec)
+			if err != nil {
+				t.Fatal("Failed to create leader elector: ", err)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancelFunc = cancel
+
+			elector.Run(ctx)
+			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+		})
+	}
 }

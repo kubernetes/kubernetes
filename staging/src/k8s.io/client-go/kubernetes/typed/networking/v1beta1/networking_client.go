@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"net/http"
+
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -26,13 +28,19 @@ import (
 
 type NetworkingV1beta1Interface interface {
 	RESTClient() rest.Interface
+	IPAddressesGetter
 	IngressesGetter
 	IngressClassesGetter
+	ServiceCIDRsGetter
 }
 
 // NetworkingV1beta1Client is used to interact with features provided by the networking.k8s.io group.
 type NetworkingV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *NetworkingV1beta1Client) IPAddresses() IPAddressInterface {
+	return newIPAddresses(c)
 }
 
 func (c *NetworkingV1beta1Client) Ingresses(namespace string) IngressInterface {
@@ -43,13 +51,33 @@ func (c *NetworkingV1beta1Client) IngressClasses() IngressClassInterface {
 	return newIngressClasses(c)
 }
 
+func (c *NetworkingV1beta1Client) ServiceCIDRs() ServiceCIDRInterface {
+	return newServiceCIDRs(c)
+}
+
 // NewForConfig creates a new NetworkingV1beta1Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*NetworkingV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	httpClient, err := rest.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+
+// NewForConfigAndClient creates a new NetworkingV1beta1Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*NetworkingV1beta1Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}

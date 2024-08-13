@@ -18,8 +18,11 @@ package node
 
 import (
 	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
@@ -111,10 +114,12 @@ type vertexType byte
 
 const (
 	configMapVertexType vertexType = iota
+	sliceVertexType
 	nodeVertexType
 	podVertexType
 	pvcVertexType
 	pvVertexType
+	resourceClaimVertexType
 	secretVertexType
 	vaVertexType
 	serviceAccountVertexType
@@ -122,10 +127,12 @@ const (
 
 var vertexTypes = map[vertexType]string{
 	configMapVertexType:      "configmap",
+	sliceVertexType:          "resourceslice",
 	nodeVertexType:           "node",
 	podVertexType:            "pod",
 	pvcVertexType:            "pvc",
 	pvVertexType:             "pv",
+	resourceClaimVertexType:  "resourceclaim",
 	secretVertexType:         "secret",
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
@@ -325,13 +332,16 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 // AddPod should only be called once spec.NodeName is populated.
 // It sets up edges for the following relationships (which are immutable for a pod once bound to a node):
 //
-//   pod -> node
-//
-//   secret    -> pod
-//   configmap -> pod
-//   pvc       -> pod
-//   svcacct   -> pod
+//	pod       -> node
+//	secret    -> pod
+//	configmap -> pod
+//	pvc       -> pod
+//	svcacct   -> pod
 func (g *Graph) AddPod(pod *corev1.Pod) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddPod").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -375,15 +385,39 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	})
 
 	for _, v := range pod.Spec.Volumes {
+		claimName := ""
 		if v.PersistentVolumeClaim != nil {
-			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			claimName = v.PersistentVolumeClaim.ClaimName
+		} else if v.Ephemeral != nil {
+			claimName = ephemeral.VolumeClaimName(pod, &v)
+		}
+		if claimName != "" {
+			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, claimName)
 			e := newDestinationEdge(pvcVertex, podVertex, nodeVertex)
+			g.graph.SetEdge(e)
+			g.addEdgeToDestinationIndex_locked(e)
+		}
+	}
+
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
+		// Do we have a valid claim name? If yes, add an edge that grants
+		// kubelet access to that claim. An error indicates that a claim
+		// still needs to be created, nil that intentionally no claim
+		// was created and never will be because it isn't needed.
+		if err == nil && claimName != nil {
+			claimVertex := g.getOrCreateVertex_locked(resourceClaimVertexType, pod.Namespace, *claimName)
+			e := newDestinationEdge(claimVertex, podVertex, nodeVertex)
 			g.graph.SetEdge(e)
 			g.addEdgeToDestinationIndex_locked(e)
 		}
 	}
 }
 func (g *Graph) DeletePod(name, namespace string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeletePod").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(podVertexType, namespace, name)
@@ -391,10 +425,14 @@ func (g *Graph) DeletePod(name, namespace string) {
 
 // AddPV sets up edges for the following relationships:
 //
-//   secret -> pv
+//	secret -> pv
 //
-//   pv -> pvc
+//	pv -> pvc
 func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddPV").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -417,6 +455,10 @@ func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	}
 }
 func (g *Graph) DeletePV(name string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeletePV").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(pvVertexType, "", name)
@@ -424,8 +466,12 @@ func (g *Graph) DeletePV(name string) {
 
 // AddVolumeAttachment sets up edges for the following relationships:
 //
-//   volume attachment -> node
+//	volume attachment -> node
 func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddVolumeAttachment").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -440,31 +486,42 @@ func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
 	}
 }
 func (g *Graph) DeleteVolumeAttachment(name string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteVolumeAttachment").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(vaVertexType, "", name)
 }
 
-// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMap relationship:
+// AddResourceSlice sets up edges for the following relationships:
 //
-// configmap -> node
-func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace string) {
+//	node resource slice -> node
+func (g *Graph) AddResourceSlice(sliceName, nodeName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddResourceSlice").Observe(time.Since(start).Seconds())
+	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	// TODO(mtaufen): ensure len(nodeName) > 0 in all cases (would sure be nice to have a dependently-typed language here...)
+	// clear existing edges
+	g.deleteVertex_locked(sliceVertexType, "", sliceName)
 
-	// clear edges configmaps -> node where the destination is the current node *only*
-	// at present, a node can only have one *direct* configmap reference at a time
-	g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
-
-	// establish new edges if we have a real ConfigMap to reference
-	if len(configMapName) > 0 && len(configMapNamespace) > 0 {
-		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
+	// if we have a node, establish new edges
+	if len(nodeName) > 0 {
+		sliceVertex := g.getOrCreateVertex_locked(sliceVertexType, "", sliceName)
 		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
-		e := newDestinationEdge(configmapVertex, nodeVertex, nodeVertex)
-		g.graph.SetEdge(e)
-		g.addEdgeToDestinationIndex_locked(e)
+		g.graph.SetEdge(newDestinationEdge(sliceVertex, nodeVertex, nodeVertex))
 	}
-
+}
+func (g *Graph) DeleteResourceSlice(sliceName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteResourceSlice").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertex_locked(sliceVertexType, "", sliceName)
 }

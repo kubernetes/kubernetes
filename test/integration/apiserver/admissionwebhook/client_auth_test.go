@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,10 +31,11 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -84,13 +85,13 @@ func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
 		t.Fatal(err)
 	}
 
-	kubeConfigFile, err := ioutil.TempFile("", "admission-config.yaml")
+	kubeConfigFile, err := os.CreateTemp("", "admission-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(kubeConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, kubeConfigFile)
 
-	if err := ioutil.WriteFile(kubeConfigFile.Name(), []byte(`
+	if err := os.WriteFile(kubeConfigFile.Name(), []byte(`
 apiVersion: v1
 kind: Config
 users:
@@ -110,13 +111,13 @@ users:
 		t.Fatal(err)
 	}
 
-	admissionConfigFile, err := ioutil.TempFile("", "admission-config.yaml")
+	admissionConfigFile, err := os.CreateTemp("", "admission-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(admissionConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, admissionConfigFile)
 
-	if err := ioutil.WriteFile(admissionConfigFile.Name(), []byte(`
+	if err := os.WriteFile(admissionConfigFile.Name(), []byte(`
 apiVersion: apiserver.k8s.io/v1alpha1
 kind: AdmissionConfiguration
 plugins:
@@ -160,33 +161,34 @@ plugins:
 
 	upCh := recorder.Reset()
 	ns := "load-balance"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fail := admissionv1beta1.Fail
-	mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+	fail := admissionregistrationv1.Fail
+	mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
-		Webhooks: []admissionv1beta1.MutatingWebhook{{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{{
 			Name: "admission.integration.test",
-			ClientConfig: admissionv1beta1.WebhookClientConfig{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &webhookServer.URL,
 				CABundle: localhostCert,
 			},
-			Rules: []admissionv1beta1.RuleWithOperations{{
-				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-				Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 			}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
+			SideEffects:             &noSideEffects,
 		}},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
+		err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -246,7 +248,7 @@ func newClientAuthWebhookHandler(t *testing.T, recorder *clientAuthRecorder) htt
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
@@ -292,7 +294,7 @@ var clientAuthMarkerFixture = &corev1.Pod{
 		Name:      "marker",
 	},
 	Spec: corev1.PodSpec{
-		Containers: []v1.Container{{
+		Containers: []corev1.Container{{
 			Name:  "fake-name",
 			Image: "fakeimage",
 		}},

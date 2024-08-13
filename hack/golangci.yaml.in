@@ -1,0 +1,224 @@
+# golangci-lint is used in Kubernetes with different configurations that
+# enable an increasing amount of checks:
+# - golangci.yaml is the most permissive configuration. All existing code
+#   passed.
+# - golangci-strict.yaml adds checks that all new code in pull requests
+#   must pass.
+# - golangci-hints.yaml adds checks for code patterns where developer
+#   and reviewer may decide whether findings should get addressed before
+#   merging. Beware that the golangci-lint output includes also the
+#   issues that must be fixed and doesn't indicate how severe each issue
+#   is (https://gophers.slack.com/archives/CS0TBRKPC/p1685721815275349).
+#
+# All three flavors are generated from golangci.yaml.in with
+# hack/update-golangci-lint-config.sh.
+
+run:
+  timeout: 30m
+  skip-files:
+    - "^zz_generated.*"
+
+output:
+  sort-results: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # The default excludes disable the "should have comment or be unexported" check from revive.
+  # We want that to be enabled, therefore we have to disable all default excludes and
+  # add those back one-by-one that we want. See https://github.com/golangci/golangci-lint/issues/456#issuecomment-617470264
+  exclude-use-default: false
+  exclude:
+    # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+    - ineffective break statement. Did you mean to break out of the outer loop
+
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # exclude ineffassign linter for generated files for conversion
+    - path: conversion\.go
+      linters:
+        - ineffassign
+
+    # SSA Extract calls are allowed in tests.
+    - linters:
+        - forbidigo
+      text: should not be used because managedFields was removed
+      path: _test.go$
+
+    {{- if .Base}}
+
+    # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
+    # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+    - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+      linters:
+        - gocritic
+    {{- end}}
+
+    # The Kubernetes naming convention for conversion functions uses underscores
+    # and intentionally deviates from normal Go conventions to make those function
+    # names more readable. Same for SetDefaults_*.
+    #
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
+    - linters:
+        - stylecheck
+        - revive
+      text: "(ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+
+    # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
+    - linters:
+       - ginkgolinter
+      text: use a function call in (Eventually|Consistently)
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
+    - linters:
+        - gocritic
+      text: "ifElseChain: rewrite if-else to switch statement"
+
+    # Only packages listed here opt into the strict "exported symbols must be documented".
+    #
+    # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
+    - linters:
+        - golint
+        - revive
+        - stylecheck
+      text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
+      path-except: cmd/kubeadm
+
+    {{- if not .Hints}}
+
+    # The following issues were deemed "might be worth fixing, needs to be
+    # decided on a case-by-case basis".  This was initially decided by a
+    # majority of the developers who voted in
+    # https://github.com/kubernetes/kubernetes/issues/117288 and may evolve
+    # over time.
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
+    - linters:
+        - gocritic
+      text: "assignOp:"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507016854
+    - linters:
+        - gosimple
+      text: "S1002: should omit comparison to bool constant"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507023980
+    - linters:
+        - gosimple
+      text: "S1016: should convert opts .* instead of using struct literal"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507026758
+    - linters:
+        - gosimple
+      text: "S1033: unnecessary guard around call to delete"
+
+    # Didn't make it into https://github.com/kubernetes/kubernetes/issues/117288.
+    # Discussion on Slack concluded that "it's hard to have a universal policy for all
+    # functions marked deprecated" and thus this can only be a hint which must
+    # be considered on a case-by-case basis.
+    - linters:
+        - staticcheck
+      text: "SA1019: .*is deprecated"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507030071
+    - linters:
+        - stylecheck
+      text: "ST1012: error var .* should have name of the form ErrFoo"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507031224
+    - linters:
+        - stylecheck
+      text: "ST1023: should omit type .* from declaration; it will be inferred from the right-hand side"
+    {{- end}}
+
+linters:
+  disable-all: {{if .Base -}} true {{- else -}} false {{- end}}
+  enable: # please keep this alphabetized
+    - forbidigo
+    - ginkgolinter
+    - gocritic
+    - govet
+    {{- if .Hints}}
+    - errorlint
+    {{- end}}
+    - ineffassign
+    - logcheck
+    - revive
+    - staticcheck
+    - stylecheck
+    - testifylint
+    - unused
+  {{- if .Strict}}
+  disable:
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
+    - errcheck
+  {{- end}}
+
+linters-settings: # please keep this alphabetized
+  custom:
+    logcheck:
+      # Installed there by hack/verify-golangci-lint.sh.
+      path: ../_output/local/bin/logcheck.so
+      description: structured logging checker
+      original-url: k8s.io/logtools/logcheck
+      settings:
+        config: |
+          {{include "hack/logcheck.conf" | indent 10 | trim}}
+  forbidigo:
+    analyze-types: true
+    forbid:
+    - p: ^managedfields\.ExtractInto$
+      pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
+      msg: should not be used because managedFields was removed
+    - p: \.Extract
+      pkg: ^k8s\.io/client-go/applyconfigurations/
+      msg: should not be used because managedFields was removed
+    {{- if .Hints}}
+    - p: ^gomega\.BeTrue$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    - p: ^gomega\.BeFalse$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    {{- end}}
+  {{- if .Base }}
+  gocritic:
+    enabled-checks:
+      - equalFold
+      - boolExprSimplify
+  {{- end}}
+  revive:
+    # Only these rules are enabled.
+    rules:
+      - name: exported
+        arguments:
+        - disableStutteringCheck
+  staticcheck:
+    checks:
+      - "all"
+      {{- if .Base }}
+      - "-SA1019"  # TODO(fix) Using a deprecated function, variable, constant or field
+      - "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+      - "-SA1006"  # TODO(fix) Using a printf-style function with a dynamic format string and no arguments can just use a print-style func
+      {{- end}}
+  {{- if .Base }}
+  stylecheck:
+    checks:
+      - "ST1019"   # Importing the same package multiple times
+  {{- end}}
+  testifylint:
+    enable-all: true
+    {{- if .Base}}
+    disable:  # TODO: remove each disabled rule and fix it
+      - blank-import
+      - compares
+      - error-is-as
+      - error-nil
+      - expected-actual
+      - float-compare
+      - go-require
+      - nil-compare
+      - require-error
+    {{- end}}

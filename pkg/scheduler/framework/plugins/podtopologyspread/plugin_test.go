@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,137 +17,299 @@ limitations under the License.
 package podtopologyspread
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestNew(t *testing.T) {
-	cases := []struct {
-		name    string
-		args    config.PodTopologySpreadArgs
-		wantErr string
+func Test_isSchedulableAfterNodeChange(t *testing.T) {
+	testcases := []struct {
+		name             string
+		pod              *v1.Pod
+		oldNode, newNode *v1.Node
+		expectedHint     framework.QueueingHint
+		expectedErr      bool
 	}{
-		{name: "empty args"},
 		{
-			name: "valid constraints",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           1,
-						TopologyKey:       "node",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-					{
-						MaxSkew:           5,
-						TopologyKey:       "zone",
-						WhenUnsatisfiable: v1.DoNotSchedule,
-					},
-				},
-			},
+			name: "node updates label which matches topologyKey",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone2").Obj(),
+			expectedHint: framework.Queue,
 		},
 		{
-			name: "repeated constraints",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           1,
-						TopologyKey:       "node",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-					{
-						MaxSkew:           5,
-						TopologyKey:       "node",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-				},
-			},
-			wantErr: "Duplicate value",
+			name: "node that doesn't match topologySpreadConstraints updates non-related label",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("foo", "bar1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("foo", "bar2").Obj(),
+			expectedHint: framework.QueueSkip,
 		},
 		{
-			name: "unknown whenUnsatisfiable",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           1,
-						TopologyKey:       "node",
-						WhenUnsatisfiable: "Unknown",
-					},
-				},
-			},
-			wantErr: "Unsupported value",
+			name: "node that match topologySpreadConstraints adds non-related label",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Label("foo", "bar").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
+			expectedHint: framework.Queue,
 		},
 		{
-			name: "negative maxSkew",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           -1,
-						TopologyKey:       "node",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-				},
-			},
-			wantErr: "must be greater than zero",
+			name: "create node with non-related labels",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("foo", "bar").Obj(),
+			expectedHint: framework.QueueSkip,
 		},
 		{
-			name: "empty topologyKey",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           1,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-				},
-			},
-			wantErr: "can not be empty",
+			name: "create node with related labels",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.Queue,
 		},
 		{
-			name: "with label selector",
-			args: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           1,
-						TopologyKey:       "rack",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			wantErr: "constraint must not define a selector",
+			name: "delete node with non-related labels",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("foo", "bar").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "delete node with related labels",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "add node with related labels that only match one of topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "add node with related labels that match all topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "update node with related labels that only match one of topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "update node with related labels that match all topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node2").Obj(),
+			expectedHint: framework.Queue,
 		},
 	}
-	for _, tc := range cases {
+
+	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
-			f, err := framework.NewFramework(nil, nil, nil,
-				framework.WithSnapshotSharedLister(cache.NewSnapshot(nil, nil)),
-				framework.WithInformerFactory(informerFactory),
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = New(&tc.args, f)
-			if len(tc.wantErr) != 0 {
-				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
-					t.Errorf("must fail, got error %q, want %q", err, tc.wantErr)
-				}
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := cache.NewSnapshot(nil, nil)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			actualHint, err := p.isSchedulableAfterNodeChange(logger, tc.pod, tc.oldNode, tc.newNode)
+			if tc.expectedErr {
+				require.Error(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodChange(t *testing.T) {
+	testcases := []struct {
+		name           string
+		pod            *v1.Pod
+		oldPod, newPod *v1.Pod
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		{
+			name: "add pod with labels match topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "add un-scheduled pod",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().Label("foo", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "update un-scheduled pod",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().Label("foo", "").Obj(),
+			oldPod:       st.MakePod().Label("bar", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "delete un-scheduled pod",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Label("foo", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "add pod with different namespace",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().Node("fake-node").Namespace("fake-namespace").Label("foo", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "add pod with labels don't match topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("bar", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "delete pod with labels that match topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "delete pod with labels that don't match topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("bar", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "update pod's non-related label",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar1").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "add pod's label that matches topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "delete pod label that matches topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "change pod's label that matches topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "foo1").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "foo2").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "change pod's label that doesn't match topologySpreadConstraints selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar1").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "add pod's label that matches topologySpreadConstraints selector with multi topologySpreadConstraints",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "change pod's label that doesn't match topologySpreadConstraints selector with multi topologySpreadConstraints",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("baz", "").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "change pod's label that match topologySpreadConstraints selector with multi topologySpreadConstraints",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := cache.NewSnapshot(nil, nil)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
 }

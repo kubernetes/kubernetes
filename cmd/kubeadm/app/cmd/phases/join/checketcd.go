@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 )
@@ -60,10 +61,10 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 	// Checks that the etcd cluster is healthy
 	// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
 	//     for connecting to etcd already in place
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return err
 	}
 
-	return etcdphase.CheckLocalEtcdClusterStatus(client, &cfg.ClusterConfiguration)
+	return etcdphase.CheckLocalEtcdClusterStatus(client, data.CertificateWriteDir())
 }

@@ -18,7 +18,7 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -56,7 +57,7 @@ func TestSetEnvLocal(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 	outputFormat := "name"
 
-	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -71,7 +72,7 @@ func TestSetEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -79,7 +80,7 @@ func TestSetEnvLocal(t *testing.T) {
 }
 
 func TestSetEnvLocalNamespace(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -93,7 +94,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 	outputFormat := "yaml"
 
-	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -108,7 +109,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	if !strings.Contains(buf.String(), "namespace: existing-ns") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -130,7 +131,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
-	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -145,7 +146,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
@@ -435,16 +436,20 @@ func TestSetEnvRemote(t *testing.T) {
 			args:         []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
-			name: "test batchv1 Job",
-			object: &batchv1.Job{
+			name: "set image batchv1 CronJob",
+			object: &batchv1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{
+											Name:  "nginx",
+											Image: "nginx",
+										},
+									},
 								},
 							},
 						},
@@ -452,8 +457,8 @@ func TestSetEnvRemote(t *testing.T) {
 				},
 			},
 			groupVersion: batchv1.SchemeGroupVersion,
-			path:         "/namespaces/test/jobs/nginx",
-			args:         []string{"job", "nginx", "env=prod"},
+			path:         "/namespaces/test/cronjobs/nginx",
+			args:         []string{"cronjob", "nginx", "env=prod"},
 		},
 		{
 			name: "test corev1 replication controller",
@@ -494,7 +499,7 @@ func TestSetEnvRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -508,7 +513,7 @@ func TestSetEnvRemote(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-			streams := genericclioptions.NewTestIOStreamsDiscard()
+			streams := genericiooptions.NewTestIOStreamsDiscard()
 			opts := NewEnvOptions(streams)
 			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 			opts.Local = false
@@ -531,12 +536,30 @@ func TestSetEnvFromResource(t *testing.T) {
 		},
 	}
 
+	mockConfigMapUpperCaseKey := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "testconfigmapuppercasekey"},
+		Data: map[string]string{
+			"ENV":          "prod",
+			"TEST_KEY":     "testValue",
+			"TEST_KEY_TWO": "testValueTwo",
+		},
+	}
+
 	mockSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "testsecret"},
 		Data: map[string][]byte{
 			"env":          []byte("prod"),
 			"test-key":     []byte("testValue"),
 			"test-key-two": []byte("testValueTwo"),
+		},
+	}
+
+	mockSecretUpperCaseKey := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "testsecretuppercasekey"},
+		Data: map[string][]byte{
+			"ENV":          []byte("prod"),
+			"TEST_KEY":     []byte("testValue"),
+			"TEST_KEY_TWO": []byte("testValueTwo"),
 		},
 	}
 
@@ -547,6 +570,7 @@ func TestSetEnvFromResource(t *testing.T) {
 		keys           []string
 		assertIncludes []string
 		assertExcludes []string
+		warning        bool
 	}{
 		{
 			name: "test from configmap",
@@ -559,6 +583,20 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
 			},
 			assertExcludes: []string{},
+			warning:        true,
+		},
+		{
+			name: "test from configmap with upper case key",
+			args: []string{"deployment", "nginx"},
+			from: "configmap/testconfigmapuppercasekey",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"ENV","name":"testconfigmapuppercasekey"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"TEST_KEY","name":"testconfigmapuppercasekey"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"TEST_KEY_TWO","name":"testconfigmapuppercasekey"}}}`,
+			},
+			assertExcludes: []string{},
+			warning:        false,
 		},
 		{
 			name: "test from secret",
@@ -571,6 +609,20 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
 			},
 			assertExcludes: []string{},
+			warning:        true,
+		},
+		{
+			name: "test from secret with upper case key",
+			args: []string{"deployment", "nginx"},
+			from: "secret/testsecretuppercasekey",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"secretKeyRef":{"key":"ENV","name":"testsecretuppercasekey"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"TEST_KEY","name":"testsecretuppercasekey"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"TEST_KEY_TWO","name":"testsecretuppercasekey"}}}`,
+			},
+			assertExcludes: []string{},
+			warning:        false,
 		},
 		{
 			name: "test from configmap with keys",
@@ -582,6 +634,7 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
 			},
 			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"test-key","name":"testconfigmap"}}}`},
+			warning:        true,
 		},
 		{
 			name: "test from secret with keys",
@@ -593,6 +646,7 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
 			},
 			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"test-key","name":"testsecret"}}}`},
+			warning:        true,
 		},
 	}
 
@@ -624,8 +678,12 @@ func TestSetEnvFromResource(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMap)}, nil
+					case p == "/namespaces/test/configmaps/testconfigmapuppercasekey" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMapUpperCaseKey)}, nil
 					case p == "/namespaces/test/secrets/testsecret" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecret)}, nil
+					case p == "/namespaces/test/secrets/testsecretuppercasekey" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecretUpperCaseKey)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodPatch:
@@ -633,7 +691,7 @@ func TestSetEnvFromResource(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -652,7 +710,7 @@ func TestSetEnvFromResource(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-			streams := genericclioptions.NewTestIOStreamsDiscard()
+			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
 			opts := NewEnvOptions(streams)
 			opts.From = input.from
 			opts.Keys = input.keys
@@ -662,7 +720,140 @@ func TestSetEnvFromResource(t *testing.T) {
 			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
 			assert.NoError(t, err)
 			err = opts.RunEnv()
+			if input.warning {
+				assert.Contains(t, errOut.String(), "Warning")
+			} else {
+				assert.NotContains(t, errOut.String(), "Warning")
+			}
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
+	inputs := []struct {
+		name     string
+		args     []string
+		selector string
+
+		expectedContainers int
+	}{
+		{
+			name:               "all containers",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "*",
+			expectedContainers: 2,
+		},
+		{
+			name:               "use wildcards to select some containers",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "red*",
+			expectedContainers: 1,
+		},
+		{
+			name:               "single container",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "redis",
+			expectedContainers: 1,
+		},
+	}
+
+	for _, input := range inputs {
+		mockDeployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "redis",
+				Namespace: "test",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{
+							{
+								Name:  "init",
+								Image: "redis",
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "redis",
+								Image: "redis",
+							},
+						},
+					},
+				},
+			},
+		}
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := io.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						updated := strings.Count(string(bytes), `"value":`+`"`+"prod"+`"`)
+						if updated != input.expectedContainers {
+							t.Errorf("expected %d containers to be selected but got %d \n", input.expectedContainers, updated)
+						}
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %#v\n%#v", input.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			streams := genericiooptions.NewTestIOStreamsDiscard()
+			opts := &EnvOptions{
+				PrintFlags:        genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml").WithTypeSetter(scheme.Scheme),
+				ContainerSelector: input.selector,
+				Overwrite:         true,
+				IOStreams:         streams,
+			}
+			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
+			assert.NoError(t, err)
+			err = opts.RunEnv()
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSetEnvDoubleStdinUsage(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+
+	streams, bufIn, _, _ := genericiooptions.NewTestIOStreams()
+	bufIn.WriteString("SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL")
+	opts := NewEnvOptions(streams)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"-"},
+	}
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"-"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.ErrorIs(t, err, resource.StdinMultiUseError)
 }

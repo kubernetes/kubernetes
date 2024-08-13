@@ -17,11 +17,15 @@ limitations under the License.
 package componentstatus
 
 import (
+	"context"
 	"crypto/tls"
+	"fmt"
 	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
 )
@@ -32,7 +36,11 @@ const (
 
 type ValidatorFn func([]byte) error
 
-type Server struct {
+type Server interface {
+	DoServerCheck() (probe.Result, string, error)
+}
+
+type HttpServer struct {
 	Addr        string
 	Port        int
 	Path        string
@@ -56,7 +64,7 @@ type ServerStatus struct {
 	Err string `json:"err,omitempty"`
 }
 
-func (server *Server) DoServerCheck() (probe.Result, string, error) {
+func (server *HttpServer) DoServerCheck() (probe.Result, string, error) {
 	// setup the prober
 	server.Once.Do(func() {
 		if server.Prober != nil {
@@ -72,18 +80,42 @@ func (server *Server) DoServerCheck() (probe.Result, string, error) {
 	}
 	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
-	result, data, err := server.Prober.Probe(url, nil, probeTimeOut)
+	req, err := httpprober.NewProbeRequest(url, nil)
+	if err != nil {
+		return probe.Unknown, "", fmt.Errorf("failed to construct probe request: %w", err)
+	}
+	result, data, err := server.Prober.Probe(req, probeTimeOut)
 
 	if err != nil {
 		return probe.Unknown, "", err
 	}
 	if result == probe.Failure {
-		return probe.Failure, string(data), err
+		return probe.Failure, data, err
 	}
 	if server.Validate != nil {
 		if err := server.Validate([]byte(data)); err != nil {
-			return probe.Failure, string(data), err
+			return probe.Failure, data, err
 		}
 	}
-	return result, string(data), nil
+	return result, data, nil
+}
+
+type EtcdServer struct {
+	storagebackend.Config
+}
+
+func (server *EtcdServer) DoServerCheck() (probe.Result, string, error) {
+	prober, err := factory.CreateProber(server.Config)
+	if err != nil {
+		return probe.Failure, "", err
+	}
+	defer prober.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeOut)
+	defer cancel()
+	err = prober.Probe(ctx)
+	if err != nil {
+		return probe.Failure, "", err
+	}
+	return probe.Success, "ok", err
 }

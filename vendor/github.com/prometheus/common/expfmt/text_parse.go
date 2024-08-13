@@ -16,6 +16,7 @@ package expfmt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -24,7 +25,8 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/prometheus/common/model"
 )
 
@@ -112,7 +114,7 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 	// stream. Turn this error into something nicer and more
 	// meaningful. (io.EOF is often used as a signal for the legitimate end
 	// of an input stream.)
-	if p.err == io.EOF {
+	if p.err != nil && errors.Is(p.err, io.EOF) {
 		p.parseError("unexpected end of input stream")
 	}
 	return p.metricFamiliesByName, p.err
@@ -142,9 +144,13 @@ func (p *TextParser) reset(in io.Reader) {
 func (p *TextParser) startOfLine() stateFn {
 	p.lineCount++
 	if p.skipBlankTab(); p.err != nil {
-		// End of input reached. This is the only case where
-		// that is not an error but a signal that we are done.
-		p.err = nil
+		// This is the only place that we expect to see io.EOF,
+		// which is not an error but the signal that we are done.
+		// Any other error that happens to align with the start of
+		// a line is still an error.
+		if errors.Is(p.err, io.EOF) {
+			p.err = nil
+		}
 		return nil
 	}
 	switch p.currentByte {
@@ -298,6 +304,17 @@ func (p *TextParser) startLabelName() stateFn {
 	if p.currentByte != '=' {
 		p.parseError(fmt.Sprintf("expected '=' after label name, found %q", p.currentByte))
 		return nil
+	}
+	// Check for duplicate label names.
+	labels := make(map[string]struct{})
+	for _, l := range p.currentMetric.Label {
+		lName := l.GetName()
+		if _, exists := labels[lName]; !exists {
+			labels[lName] = struct{}{}
+		} else {
+			p.parseError(fmt.Sprintf("duplicate label names for metric %q", p.currentMF.GetName()))
+			return nil
+		}
 	}
 	return p.startLabelValue
 }

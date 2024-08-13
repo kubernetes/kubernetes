@@ -34,6 +34,7 @@ type EventExpansion interface {
 	CreateWithEventNamespace(event *v1.Event) (*v1.Event, error)
 	// UpdateWithEventNamespace is the same as a Update, except that it sends the request to the event.Namespace.
 	UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error)
+	// PatchWithEventNamespace is the same as a Patch, except that it sends the request to the event.Namespace.
 	PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.Event, error)
 	// Search finds events about the specified object
 	Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error)
@@ -47,11 +48,11 @@ type EventExpansion interface {
 // event; it must either match this event client's namespace, or this event
 // client must have been created with the "" namespace.
 func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
-	if e.ns != "" && event.Namespace != e.ns {
-		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	if e.GetNamespace() != "" && event.Namespace != e.GetNamespace() {
+		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.GetNamespace())
 	}
 	result := &v1.Event{}
-	err := e.client.Post().
+	err := e.GetClient().Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
@@ -66,8 +67,11 @@ func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
 func (e *events) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
+	if e.GetNamespace() != "" && event.Namespace != e.GetNamespace() {
+		return nil, fmt.Errorf("can't update an event with namespace '%v' in namespace '%v'", event.Namespace, e.GetNamespace())
+	}
 	result := &v1.Event{}
-	err := e.client.Put().
+	err := e.GetClient().Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
@@ -83,11 +87,11 @@ func (e *events) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 // match this event client's namespace, or this event client must have been
 // created with the "" namespace.
 func (e *events) PatchWithEventNamespace(incompleteEvent *v1.Event, data []byte) (*v1.Event, error) {
-	if e.ns != "" && incompleteEvent.Namespace != e.ns {
-		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.ns)
+	if e.GetNamespace() != "" && incompleteEvent.Namespace != e.GetNamespace() {
+		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.GetNamespace())
 	}
 	result := &v1.Event{}
-	err := e.client.Patch(types.StrategicMergePatchType).
+	err := e.GetClient().Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
 		Resource("events").
 		Name(incompleteEvent.Name).
@@ -105,8 +109,8 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.Ev
 	if err != nil {
 		return nil, err
 	}
-	if len(e.ns) > 0 && ref.Namespace != e.ns {
-		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.ns)
+	if len(e.GetNamespace()) > 0 && ref.Namespace != e.GetNamespace() {
+		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.GetNamespace())
 	}
 	stringRefKind := string(ref.Kind)
 	var refKind *string

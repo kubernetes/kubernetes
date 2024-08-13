@@ -1,0 +1,147 @@
+# This DaemonSet was originally referenced from
+# https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
+
+# The Dockerfile and other source for this daemonset are in
+# https://github.com/GoogleCloudPlatform/cos-gpu-installer
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-driver-installer
+  namespace: kube-system
+  labels:
+    k8s-app: nvidia-driver-installer
+spec:
+  selector:
+    matchLabels:
+      k8s-app: nvidia-driver-installer
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-driver-installer
+        k8s-app: nvidia-driver-installer
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-accelerator
+                operator: Exists
+      tolerations:
+      - operator: "Exists"
+      hostNetwork: true
+      hostPID: true
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: vulkan-icd-mount
+        hostPath:
+          path: /home/kubernetes/bin/nvidia/vulkan/icd.d
+      - name: nvidia-install-dir-host
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      - name: root-mount
+        hostPath:
+          path: /
+      - name: cos-tools
+        hostPath:
+          path: /var/lib/cos-tools
+      - name: nvidia-config
+        hostPath:
+          path: /etc/nvidia
+      initContainers:
+      - image: "ubuntu@sha256:3f85b7caad41a95462cf5b787d8a04604c8262cdcdf9a472b8c52ef83375fe15"
+        name: bind-mount-install-dir
+        securityContext:
+          privileged: true
+        command:
+        - nsenter
+        - -at
+        - '1'
+        - --
+        - sh
+        - -c
+        - |
+          if mountpoint -q /var/lib/nvidia; then
+            echo "The mountpoint /var/lib/nvidia exists."
+          else
+            echo "The mountpoint /var/lib/nvidia does not exist. Creating directories /home/kubernetes/bin/nvidia and /var/lib/nvidia and bind mount."
+            mkdir -p /var/lib/nvidia /home/kubernetes/bin/nvidia
+            mount --bind /home/kubernetes/bin/nvidia /var/lib/nvidia
+            echo "Done creating bind mounts"
+          fi
+        # The COS GPU installer image version may be dependent on the version of COS being used.
+        # Refer to details about the installer in https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer/
+        # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
+
+        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.1.10 - suitable for COS M109 as per https://cloud.google.com/container-optimized-os/docs/release-notes
+      - image: "gcr.io/cos-cloud/cos-gpu-installer:v2.1.10"
+        name: nvidia-driver-installer
+        resources:
+          requests:
+            cpu: 150m
+        securityContext:
+          privileged: true
+        env:
+          - name: NVIDIA_INSTALL_DIR_HOST
+            value: /home/kubernetes/bin/nvidia
+          - name: NVIDIA_INSTALL_DIR_CONTAINER
+            value: /usr/local/nvidia
+          - name: VULKAN_ICD_DIR_HOST
+            value: /home/kubernetes/bin/nvidia/vulkan/icd.d
+          - name: VULKAN_ICD_DIR_CONTAINER
+            value: /etc/vulkan/icd.d
+          - name: ROOT_MOUNT_DIR
+            value: /root
+          - name: COS_TOOLS_DIR_HOST
+            value: /var/lib/cos-tools
+          - name: COS_TOOLS_DIR_CONTAINER
+            value: /build/cos-tools
+        volumeMounts:
+        - name: nvidia-install-dir-host
+          mountPath: /usr/local/nvidia
+        - name: vulkan-icd-mount
+          mountPath: /etc/vulkan/icd.d
+        - name: dev
+          mountPath: /dev
+        - name: root-mount
+          mountPath: /root
+        - name: cos-tools
+          mountPath: /build/cos-tools
+        command:
+        - bash
+        - -c
+        - |
+          echo "Checking for existing GPU driver modules"
+          if lsmod | grep nvidia; then
+            echo "GPU driver is already installed, the installed version may or may not be the driver version being tried to install, skipping installation"
+            exit 0
+          else
+            echo "No GPU driver module detected, installing now"
+            /cos-gpu-installer install
+          fi
+      - image: "gcr.io/gke-release/nvidia-partition-gpu@sha256:e226275da6c45816959fe43cde907ee9a85c6a2aa8a429418a4cadef8ecdb86a"
+        name: partition-gpus
+        env:
+          - name: LD_LIBRARY_PATH
+            value: /usr/local/nvidia/lib64
+        resources:
+          requests:
+            cpu: 150m
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: nvidia-install-dir-host
+          mountPath: /usr/local/nvidia
+        - name: dev
+          mountPath: /dev
+        - name: nvidia-config
+          mountPath: /etc/nvidia
+      containers:
+      - image: "registry.k8s.io/pause:3.10"
+        name: pause
+

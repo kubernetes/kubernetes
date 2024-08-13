@@ -1,6 +1,6 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmpopts
 
@@ -13,19 +13,19 @@ import (
 	"github.com/google/go-cmp/cmp/internal/function"
 )
 
-// SortSlices returns a Transformer option that sorts all []V.
+// SortSlices returns a [cmp.Transformer] option that sorts all []V.
 // The less function must be of the form "func(T, T) bool" which is used to
 // sort any slice with element type V that is assignable to T.
 //
 // The less function must be:
-//	• Deterministic: less(x, y) == less(x, y)
-//	• Irreflexive: !less(x, x)
-//	• Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
+//   - Deterministic: less(x, y) == less(x, y)
+//   - Irreflexive: !less(x, x)
+//   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
 //
 // The less function does not have to be "total". That is, if !less(x, y) and
 // !less(y, x) for two elements x and y, their relative order is maintained.
 //
-// SortSlices can be used in conjunction with EquateEmpty.
+// SortSlices can be used in conjunction with [EquateEmpty].
 func SortSlices(lessFunc interface{}) cmp.Option {
 	vf := reflect.ValueOf(lessFunc)
 	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {
@@ -82,21 +82,21 @@ func (ss sliceSorter) less(v reflect.Value, i, j int) bool {
 	return ss.fnc.Call([]reflect.Value{vx, vy})[0].Bool()
 }
 
-// SortMaps returns a Transformer option that flattens map[K]V types to be a
+// SortMaps returns a [cmp.Transformer] option that flattens map[K]V types to be a
 // sorted []struct{K, V}. The less function must be of the form
 // "func(T, T) bool" which is used to sort any map with key K that is
 // assignable to T.
 //
-// Flattening the map into a slice has the property that cmp.Equal is able to
-// use Comparers on K or the K.Equal method if it exists.
+// Flattening the map into a slice has the property that [cmp.Equal] is able to
+// use [cmp.Comparer] options on K or the K.Equal method if it exists.
 //
 // The less function must be:
-//	• Deterministic: less(x, y) == less(x, y)
-//	• Irreflexive: !less(x, x)
-//	• Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
-//	• Total: if x != y, then either less(x, y) or less(y, x)
+//   - Deterministic: less(x, y) == less(x, y)
+//   - Irreflexive: !less(x, x)
+//   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
+//   - Total: if x != y, then either less(x, y) or less(y, x)
 //
-// SortMaps can be used in conjunction with EquateEmpty.
+// SortMaps can be used in conjunction with [EquateEmpty].
 func SortMaps(lessFunc interface{}) cmp.Option {
 	vf := reflect.ValueOf(lessFunc)
 	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {

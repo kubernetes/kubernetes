@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package io.containerd.cgroups.v1;
+
+import "gogoproto/gogo.proto";
+
+message Metrics {
+	repeated HugetlbStat hugetlb = 1;
+	PidsStat pids = 2;
+	CPUStat cpu = 3 [(gogoproto.customname) = "CPU"];
+	MemoryStat memory = 4;
+	BlkIOStat blkio = 5;
+	RdmaStat rdma = 6;
+	repeated NetworkStat network = 7;
+	CgroupStats cgroup_stats = 8;
+	MemoryOomControl memory_oom_control = 9;
+}
+
+message HugetlbStat {
+	uint64 usage = 1;
+	uint64 max = 2;
+	uint64 failcnt = 3;
+	string pagesize = 4;
+}
+
+message PidsStat {
+	uint64 current = 1;
+	uint64 limit = 2;
+}
+
+message CPUStat {
+	CPUUsage usage = 1;
+	Throttle throttling = 2;
+}
+
+message CPUUsage {
+	// values in nanoseconds
+	uint64 total = 1;
+	uint64 kernel = 2;
+	uint64 user = 3;
+	repeated uint64 per_cpu = 4 [(gogoproto.customname) = "PerCPU"];
+
+}
+
+message Throttle {
+	uint64 periods = 1;
+	uint64 throttled_periods = 2;
+	uint64 throttled_time = 3;
+}
+
+message MemoryStat {
+	uint64 cache = 1;
+	uint64 rss = 2 [(gogoproto.customname) = "RSS"];
+	uint64 rss_huge = 3 [(gogoproto.customname) = "RSSHuge"];
+	uint64 mapped_file = 4;
+	uint64 dirty = 5;
+	uint64 writeback = 6;
+	uint64 pg_pg_in = 7;
+	uint64 pg_pg_out = 8;
+	uint64 pg_fault = 9;
+	uint64 pg_maj_fault = 10;
+	uint64 inactive_anon = 11;
+	uint64 active_anon = 12;
+	uint64 inactive_file = 13;
+	uint64 active_file = 14;
+	uint64 unevictable = 15;
+	uint64 hierarchical_memory_limit = 16;
+	uint64 hierarchical_swap_limit = 17;
+	uint64 total_cache = 18;
+	uint64 total_rss = 19 [(gogoproto.customname) = "TotalRSS"];
+	uint64 total_rss_huge = 20 [(gogoproto.customname) = "TotalRSSHuge"];
+	uint64 total_mapped_file = 21;
+	uint64 total_dirty = 22;
+	uint64 total_writeback = 23;
+	uint64 total_pg_pg_in = 24;
+	uint64 total_pg_pg_out = 25;
+	uint64 total_pg_fault = 26;
+	uint64 total_pg_maj_fault = 27;
+	uint64 total_inactive_anon = 28;
+	uint64 total_active_anon = 29;
+	uint64 total_inactive_file = 30;
+	uint64 total_active_file = 31;
+	uint64 total_unevictable = 32;
+	MemoryEntry usage = 33;
+	MemoryEntry swap = 34;
+	MemoryEntry kernel = 35;
+	MemoryEntry kernel_tcp = 36 [(gogoproto.customname) = "KernelTCP"];
+
+}
+
+message MemoryEntry {
+	uint64 limit = 1;
+	uint64 usage = 2;
+	uint64 max = 3;
+	uint64 failcnt = 4;
+}
+
+message MemoryOomControl {
+	uint64 oom_kill_disable = 1;
+	uint64 under_oom = 2;
+	uint64 oom_kill = 3;
+}
+
+message BlkIOStat {
+	repeated BlkIOEntry io_service_bytes_recursive = 1;
+	repeated BlkIOEntry io_serviced_recursive = 2;
+	repeated BlkIOEntry io_queued_recursive = 3;
+	repeated BlkIOEntry io_service_time_recursive = 4;
+	repeated BlkIOEntry io_wait_time_recursive = 5;
+	repeated BlkIOEntry io_merged_recursive = 6;
+	repeated BlkIOEntry io_time_recursive = 7;
+	repeated BlkIOEntry sectors_recursive = 8;
+}
+
+message BlkIOEntry {
+	string op = 1;
+	string device = 2;
+	uint64 major = 3;
+	uint64 minor = 4;
+	uint64 value = 5;
+}
+
+message RdmaStat {
+	repeated RdmaEntry current = 1;
+	repeated RdmaEntry limit = 2;
+}
+
+message RdmaEntry {
+	string device = 1;
+	uint32 hca_handles = 2;
+	uint32 hca_objects = 3;
+}
+
+message NetworkStat {
+	string name = 1;
+	uint64 rx_bytes = 2;
+	uint64 rx_packets = 3;
+	uint64 rx_errors  = 4;
+	uint64 rx_dropped = 5;
+	uint64 tx_bytes = 6;
+	uint64 tx_packets = 7;
+	uint64 tx_errors = 8;
+	uint64 tx_dropped = 9;
+}
+
+// CgroupStats exports per-cgroup statistics.
+message CgroupStats {
+	// number of tasks sleeping
+	uint64 nr_sleeping = 1;
+	// number of tasks running
+	uint64 nr_running = 2;
+	// number of tasks in stopped state
+	uint64 nr_stopped = 3;
+	// number of tasks in uninterruptible state
+	uint64 nr_uninterruptible = 4;
+	// number of tasks waiting on IO
+	uint64 nr_io_wait = 5;
+}

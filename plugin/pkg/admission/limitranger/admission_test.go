@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -61,6 +64,13 @@ func getStorageResourceList(storage string) api.ResourceList {
 
 func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
+}
+
+func getVolumeResourceRequirements(requests, limits api.ResourceList) api.VolumeResourceRequirements {
+	res := api.VolumeResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
@@ -624,6 +634,11 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
 		},
+		{
+			pod: withRestartableInitContainer(getComputeResourceList("1500m", ""), api.ResourceList{},
+				validPod("ctr-max-cpu-limit-restartable-init-container", 1, getResourceRequirements(getComputeResourceList("1000m", ""), getComputeResourceList("1500m", "")))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
@@ -636,6 +651,18 @@ func TestPodLimitFunc(t *testing.T) {
 			t.Errorf("Expected error for pod: %s", test.pod.Name)
 		}
 	}
+}
+
+func withRestartableInitContainer(requests, limits api.ResourceList, pod api.Pod) api.Pod {
+	policyAlways := api.ContainerRestartPolicyAlways
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+		api.Container{
+			RestartPolicy: &policyAlways,
+			Image:         "foo:V" + strconv.Itoa(len(pod.Spec.InitContainers)),
+			Resources:     getResourceRequirements(requests, limits),
+			Name:          "foo-" + strconv.Itoa(len(pod.Spec.InitContainers)),
+		})
+	return pod
 }
 
 func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
@@ -790,13 +817,13 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, nil, f, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 
-func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) api.PersistentVolumeClaim {
+func validPersistentVolumeClaim(name string, resources api.VolumeResourceRequirements) api.PersistentVolumeClaim {
 	pvc := api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec: api.PersistentVolumeClaimSpec{
@@ -814,19 +841,19 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 
 	successCases := []testCase{
 		{
-			pvc:        validPersistentVolumeClaim("pvc-is-min-storage-request", getResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-is-min-storage-request", getVolumeResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-is-max-storage-request", getResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-is-max-storage-request", getVolumeResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-no-minmax-storage-request", getResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-no-minmax-storage-request", getVolumeResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList(""), getStorageResourceList(""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-within-minmax-storage-request", getResourceRequirements(getStorageResourceList("5Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-within-minmax-storage-request", getVolumeResourceRequirements(getStorageResourceList("5Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), getStorageResourceList("10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 	}
@@ -840,11 +867,11 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 
 	errorCases := []testCase{
 		{
-			pvc:        validPersistentVolumeClaim("pvc-below-min-storage-request", getResourceRequirements(getStorageResourceList("500Mi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-below-min-storage-request", getVolumeResourceRequirements(getStorageResourceList("500Mi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-exceeds-max-storage-request", getResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-exceeds-max-storage-request", getVolumeResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 	}
@@ -854,5 +881,109 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}
+	}
+}
+
+// TestLimitRanger_GetLimitRangesFixed22422 Fixed Admission controllers can cause unnecessary significant load on apiserver #22422
+func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
+	limitRange := validLimitRangeNoDefaults()
+	limitRanges := []corev1.LimitRange{limitRange}
+
+	mockClient := &fake.Clientset{}
+
+	var (
+		testCount  int64
+		test1Count int64
+	)
+	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
+		switch action.GetNamespace() {
+		case "test":
+			atomic.AddInt64(&testCount, 1)
+		case "test1":
+			atomic.AddInt64(&test1Count, 1)
+		default:
+			t.Error("unexpected namespace")
+		}
+
+		limitRangeList := &corev1.LimitRangeList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: fmt.Sprintf("%d", len(limitRanges)),
+			},
+		}
+		for index, value := range limitRanges {
+			value.ResourceVersion = fmt.Sprintf("%d", index)
+			value.Namespace = action.GetNamespace()
+			limitRangeList.Items = append(limitRangeList.Items, value)
+		}
+		// make the handler slow so concurrent calls exercise the singleflight
+		time.Sleep(time.Second)
+		return true, limitRangeList, nil
+	})
+
+	handler, _, err := newHandlerForTest(mockClient)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+
+	attributes := admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "test", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
+
+	attributesTest1 := admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "test1", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(2)
+		// simulating concurrent calls after a cache failure
+		go func() {
+			defer wg.Done()
+			ret, err := handler.GetLimitRanges(attributes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, c := range ret {
+				if c.Namespace != attributes.GetNamespace() {
+					t.Errorf("Expected %s namespace, got %s", attributes.GetNamespace(), c.Namespace)
+				}
+			}
+		}()
+
+		// simulation of different namespaces is not a call
+		go func() {
+			defer wg.Done()
+			ret, err := handler.GetLimitRanges(attributesTest1)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, c := range ret {
+				if c.Namespace != attributesTest1.GetNamespace() {
+					t.Errorf("Expected %s namespace, got %s", attributesTest1.GetNamespace(), c.Namespace)
+				}
+			}
+		}()
+	}
+
+	// and here we wait for all the goroutines
+	wg.Wait()
+	// since all the calls with the same namespace will be holded, they must be catched on the singleflight group,
+	// There are two different sets of namespace calls
+	// hence only 2
+	if testCount != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", testCount)
+	}
+	if test1Count != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	}
+
+	// invalidate the cache
+	handler.liveLookupCache.Remove(attributes.GetNamespace())
+	_, err = handler.GetLimitRanges(attributes)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if testCount != 2 {
+		t.Errorf("Expected 2 limit range call, got %d", testCount)
+	}
+	if test1Count != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count)
 	}
 }

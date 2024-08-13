@@ -27,28 +27,26 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
-func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcd3testing.EtcdTestServer) {
+// NewEtcdStorage is for testing.  It configures the etcd storage for a bogus resource; the test must not care.
+func NewEtcdStorage(t *testing.T, group string) (*storagebackend.ConfigForResource, *etcd3testing.EtcdTestServer) {
 	return NewEtcdStorageForResource(t, schema.GroupResource{Group: group, Resource: "any"})
 }
 
-func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*storagebackend.Config, *etcd3testing.EtcdTestServer) {
+func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*storagebackend.ConfigForResource, *etcd3testing.EtcdTestServer) {
 	t.Helper()
 
 	server, config := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	options := options.NewEtcdOptions(config)
-	completedConfig, err := kubeapiserver.NewStorageFactoryConfig().Complete(options)
-	if err != nil {
-		t.Fatal(err)
-	}
+	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options)
 	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	factory, err := completedConfig.New()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while making storage factory: %v", err)
 	}
-	resourceConfig, err := factory.NewConfig(resource)
+	resourceConfig, err := factory.NewConfig(resource, nil)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while finding storage destination: %v", err)
 	}
 	return resourceConfig, server
 }

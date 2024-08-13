@@ -1,31 +1,28 @@
-// +build linux
-
 package fs2
 
 import (
-	"io/ioutil"
+	"errors"
+	"math"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
-func setPids(dirPath string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.PidsLimit != 0 {
-		// "max" is the fallback value.
-		limit := "max"
+func isPidsSet(r *configs.Resources) bool {
+	return r.PidsLimit != 0
+}
 
-		if cgroup.Resources.PidsLimit > 0 {
-			limit = strconv.FormatInt(cgroup.Resources.PidsLimit, 10)
-		}
-
-		if err := fscommon.WriteFile(dirPath, "pids.max", limit); err != nil {
+func setPids(dirPath string, r *configs.Resources) error {
+	if !isPidsSet(r) {
+		return nil
+	}
+	if val := numToStr(r.PidsLimit); val != "" {
+		if err := cgroups.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
 	}
@@ -33,32 +30,18 @@ func setPids(dirPath string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func isNOTSUP(err error) bool {
-	switch err := err.(type) {
-	case *os.PathError:
-		return err.Err == unix.ENOTSUP
-	default:
-		return false
-	}
-}
-
-func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
+func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
-	contents, err := ioutil.ReadFile(filepath.Join(dirPath, "cgroup.procs"))
-	if err != nil && isNOTSUP(err) {
-		contents, err = ioutil.ReadFile(filepath.Join(dirPath, "cgroup.threads"))
+	contents, err := cgroups.ReadFile(dirPath, "cgroup.procs")
+	if errors.Is(err, unix.ENOTSUP) {
+		contents, err = cgroups.ReadFile(dirPath, "cgroup.threads")
 	}
 	if err != nil {
 		return err
 	}
-	pids := make(map[string]string)
-	for _, i := range strings.Split(string(contents), "\n") {
-		if i != "" {
-			pids[i] = i
-		}
-	}
-	stats.PidsStats.Current = uint64(len(pids))
+	pids := strings.Count(contents, "\n")
+	stats.PidsStats.Current = uint64(pids)
 	stats.PidsStats.Limit = 0
 	return nil
 }
@@ -66,22 +49,21 @@ func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 func statPids(dirPath string, stats *cgroups.Stats) error {
 	current, err := fscommon.GetCgroupParamUint(dirPath, "pids.current")
 	if err != nil {
-		return errors.Wrap(err, "failed to parse pids.current")
-	}
-
-	maxString, err := fscommon.GetCgroupParamString(dirPath, "pids.max")
-	if err != nil {
-		return errors.Wrap(err, "failed to parse pids.max")
-	}
-
-	// Default if pids.max == "max" is 0 -- which represents "no limit".
-	var max uint64
-	if maxString != "max" {
-		max, err = fscommon.ParseUint(maxString, 10, 64)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse pids.max - unable to parse %q as a uint from Cgroup file %q",
-				maxString, filepath.Join(dirPath, "pids.max"))
+		if os.IsNotExist(err) {
+			return statPidsFromCgroupProcs(dirPath, stats)
 		}
+		return err
+	}
+
+	max, err := fscommon.GetCgroupParamUint(dirPath, "pids.max")
+	if err != nil {
+		return err
+	}
+	// If no limit is set, read from pids.max returns "max", which is
+	// converted to MaxUint64 by GetCgroupParamUint. Historically, we
+	// represent "no limit" for pids as 0, thus this conversion.
+	if max == math.MaxUint64 {
+		max = 0
 	}
 
 	stats.PidsStats.Current = current

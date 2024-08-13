@@ -18,11 +18,18 @@ package fake
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
-	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	fakerest "k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 )
 
@@ -57,10 +64,26 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
-	return &restclient.Request{}
+	fakeClient := &fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("fake logs")),
+			}
+			return resp, nil
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		GroupVersion:         podsKind.GroupVersion(),
+		VersionedAPIPath:     fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log", c.ns, name),
+	}
+	return fakeClient.Request()
 }
 
-func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
+func (c *FakePods) Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error {
+	return c.EvictV1beta1(ctx, eviction)
+}
+
+func (c *FakePods) EvictV1(ctx context.Context, eviction *policyv1.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Namespace = c.ns
@@ -70,4 +93,20 @@ func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
 
 	_, err := c.Fake.Invokes(action, eviction)
 	return err
+}
+
+func (c *FakePods) EvictV1beta1(ctx context.Context, eviction *policyv1beta1.Eviction) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Namespace = c.ns
+	action.Resource = podsResource
+	action.Subresource = "eviction"
+	action.Object = eviction
+
+	_, err := c.Fake.Invokes(action, eviction)
+	return err
+}
+
+func (c *FakePods) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
+	return c.Fake.InvokesProxy(core.NewProxyGetAction(podsResource, c.ns, scheme, name, port, path, params))
 }

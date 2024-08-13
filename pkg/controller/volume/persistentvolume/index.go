@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/storage/volume"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -92,7 +94,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			return nil, err
 		}
 
-		bestVol, err := pvutil.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding)
+		bestVol, err := volume.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding, utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass))
 		if err != nil {
 			return nil, err
 		}
@@ -127,23 +129,23 @@ func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.Per
 // A request for RWO could be satisfied by both sets of indexed volumes, so
 // allPossibleMatchingAccessModes returns:
 //
-// [][]v1.PersistentVolumeAccessMode {
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany,
-//		},
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
-//		},
-// }
+//	[][]v1.PersistentVolumeAccessMode {
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany,
+//			},
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
+//			},
+//	}
 //
 // A request for RWX can be satisfied by only one set of indexed volumes, so
 // the return is:
 //
-// [][]v1.PersistentVolumeAccessMode {
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
-//		},
-// }
+//	[][]v1.PersistentVolumeAccessMode {
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
+//			},
+//	}
 //
 // This func returns modes with ascending levels of modes to give the user
 // what is closest to what they actually asked for.
@@ -152,7 +154,7 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
 		indexedModes := v1helper.GetAccessModesFromString(key)
-		if volumeutil.AccessModesContainedInAll(indexedModes, requestedModes) {
+		if util.ContainsAllAccessModes(indexedModes, requestedModes) {
 			matchedModes = append(matchedModes, indexedModes)
 		}
 	}

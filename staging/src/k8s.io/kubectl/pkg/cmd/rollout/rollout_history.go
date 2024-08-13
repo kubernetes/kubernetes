@@ -18,22 +18,25 @@ package rollout
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	historyLong = templates.LongDesc(`
-		View previous rollout revisions and configurations.`)
+	historyLong = templates.LongDesc(i18n.T(`
+		View previous rollout revisions and configurations.`))
 
 	historyExample = templates.Examples(`
 		# View the rollout history of a deployment
@@ -54,16 +57,17 @@ type RolloutHistoryOptions struct {
 	Resources        []string
 	Namespace        string
 	EnforceNamespace bool
+	LabelSelector    string
 
 	HistoryViewer    polymorphichelpers.HistoryViewerFunc
 	RESTClientGetter genericclioptions.RESTClientGetter
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewRolloutHistoryOptions returns an initialized RolloutHistoryOptions instance
-func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHistoryOptions {
+func NewRolloutHistoryOptions(streams genericiooptions.IOStreams) *RolloutHistoryOptions {
 	return &RolloutHistoryOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -71,7 +75,7 @@ func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHisto
 }
 
 // NewCmdRolloutHistory returns a Command instance for RolloutHistory sub command
-func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutHistory(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutHistoryOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -82,15 +86,16 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Short:                 i18n.T("View rollout history"),
 		Long:                  historyLong,
 		Example:               historyExample,
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs: validArgs,
 	}
 
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "See the details, including podTemplate of the revision specified")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
@@ -140,6 +145,7 @@ func (o *RolloutHistoryOptions) Run() error {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
 		Latest().
@@ -147,6 +153,44 @@ func (o *RolloutHistoryOptions) Run() error {
 		Do()
 	if err := r.Err(); err != nil {
 		return err
+	}
+
+	if o.PrintFlags.OutputFlagSpecified() {
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return err
+		}
+
+		return r.Visit(func(info *resource.Info, err error) error {
+			if err != nil {
+				return err
+			}
+
+			mapping := info.ResourceMapping()
+			historyViewer, err := o.HistoryViewer(o.RESTClientGetter, mapping)
+			if err != nil {
+				return err
+			}
+			historyInfo, err := historyViewer.GetHistory(info.Namespace, info.Name)
+			if err != nil {
+				return err
+			}
+
+			if o.Revision > 0 {
+				printer.PrintObj(historyInfo[o.Revision], o.Out)
+			} else {
+				sortedKeys := make([]int64, 0, len(historyInfo))
+				for k := range historyInfo {
+					sortedKeys = append(sortedKeys, k)
+				}
+				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
+				for _, k := range sortedKeys {
+					printer.PrintObj(historyInfo[k], o.Out)
+				}
+			}
+
+			return nil
+		})
 	}
 
 	return r.Visit(func(info *resource.Info, err error) error {

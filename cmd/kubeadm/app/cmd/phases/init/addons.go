@@ -17,9 +17,13 @@ limitations under the License.
 package phases
 
 import (
+	"io"
+
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 
 	clientset "k8s.io/client-go/kubernetes"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -37,13 +41,21 @@ var (
 	kubeProxyAddonLongDesc = cmdutil.LongDesc(`
 		Install the kube-proxy addon components via the API server.
 		`)
+
+	printManifest = false
 )
 
 // NewAddonPhase returns the addon Cobra command
 func NewAddonPhase() workflow.Phase {
+	dnsLocalFlags := pflag.NewFlagSet(options.PrintManifest, pflag.ContinueOnError)
+	dnsLocalFlags.BoolVar(&printManifest, options.PrintManifest, printManifest, "Print the addon manifests to STDOUT instead of installing them")
+
+	proxyLocalFlags := pflag.NewFlagSet(options.PrintManifest, pflag.ContinueOnError)
+	proxyLocalFlags.BoolVar(&printManifest, options.PrintManifest, printManifest, "Print the addon manifests to STDOUT instead of installing them")
+
 	return workflow.Phase{
 		Name:  "addon",
-		Short: "Install required addons for passing Conformance tests",
+		Short: "Install required addons for passing conformance tests",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
@@ -58,6 +70,7 @@ func NewAddonPhase() workflow.Phase {
 				Long:         coreDNSAddonLongDesc,
 				InheritFlags: getAddonPhaseFlags("coredns"),
 				Run:          runCoreDNSAddon,
+				LocalFlags:   dnsLocalFlags,
 			},
 			{
 				Name:         "kube-proxy",
@@ -65,40 +78,48 @@ func NewAddonPhase() workflow.Phase {
 				Long:         kubeProxyAddonLongDesc,
 				InheritFlags: getAddonPhaseFlags("kube-proxy"),
 				Run:          runKubeProxyAddon,
+				LocalFlags:   proxyLocalFlags,
 			},
 		},
 	}
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, error) {
+func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, error) {
 	data, ok := c.(InitData)
 	if !ok {
-		return nil, nil, errors.New("addon phase invoked with an invalid data struct")
+		return nil, nil, "", nil, errors.New("addon phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
-	client, err := data.Client()
-	if err != nil {
-		return nil, nil, err
+	var client clientset.Interface
+	var err error
+	if !printManifest {
+		client, err = data.Client()
+		if err != nil {
+			return nil, nil, "", nil, err
+		}
 	}
-	return cfg, client, err
+
+	out := data.OutputWriter()
+	patchesDir := data.PatchesDir()
+	return cfg, client, patchesDir, out, err
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
 func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, err := getInitData(c)
+	cfg, client, patchesDir, out, err := getInitData(c)
 	if err != nil {
 		return err
 	}
-	return dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client)
+	return dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, printManifest)
 }
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, err := getInitData(c)
+	cfg, client, _, out, err := getInitData(c)
 	if err != nil {
 		return err
 	}
-	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client)
+	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, printManifest)
 }
 
 func getAddonPhaseFlags(name string) []string {
@@ -107,6 +128,7 @@ func getAddonPhaseFlags(name string) []string {
 		options.KubeconfigPath,
 		options.KubernetesVersion,
 		options.ImageRepository,
+		options.DryRun,
 	}
 	if name == "all" || name == "kube-proxy" {
 		flags = append(flags,

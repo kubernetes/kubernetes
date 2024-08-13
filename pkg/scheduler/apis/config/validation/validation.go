@@ -17,11 +17,12 @@ limitations under the License.
 package validation
 
 import (
-	"errors"
 	"fmt"
+	"reflect"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -32,109 +33,230 @@ import (
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
-func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
-	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
+func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) utilerrors.Aggregate {
+	var errs []error
+	errs = append(errs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection")).ToAggregate())
+	errs = append(errs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection")).ToAggregate())
+
+	// TODO: This can be removed when ResourceLock is not available
+	// Only ResourceLock values with leases are allowed
+	if cc.LeaderElection.LeaderElect && cc.LeaderElection.ResourceLock != "leases" {
+		leaderElectionPath := field.NewPath("leaderElection")
+		errs = append(errs, field.Invalid(leaderElectionPath.Child("resourceLock"), cc.LeaderElection.ResourceLock, `resourceLock value must be "leases"`))
+	}
 
 	profilesPath := field.NewPath("profiles")
+	if cc.Parallelism <= 0 {
+		errs = append(errs, field.Invalid(field.NewPath("parallelism"), cc.Parallelism, "should be an integer value greater than zero"))
+	}
+
 	if len(cc.Profiles) == 0 {
-		allErrs = append(allErrs, field.Required(profilesPath, ""))
+		errs = append(errs, field.Required(profilesPath, ""))
 	} else {
 		existingProfiles := make(map[string]int, len(cc.Profiles))
 		for i := range cc.Profiles {
 			profile := &cc.Profiles[i]
 			path := profilesPath.Index(i)
-			allErrs = append(allErrs, validateKubeSchedulerProfile(path, profile)...)
+			errs = append(errs, validateKubeSchedulerProfile(path, cc.APIVersion, profile)...)
 			if idx, ok := existingProfiles[profile.SchedulerName]; ok {
-				allErrs = append(allErrs, field.Duplicate(path.Child("schedulerName"), profilesPath.Index(idx).Child("schedulerName")))
+				errs = append(errs, field.Duplicate(path.Child("schedulerName"), profilesPath.Index(idx).Child("schedulerName")))
 			}
 			existingProfiles[profile.SchedulerName] = i
 		}
-		allErrs = append(allErrs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
+		errs = append(errs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
-	for _, msg := range validation.IsValidSocketAddr(cc.HealthzBindAddress) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, msg))
-	}
-	for _, msg := range validation.IsValidSocketAddr(cc.MetricsBindAddress) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, msg))
-	}
-	if cc.PercentageOfNodesToScore < 0 || cc.PercentageOfNodesToScore > 100 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
-			cc.PercentageOfNodesToScore, "not in valid range [0-100]"))
-	}
+
+	errs = append(errs, validatePercentageOfNodesToScore(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
+
 	if cc.PodInitialBackoffSeconds <= 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
+		errs = append(errs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
 			cc.PodInitialBackoffSeconds, "must be greater than 0"))
 	}
 	if cc.PodMaxBackoffSeconds < cc.PodInitialBackoffSeconds {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("podMaxBackoffSeconds"),
+		errs = append(errs, field.Invalid(field.NewPath("podMaxBackoffSeconds"),
 			cc.PodMaxBackoffSeconds, "must be greater than or equal to PodInitialBackoffSeconds"))
 	}
 
-	allErrs = append(allErrs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
-	return allErrs
+	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
+	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
 }
 
-func validateKubeSchedulerProfile(path *field.Path, profile *config.KubeSchedulerProfile) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(profile.SchedulerName) == 0 {
-		allErrs = append(allErrs, field.Required(path.Child("schedulerName"), ""))
+func validatePercentageOfNodesToScore(path *field.Path, percentageOfNodesToScore *int32) error {
+	if percentageOfNodesToScore != nil {
+		if *percentageOfNodesToScore < 0 || *percentageOfNodesToScore > 100 {
+			return field.Invalid(path, *percentageOfNodesToScore, "not in valid range [0-100]")
+		}
 	}
-	return allErrs
+	return nil
 }
 
-func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerProfile) field.ErrorList {
-	allErrs := field.ErrorList{}
-	var canon *config.PluginSet
+type invalidPlugins struct {
+	schemeGroupVersion string
+	plugins            []string
+}
+
+// invalidPluginsByVersion maintains a list of removed/deprecated plugins in each version.
+// Remember to add an entry to that list when creating a new component config
+// version (even if the list of invalid plugins is empty).
+var invalidPluginsByVersion = []invalidPlugins{
+	{
+		schemeGroupVersion: v1.SchemeGroupVersion.String(),
+		plugins: []string{
+			"AzureDiskLimits",
+			"CinderLimits",
+			"EBSLimits",
+			"GCEPDLimits",
+		},
+	},
+}
+
+// isPluginInvalid checks if a given plugin was removed/deprecated in the given component
+// config version or earlier.
+func isPluginInvalid(apiVersion string, name string) (bool, string) {
+	for _, dp := range invalidPluginsByVersion {
+		for _, plugin := range dp.plugins {
+			if name == plugin {
+				return true, dp.schemeGroupVersion
+			}
+		}
+		if apiVersion == dp.schemeGroupVersion {
+			break
+		}
+	}
+	return false, ""
+}
+
+func validatePluginSetForInvalidPlugins(path *field.Path, apiVersion string, ps config.PluginSet) []error {
+	var errs []error
+	for i, plugin := range ps.Enabled {
+		if invalid, invalidVersion := isPluginInvalid(apiVersion, plugin.Name); invalid {
+			errs = append(errs, field.Invalid(path.Child("enabled").Index(i), plugin.Name, fmt.Sprintf("was invalid in version %q (KubeSchedulerConfiguration is version %q)", invalidVersion, apiVersion)))
+		}
+	}
+	return errs
+}
+
+func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
+	var errs []error
+	if len(profile.SchedulerName) == 0 {
+		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
+	}
+	errs = append(errs, validatePercentageOfNodesToScore(path.Child("percentageOfNodesToScore"), profile.PercentageOfNodesToScore))
+	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
+	return errs
+}
+
+func validatePluginConfig(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
+	var errs []error
+	m := map[string]interface{}{
+		"DefaultPreemption":               ValidateDefaultPreemptionArgs,
+		"InterPodAffinity":                ValidateInterPodAffinityArgs,
+		"NodeAffinity":                    ValidateNodeAffinityArgs,
+		"NodeResourcesBalancedAllocation": ValidateNodeResourcesBalancedAllocationArgs,
+		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
+		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
+		"VolumeBinding":                   ValidateVolumeBindingArgs,
+	}
+
+	if profile.Plugins != nil {
+		stagesToPluginSet := map[string]config.PluginSet{
+			"preEnqueue": profile.Plugins.PreEnqueue,
+			"queueSort":  profile.Plugins.QueueSort,
+			"preFilter":  profile.Plugins.PreFilter,
+			"filter":     profile.Plugins.Filter,
+			"postFilter": profile.Plugins.PostFilter,
+			"preScore":   profile.Plugins.PreScore,
+			"score":      profile.Plugins.Score,
+			"reserve":    profile.Plugins.Reserve,
+			"permit":     profile.Plugins.Permit,
+			"preBind":    profile.Plugins.PreBind,
+			"bind":       profile.Plugins.Bind,
+			"postBind":   profile.Plugins.PostBind,
+		}
+
+		pluginsPath := path.Child("plugins")
+		for s, p := range stagesToPluginSet {
+			errs = append(errs, validatePluginSetForInvalidPlugins(
+				pluginsPath.Child(s), apiVersion, p)...)
+		}
+	}
+
+	seenPluginConfig := sets.New[string]()
+
+	for i := range profile.PluginConfig {
+		pluginConfigPath := path.Child("pluginConfig").Index(i)
+		name := profile.PluginConfig[i].Name
+		args := profile.PluginConfig[i].Args
+		if seenPluginConfig.Has(name) {
+			errs = append(errs, field.Duplicate(pluginConfigPath, name))
+		} else {
+			seenPluginConfig.Insert(name)
+		}
+		if invalid, invalidVersion := isPluginInvalid(apiVersion, name); invalid {
+			errs = append(errs, field.Invalid(pluginConfigPath, name, fmt.Sprintf("was invalid in version %q (KubeSchedulerConfiguration is version %q)", invalidVersion, apiVersion)))
+		} else if validateFunc, ok := m[name]; ok {
+			// type mismatch, no need to validate the `args`.
+			if reflect.TypeOf(args) != reflect.ValueOf(validateFunc).Type().In(1) {
+				errs = append(errs, field.Invalid(pluginConfigPath.Child("args"), args, "has to match plugin args"))
+			} else {
+				in := []reflect.Value{reflect.ValueOf(pluginConfigPath.Child("args")), reflect.ValueOf(args)}
+				res := reflect.ValueOf(validateFunc).Call(in)
+				// It's possible that validation function return a Aggregate, just append here and it will be flattened at the end of CC validation.
+				if res[0].Interface() != nil {
+					errs = append(errs, res[0].Interface().(error))
+				}
+			}
+		}
+	}
+	return errs
+}
+
+func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerProfile) []error {
+	var errs []error
+	var canon config.PluginSet
+	var queueSortName string
+	var queueSortArgs runtime.Object
 	if profiles[0].Plugins != nil {
 		canon = profiles[0].Plugins.QueueSort
+		if len(profiles[0].Plugins.QueueSort.Enabled) != 0 {
+			queueSortName = profiles[0].Plugins.QueueSort.Enabled[0].Name
+		}
+		length := len(profiles[0].Plugins.QueueSort.Enabled)
+		if length > 1 {
+			errs = append(errs, field.Invalid(path.Index(0).Child("plugins", "queueSort", "Enabled"), length, "only one queue sort plugin can be enabled"))
+		}
+	}
+	for _, cfg := range profiles[0].PluginConfig {
+		if len(queueSortName) > 0 && cfg.Name == queueSortName {
+			queueSortArgs = cfg.Args
+		}
 	}
 	for i := 1; i < len(profiles); i++ {
-		var curr *config.PluginSet
+		var curr config.PluginSet
 		if profiles[i].Plugins != nil {
 			curr = profiles[i].Plugins.QueueSort
 		}
-		if !cmp.Equal(canon, curr) {
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "has to match for all profiles"))
+		if !apiequality.Semantic.DeepEqual(canon, curr) {
+			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "queueSort must be the same for all profiles"))
+		}
+		for _, cfg := range profiles[i].PluginConfig {
+			if cfg.Name == queueSortName && !apiequality.Semantic.DeepEqual(queueSortArgs, cfg.Args) {
+				errs = append(errs, field.Invalid(path.Index(i).Child("pluginConfig", "args"), cfg.Args, "queueSort must be the same for all profiles"))
+			}
 		}
 	}
-	// TODO(#88093): Validate that all plugin configs for the queue sort extension match.
-	return allErrs
-}
-
-// ValidatePolicy checks for errors in the Config
-// It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy config.Policy) error {
-	var validationErrors []error
-
-	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
-	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
-		}
-		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
-	}
-
-	if extenderErrs := validateExtenders(field.NewPath("extenders"), policy.Extenders); len(extenderErrs) > 0 {
-		validationErrors = append(validationErrors, extenderErrs.ToAggregate().Errors()...)
-	}
-
-	if policy.HardPodAffinitySymmetricWeight < 0 || policy.HardPodAffinitySymmetricWeight > 100 {
-		validationErrors = append(validationErrors, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), policy.HardPodAffinitySymmetricWeight, "not in valid range [0-100]"))
-	}
-	return utilerrors.NewAggregate(validationErrors)
+	return errs
 }
 
 // validateExtenders validates the configured extenders for the Scheduler
-func validateExtenders(fldPath *field.Path, extenders []config.Extender) field.ErrorList {
-	allErrs := field.ErrorList{}
+func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error {
+	var errs []error
 	binders := 0
-	extenderManagedResources := sets.NewString()
+	extenderManagedResources := sets.New[string]()
 	for i, extender := range extenders {
 		path := fldPath.Index(i)
 		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
-			allErrs = append(allErrs, field.Invalid(path.Child("weight"),
+			errs = append(errs, field.Invalid(path.Child("weight"),
 				extender.Weight, "must have a positive weight applied to it"))
 		}
 		if extender.BindVerb != "" {
@@ -142,77 +264,33 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) field.E
 		}
 		for j, resource := range extender.ManagedResources {
 			managedResourcesPath := path.Child("managedResources").Index(j)
-			errs := validateExtendedResourceName(v1.ResourceName(resource.Name))
-			for _, err := range errs {
-				allErrs = append(allErrs, field.Invalid(managedResourcesPath.Child("name"),
-					resource.Name, fmt.Sprintf("%+v", err)))
-			}
+			validationErrors := validateExtendedResourceName(managedResourcesPath.Child("name"), v1.ResourceName(resource.Name))
+			errs = append(errs, validationErrors...)
 			if extenderManagedResources.Has(resource.Name) {
-				allErrs = append(allErrs, field.Invalid(managedResourcesPath.Child("name"),
+				errs = append(errs, field.Invalid(managedResourcesPath.Child("name"),
 					resource.Name, "duplicate extender managed resource name"))
 			}
 			extenderManagedResources.Insert(resource.Name)
 		}
 	}
 	if binders > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("found %d extenders implementing bind", binders), "only one extender can implement bind"))
+		errs = append(errs, field.Invalid(fldPath, fmt.Sprintf("found %d extenders implementing bind", binders), "only one extender can implement bind"))
 	}
-	return allErrs
-}
-
-// validateCustomPriorities validates that:
-// 1. RequestedToCapacityRatioRedeclared custom priority cannot be declared multiple times,
-// 2. LabelPreference/ServiceAntiAffinity custom priorities can be declared multiple times,
-// however the weights for each custom priority type should be the same.
-func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
-	verifyRedeclaration := func(priorityType string) error {
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("Priority %q redeclares custom priority %q, from:%q", priority.Name, priorityType, existing.Name)
-		}
-		priorities[priorityType] = priority
-		return nil
-	}
-	verifyDifferentWeights := func(priorityType string) error {
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			if existing.Weight != priority.Weight {
-				return fmt.Errorf("%s  priority %q has a different weight with %q", priorityType, priority.Name, existing.Name)
-			}
-		}
-		priorities[priorityType] = priority
-		return nil
-	}
-	if priority.Argument != nil {
-		if priority.Argument.LabelPreference != nil {
-			if err := verifyDifferentWeights("LabelPreference"); err != nil {
-				return err
-			}
-		} else if priority.Argument.ServiceAntiAffinity != nil {
-			if err := verifyDifferentWeights("ServiceAntiAffinity"); err != nil {
-				return err
-			}
-		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
-			if err := verifyRedeclaration("RequestedToCapacityRatio"); err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("No priority arguments set for priority %s", priority.Name)
-		}
-	}
-	return nil
+	return errs
 }
 
 // validateExtendedResourceName checks whether the specified name is a valid
 // extended resource name.
-func validateExtendedResourceName(name v1.ResourceName) []error {
+func validateExtendedResourceName(path *field.Path, name v1.ResourceName) []error {
 	var validationErrors []error
 	for _, msg := range validation.IsQualifiedName(string(name)) {
-		validationErrors = append(validationErrors, errors.New(msg))
+		validationErrors = append(validationErrors, field.Invalid(path, name, msg))
 	}
 	if len(validationErrors) != 0 {
 		return validationErrors
 	}
 	if !v1helper.IsExtendedResourceName(name) {
-		validationErrors = append(validationErrors, fmt.Errorf("%s is an invalid extended resource name", name))
+		validationErrors = append(validationErrors, field.Invalid(path, string(name), "is an invalid extended resource name"))
 	}
 	return validationErrors
 }

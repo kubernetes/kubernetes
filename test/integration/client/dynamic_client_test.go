@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -29,8 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -39,7 +43,7 @@ import (
 )
 
 func TestDynamicClient(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -121,7 +125,7 @@ func TestDynamicClient(t *testing.T) {
 }
 
 func TestDynamicClientWatch(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -201,6 +205,75 @@ func TestDynamicClientWatch(t *testing.T) {
 			t.Errorf("Wanted %v, got %v", e, a)
 		}
 	}
+}
+
+func TestUnstructuredExtract(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	dynamicClient, err := dynamic.NewForConfig(result.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error creating dynamic client: %v", err)
+	}
+
+	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+
+	// Apply an unstructured with the dynamic client
+	name := "test-pod"
+	pod := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name": name,
+				// namespace will always get set by extract,
+				// so we add it here (even though it's optional)
+				// to ensure what we apply equals what we extract.
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "test",
+						"image": "test-image",
+					},
+				},
+			},
+		},
+	}
+	mgr := "testManager"
+	podData, err := json.Marshal(pod)
+	if err != nil {
+		t.Fatalf("failed to marshal pod into bytes: %v", err)
+	}
+
+	// apply the unstructured object to the cluster
+	actual, err := dynamicClient.Resource(resource).Namespace("default").Patch(
+		context.TODO(),
+		name,
+		types.ApplyPatchType,
+		podData,
+		metav1.PatchOptions{FieldManager: mgr})
+	if err != nil {
+		t.Fatalf("unexpected error when creating pod: %v", err)
+	}
+
+	// extract the object
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(result.ClientConfig)
+	extractor, err := metav1ac.NewUnstructuredExtractor(discoveryClient)
+	if err != nil {
+		t.Fatalf("unexpected error when constructing extrator: %v", err)
+	}
+	extracted, err := extractor.Extract(actual, mgr)
+	if err != nil {
+		t.Fatalf("unexpected error when extracting: %v", err)
+	}
+
+	// confirm that the extracted object equals the applied object
+	if !reflect.DeepEqual(pod, extracted) {
+		t.Fatalf("extracted pod doesn't equal applied pod. wanted:\n %v\n, got:\n %v\n", pod, extracted)
+	}
+
 }
 
 func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {

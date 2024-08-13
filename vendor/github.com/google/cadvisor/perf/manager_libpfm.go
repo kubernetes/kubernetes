@@ -1,3 +1,4 @@
+//go:build libpfm && cgo
 // +build libpfm,cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
@@ -21,48 +22,50 @@ import (
 	"fmt"
 	"os"
 
+	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/stats"
+	"github.com/google/cadvisor/utils/sysinfo"
 )
 
 type manager struct {
-	events   Events
-	numCores int
+	events      PerfEvents
+	onlineCPUs  []int
+	cpuToSocket map[int]int
 	stats.NoopDestroy
 }
 
-func NewManager(configFile string, numCores int) (stats.Manager, error) {
+func NewManager(configFile string, topology []info.Node) (stats.Manager, error) {
 	if configFile == "" {
 		return &stats.NoopManager{}, nil
 	}
 
 	file, err := os.Open(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read configuration file %q: %q", configFile, err)
+		return nil, fmt.Errorf("unable to read configuration file %q: %w", configFile, err)
 	}
 
 	config, err := parseConfig(file)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read configuration file %q: %q", configFile, err)
+		return nil, fmt.Errorf("unable to parse configuration file %q: %w", configFile, err)
 	}
 
-	if areGroupedEventsUsed(config) {
-		return nil, fmt.Errorf("event grouping is not supported you must modify config file at %s", configFile)
+	if len(config.Core.Events) == 0 && len(config.Uncore.Events) == 0 {
+		return nil, fmt.Errorf("there is no events in config file %q", configFile)
 	}
 
-	return &manager{events: config, numCores: numCores}, nil
-}
+	onlineCPUs := sysinfo.GetOnlineCPUs(topology)
 
-func areGroupedEventsUsed(events Events) bool {
-	for _, group := range events.Events {
-		if len(group) > 1 {
-			return true
-		}
+	cpuToSocket := make(map[int]int)
+
+	for _, cpu := range onlineCPUs {
+		cpuToSocket[cpu] = sysinfo.GetSocketFromCPU(topology, cpu)
 	}
-	return false
+
+	return &manager{events: config, onlineCPUs: onlineCPUs, cpuToSocket: cpuToSocket}, nil
 }
 
 func (m *manager) GetCollector(cgroupPath string) (stats.Collector, error) {
-	collector := newCollector(cgroupPath, m.events, m.numCores)
+	collector := newCollector(cgroupPath, m.events, m.onlineCPUs, m.cpuToSocket)
 	err := collector.setup()
 	if err != nil {
 		collector.Destroy()

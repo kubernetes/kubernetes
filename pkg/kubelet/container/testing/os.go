@@ -19,6 +19,7 @@ package testing
 import (
 	"errors"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -27,19 +28,14 @@ import (
 // of the real call.
 type FakeOS struct {
 	StatFn     func(string) (os.FileInfo, error)
-	ReadDirFn  func(string) ([]os.FileInfo, error)
+	ReadDirFn  func(string) ([]os.DirEntry, error)
 	MkdirAllFn func(string, os.FileMode) error
 	SymlinkFn  func(string, string) error
+	GlobFn     func(string, string) bool
 	HostName   string
 	Removes    []string
 	Files      map[string][]*os.FileInfo
-}
-
-func NewFakeOS() *FakeOS {
-	return &FakeOS{
-		Removes: []string{},
-		Files:   make(map[string][]*os.FileInfo),
-	}
+	FilesLock  sync.RWMutex
 }
 
 // Mkdir is a fake call that just returns nil.
@@ -59,7 +55,7 @@ func (f *FakeOS) Symlink(oldname string, newname string) error {
 }
 
 // Stat is a fake that returns an error
-func (f FakeOS) Stat(path string) (os.FileInfo, error) {
+func (f *FakeOS) Stat(path string) (os.FileInfo, error) {
 	if f.StatFn != nil {
 		return f.StatFn(path)
 	}
@@ -78,13 +74,19 @@ func (f *FakeOS) RemoveAll(path string) error {
 	return nil
 }
 
-// Create is a fake call that returns nil.
-func (FakeOS) Create(path string) (*os.File, error) {
+// Create is a fake call that creates a virtual file and returns nil.
+func (f *FakeOS) Create(path string) (*os.File, error) {
+	f.FilesLock.Lock()
+	defer f.FilesLock.Unlock()
+	if f.Files == nil {
+		f.Files = make(map[string][]*os.FileInfo)
+	}
+	f.Files[path] = []*os.FileInfo{}
 	return nil, nil
 }
 
 // Chmod is a fake call that returns nil.
-func (FakeOS) Chmod(path string, perm os.FileMode) error {
+func (*FakeOS) Chmod(path string, perm os.FileMode) error {
 	return nil
 }
 
@@ -94,24 +96,50 @@ func (f *FakeOS) Hostname() (name string, err error) {
 }
 
 // Chtimes is a fake call that returns nil.
-func (FakeOS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+func (*FakeOS) Chtimes(path string, atime time.Time, mtime time.Time) error {
 	return nil
 }
 
 // Pipe is a fake call that returns nil.
-func (FakeOS) Pipe() (r *os.File, w *os.File, err error) {
+func (*FakeOS) Pipe() (r *os.File, w *os.File, err error) {
 	return nil, nil, nil
 }
 
 // ReadDir is a fake call that returns the files under the directory.
-func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (f *FakeOS) ReadDir(dirname string) ([]os.DirEntry, error) {
 	if f.ReadDirFn != nil {
 		return f.ReadDirFn(dirname)
 	}
 	return nil, nil
 }
 
-// Glob is a fake call that returns nil.
+// Glob is a fake call that returns list of virtual files matching a pattern.
 func (f *FakeOS) Glob(pattern string) ([]string, error) {
+	if f.GlobFn != nil {
+		var res []string
+		f.FilesLock.RLock()
+		defer f.FilesLock.RUnlock()
+		for k := range f.Files {
+			if f.GlobFn(pattern, k) {
+				res = append(res, k)
+			}
+		}
+		return res, nil
+	}
 	return nil, nil
+}
+
+// Open is a fake call that returns nil.
+func (*FakeOS) Open(name string) (*os.File, error) {
+	return nil, nil
+}
+
+// OpenFile is a fake call that return nil.
+func (*FakeOS) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return nil, nil
+}
+
+// Rename is a fake call that return nil.
+func (*FakeOS) Rename(oldpath, newpath string) error {
+	return nil
 }

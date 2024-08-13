@@ -3,34 +3,21 @@
 filters:
   ".*":
     reviewers:
-      - brendandburns
-      - dchen1107
-      - lavalamp
-      - smarterclayton
-      - thockin
-      - liggitt
+      - dep-reviewers
+      - sig-architecture-approvers
     approvers:
+      - dep-approvers # for go.mod/go.sum
+      - sig-architecture-approvers # for OWNERS_ALIASES and other root files
+    emeritus_approvers:
       - bgrant0607
       - brendandburns
       - dchen1107
+      - jbeda
       - lavalamp
+      - liggitt
       - smarterclayton
       - thockin
       - wojtek-t
-      - liggitt
-    emeritus_approvers:
-      - jbeda
-
-  # Bazel build infrastructure changes often touch files throughout the tree
-  "\\.bzl$":
-    reviewers:
-      - ixdy
-    approvers:
-      - ixdy
-  "BUILD(\\.bazel)?$":
-    approvers:
-      - ixdy
-
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
   # dep-approvers
   "go\\.(mod|sum)$":

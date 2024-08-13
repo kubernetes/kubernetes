@@ -381,6 +381,53 @@ func TestIsSet(t *testing.T) {
 	}
 }
 
+func TestAnySet(t *testing.T) {
+	tcases := []struct {
+		name        string
+		mask        []int
+		checkBits   []int
+		expectedSet bool
+	}{
+		{
+			name:        "Check if any bits from 11 in mask 00 is set",
+			mask:        nil,
+			checkBits:   []int{0, 1},
+			expectedSet: false,
+		},
+		{
+			name:        "Check if any bits from 11 in mask 01 is set",
+			mask:        []int{0},
+			checkBits:   []int{0, 1},
+			expectedSet: true,
+		},
+		{
+			name:        "Check if any bits from 11 in mask 11 is set",
+			mask:        []int{0, 1},
+			checkBits:   []int{0, 1},
+			expectedSet: true,
+		},
+		{
+			name:        "Check if any bit outside range 0-63 is set",
+			mask:        []int{0, 1},
+			checkBits:   []int{64, 65},
+			expectedSet: false,
+		},
+		{
+			name:        "Check if any bits from 1001 in mask 0110 is set",
+			mask:        []int{1, 2},
+			checkBits:   []int{0, 3},
+			expectedSet: false,
+		},
+	}
+	for _, tc := range tcases {
+		mask, _ := NewBitMask(tc.mask...)
+		set := mask.AnySet(tc.checkBits)
+		if set != tc.expectedSet {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedSet, set)
+		}
+	}
+}
+
 func TestIsEqual(t *testing.T) {
 	tcases := []struct {
 		name          string
@@ -580,6 +627,78 @@ func TestIterateBitMasks(t *testing.T) {
 		// Compare the number of masks generated to the expected amount.
 		if expectedNumMasks != numMasks {
 			t.Errorf("Expected to iterate %v masks, got %v", expectedNumMasks, numMasks)
+		}
+	}
+}
+
+func TestIsLessThan(t *testing.T) {
+	tcases := []struct {
+		name               string
+		firstMask          []int
+		secondMask         []int
+		expectedFirstLower bool
+	}{
+		{
+			name:               "Check which value is lower of masks with equal bits set 1/1",
+			firstMask:          []int{0},
+			secondMask:         []int{0},
+			expectedFirstLower: false,
+		},
+		{
+			name:               "Check which value is lower of masks with unequal bits set 2/1",
+			firstMask:          []int{1},
+			secondMask:         []int{0},
+			expectedFirstLower: false,
+		},
+		{
+			name:               "Check which value is lower of masks with unequal bits set 1/2",
+			firstMask:          []int{0},
+			secondMask:         []int{1},
+			expectedFirstLower: true,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
+		expectedFirstLower := firstMask.IsLessThan(secondMask)
+		if expectedFirstLower != tc.expectedFirstLower {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstLower, expectedFirstLower)
+		}
+	}
+}
+
+func TestIsGreaterThan(t *testing.T) {
+	tcases := []struct {
+		name                 string
+		firstMask            []int
+		secondMask           []int
+		expectedFirstGreater bool
+	}{
+		{
+			name:                 "Check which value is greater of masks with equal bits set 1/1",
+			firstMask:            []int{0},
+			secondMask:           []int{0},
+			expectedFirstGreater: false,
+		},
+		{
+			name:                 "Check which value is greater of masks with unequal bits set 2/1",
+			firstMask:            []int{1},
+			secondMask:           []int{0},
+			expectedFirstGreater: true,
+		},
+		{
+			name:                 "Check which value is greater of masks with unequal bits set 1/2",
+			firstMask:            []int{0},
+			secondMask:           []int{1},
+			expectedFirstGreater: false,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
+		expectedFirstGreater := firstMask.IsGreaterThan(secondMask)
+		if expectedFirstGreater != tc.expectedFirstGreater {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstGreater, expectedFirstGreater)
 		}
 	}
 }

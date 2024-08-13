@@ -150,7 +150,7 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 		if c == '}' {
 			return iter.decrementDepth()
 		}
-		iter.ReportError("ReadObjectCB", `expect " after }, but found `+string([]byte{c}))
+		iter.ReportError("ReadObjectCB", `expect " after {, but found `+string([]byte{c}))
 		iter.decrementDepth()
 		return false
 	}
@@ -206,7 +206,7 @@ func (iter *Iterator) ReadMapCB(callback func(*Iterator, string) bool) bool {
 		if c == '}' {
 			return iter.decrementDepth()
 		}
-		iter.ReportError("ReadMapCB", `expect " after }, but found `+string([]byte{c}))
+		iter.ReportError("ReadMapCB", `expect " after {, but found `+string([]byte{c}))
 		iter.decrementDepth()
 		return false
 	}

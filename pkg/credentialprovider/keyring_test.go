@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-func TestUrlsMatch(t *testing.T) {
+func TestURLsMatch(t *testing.T) {
 	tests := []struct {
 		globURL       string
 		targetURL     string
@@ -88,6 +88,22 @@ func TestUrlsMatch(t *testing.T) {
 			targetURL:     "kubernetes.io",
 			matchExpected: false,
 		},
+		{
+			globURL:       "*kubernetes.io",
+			targetURL:     "a.kubernetes.io",
+			matchExpected: false,
+		},
+		// match when number of parts match
+		{
+			globURL:       "*kubernetes.io",
+			targetURL:     "kubernetes.io",
+			matchExpected: true,
+		},
+		{
+			globURL:       "*.*.*.kubernetes.io",
+			targetURL:     "a.b.c.kubernetes.io",
+			matchExpected: true,
+		},
 		// no match when some parts mismatch
 		{
 			globURL:       "kubernetes.io",
@@ -112,7 +128,7 @@ func TestUrlsMatch(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		matched, _ := urlsMatchStr(test.globURL, test.targetURL)
+		matched, _ := URLsMatchStr(test.globURL, test.targetURL)
 		if matched != test.matchExpected {
 			t.Errorf("Expected match result of %s and %s to be %t, but was %t",
 				test.globURL, test.targetURL, test.matchExpected, matched)
@@ -203,7 +219,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -271,7 +287,7 @@ func TestKeyringMiss(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -299,7 +315,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -325,7 +341,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -366,7 +382,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -407,7 +423,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -452,21 +468,6 @@ func TestIsDefaultRegistryMatch(t *testing.T) {
 			}
 		}
 	}
-}
-
-type testProvider struct {
-	Count int
-}
-
-// Enabled implements dockerConfigProvider
-func (d *testProvider) Enabled() bool {
-	return true
-}
-
-// Provide implements dockerConfigProvider
-func (d *testProvider) Provide(image string) DockerConfig {
-	d.Count++
-	return DockerConfig{}
 }
 
 func TestProvidersDockerKeyring(t *testing.T) {

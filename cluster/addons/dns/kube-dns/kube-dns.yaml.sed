@@ -82,12 +82,13 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
         prometheus.io/port: "10054"
         prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
       affinity:
@@ -104,8 +105,6 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
-      nodeSelector:
-        kubernetes.io/os: linux
       volumes:
       - name: kube-dns-config
         configMap:
@@ -115,7 +114,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-kube-dns:1.23.1
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -171,7 +170,7 @@ spec:
           runAsUser: 1001
           runAsGroup: 1001
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-dnsmasq-nanny:1.23.1
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -218,7 +217,7 @@ spec:
               - NET_BIND_SERVICE
               - SETGID
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-sidecar:1.23.1
         livenessProbe:
           httpGet:
             path: /metrics

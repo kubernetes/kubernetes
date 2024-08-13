@@ -17,14 +17,16 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	"fmt"
 
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -54,22 +56,23 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-certs")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		s := GetSecret(f.ClientSet, kubeSystemNamespace, kubeadmCertsSecretName)
 
 		// Checks the kubeadm-certs is ownen by a time lived token
 		gomega.Expect(s.OwnerReferences).To(gomega.HaveLen(1), "%s should have one owner reference", kubeadmCertsSecretName)
 		ownRef := s.OwnerReferences[0]
-		framework.ExpectEqual(ownRef.Kind, "Secret", "%s should be owned by a secret", kubeadmCertsSecretName)
+		gomega.Expect(ownRef.Kind).To(gomega.Equal("Secret"), "%s should be owned by a secret", kubeadmCertsSecretName)
 		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrue(), "%s should be deleted on owner deletion", kubeadmCertsSecretName)
 
 		o := GetSecret(f.ClientSet, kubeSystemNamespace, ownRef.Name)
-		framework.ExpectEqual(o.Type, corev1.SecretTypeBootstrapToken, "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
+		gomega.Expect(o.Type).To(gomega.Equal(corev1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
 		gomega.Expect(o.Data).To(gomega.HaveKey("expiration"), "%s should have an owner reference with an expiration", kubeadmCertsSecretName)
 
 		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map
@@ -102,12 +105,12 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 		}
 	})
 
-	ginkgo.It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleBindingName)
 	})
 
-	ginkgo.It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmCertsSecretResource,

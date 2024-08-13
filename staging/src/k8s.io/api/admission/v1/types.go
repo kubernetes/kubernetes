@@ -24,6 +24,7 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // AdmissionReview describes an admission review request/response.
 type AdmissionReview struct {
@@ -140,6 +141,13 @@ type AdmissionResponse struct {
 	// the admission webhook to add additional context to the audit log for this request.
 	// +optional
 	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty" protobuf:"bytes,6,opt,name=auditAnnotations"`
+
+	// warnings is a list of warning messages to return to the requesting API client.
+	// Warning messages describe a problem the client making the API request should correct or be aware of.
+	// Limit warnings to 120 characters if possible.
+	// Warnings over 256 characters and large numbers of warnings may be truncated.
+	// +optional
+	Warnings []string `json:"warnings,omitempty" protobuf:"bytes,7,rep,name=warnings"`
 }
 
 // PatchType is the type of patch being used to represent the mutated object

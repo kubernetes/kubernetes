@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 )
 
 func Example() {
@@ -44,7 +46,10 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, downstream)
+	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:  MetaNamespaceKeyFunc,
+		KnownObjects: downstream,
+	})
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -58,7 +63,7 @@ func Example() {
 
 		// Let's implement a simple controller that just deletes
 		// everything that comes in.
-		Process: func(obj interface{}) error {
+		Process: func(obj interface{}, isInInitialList bool) error {
 			// Obj is from the Pop method of the Queue we make above.
 			newest := obj.(Deltas).Newest()
 
@@ -133,8 +138,8 @@ func ExampleNewInformer() {
 		source,
 		&v1.Pod{},
 		time.Millisecond*100,
-		ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+		ResourceEventHandlerDetailedFuncs{
+			AddFunc: func(obj interface{}, isInInitialList bool) {
 				source.Delete(obj.(runtime.Object))
 			},
 			DeleteFunc: func(obj interface{}) {
@@ -209,8 +214,8 @@ func TestHammerController(t *testing.T) {
 		source,
 		&v1.Pod{},
 		time.Millisecond*100,
-		ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { recordFunc("add", obj) },
+		ResourceEventHandlerDetailedFuncs{
+			AddFunc:    func(obj interface{}, isInInitialList bool) { recordFunc("add", obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { recordFunc("update", newObj) },
 			DeleteFunc: func(obj interface{}) { recordFunc("delete", obj) },
 		},
@@ -401,4 +406,308 @@ func TestUpdate(t *testing.T) {
 	// Let's wait for the controller to process the things we just added.
 	testDoneWG.Wait()
 	close(stop)
+}
+
+func TestPanicPropagated(t *testing.T) {
+	// source simulates an apiserver object endpoint.
+	source := fcache.NewFakeControllerSource()
+
+	// Make a controller that just panic if the AddFunc is called.
+	_, controller := NewInformer(
+		source,
+		&v1.Pod{},
+		time.Millisecond*100,
+		ResourceEventHandlerDetailedFuncs{
+			AddFunc: func(obj interface{}, isInInitialList bool) {
+				// Create a panic.
+				panic("Just panic.")
+			},
+		},
+	)
+
+	// Run the controller and run it until we close stop.
+	stop := make(chan struct{})
+	defer close(stop)
+
+	propagated := make(chan interface{})
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				propagated <- r
+			}
+		}()
+		controller.Run(stop)
+	}()
+	// Let's add a object to the source. It will trigger a panic.
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}})
+
+	// Check if the panic propagated up.
+	select {
+	case p := <-propagated:
+		if p == "Just panic." {
+			t.Logf("Test Passed")
+		} else {
+			t.Errorf("unrecognized panic in controller run: %v", p)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout: the panic failed to propagate from the controller run method!")
+	}
+}
+
+func TestTransformingInformer(t *testing.T) {
+	// source simulates an apiserver object endpoint.
+	source := fcache.NewFakeControllerSource()
+
+	makePod := func(name, generation string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "namespace",
+				Labels:    map[string]string{"generation": generation},
+			},
+			Spec: v1.PodSpec{
+				Hostname:  "hostname",
+				Subdomain: "subdomain",
+			},
+		}
+	}
+	expectedPod := func(name, generation string) *v1.Pod {
+		pod := makePod(name, generation)
+		pod.Spec.Hostname = "new-hostname"
+		pod.Spec.Subdomain = ""
+		pod.Spec.NodeName = "nodename"
+		return pod
+	}
+
+	source.Add(makePod("pod1", "1"))
+	source.Modify(makePod("pod1", "2"))
+
+	type event struct {
+		eventType watch.EventType
+		previous  interface{}
+		current   interface{}
+	}
+	events := make(chan event, 10)
+	recordEvent := func(eventType watch.EventType, previous, current interface{}) {
+		events <- event{eventType: eventType, previous: previous, current: current}
+	}
+	verifyEvent := func(eventType watch.EventType, previous, current interface{}) {
+		select {
+		case event := <-events:
+			if event.eventType != eventType {
+				t.Errorf("expected type %v, got %v", eventType, event.eventType)
+			}
+			if !apiequality.Semantic.DeepEqual(event.previous, previous) {
+				t.Errorf("expected previous object %#v, got %#v", previous, event.previous)
+			}
+			if !apiequality.Semantic.DeepEqual(event.current, current) {
+				t.Errorf("expected object %#v, got %#v", current, event.current)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("failed to get event")
+		}
+	}
+
+	podTransformer := func(obj interface{}) (interface{}, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object type: %T", obj)
+		}
+		pod.Spec.Hostname = "new-hostname"
+		pod.Spec.Subdomain = ""
+		pod.Spec.NodeName = "nodename"
+
+		// Clear out ResourceVersion to simplify comparisons.
+		pod.ResourceVersion = ""
+
+		return pod, nil
+	}
+
+	store, controller := NewTransformingInformer(
+		source,
+		&v1.Pod{},
+		0,
+		ResourceEventHandlerDetailedFuncs{
+			AddFunc:    func(obj interface{}, isInInitialList bool) { recordEvent(watch.Added, nil, obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { recordEvent(watch.Modified, oldObj, newObj) },
+			DeleteFunc: func(obj interface{}) { recordEvent(watch.Deleted, obj, nil) },
+		},
+		podTransformer,
+	)
+
+	verifyStore := func(expectedItems []interface{}) {
+		items := store.List()
+		if len(items) != len(expectedItems) {
+			t.Errorf("unexpected items %v, expected %v", items, expectedItems)
+		}
+		for _, expectedItem := range expectedItems {
+			found := false
+			for _, item := range items {
+				if apiequality.Semantic.DeepEqual(item, expectedItem) {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("expected item %v not found in %v", expectedItem, items)
+			}
+		}
+	}
+
+	stopCh := make(chan struct{})
+	go controller.Run(stopCh)
+
+	verifyEvent(watch.Added, nil, expectedPod("pod1", "2"))
+	verifyStore([]interface{}{expectedPod("pod1", "2")})
+
+	source.Add(makePod("pod2", "1"))
+	verifyEvent(watch.Added, nil, expectedPod("pod2", "1"))
+	verifyStore([]interface{}{expectedPod("pod1", "2"), expectedPod("pod2", "1")})
+
+	source.Add(makePod("pod3", "1"))
+	verifyEvent(watch.Added, nil, expectedPod("pod3", "1"))
+
+	source.Modify(makePod("pod2", "2"))
+	verifyEvent(watch.Modified, expectedPod("pod2", "1"), expectedPod("pod2", "2"))
+
+	source.Delete(makePod("pod1", "2"))
+	verifyEvent(watch.Deleted, expectedPod("pod1", "2"), nil)
+	verifyStore([]interface{}{expectedPod("pod2", "2"), expectedPod("pod3", "1")})
+
+	close(stopCh)
+}
+
+func TestTransformingInformerRace(t *testing.T) {
+	// source simulates an apiserver object endpoint.
+	source := fcache.NewFakeControllerSource()
+
+	label := "to-be-transformed"
+	makePod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "namespace",
+				Labels:    map[string]string{label: "true"},
+			},
+			Spec: v1.PodSpec{
+				Hostname: "hostname",
+			},
+		}
+	}
+
+	badTransform := atomic.Bool{}
+	podTransformer := func(obj interface{}) (interface{}, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object type: %T", obj)
+		}
+		if pod.ObjectMeta.Labels[label] != "true" {
+			badTransform.Store(true)
+			return nil, fmt.Errorf("object already transformed: %#v", obj)
+		}
+		pod.ObjectMeta.Labels[label] = "false"
+		return pod, nil
+	}
+
+	numObjs := 5
+	for i := 0; i < numObjs; i++ {
+		source.Add(makePod(fmt.Sprintf("pod-%d", i)))
+	}
+
+	type event struct{}
+	events := make(chan event, numObjs)
+	recordEvent := func(eventType watch.EventType, previous, current interface{}) {
+		events <- event{}
+	}
+	checkEvents := func(count int) {
+		for i := 0; i < count; i++ {
+			<-events
+		}
+	}
+	store, controller := NewTransformingInformer(
+		source,
+		&v1.Pod{},
+		5*time.Millisecond,
+		ResourceEventHandlerDetailedFuncs{
+			AddFunc:    func(obj interface{}, isInInitialList bool) { recordEvent(watch.Added, nil, obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { recordEvent(watch.Modified, oldObj, newObj) },
+			DeleteFunc: func(obj interface{}) { recordEvent(watch.Deleted, obj, nil) },
+		},
+		podTransformer,
+	)
+
+	stopCh := make(chan struct{})
+	go controller.Run(stopCh)
+
+	checkEvents(numObjs)
+
+	// Periodically fetch objects to ensure no access races.
+	wg := sync.WaitGroup{}
+	errors := make(chan error, numObjs)
+	for i := 0; i < numObjs; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			key := fmt.Sprintf("namespace/pod-%d", index)
+			for {
+				select {
+				case <-stopCh:
+					return
+				default:
+				}
+
+				obj, ok, err := store.GetByKey(key)
+				if !ok || err != nil {
+					errors <- fmt.Errorf("couldn't get the object for %v", key)
+					return
+				}
+				pod := obj.(*v1.Pod)
+				if pod.ObjectMeta.Labels[label] != "false" {
+					errors <- fmt.Errorf("unexpected object: %#v", pod)
+					return
+				}
+			}
+		}(i)
+	}
+
+	// Let resyncs to happen for some time.
+	time.Sleep(time.Second)
+
+	close(stopCh)
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		t.Error(err)
+	}
+
+	if badTransform.Load() {
+		t.Errorf("unexpected transformation happened")
+	}
+}
+
+func TestDeletionHandlingObjectToName(t *testing.T) {
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname",
+			Namespace: "testnamespace",
+		},
+	}
+	stringKey, err := MetaNamespaceKeyFunc(cm)
+	if err != nil {
+		t.Error(err)
+	}
+	deleted := DeletedFinalStateUnknown{
+		Key: stringKey,
+		Obj: cm,
+	}
+	expected, err := ObjectToName(cm)
+	if err != nil {
+		t.Error(err)
+	}
+	actual, err := DeletionHandlingObjectToName(deleted)
+	if err != nil {
+		t.Error(err)
+	}
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
 }

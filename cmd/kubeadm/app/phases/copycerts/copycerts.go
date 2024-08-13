@@ -20,9 +20,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
-	keyutil "k8s.io/client-go/util/keyutil"
+	"k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
@@ -57,11 +58,11 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	if err != nil {
 		return "", errors.Wrap(err, "error generating token to upload certs")
 	}
-	token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+	token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating upload certs token")
 	}
-	tokens := []kubeadmapi.BootstrapToken{{
+	tokens := []bootstraptokenv1.BootstrapToken{{
 		Token:       token,
 		Description: "Proxy for managing TTL for the kubeadm-certs secret",
 		TTL: &metav1.Duration{
@@ -75,7 +76,7 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	return tokens[0].Token.ID, nil
 }
 
-//CreateCertificateKey returns a cryptographically secure random key
+// CreateCertificateKey returns a cryptographically secure random key
 func CreateCertificateKey() (string, error) {
 	randBytes, err := cryptoutil.CreateRandBytes(kubeadmconstants.CertificateKeySize)
 	if err != nil {
@@ -84,7 +85,7 @@ func CreateCertificateKey() (string, error) {
 	return hex.EncodeToString(randBytes), nil
 }
 
-//UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
+// UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
 	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
@@ -171,7 +172,7 @@ func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.Own
 }
 
 func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
-	cert, err := ioutil.ReadFile(certPath)
+	cert, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
 	}
@@ -181,17 +182,17 @@ func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
 func certsToTransfer(cfg *kubeadmapi.InitConfiguration) map[string]string {
 	certsDir := cfg.CertificatesDir
 	certs := map[string]string{
-		kubeadmconstants.CACertName:                   path.Join(certsDir, kubeadmconstants.CACertName),
-		kubeadmconstants.CAKeyName:                    path.Join(certsDir, kubeadmconstants.CAKeyName),
-		kubeadmconstants.FrontProxyCACertName:         path.Join(certsDir, kubeadmconstants.FrontProxyCACertName),
-		kubeadmconstants.FrontProxyCAKeyName:          path.Join(certsDir, kubeadmconstants.FrontProxyCAKeyName),
-		kubeadmconstants.ServiceAccountPublicKeyName:  path.Join(certsDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		kubeadmconstants.ServiceAccountPrivateKeyName: path.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		kubeadmconstants.CACertName:                   filepath.Join(certsDir, kubeadmconstants.CACertName),
+		kubeadmconstants.CAKeyName:                    filepath.Join(certsDir, kubeadmconstants.CAKeyName),
+		kubeadmconstants.FrontProxyCACertName:         filepath.Join(certsDir, kubeadmconstants.FrontProxyCACertName),
+		kubeadmconstants.FrontProxyCAKeyName:          filepath.Join(certsDir, kubeadmconstants.FrontProxyCAKeyName),
+		kubeadmconstants.ServiceAccountPublicKeyName:  filepath.Join(certsDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		kubeadmconstants.ServiceAccountPrivateKeyName: filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName),
 	}
 
 	if cfg.Etcd.External == nil {
-		certs[kubeadmconstants.EtcdCACertName] = path.Join(certsDir, kubeadmconstants.EtcdCACertName)
-		certs[kubeadmconstants.EtcdCAKeyName] = path.Join(certsDir, kubeadmconstants.EtcdCAKeyName)
+		certs[kubeadmconstants.EtcdCACertName] = filepath.Join(certsDir, kubeadmconstants.EtcdCACertName)
+		certs[kubeadmconstants.EtcdCAKeyName] = filepath.Join(certsDir, kubeadmconstants.EtcdCAKeyName)
 	} else {
 		certs[externalEtcdCA] = cfg.Etcd.External.CAFile
 		certs[externalEtcdCert] = cfg.Etcd.External.CertFile
@@ -233,6 +234,8 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 		return errors.Wrap(err, "error decoding secret data with provided key")
 	}
 
+	fmt.Printf("[download-certs] Saving the certificates to the folder: %q\n", cfg.CertificatesDir)
+
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
@@ -251,9 +254,9 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 }
 
 func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
-	if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
+	if _, err := keyutil.ParsePrivateKeyPEM(certOrKeyData); err == nil {
 		return keyutil.WriteKey(certOrKeyPath, certOrKeyData)
-	} else if _, err := certutil.ParseCertsPEM(certOrKeyData); err == nil {
+	} else if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
 		return certutil.WriteCert(certOrKeyPath, certOrKeyData)
 	}
 	return errors.New("unknown data found in Secret entry")

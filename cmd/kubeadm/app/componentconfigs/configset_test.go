@@ -21,10 +21,7 @@ import (
 
 	"github.com/lithammer/dedent"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -32,59 +29,44 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+func testClusterCfg() *kubeadmapi.ClusterConfiguration {
+	return &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+	}
+}
+
 func TestDefault(t *testing.T) {
-	clusterCfg := &kubeadmapi.ClusterConfiguration{}
+	clusterCfg := testClusterCfg()
 	localAPIEndpoint := &kubeadmapi.APIEndpoint{}
 	nodeRegOps := &kubeadmapi.NodeRegistrationOptions{}
 
 	Default(clusterCfg, localAPIEndpoint, nodeRegOps)
 
 	if len(clusterCfg.ComponentConfigs) != len(known) {
-		t.Errorf("missmatch between supported and defaulted type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(known))
+		t.Errorf("mismatch between supported and defaulted type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(known))
 	}
 }
 
 func TestFromCluster(t *testing.T) {
-	clusterCfg := &kubeadmapi.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(),
-	}
-
-	k8sVersion := version.MustParseGeneric(clusterCfg.KubernetesVersion)
-
 	objects := []runtime.Object{
-		&v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.KubeProxyConfigMap,
-				Namespace: metav1.NamespaceSystem,
-			},
-			Data: map[string]string{
-				constants.KubeProxyConfigMapKey: dedent.Dedent(`
-					apiVersion: kubeproxy.config.k8s.io/v1alpha1
-					kind: KubeProxyConfiguration
-				`),
-			},
-		},
-		&v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GetKubeletConfigMapName(k8sVersion),
-				Namespace: metav1.NamespaceSystem,
-			},
-			Data: map[string]string{
-				constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
-					apiVersion: kubelet.config.k8s.io/v1beta1
-					kind: KubeletConfiguration
-				`),
-			},
-		},
+		testKubeProxyConfigMap(`
+			apiVersion: kubeproxy.config.k8s.io/v1alpha1
+			kind: KubeProxyConfiguration
+		`),
+		testKubeletConfigMap(`
+			apiVersion: kubelet.config.k8s.io/v1beta1
+			kind: KubeletConfiguration
+		`),
 	}
 	client := clientsetfake.NewSimpleClientset(objects...)
+	clusterCfg := testClusterCfg()
 
 	if err := FetchFromCluster(clusterCfg, client); err != nil {
 		t.Fatalf("FetchFromCluster failed: %v", err)
 	}
 
 	if len(clusterCfg.ComponentConfigs) != len(objects) {
-		t.Fatalf("missmatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(objects))
+		t.Fatalf("mismatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(objects))
 	}
 }
 
@@ -101,12 +83,12 @@ func TestFetchFromDocumentMap(t *testing.T) {
 		t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 	}
 
-	clusterCfg := &kubeadmapi.ClusterConfiguration{}
+	clusterCfg := testClusterCfg()
 	if err = FetchFromDocumentMap(clusterCfg, gvkmap); err != nil {
 		t.Fatalf("FetchFromDocumentMap failed: %v", err)
 	}
 
 	if len(clusterCfg.ComponentConfigs) != len(gvkmap) {
-		t.Fatalf("missmatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(gvkmap))
+		t.Fatalf("mismatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(gvkmap))
 	}
 }

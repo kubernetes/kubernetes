@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -106,6 +106,13 @@ type NestedPendingOperations interface {
 		volumeName v1.UniqueVolumeName,
 		podName volumetypes.UniquePodName,
 		nodeName types.NodeName) bool
+
+	// IsOperationSafeToRetry returns false if an operation for the given volumeName
+	// and one of podName or nodeName is pending or in exponential backoff, otherwise it returns true
+	IsOperationSafeToRetry(
+		volumeName v1.UniqueVolumeName,
+		podName volumetypes.UniquePodName,
+		nodeName types.NodeName, operationName string) bool
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
@@ -185,6 +192,33 @@ func (grm *nestedPendingOperations) Run(
 
 	return nil
 }
+func (grm *nestedPendingOperations) IsOperationSafeToRetry(
+	volumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName,
+	operationName string) bool {
+
+	grm.lock.RLock()
+	defer grm.lock.RUnlock()
+
+	opKey := operationKey{volumeName, podName, nodeName}
+	exist, previousOpIndex := grm.isOperationExists(opKey)
+	if !exist {
+		return true
+	}
+	previousOp := grm.operations[previousOpIndex]
+	if previousOp.operationPending {
+		return false
+	}
+	backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
+	if backOffErr != nil {
+		if previousOp.operationName == operationName {
+			return false
+		}
+	}
+
+	return true
+}
 
 func (grm *nestedPendingOperations) IsOperationPending(
 	volumeName v1.UniqueVolumeName,
@@ -210,6 +244,7 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 		return false, -1
 	}
 
+	opIndex := -1
 	for previousOpIndex, previousOp := range grm.operations {
 		volumeNameMatch := previousOp.key.volumeName == key.volumeName
 
@@ -217,16 +252,28 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 			key.podName == EmptyUniquePodName ||
 			previousOp.key.podName == key.podName
 
+		podNameExactMatch := previousOp.key.podName == key.podName
+
 		nodeNameMatch := previousOp.key.nodeName == EmptyNodeName ||
 			key.nodeName == EmptyNodeName ||
 			previousOp.key.nodeName == key.nodeName
 
+		nodeNameExactMatch := previousOp.key.nodeName == key.nodeName
+
 		if volumeNameMatch && podNameMatch && nodeNameMatch {
-			return true, previousOpIndex
+			// nonExactMatch pending first
+			if previousOp.operationPending {
+				return true, previousOpIndex
+			}
+			// nonExactMatch with no pending, set opIndex to the first nonExactMatch
+			// exactMatch can override opIndex to expected
+			if opIndex == -1 || (podNameExactMatch && nodeNameExactMatch) {
+				opIndex = previousOpIndex
+			}
 		}
 	}
+	return opIndex != -1, opIndex
 
-	return false, -1
 }
 
 func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {
@@ -240,7 +287,7 @@ func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error)
 		}
 	}
 
-	return 0, fmt.Errorf("Operation %+v not found", key)
+	return 0, fmt.Errorf("operation %+v not found", key)
 }
 
 func (grm *nestedPendingOperations) deleteOperation(key operationKey) {

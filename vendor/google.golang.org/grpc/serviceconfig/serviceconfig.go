@@ -19,7 +19,10 @@
 // Package serviceconfig defines types and methods for operating on gRPC
 // service configs.
 //
-// This package is EXPERIMENTAL.
+// # Experimental
+//
+// Notice: This package is EXPERIMENTAL and may be changed or removed in a
+// later release.
 package serviceconfig
 
 // Config represents an opaque data structure holding a service config.

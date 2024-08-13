@@ -17,22 +17,27 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -42,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializerjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
@@ -55,6 +61,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -148,15 +155,25 @@ func TestRouting(t *testing.T) {
 	crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	crdLister := listers.NewCustomResourceDefinitionLister(crdIndexer)
 
+	// note that in production we delegate to the special handler that is attached at the end of the delegation chain that checks if the server has installed all known HTTP paths before replying to the client.
+	// it returns 503 if not all registered signals have been ready (closed) otherwise it simply replies with 404.
+	// the apiextentionserver is considered to be initialized once hasCRDInformerSyncedSignal is closed.
+	//
+	// here, in this test the delegate represent the special handler and hasSync represents the signal.
+	// primarily we just want to make sure that the delegate has been called.
+	// the behaviour of the real delegate is tested elsewhere.
 	delegateCalled := false
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		delegateCalled = true
+		if !hasSynced {
+			http.Error(w, "", 503)
+			return
+		}
 		http.Error(w, "", 418)
 	})
 	customV1 := schema.GroupVersion{Group: "custom", Version: "v1"}
 	handler := &crdHandler{
 		crdLister: crdLister,
-		hasSynced: func() bool { return hasSynced },
 		delegate:  delegate,
 		versionDiscoveryHandler: &versionDiscoveryHandler{
 			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
@@ -206,7 +223,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group discovery",
@@ -228,7 +245,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -252,7 +269,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group version discovery",
@@ -274,7 +291,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v1",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -297,7 +314,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v2",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -322,7 +339,7 @@ func TestRouting(t *testing.T) {
 			Resource:             "foos",
 			HasSynced:            false,
 			IsResourceRequest:    true,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -387,7 +404,7 @@ func TestRouting(t *testing.T) {
 						t.Errorf("expected delegated called %v, got %v", tc.ExpectDelegateCalled, delegateCalled)
 					}
 					result := recorder.Result()
-					content, _ := ioutil.ReadAll(result.Body)
+					content, _ := io.ReadAll(result.Body)
 					if e, a := expectStatus, result.StatusCode; e != a {
 						t.Log(string(content))
 						t.Errorf("expected %v, got %v", e, a)
@@ -457,7 +474,10 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	defer server.Terminate(t)
 
 	crd := multiVersionFixture.DeepCopy()
-	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
+	// Create a context with metav1.NamespaceNone as the namespace since multiVersionFixture
+	// is a cluster scoped CRD.
+	ctx := apirequest.WithNamespace(apirequest.NewContext(), metav1.NamespaceNone)
+	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
@@ -467,7 +487,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,
@@ -475,7 +495,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		CountMetricPollPeriod:   time.Minute,
 	}
 	if enableWatchCache {
-		restOptionsGetter.Decorator = genericregistry.StorageWithCacher(100)
+		restOptionsGetter.Decorator = genericregistry.StorageWithCacher()
 	}
 
 	handler, err := NewCustomResourceDefinitionHandler(
@@ -513,12 +533,12 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		u.SetGroupVersionKind(schema.GroupVersionKind{Group: "stable.example.com", Version: "v1beta1", Kind: "MultiVersion"})
 		u.SetName("marker")
-		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			startResourceVersion = item.(*unstructured.Unstructured).GetResourceVersion()
 		}
-		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(context.TODO(), u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
+		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(ctx, u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -532,7 +552,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		unstructured.SetNestedField(u.Object, int64(1), "spec", "num")
 
 		// Create
-		if item, err := crdInfo.storages[version.Name].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected create result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -542,14 +562,14 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		// Update
 		u.SetAnnotations(map[string]string{"updated": "true"})
-		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(context.TODO(), u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(ctx, u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected update result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
 		}
 
 		// Get
-		if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -559,7 +579,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			// Allow time to propagate the create into the cache
 			time.Sleep(time.Second)
 			// Get cached
-			if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
+			if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 				t.Errorf("expected cached get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -571,7 +591,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	for _, version := range crd.Spec.Versions {
 		expectGVK := schema.GroupVersionKind{Group: "stable.example.com", Version: version.Name, Kind: "MultiVersion"}
 
-		if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{}); err != nil {
+		if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -583,7 +603,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		if enableWatchCache {
 			// List from watch cache
-			if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
+			if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else {
 				for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -594,7 +614,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			}
 		}
 
-		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
+		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(ctx, &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -623,6 +643,197 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		case <-time.After(time.Second):
 		}
 	}
+}
+
+func TestDecoder(t *testing.T) {
+	multiVersionJSON := `
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"name": "my-mv"
+	},
+	"num": 1,
+	"num": 2,
+	"unknown": "foo"
+	}
+	`
+	multiVersionYAML := `
+apiVersion: stable.example.com/v1beta1
+kind: MultiVersion
+metadata:
+  name: my-mv
+num: 1
+num: 2
+unknown: foo`
+
+	expectedObjUnknownNotPreserved := &unstructured.Unstructured{}
+	err := expectedObjUnknownNotPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedObjUnknownPreserved := &unstructured.Unstructured{}
+	err = expectedObjUnknownPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2,
+	"unknown": "foo"
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testcases := []struct {
+		name                  string
+		body                  string
+		yaml                  bool
+		strictDecoding        bool
+		preserveUnknownFields bool
+		expectedObj           *unstructured.Unstructured
+		expectedErr           error
+	}{
+		{
+			name:           "strict-decoding",
+			body:           multiVersionJSON,
+			strictDecoding: true,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    errors.New(`strict decoding error: duplicate field "num", unknown field "unknown"`),
+		},
+		{
+			name:           "non-strict-decoding",
+			body:           multiVersionJSON,
+			strictDecoding: false,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    nil,
+		},
+		{
+			name:                  "strict-decoding-preserve-unknown",
+			body:                  multiVersionJSON,
+			strictDecoding:        true,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           errors.New(`strict decoding error: duplicate field "num"`),
+		},
+		{
+			name:                  "non-strict-decoding-preserve-unknown",
+			body:                  multiVersionJSON,
+			strictDecoding:        false,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           nil,
+		},
+		{
+			name:           "strict-decoding-yaml",
+			body:           multiVersionYAML,
+			yaml:           true,
+			strictDecoding: true,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
+  line 7: key "num" already set in map, unknown field "unknown"`),
+		},
+		{
+			name:           "non-strict-decoding-yaml",
+			body:           multiVersionYAML,
+			yaml:           true,
+			strictDecoding: false,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    nil,
+		},
+		{
+			name:                  "strict-decoding-preserve-unknown-yaml",
+			body:                  multiVersionYAML,
+			yaml:                  true,
+			strictDecoding:        true,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
+  line 7: key "num" already set in map`),
+		},
+		{
+			name:                  "non-strict-decoding-preserve-unknown-yaml",
+			body:                  multiVersionYAML,
+			yaml:                  true,
+			strictDecoding:        false,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := "v1beta1"
+			structuralSchemas := map[string]*structuralschema.Structural{}
+			structuralSchema, err := structuralschema.NewStructural(&apiextensions.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			structuralSchemas[v] = structuralSchema
+			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{Yaml: tc.yaml, Strict: tc.strictDecoding})
+			decoder := &schemaCoercingDecoder{
+				delegate: delegate,
+				validator: unstructuredSchemaCoercer{
+					dropInvalidMetadata: true,
+					repairGeneration:    true,
+					structuralSchemas:   structuralSchemas,
+					structuralSchemaGK: schema.GroupKind{
+						Group: "stable.example.com",
+						Kind:  "MultiVersion",
+					},
+					returnUnknownFieldPaths: tc.strictDecoding,
+					preserveUnknownFields:   tc.preserveUnknownFields,
+				},
+			}
+
+			obj, _, err := decoder.Decode([]byte(tc.body), nil, nil)
+			if obj != nil {
+				unstructured, ok := obj.(*unstructured.Unstructured)
+				if !ok {
+					t.Fatalf("obj is not an unstructured: %v", obj)
+				}
+				objBytes, err := unstructured.MarshalJSON()
+				if err != nil {
+					t.Fatalf("err marshaling json: %v", err)
+				}
+				expectedBytes, err := tc.expectedObj.MarshalJSON()
+				if err != nil {
+					t.Fatalf("err marshaling json: %v", err)
+				}
+				if bytes.Compare(objBytes, expectedBytes) != 0 {
+					t.Fatalf("expected obj: \n%v\n got obj: \n%v\n", tc.expectedObj, obj)
+				}
+			}
+			if err == nil || tc.expectedErr == nil {
+				if err != nil || tc.expectedErr != nil {
+					t.Fatalf("expected err: %v, got err: %v", tc.expectedErr, err)
+				}
+			} else if err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("expected err: \n%v\n got err: \n%v\n", tc.expectedErr, err)
+			}
+		})
+	}
+
 }
 
 type dummyAdmissionImpl struct{}
@@ -681,4 +892,180 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 			Plural: "multiversion", Singular: "multiversion", Kind: "MultiVersion", ShortNames: []string{"mv"}, ListKind: "MultiVersionList", Categories: []string{"all"},
 		},
 	},
+}
+
+func Test_defaultDeprecationWarning(t *testing.T) {
+	tests := []struct {
+		name              string
+		deprecatedVersion string
+		crd               apiextensionsv1.CustomResourceDefinitionSpec
+		want              string
+	}{
+		{
+			name:              "no replacement",
+			deprecatedVersion: "v1",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true, Deprecated: true},
+					{Name: "v2", Served: true, Deprecated: true},
+					{Name: "v3", Served: false},
+				},
+			},
+			want: "example.com/v1 Widget is deprecated",
+		},
+		{
+			name:              "replacement sorting",
+			deprecatedVersion: "v1",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true},
+					{Name: "v1alpha1", Served: true},
+					{Name: "v1alpha2", Served: true},
+					{Name: "v1beta1", Served: true},
+					{Name: "v1beta2", Served: true},
+					{Name: "v2", Served: true},
+					{Name: "v2alpha1", Served: true},
+					{Name: "v2alpha2", Served: true},
+					{Name: "v2beta1", Served: true},
+					{Name: "v2beta2", Served: true},
+					{Name: "v3", Served: false},
+					{Name: "v3alpha1", Served: false},
+					{Name: "v3alpha2", Served: false},
+					{Name: "v3beta1", Served: false},
+					{Name: "v3beta2", Served: false},
+				},
+			},
+			want: "example.com/v1 Widget is deprecated; use example.com/v2 Widget",
+		},
+		{
+			name:              "no newer replacement of equal stability",
+			deprecatedVersion: "v2",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true},
+					{Name: "v3", Served: false},
+					{Name: "v3alpha1", Served: true},
+					{Name: "v3beta1", Served: true},
+					{Name: "v4", Served: true, Deprecated: true},
+				},
+			},
+			want: "example.com/v2 Widget is deprecated",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := defaultDeprecationWarning(tt.deprecatedVersion, tt.crd); got != tt.want {
+				t.Errorf("defaultDeprecationWarning() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildOpenAPIModelsForApply(t *testing.T) {
+	// This is a list of validation that we expect to work.
+	tests := []apiextensionsv1.CustomResourceValidation{
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:         "",
+				XIntOrString: true,
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"oneOf": {
+						OneOf: []apiextensionsv1.JSONSchemaProps{
+							{Type: "boolean"},
+							{Type: "string"},
+						},
+					},
+				},
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"nullable": {
+						Type:     "integer",
+						Nullable: true,
+					},
+				},
+			},
+		},
+	}
+
+	staticSpec, err := getOpenAPISpecFromFile()
+	if err != nil {
+		t.Fatalf("Failed to load openapi spec: %v", err)
+	}
+
+	crd := apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "example.stable.example.com", UID: types.UID("12345")},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "stable.example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "examples", Singular: "example", Kind: "Example", ShortNames: []string{"ex"}, ListKind: "ExampleList", Categories: []string{"all"},
+			},
+			Conversion:            &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
+			Scope:                 apiextensionsv1.ClusterScoped,
+			PreserveUnknownFields: false,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1beta1", Served: true, Storage: true,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+				},
+			},
+		},
+	}
+
+	convertedDefs := map[string]*spec.Schema{}
+	for k, v := range staticSpec.Definitions {
+		vCopy := v
+		convertedDefs[k] = &vCopy
+	}
+
+	for i, test := range tests {
+		crd.Spec.Versions[0].Schema = &test
+		models, err := buildOpenAPIModelsForApply(convertedDefs, &crd)
+		if err != nil {
+			t.Fatalf("failed to convert to apply model: %v", err)
+		}
+		if models == nil {
+			t.Fatalf("%d: failed to convert to apply model: nil", i)
+		}
+	}
+}
+
+func getOpenAPISpecFromFile() (*spec.Swagger, error) {
+	path := filepath.Join("testdata", "swagger.json")
+	_, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	byteSpec, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	staticSpec := &spec.Swagger{}
+
+	err = yaml.Unmarshal(byteSpec, staticSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return staticSpec, nil
 }

@@ -72,7 +72,7 @@ spec:
           secretName: kubeconfig
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.9
+        image: registry.k8s.io/k8s-dns-kube-dns-amd64:1.14.9
         resources:
           limits:
             memory: 170Mi
@@ -120,7 +120,7 @@ spec:
         - name: secret-volume
           mountPath: /etc/secret-volume
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.9
+        image: registry.k8s.io/k8s-dns-dnsmasq-nanny-amd64:1.14.9
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -160,7 +160,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.9
+        image: registry.k8s.io/k8s-dns-sidecar-amd64:1.14.9
         livenessProbe:
           httpGet:
             path: /metrics

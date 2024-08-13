@@ -2,6 +2,21 @@
 
 This directory tree contains serialized API objects in json, yaml, and protobuf formats.
 
+## Populating data for each release
+
+After every v1.x.0 release, snapshot compatibility data.
+
+For example, to capture compatibility data for `v1.20.0`:
+
+```sh
+export VERSION=v1.20.0
+git checkout ${VERSION}
+cp -fr staging/src/k8s.io/api/testdata/{HEAD,${VERSION}}
+git checkout -b ${VERSION}-api-testdata master
+git add .
+git commit -m "Add ${VERSION} API testdata"
+```
+
 ## Current version
 
 The `HEAD` subdirectory contains serialized API objects generated from the current commit:
@@ -14,7 +29,7 @@ HEAD/
 To run serialization tests just for the current version:
 
 ```sh
-go test ./vendor/k8s.io/api -run //HEAD
+go test k8s.io/api -run //HEAD
 ```
 
 All three formats of a given group/version/kind are expected to decode successfully to identical objects,
@@ -22,7 +37,7 @@ and to round-trip back to serialized form with identical bytes.
 Adding new fields or API types *is* expected to modify these fixtures. To regenerate them, run:
 
 ```sh
-UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test ./vendor/k8s.io/api -run //HEAD
+UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test k8s.io/api -run //HEAD
 ```
 
 ## Previous versions
@@ -42,12 +57,12 @@ This requires making optional scalar and struct fields pointers so that protobuf
 To run serialization tests just for a previous version, like `v1.14.0`:
 
 ```sh
-go test ./vendor/k8s.io/api -run //v1.14.0
+go test k8s.io/api -run //v1.14.0
 ```
 
 To run serialization tests for a particular group/version/kind, like `apps/v1` `Deployment`:
 ```sh
-go test ./vendor/k8s.io/api -run /apps.v1.Deployment/
+go test k8s.io/api -run /apps.v1.Deployment/
 ```
 
 Failures to decode, to round-trip identical bytes, or to decode identical objects from json/yaml/protobuf,
@@ -68,7 +83,7 @@ to ensure we are not breaking backwards compatibility with serialized data from 
 To see the diff between the original JSON/YAML data and the `...after_roundtrip...` files:
 
 ```sh
-cd vendor/k8s.io/api/testdata/v1.14.0/
+cd staging/src/k8s.io/api/testdata/v1.14.0/
 diff -u admission.k8s.io.v1beta1.AdmissionReview.json admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.json
 diff -u admission.k8s.io.v1beta1.AdmissionReview.yaml admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.yaml
 ```
@@ -105,7 +120,7 @@ To see the diff between the original proto data and the `...after_roundtrip...` 
 and strip off the leading four-byte kubernetes protobuf header to get standard protobuf that can be decoded:
 
 ```sh
-cd vendor/k8s.io/api/testdata/v1.14.0/
+cd staging/src/k8s.io/api/testdata/v1.14.0/
 diff -u \
   <(tail -c +5 admission.k8s.io.v1beta1.AdmissionReview.pb | protoc --decode_raw) \
   <(tail -c +5 admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.pb | protoc --decode_raw)

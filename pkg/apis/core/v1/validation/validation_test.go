@@ -17,115 +17,192 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestValidateResourceRequirements(t *testing.T) {
 	successCase := []struct {
-		Name         string
+		name         string
 		requirements v1.ResourceRequirements
-	}{
-		{
-			Name: "Resources with Requests equal to Limits",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-				},
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-				},
+	}{{
+		name: "Resources with Requests equal to Limits",
+		requirements: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
-		{
-			Name: "Resources with only Limits",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("10"),
-				},
+	}, {
+		name: "Resources with only Limits",
+		requirements: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("10"),
 			},
 		},
-		{
-			Name: "Resources with only Requests",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("10"),
-				},
+	}, {
+		name: "Resources with only Requests",
+		requirements: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("10"),
 			},
 		},
-		{
-			Name: "Resources with Requests Less Than Limits",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("9"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("9G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("9"),
-				},
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("9"),
-				},
+	}, {
+		name: "Resources with Requests Less Than Limits",
+		requirements: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("9"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("9G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("9"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("9"),
 			},
 		},
-	}
+	}}
 	for _, tc := range successCase {
-		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) != 0 {
-			t.Errorf("%q unexpected error: %v", tc.Name, errs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 
 	errorCase := []struct {
-		Name         string
-		requirements v1.ResourceRequirements
-	}{
-		{
-			Name: "Resources with Requests Larger Than Limits",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("10m"),
-				},
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("9"),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("9G"),
-					v1.ResourceName("my.org/resource"): resource.MustParse("9m"),
-				},
+		name                  string
+		requirements          v1.ResourceRequirements
+		skipLimitValueCheck   bool
+		skipRequestValueCheck bool
+	}{{
+		name: "Resources with Requests Larger Than Limits",
+		requirements: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("10m"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("9"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("9G"),
+				v1.ResourceName("my.org/resource"): resource.MustParse("9m"),
 			},
 		},
-		{
-			Name: "Invalid Resources with Requests",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName("my.org"): resource.MustParse("10m"),
-				},
+	}, {
+		name: "Invalid Resources with Requests",
+		requirements: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName("my.org"): resource.MustParse("10m"),
 			},
 		},
-		{
-			Name: "Invalid Resources with Limits",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName("my.org"): resource.MustParse("9m"),
-				},
+		skipRequestValueCheck: true,
+	}, {
+		name: "Invalid Resources with Limits",
+		requirements: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceName("my.org"): resource.MustParse("9m"),
 			},
 		},
-	}
+		skipLimitValueCheck: true,
+	}}
 	for _, tc := range errorCase {
-		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
-			t.Errorf("%q expected error", tc.Name)
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources"))
+			if len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+			validateNamesAndValuesInDescription(t, tc.requirements.Limits, errs, tc.skipLimitValueCheck, "limit")
+			validateNamesAndValuesInDescription(t, tc.requirements.Requests, errs, tc.skipRequestValueCheck, "request")
+		})
+	}
+}
+
+func validateNamesAndValuesInDescription(t *testing.T, r v1.ResourceList, errs field.ErrorList, skipValueTest bool, rl string) {
+	for name, value := range r {
+		containsName := false
+		containsValue := false
+
+		for _, e := range errs {
+			if strings.Contains(e.Error(), name.String()) {
+				containsName = true
+			}
+
+			if strings.Contains(e.Error(), value.String()) {
+				containsValue = true
+			}
 		}
+		if !containsName {
+			t.Errorf("error must contain %s name", rl)
+		}
+		if !containsValue && !skipValueTest {
+			t.Errorf("error must contain %s value", rl)
+		}
+	}
+}
+
+func TestValidateContainerResourceName(t *testing.T) {
+	successCase := []struct {
+		name         string
+		ResourceName core.ResourceName
+	}{{
+		name:         "CPU resource",
+		ResourceName: "cpu",
+	}, {
+		name:         "Memory resource",
+		ResourceName: "memory",
+	}, {
+		name:         "Hugepages resource",
+		ResourceName: "hugepages-2Mi",
+	}, {
+		name:         "Namespaced resource",
+		ResourceName: "kubernetes.io/resource-foo",
+	}, {
+		name:         "Extended Resource",
+		ResourceName: "my.org/resource-bar",
+	}}
+	for _, tc := range successCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(string(tc.ResourceName))); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
+	}
+
+	errorCase := []struct {
+		name         string
+		ResourceName core.ResourceName
+	}{{
+		name:         "Invalid standard resource",
+		ResourceName: "cpu-core",
+	}, {
+		name:         "Invalid namespaced resource",
+		ResourceName: "kubernetes.io/",
+	}, {
+		name:         "Invalid extended resource",
+		ResourceName: "my.org-foo-resource",
+	}}
+	for _, tc := range errorCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(string(tc.ResourceName))); len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
@@ -142,212 +219,175 @@ func TestValidatePodLogOptions(t *testing.T) {
 	)
 
 	successCase := []struct {
-		Name          string
+		name          string
 		podLogOptions v1.PodLogOptions
-	}{
-		{
-			Name:          "Empty PodLogOptions",
-			podLogOptions: v1.PodLogOptions{},
+	}{{
+		name:          "Empty PodLogOptions",
+		podLogOptions: v1.PodLogOptions{},
+	}, {
+		name: "PodLogOptions with TailLines",
+		podLogOptions: v1.PodLogOptions{
+			TailLines: &positiveLine,
 		},
-		{
-			Name: "PodLogOptions with TailLines",
-			podLogOptions: v1.PodLogOptions{
-				TailLines: &positiveLine,
-			},
+	}, {
+		name: "PodLogOptions with LimitBytes",
+		podLogOptions: v1.PodLogOptions{
+			LimitBytes: &limitBytesGreaterThan1,
 		},
-		{
-			Name: "PodLogOptions with LimitBytes",
-			podLogOptions: v1.PodLogOptions{
-				LimitBytes: &limitBytesGreaterThan1,
-			},
+	}, {
+		name: "PodLogOptions with only sinceSeconds",
+		podLogOptions: v1.PodLogOptions{
+			SinceSeconds: &sinceSecondsGreaterThan1,
 		},
-		{
-			Name: "PodLogOptions with only sinceSeconds",
-			podLogOptions: v1.PodLogOptions{
-				SinceSeconds: &sinceSecondsGreaterThan1,
-			},
+	}, {
+		name: "PodLogOptions with LimitBytes with TailLines",
+		podLogOptions: v1.PodLogOptions{
+			LimitBytes: &limitBytesGreaterThan1,
+			TailLines:  &positiveLine,
 		},
-		{
-			Name: "PodLogOptions with LimitBytes with TailLines",
-			podLogOptions: v1.PodLogOptions{
-				LimitBytes: &limitBytesGreaterThan1,
-				TailLines:  &positiveLine,
-			},
+	}, {
+		name: "PodLogOptions with LimitBytes with TailLines with SinceSeconds",
+		podLogOptions: v1.PodLogOptions{
+			LimitBytes:   &limitBytesGreaterThan1,
+			TailLines:    &positiveLine,
+			SinceSeconds: &sinceSecondsGreaterThan1,
 		},
-		{
-			Name: "PodLogOptions with LimitBytes with TailLines with SinceSeconds",
-			podLogOptions: v1.PodLogOptions{
-				LimitBytes:   &limitBytesGreaterThan1,
-				TailLines:    &positiveLine,
-				SinceSeconds: &sinceSecondsGreaterThan1,
-			},
-		},
-	}
+	}}
 	for _, tc := range successCase {
-		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
-			t.Errorf("%q unexpected error: %v", tc.Name, errs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 
 	errorCase := []struct {
-		Name          string
+		name          string
 		podLogOptions v1.PodLogOptions
-	}{
-		{
-			Name: "Invalid podLogOptions with Negative TailLines",
-			podLogOptions: v1.PodLogOptions{
-				TailLines:    &negativeLine,
-				LimitBytes:   &limitBytesGreaterThan1,
-				SinceSeconds: &sinceSecondsGreaterThan1,
-			},
+	}{{
+		name: "Invalid podLogOptions with Negative TailLines",
+		podLogOptions: v1.PodLogOptions{
+			TailLines:    &negativeLine,
+			LimitBytes:   &limitBytesGreaterThan1,
+			SinceSeconds: &sinceSecondsGreaterThan1,
 		},
-		{
-			Name: "Invalid podLogOptions with zero or negative LimitBytes",
-			podLogOptions: v1.PodLogOptions{
-				TailLines:    &positiveLine,
-				LimitBytes:   &limitBytesLessThan1,
-				SinceSeconds: &sinceSecondsGreaterThan1,
-			},
+	}, {
+		name: "Invalid podLogOptions with zero or negative LimitBytes",
+		podLogOptions: v1.PodLogOptions{
+			TailLines:    &positiveLine,
+			LimitBytes:   &limitBytesLessThan1,
+			SinceSeconds: &sinceSecondsGreaterThan1,
 		},
-		{
-			Name: "Invalid podLogOptions with zero or negative SinceSeconds",
-			podLogOptions: v1.PodLogOptions{
-				TailLines:    &negativeLine,
-				LimitBytes:   &limitBytesGreaterThan1,
-				SinceSeconds: &sinceSecondsLessThan1,
-			},
-		}, {
-			Name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
-			podLogOptions: v1.PodLogOptions{
-				TailLines:    &negativeLine,
-				LimitBytes:   &limitBytesGreaterThan1,
-				SinceSeconds: &sinceSecondsGreaterThan1,
-				SinceTime:    &timestamp,
-			},
+	}, {
+		name: "Invalid podLogOptions with zero or negative SinceSeconds",
+		podLogOptions: v1.PodLogOptions{
+			TailLines:    &negativeLine,
+			LimitBytes:   &limitBytesGreaterThan1,
+			SinceSeconds: &sinceSecondsLessThan1,
 		},
-	}
+	}, {
+		name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
+		podLogOptions: v1.PodLogOptions{
+			TailLines:    &negativeLine,
+			LimitBytes:   &limitBytesGreaterThan1,
+			SinceSeconds: &sinceSecondsGreaterThan1,
+			SinceTime:    &timestamp,
+		},
+	}}
 	for _, tc := range errorCase {
-		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
-			t.Errorf("%q expected error", tc.Name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
 func TestAccumulateUniqueHostPorts(t *testing.T) {
 	successCase := []struct {
+		name        string
 		containers  []v1.Container
 		accumulator *sets.String
 		fldPath     *field.Path
-		result      string
-	}{
-		{
-			containers: []v1.Container{
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolTCP,
-						},
-					},
-				},
-			},
-			accumulator: &sets.String{},
-			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is not allocated",
-		},
-		{
-			containers: []v1.Container{
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8081,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-			},
-			accumulator: &sets.String{},
-			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is not allocated",
-		},
-	}
-	for index, tc := range successCase {
-		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) != 0 {
-			t.Errorf("unexpected error for test case %v: %v", index, errs)
-		}
+	}{{
+		name: "HostPort is not allocated while containers use the same port with different protocol",
+		containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}, {
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolTCP,
+			}},
+		}},
+		accumulator: &sets.String{},
+		fldPath:     field.NewPath("spec", "containers"),
+	}, {
+		name: "HostPort is not allocated while containers use different ports",
+		containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}, {
+			Ports: []v1.ContainerPort{{
+				HostPort: 8081,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}},
+		accumulator: &sets.String{},
+		fldPath:     field.NewPath("spec", "containers"),
+	}}
+	for _, tc := range successCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 	errorCase := []struct {
+		name        string
 		containers  []v1.Container
 		accumulator *sets.String
 		fldPath     *field.Path
-		result      string
-	}{
-		{
-			containers: []v1.Container{
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-			},
-			accumulator: &sets.String{},
-			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is already allocated",
-		},
-		{
-			containers: []v1.Container{
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8080,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-				{
-					Ports: []v1.ContainerPort{
-						{
-							HostPort: 8081,
-							Protocol: v1.ProtocolUDP,
-						},
-					},
-				},
-			},
-			accumulator: &sets.String{"8080/UDP": sets.Empty{}},
-			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is already allocated",
-		},
-	}
-	for index, tc := range errorCase {
-		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) == 0 {
-			t.Errorf("test case %v: expected error %v, but get nil", index, tc.result)
-		}
+	}{{
+		name: "HostPort is already allocated while containers use the same port with UDP",
+		containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}, {
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}},
+		accumulator: &sets.String{},
+		fldPath:     field.NewPath("spec", "containers"),
+	}, {
+		name: "HostPort is already allocated",
+		containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
+				HostPort: 8080,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}, {
+			Ports: []v1.ContainerPort{{
+				HostPort: 8081,
+				Protocol: v1.ProtocolUDP,
+			}},
+		}},
+		accumulator: &sets.String{"8080/UDP": sets.Empty{}},
+		fldPath:     field.NewPath("spec", "containers"),
+	}}
+	for _, tc := range errorCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) == 0 {
+				t.Errorf("expected error, but get nil")
+			}
+		})
 	}
 }

@@ -38,12 +38,14 @@ import (
 var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
 
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
-//   * metadata.name (no leading '.' or curly braces '{...}'
-//   * {metadata.name} (no leading '.')
-//   * .metadata.name (no curly braces '{...}')
-//   * {.metadata.name} (complete expression)
+//   - metadata.name (no leading '.' or curly braces '{...}'
+//   - {metadata.name} (no leading '.')
+//   - .metadata.name (no curly braces '{...}')
+//   - {.metadata.name} (complete expression)
+//
 // And transforms them all into a valid jsonpath expression:
-//   {.metadata.name}
+//
+//	{.metadata.name}
 func RelaxedJSONPathExpression(pathExpression string) (string, error) {
 	if len(pathExpression) == 0 {
 		return pathExpression, nil
@@ -67,8 +69,8 @@ func RelaxedJSONPathExpression(pathExpression string) (string, error) {
 // NewCustomColumnsPrinterFromSpec creates a custom columns printer from a comma separated list of <header>:<jsonpath-field-spec> pairs.
 // e.g. NAME:metadata.name,API_VERSION:apiVersion creates a printer that prints:
 //
-//      NAME               API_VERSION
-//      foo                bar
+//	NAME               API_VERSION
+//	foo                bar
 func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHeaders bool) (*CustomColumnsPrinter, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
@@ -162,8 +164,8 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 		return fmt.Errorf(printers.InternalObjectPrinterErr)
 	}
 
-	if w, found := out.(*tabwriter.Writer); !found {
-		w = printers.GetNewTabWriter(out)
+	if _, found := out.(*tabwriter.Writer); !found {
+		w := printers.GetNewTabWriter(out)
 		out = w
 		defer w.Flush()
 	}
@@ -250,7 +252,7 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 		}
 		for arrIx := range values {
 			for valIx := range values[arrIx] {
-				valueStrings = append(valueStrings, fmt.Sprintf("%v", values[arrIx][valIx].Interface()))
+				valueStrings = append(valueStrings, printers.EscapeTerminal(fmt.Sprint(values[arrIx][valIx].Interface())))
 			}
 		}
 		columns[ix] = strings.Join(valueStrings, ",")

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -34,7 +35,7 @@ var DefaultSysSpec = SysSpec{
 	},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version:     []string{`18\.0[6,9]\..*`},
+			Version:     []string{`18\.0[6,9]\..*`, `19\.03\..*`},
 			GraphDriver: []string{"windowsfilter"},
 		},
 	},

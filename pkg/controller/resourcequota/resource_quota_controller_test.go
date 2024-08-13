@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,22 +26,24 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -102,7 +105,7 @@ func (errorLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 }
 
 type quotaController struct {
-	*ResourceQuotaController
+	*Controller
 	stop chan struct{}
 }
 
@@ -111,7 +114,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &ControllerOptions{
 		QuotaClient:               kubeClient.CoreV1(),
 		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -122,7 +125,8 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		InformersStarted:          alwaysStarted,
 		InformerFactory:           informerFactory,
 	}
-	qc, err := NewResourceQuotaController(resourceQuotaControllerOptions)
+	_, ctx := ktesting.NewTestContext(t)
+	qc, err := NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -782,7 +786,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 		defer close(qc.stop)
 
-		if err := qc.syncResourceQuota(&testCase.quota); err != nil {
+		if err := qc.syncResourceQuota(context.TODO(), &testCase.quota); err != nil {
 			if len(testCase.expectedError) == 0 || !strings.Contains(err.Error(), testCase.expectedError) {
 				t.Fatalf("test: %s, unexpected error: %v", testName, err)
 			}
@@ -794,7 +798,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		for _, action := range kubeClient.Actions() {
 			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 		}
-		if !actionSet.HasAll(testCase.expectedActionSet.List()...) {
+		if !actionSet.IsSuperset(testCase.expectedActionSet) {
 			t.Errorf("test: %s,\nExpected actions:\n%v\n but got:\n%v\nDifference:\n%v", testName, testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
 		}
 
@@ -807,7 +811,7 @@ func TestSyncResourceQuota(t *testing.T) {
 			}
 		}
 		if usage == nil {
-			t.Errorf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
+			t.Fatalf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
 		}
 
 		// ensure usage is as expected
@@ -975,7 +979,8 @@ func TestAddQuota(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		qc.addQuota(tc.quota)
+		logger, _ := ktesting.NewTestContext(t)
+		qc.addQuota(logger, tc.quota)
 		if tc.expectedPriority {
 			if e, a := 1, qc.missingUsageQueue.Len(); e != a {
 				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
@@ -1012,6 +1017,12 @@ func TestDiscoverySync(t *testing.T) {
 				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
 			},
 		},
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
+			},
+		},
 	}
 	unsyncableServerResources := []*metav1.APIResourceList{
 		{
@@ -1022,6 +1033,16 @@ func TestDiscoverySync(t *testing.T) {
 			},
 		},
 	}
+	appsV1Resources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
+			},
+		},
+	}
+	appsV1Error := &discovery.ErrGroupDiscoveryFailed{Groups: map[schema.GroupVersion]error{{Group: "apps", Version: "v1"}: fmt.Errorf(":-/")}}
+	coreV1Error := &discovery.ErrGroupDiscoveryFailed{Groups: map[schema.GroupVersion]error{{Group: "", Version: "v1"}: fmt.Errorf(":-/")}}
 	fakeDiscoveryClient := &fakeServerResources{
 		PreferredResources: serverResources,
 		Error:              nil,
@@ -1039,6 +1060,10 @@ func TestDiscoverySync(t *testing.T) {
 				404,
 				[]byte("{}"),
 			},
+			"GET" + "/apis/apps/v1/deployments": {
+				200,
+				[]byte("{}"),
+			},
 		},
 	}
 
@@ -1052,9 +1077,11 @@ func TestDiscoverySync(t *testing.T) {
 
 	pods := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	secrets := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	deployments := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
-		pods:    newGenericLister(pods.GroupResource(), []runtime.Object{}),
-		secrets: newGenericLister(secrets.GroupResource(), []runtime.Object{}),
+		pods:        newGenericLister(pods.GroupResource(), []runtime.Object{}),
+		secrets:     newGenericLister(secrets.GroupResource(), []runtime.Object{}),
+		deployments: newGenericLister(deployments.GroupResource(), []runtime.Object{}),
 	}
 	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), fakeDiscoveryClient.ServerPreferredNamespacedResources)
 	defer close(qc.stop)
@@ -1074,7 +1101,8 @@ func TestDiscoverySync(t *testing.T) {
 	// The 1s sleep in the test allows GetQuotableResources and
 	// resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go qc.Sync(fakeDiscoveryClient.ServerPreferredNamespacedResources, 200*time.Millisecond, stopSync)
+	_, ctx := ktesting.NewTestContext(t)
+	go qc.Sync(ctx, fakeDiscoveryClient.ServerPreferredNamespacedResources, 200*time.Millisecond)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
@@ -1083,37 +1111,87 @@ func TestDiscoverySync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected quotacontroller.Sync to be running but it is blocked: %v", err)
 	}
+	assertMonitors(t, qc, "pods", "deployments")
 
 	// Simulate the discovery client returning an error
-	fakeDiscoveryClient.setPreferredResources(nil)
-	fakeDiscoveryClient.setError(fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
+	fakeDiscoveryClient.setPreferredResources(nil, fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	// No monitors removed
+	assertMonitors(t, qc, "pods", "deployments")
 
 	// Remove the error from being returned and see if the quota sync is still working
-	fakeDiscoveryClient.setPreferredResources(serverResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
 	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
 	}
+	assertMonitors(t, qc, "pods", "deployments")
 
 	// Simulate the discovery client returning a resource the restmapper can resolve, but will not sync caches
-	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	// deployments removed, secrets added
+	assertMonitors(t, qc, "pods", "secrets")
 
 	// Put the resources back to normal and ensure quota sync recovers
-	fakeDiscoveryClient.setPreferredResources(serverResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
+
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+	// secrets removed, deployments readded
+	assertMonitors(t, qc, "pods", "deployments")
+
+	// apps/v1 discovery failure
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, appsV1Error)
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+	// deployments remain due to appsv1 error, secrets added
+	assertMonitors(t, qc, "pods", "deployments", "secrets")
+
+	// core/v1 discovery failure
+	fakeDiscoveryClient.setPreferredResources(appsV1Resources, coreV1Error)
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+	// pods and secrets remain due to corev1 error
+	assertMonitors(t, qc, "pods", "deployments", "secrets")
+
+	// Put the resources back to normal and ensure quota sync recovers
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
 	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+	// secrets removed, deployments remain
+	assertMonitors(t, qc, "pods", "deployments")
+}
+
+func assertMonitors(t *testing.T, qc quotaController, resources ...string) {
+	t.Helper()
+	expected := sets.NewString(resources...)
+	actual := sets.NewString()
+	for m := range qc.Controller.quotaMonitor.monitors {
+		actual.Insert(m.Resource)
+	}
+	if !actual.Equal(expected) {
+		t.Fatalf("expected monitors %v, got %v", expected.List(), actual.List())
 	}
 }
 
@@ -1138,7 +1216,7 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 	workerLockAcquired := make(chan struct{})
 	go func() {
 		workerLock.Lock()
-		workerLock.Unlock()
+		defer workerLock.Unlock()
 		close(workerLockAcquired)
 	}()
 	select {
@@ -1156,27 +1234,18 @@ type fakeServerResources struct {
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList) {
+func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList, err error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.PreferredResources = resources
-}
-
-func (f *fakeServerResources) setError(err error) {
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
 	f.Error = err
 }
 

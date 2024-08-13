@@ -27,25 +27,25 @@ import (
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/jsonpath"
+	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	waitLong = templates.LongDesc(`
+	waitLong = templates.LongDesc(i18n.T(`
 		Experimental: Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
@@ -55,15 +55,27 @@ var (
 		by providing the "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. One can use -o option to change to output destination.`)
+        condition has been met. You can use -o option to change to output destination.`))
 
-	waitExample = templates.Examples(`
-		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
+	waitExample = templates.Examples(i18n.T(`
+		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
 		kubectl wait --for=condition=Ready pod/busybox1
 
-		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
+		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity)
+		kubectl wait --for=condition=Ready=false pod/busybox1
+
+		# Wait for the pod "busybox1" to contain the status phase to be "Running"
+		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
+
+		# Wait for pod "busybox1" to be Ready
+		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
+
+		# Wait for the service "loadbalancer" to have ingress
+		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
+
+		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -80,11 +92,11 @@ type WaitFlags struct {
 	Timeout      time.Duration
 	ForCondition string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewWaitFlags returns a default WaitFlags
-func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
+func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
@@ -103,12 +115,12 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 }
 
 // NewCmdWait returns a cobra command for waiting
-func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
-		Short:   "Experimental: Wait for a specific condition on one or many resources.",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
+		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -116,8 +128,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
-			err = o.RunWait()
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.RunWait())
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -133,7 +144,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -165,6 +176,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
+		ForCondition:   flags.ForCondition,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -175,11 +187,16 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 }
 
 func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
-	if strings.ToLower(condition) == "delete" {
+	lowercaseCond := strings.ToLower(condition)
+	switch {
+	case lowercaseCond == "delete":
 		return IsDeleted, nil
-	}
-	if strings.HasPrefix(condition, "condition=") {
-		conditionName := condition[len("condition="):]
+
+	case lowercaseCond == "create":
+		return IsCreated, nil
+
+	case strings.HasPrefix(condition, "condition="):
+		conditionName := strings.TrimPrefix(condition, "condition=")
 		conditionValue := "true"
 		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
 			conditionValue = conditionName[equalsIndex+1:]
@@ -191,9 +208,80 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			conditionStatus: conditionValue,
 			errOut:          errOut,
 		}.IsConditionMet, nil
+
+	case strings.HasPrefix(condition, "jsonpath="):
+		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
+		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
+		if err != nil {
+			return nil, err
+		}
+		j, err := newJSONPathParser(jsonPathExp)
+		if err != nil {
+			return nil, err
+		}
+		return JSONPathWait{
+			matchAnyValue:  jsonPathValue == "",
+			jsonPathValue:  jsonPathValue,
+			jsonPathParser: j,
+			errOut:         errOut,
+		}.IsJSONPathConditionMet, nil
 	}
 
 	return nil, fmt.Errorf("unrecognized condition: %q", condition)
+}
+
+// newJSONPathParser will create a new JSONPath parser based on the jsonPathExpression
+func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
+	j := jsonpath.New("wait").AllowMissingKeys(true)
+	if jsonPathExpression == "" {
+		return nil, errors.New("jsonpath expression cannot be empty")
+	}
+	if err := j.Parse(jsonPathExpression); err != nil {
+		return nil, err
+	}
+	return j, nil
+}
+
+// processJSONPathInput will parse and process the provided JSONPath input containing a JSON expression and optionally
+// a value for the matching condition.
+func processJSONPathInput(input string) (string, string, error) {
+	jsonPathInput := splitJSONPathInput(input)
+	if numOfArgs := len(jsonPathInput); numOfArgs < 1 || numOfArgs > 2 {
+		return "", "", fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3 or --for=jsonpath='{.status.readyReplicas}'")
+	}
+	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathInput[0])
+	if err != nil {
+		return "", "", err
+	}
+	if len(jsonPathInput) == 1 {
+		return relaxedJSONPathExp, "", nil
+	}
+	jsonPathValue := strings.Trim(jsonPathInput[1], `'"`)
+	if jsonPathValue == "" {
+		return "", "", errors.New("jsonpath wait has to have a value after equal sign, like --for=jsonpath='{.status.readyReplicas}'=3")
+	}
+	return relaxedJSONPathExp, jsonPathValue, nil
+}
+
+// splitJSONPathInput splits the provided input string on single '='. Double '==' will not cause the string to be
+// split. E.g., "a.b.c====d.e.f===g.h.i===" will split to ["a.b.c====d.e.f==","g.h.i==",""].
+func splitJSONPathInput(input string) []string {
+	var output []string
+	var element strings.Builder
+	for i := 0; i < len(input); i++ {
+		if input[i] == '=' {
+			if i < len(input)-1 && input[i+1] == '=' {
+				element.WriteString("==")
+				i++
+				continue
+			}
+			output = append(output, element.String())
+			element.Reset()
+			continue
+		}
+		element.WriteByte(input[i])
+	}
+	return append(output, element.String())
 }
 
 // ResourceLocation holds the location of a resource
@@ -215,25 +303,54 @@ type WaitOptions struct {
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
+	ForCondition  string
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ConditionFunc is the interface for providing condition checks
-type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
+type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
 
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+
+	if strings.ToLower(o.ForCondition) == "create" {
+		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
+		// and we have to use ResourceFinder, which contains the resource name.
+		// In the long run, we should expose resource information from ResourceFinder,
+		// or functions from ResourceBuilder for parsing those. Lastly, this poll
+		// should be replaced with a ListWatch cache.
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, o.Timeout, true, func(context.Context) (done bool, err error) {
+			visitErr := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+				return nil
+			})
+			if apierrors.IsNotFound(visitErr) {
+				return false, nil
+			}
+			if visitErr != nil {
+				return false, visitErr
+			}
+			return true, nil
+		}); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+			}
+			return err
+		}
+	}
+
 	visitCount := 0
-	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+	visitFunc := func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
 		visitCount++
-		finalObject, success, err := o.ConditionFn(info, o)
+		finalObject, success, err := o.ConditionFn(ctx, info, o)
 		if success {
 			o.Printer.PrintObj(finalObject, o.Out)
 			return nil
@@ -242,219 +359,19 @@ func (o *WaitOptions) RunWait() error {
 			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
 		}
 		return err
-	})
+	}
+	visitor := o.ResourceFinder.Do()
+	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
+		visitor.IgnoreErrors(apierrors.IsNotFound)
+	}
+
+	err := visitor.Visit(visitFunc)
 	if err != nil {
 		return err
 	}
-	if visitCount == 0 {
+	if visitCount == 0 && !isForDelete {
 		return errNoMatchingResources
 	}
 	return err
-}
-
-// IsDeleted is a condition func for waiting for something to be deleted
-func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
-	for {
-		if len(info.Name) == 0 {
-			return info.Object, false, fmt.Errorf("resource name must be provided")
-		}
-
-		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-
-		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
-		if apierrors.IsNotFound(err) {
-			return info.Object, true, nil
-		}
-		if err != nil {
-			// TODO this could do something slightly fancier if we wish
-			return info.Object, false, err
-		}
-		if len(gottenObjList.Items) != 1 {
-			return info.Object, true, nil
-		}
-		gottenObj := &gottenObjList.Items[0]
-		resourceLocation := ResourceLocation{
-			GroupResource: info.Mapping.Resource.GroupResource(),
-			Namespace:     gottenObj.GetNamespace(),
-			Name:          gottenObj.GetName(),
-		}
-		if uid, ok := o.UIDMap[resourceLocation]; ok {
-			if gottenObj.GetUID() != uid {
-				return gottenObj, true, nil
-			}
-		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = gottenObjList.GetResourceVersion()
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
-		if err != nil {
-			return gottenObj, false, err
-		}
-
-		timeout := endTime.Sub(time.Now())
-		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, errWaitTimeoutWithName
-		}
-
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
-		cancel()
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watchtools.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, errWaitTimeoutWithName
-			}
-			return gottenObj, false, errWaitTimeoutWithName
-		default:
-			return gottenObj, false, err
-		}
-	}
-}
-
-// Wait has helper methods for handling watches, including error handling.
-type Wait struct {
-	errOut io.Writer
-}
-
-// IsDeleted returns true if the object is deleted. It prints any errors it encounters.
-func (w Wait) IsDeleted(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Error:
-		// keep waiting in the event we see an error - we expect the watch to be closed by
-		// the server if the error is unrecoverable.
-		err := apierrors.FromObject(event.Object)
-		fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the object to be deleted: %v", err)
-		return false, nil
-	case watch.Deleted:
-		return true, nil
-	default:
-		return false, nil
-	}
-}
-
-// ConditionalWait hold information to check an API status condition
-type ConditionalWait struct {
-	conditionName   string
-	conditionStatus string
-	// errOut is written to if an error occurs
-	errOut io.Writer
-}
-
-// IsConditionMet is a conditionfunc for waiting on an API condition to be met
-func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
-	for {
-		if len(info.Name) == 0 {
-			return info.Object, false, fmt.Errorf("resource name must be provided")
-		}
-
-		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-
-		var gottenObj *unstructured.Unstructured
-		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
-
-		resourceVersion := ""
-		switch {
-		case err != nil:
-			return info.Object, false, err
-		case len(gottenObjList.Items) != 1:
-			resourceVersion = gottenObjList.GetResourceVersion()
-		default:
-			gottenObj = &gottenObjList.Items[0]
-			conditionMet, err := w.checkCondition(gottenObj)
-			if conditionMet {
-				return gottenObj, true, nil
-			}
-			if err != nil {
-				return gottenObj, false, err
-			}
-			resourceVersion = gottenObjList.GetResourceVersion()
-		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = resourceVersion
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
-		if err != nil {
-			return gottenObj, false, err
-		}
-
-		timeout := endTime.Sub(time.Now())
-		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, errWaitTimeoutWithName
-		}
-
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, w.isConditionMet)
-		cancel()
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watchtools.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, errWaitTimeoutWithName
-			}
-			return gottenObj, false, errWaitTimeoutWithName
-		default:
-			return gottenObj, false, err
-		}
-	}
-}
-
-func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, error) {
-	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
-	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
-	}
-	for _, conditionUncast := range conditions {
-		condition := conditionUncast.(map[string]interface{})
-		name, found, err := unstructured.NestedString(condition, "type")
-		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
-			continue
-		}
-		status, found, err := unstructured.NestedString(condition, "status")
-		if !found || err != nil {
-			continue
-		}
-		return strings.EqualFold(status, w.conditionStatus), nil
-	}
-
-	return false, nil
-}
-
-func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
-	if event.Type == watch.Error {
-		// keep waiting in the event we see an error - we expect the watch to be closed by
-		// the server
-		err := apierrors.FromObject(event.Object)
-		fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the condition to be satisfied: %v", err)
-		return false, nil
-	}
-	if event.Type == watch.Deleted {
-		// this will chain back out, result in another get and an return false back up the chain
-		return false, nil
-	}
-	obj := event.Object.(*unstructured.Unstructured)
-	return w.checkCondition(obj)
-}
-
-func extendErrWaitTimeout(err error, info *resource.Info) error {
-	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
 }

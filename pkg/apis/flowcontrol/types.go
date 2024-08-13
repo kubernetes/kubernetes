@@ -60,15 +60,15 @@ const (
 type FlowSchema struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 	// `spec` is the specification of the desired behavior of a FlowSchema.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec FlowSchemaSpec
 	// `status` is the current status of a FlowSchema.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status FlowSchemaStatus
 }
@@ -79,7 +79,7 @@ type FlowSchema struct {
 type FlowSchemaList struct {
 	metav1.TypeMeta
 	// `metadata` is the standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -171,13 +171,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind
+	// `user` matches based on username.
 	// +optional
 	User *UserSubject
+	// `group` matches based on user group name.
 	// +optional
 	Group *GroupSubject
+	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject
 }
@@ -294,6 +298,8 @@ type FlowSchemaStatus struct {
 	// `conditions` is a list of the current states of FlowSchema.
 	// +listType=map
 	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
 	Conditions []FlowSchemaCondition
 }
@@ -326,15 +332,15 @@ type FlowSchemaConditionType string
 type PriorityLevelConfiguration struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 	// `spec` is the specification of the desired behavior of a "request-priority".
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec PriorityLevelConfigurationSpec
 	// `status` is the current status of a "request-priority".
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status PriorityLevelConfigurationStatus
 }
@@ -345,7 +351,7 @@ type PriorityLevelConfiguration struct {
 type PriorityLevelConfigurationList struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 	// `items` is a list of request-priorities.
@@ -371,6 +377,14 @@ type PriorityLevelConfigurationSpec struct {
 	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
 	Limited *LimitedPriorityLevelConfiguration
+
+	// `exempt` specifies how requests are handled for an exempt priority level.
+	// This field MUST be empty if `type` is `"Limited"`.
+	// This field MAY be non-empty if `type` is `"Exempt"`.
+	// If empty and `type` is `"Exempt"` then the default values
+	// for `ExemptPriorityLevelConfiguration` apply.
+	// +optional
+	Exempt *ExemptPriorityLevelConfiguration
 }
 
 // PriorityLevelEnablement indicates whether limits on execution are enabled for the priority level
@@ -387,29 +401,99 @@ const (
 
 // LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits.
 // It addresses two issues:
-//  * How are requests for this priority level limited?
-//  * What should be done with requests that exceed the limit?
+//   - How are requests for this priority level limited?
+//   - What should be done with requests that exceed the limit?
 type LimitedPriorityLevelConfiguration struct {
-	// `assuredConcurrencyShares` (ACS) configures the execution
-	// limit, which is a limit on the number of requests of this
-	// priority level that may be exeucting at a given time.  ACS must
-	// be a positive number. The server's concurrency limit (SCL) is
-	// divided among the concurrency-controlled priority levels in
-	// proportion to their assured concurrency shares. This produces
-	// the assured concurrency value (ACV) --- the number of requests
-	// that may be executing at a time --- for each such priority
-	// level:
+	// `nominalConcurrencyShares` (NCS) contributes to the computation of the
+	// NominalConcurrencyLimit (NominalCL) of this level.
+	// This is the number of execution seats available at this priority level.
+	// This is used both for requests dispatched from this priority level
+	// as well as requests dispatched from other priority levels
+	// borrowing seats from this level.
+	// The server's concurrency limit (ServerCL) is divided among the
+	// Limited priority levels in proportion to their NCS values:
 	//
-	//             ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
+	// NominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs )
+	// sum_ncs = sum[priority level k] NCS(k)
 	//
-	// bigger numbers of ACS mean more reserved concurrent requests (at the
-	// expense of every other PL).
+	// Bigger numbers mean a larger nominal concurrency limit,
+	// at the expense of every other priority level.
 	// This field has a default value of 30.
+	//
+	// Setting this field to zero supports the construction of a
+	// "jail" for this priority level that is used to hold some request(s)
+	//
 	// +optional
-	AssuredConcurrencyShares int32
+	NominalConcurrencyShares int32
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
 	LimitResponse LimitResponse
+
+	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// can be borrowed by other priority levels. The value of this
+	// field must be between 0 and 100, inclusive, and it defaults to 0.
+	// The number of seats that other levels can borrow from this level, known
+	// as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+	//
+	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+	//
+	// +optional
+	LendablePercent *int32
+
+	// `borrowingLimitPercent`, if present, configures a limit on how many
+	// seats this priority level can borrow from other priority levels.
+	// The limit is known as this level's BorrowingConcurrencyLimit
+	// (BorrowingCL) and is a limit on the total number of seats that this
+	// level may borrow at any one time.
+	// This field holds the ratio of that limit to the level's nominal
+	// concurrency limit. When this field is non-nil, it must hold a
+	// non-negative integer and the limit is calculated as follows.
+	//
+	// BorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )
+	//
+	// The value of this field can be more than 100, implying that this
+	// priority level can borrow a number of seats that is greater than
+	// its own nominal concurrency limit (NominalCL).
+	// When this field is left `nil`, the limit is effectively infinite.
+	// +optional
+	BorrowingLimitPercent *int32
+}
+
+// ExemptPriorityLevelConfiguration describes the configurable aspects
+// of the handling of exempt requests.
+// In the mandatory exempt configuration object the values in the fields
+// here can be modified by authorized users, unlike the rest of the `spec`.
+type ExemptPriorityLevelConfiguration struct {
+	// `nominalConcurrencyShares` (NCS) contributes to the computation of the
+	// NominalConcurrencyLimit (NominalCL) of this level.
+	// This is the number of execution seats nominally reserved for this priority level.
+	// This DOES NOT limit the dispatching from this priority level
+	// but affects the other priority levels through the borrowing mechanism.
+	// The server's concurrency limit (ServerCL) is divided among all the
+	// priority levels in proportion to their NCS values:
+	//
+	// NominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs )
+	// sum_ncs = sum[priority level k] NCS(k)
+	//
+	// Bigger numbers mean a larger nominal concurrency limit,
+	// at the expense of every other priority level.
+	// This field has a default value of zero.
+	// +optional
+	NominalConcurrencyShares *int32
+	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// can be borrowed by other priority levels.  This value of this
+	// field must be between 0 and 100, inclusive, and it defaults to 0.
+	// The number of seats that other levels can borrow from this level, known
+	// as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+	//
+	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+	//
+	// +optional
+	LendablePercent *int32
+	// The `BorrowingCL` of an Exempt priority level is implicitly `ServerCL`.
+	// In other words, an exempt priority level
+	// has no meaningful limit on how much it borrows.
+	// There is no explicit representation of that here.
 }
 
 // LimitResponse defines how to handle requests that can not be executed right now.
@@ -484,6 +568,8 @@ type PriorityLevelConfigurationStatus struct {
 	// `conditions` is the current state of "request-priority".
 	// +listType=map
 	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
 	Conditions []PriorityLevelConfigurationCondition
 }

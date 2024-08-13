@@ -24,12 +24,12 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestTokenCachingAndExpiration(t *testing.T) {
 	type suite struct {
-		clock *clock.FakeClock
+		clock *testingclock.FakeClock
 		tg    *fakeTokenGetter
 		mgr   *Manager
 	}
@@ -87,7 +87,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clock := clock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
+			clock := testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 			expSecs := int64(c.exp.Seconds())
 			s := &suite{
 				clock: clock,
@@ -165,7 +165,7 @@ func TestRequiresRefresh(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			clock := clock.NewFakeClock(c.now)
+			clock := testingclock.NewFakeClock(c.now)
 			secs := int64(c.exp.Sub(start).Seconds())
 			tr := &authenticationv1.TokenRequest{
 				Spec: authenticationv1.TokenRequestSpec{
@@ -222,7 +222,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 			expLeftIndex: []int{1},
 		},
 		{
-			name:         "delete all with all suceess requests",
+			name:         "delete all with all success requests",
 			requestIndex: []int{0, 1, 2},
 			deletePodUID: []types.UID{"fake-uid-1", "fake-uid-2", "fake-uid-3"},
 		},
@@ -335,7 +335,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 				},
 			}
 			testMgr := NewManager(nil)
-			testMgr.clock = clock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
+			testMgr.clock = testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 
 			successGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 				tr.Status = authenticationv1.TokenRequestStatus{
@@ -404,7 +404,7 @@ func TestCleanup(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clock := clock.NewFakeClock(time.Time{}.Add(24 * time.Hour))
+			clock := testingclock.NewFakeClock(time.Time{}.Add(24 * time.Hour))
 			mgr := NewManager(nil)
 			mgr.clock = clock
 
@@ -568,7 +568,7 @@ func TestKeyFunc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			mgr := NewManager(nil)
-			mgr.clock = clock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
+			mgr.clock = testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 			for _, tru := range c.trus {
 				mgr.set(getKeyFunc(tru), &authenticationv1.TokenRequest{
 					Status: authenticationv1.TokenRequestStatus{

@@ -235,6 +235,28 @@ func Convert_autoscaling_ResourceMetricSource_To_v1_ResourceMetricSource(in *aut
 	return nil
 }
 
+func Convert_v1_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *autoscalingv1.ContainerResourceMetricStatus, out *autoscaling.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	out.Container = in.Container
+	utilization := in.CurrentAverageUtilization
+	averageValue := &in.CurrentAverageValue
+	out.Current = autoscaling.MetricValueStatus{
+		AverageValue:       averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ContainerResourceMetricStatus_To_v1_ContainerResourceMetricStatus(in *autoscaling.ContainerResourceMetricStatus, out *autoscalingv1.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.Container = in.Container
+	out.CurrentAverageUtilization = in.Current.AverageUtilization
+	if in.Current.AverageValue != nil {
+		out.CurrentAverageValue = *in.Current.AverageValue
+	}
+	return nil
+}
+
 func Convert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *autoscalingv1.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
 	out.Name = core.ResourceName(in.Name)
 	utilization := in.CurrentAverageUtilization
@@ -340,6 +362,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		}
 		// copy before mutating
 		if !copiedAnnotations {
+			//nolint:ineffassign
 			copiedAnnotations = true
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
@@ -438,11 +461,9 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 	out.MaxReplicas = in.MaxReplicas
 
 	for _, metric := range in.Metrics {
-		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == core.ResourceCPU {
-			if metric.Resource.Target.AverageUtilization != nil {
-				out.TargetCPUUtilizationPercentage = new(int32)
-				*out.TargetCPUUtilizationPercentage = *metric.Resource.Target.AverageUtilization
-			}
+		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == core.ResourceCPU && metric.Resource.Target.AverageUtilization != nil {
+			out.TargetCPUUtilizationPercentage = new(int32)
+			*out.TargetCPUUtilizationPercentage = *metric.Resource.Target.AverageUtilization
 			break
 		}
 	}
@@ -515,5 +536,32 @@ func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutosc
 		out.CurrentMetrics[0].Resource.Current.AverageUtilization = new(int32)
 		*out.CurrentMetrics[0].Resource.Current.AverageUtilization = *in.CurrentCPUUtilizationPercentage
 	}
+	return nil
+}
+
+func Convert_v1_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *autoscalingv1.ContainerResourceMetricSource, out *autoscaling.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	out.Container = in.Container
+	utilization := in.TargetAverageUtilization
+	averageValue := in.TargetAverageValue
+	var metricType autoscaling.MetricTargetType
+	if utilization == nil {
+		metricType = autoscaling.AverageValueMetricType
+	} else {
+		metricType = autoscaling.UtilizationMetricType
+	}
+	out.Target = autoscaling.MetricTarget{
+		Type:               metricType,
+		AverageValue:       averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ContainerResourceMetricSource_To_v1_ContainerResourceMetricSource(in *autoscaling.ContainerResourceMetricSource, out *autoscalingv1.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.Container = in.Container
+	out.TargetAverageUtilization = in.Target.AverageUtilization
+	out.TargetAverageValue = in.Target.AverageValue
 	return nil
 }

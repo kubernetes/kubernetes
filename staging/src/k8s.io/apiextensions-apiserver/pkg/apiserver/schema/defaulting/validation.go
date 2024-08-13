@@ -17,23 +17,26 @@ limitations under the License.
 package defaulting
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
-	"github.com/go-openapi/strfmt"
-	goopenapivalidate "github.com/go-openapi/validate"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
-func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourceRoot, requirePrunedDefaults bool) (field.ErrorList, error) {
+// context is passed for supporting context cancellation during cel validation
+func ValidateDefaults(ctx context.Context, pth *field.Path, s *structuralschema.Structural, isResourceRoot, requirePrunedDefaults bool) (field.ErrorList, error) {
 	f := NewRootObjectFunc().WithTypeMeta(metav1.TypeMeta{APIVersion: "validation/v1", Kind: "Validation"})
 
 	if isResourceRoot {
@@ -47,15 +50,18 @@ func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourc
 		}
 	}
 
-	return validate(pth, s, s, f, false, requirePrunedDefaults)
+	allErr, error, _ := validate(ctx, pth, s, s, f, false, requirePrunedDefaults, celconfig.RuntimeCELCostBudget)
+	return allErr, error
 }
 
 // validate is the recursive step func for the validation. insideMeta is true if s specifies
 // TypeMeta or ObjectMeta. The SurroundingObjectFunc f is used to validate defaults of
 // TypeMeta or ObjectMeta fields.
-func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta, requirePrunedDefaults bool) (field.ErrorList, error) {
+// context is passed for supporting context cancellation during cel validation
+func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta, requirePrunedDefaults bool, costBudget int64) (allErrs field.ErrorList, error error, remainingCost int64) {
+	remainingCost = costBudget
 	if s == nil {
-		return nil, nil
+		return nil, nil, remainingCost
 	}
 
 	if s.XEmbeddedResource {
@@ -64,10 +70,10 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 		rootSchema = s
 	}
 
-	allErrs := field.ErrorList{}
+	isResourceRoot := s == rootSchema
 
 	if s.Default.Object != nil {
-		validator := goopenapivalidate.NewSchemaValidator(s.ToGoOpenAPI(), nil, "", strfmt.Default)
+		validator := apiservervalidation.NewSchemaValidatorFromOpenAPI(s.ToKubeOpenAPI())
 
 		if insideMeta {
 			obj, _, err := f(runtime.DeepCopyJSONValue(s.Default.Object))
@@ -75,7 +81,7 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				// this should never happen. f(s.Default.Object) only gives an error if f is the
 				// root object func, but the default value is not a map. But then we wouldn't be
 				// in this case.
-				return nil, fmt.Errorf("failed to validate default value inside metadata: %v", err)
+				return nil, fmt.Errorf("failed to validate default value inside metadata: %v", err), remainingCost
 			}
 
 			// check ObjectMeta/TypeMeta and everything else
@@ -85,6 +91,32 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
+			} else if celValidator := cel.NewValidator(s, isResourceRoot, celconfig.PerCallLimit); celValidator != nil {
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
+				allErrs = append(allErrs, celErrs...)
+
+				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+					// If ratcheting is enabled some CEL rules may use optionalOldSelf
+					// For such rules the above validation is not sufficient for
+					// determining if the default value is a valid value to introduce
+					// via create or uncorrelated update.
+					//
+					// Validate an update from nil to the default value to ensure
+					// that the default value pass
+					celErrs, rmCostWithoutOldObject := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
+					allErrs = append(allErrs, celErrs...)
+
+					// capture the cost of both types of runs and take whichever
+					// leaves less remaining cost
+					if rmCostWithoutOldObject < rmCost {
+						rmCost = rmCostWithoutOldObject
+					}
+				}
+
+				remainingCost = rmCost
+				if remainingCost < 0 {
+					return allErrs, nil, remainingCost
+				}
 			}
 		} else {
 			// check whether default is pruned
@@ -103,6 +135,32 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
+			} else if celValidator := cel.NewValidator(s, isResourceRoot, celconfig.PerCallLimit); celValidator != nil {
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
+				allErrs = append(allErrs, celErrs...)
+
+				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+					// If ratcheting is enabled some CEL rules may use optionalOldSelf
+					// For such rules the above validation is not sufficient for
+					// determining if the default value is a valid value to introduce
+					// via create or uncorrelated update.
+					//
+					// Validate an update from nil to the default value to ensure
+					// that the default value pass
+					celErrs, rmCostWithoutOldObject := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
+					allErrs = append(allErrs, celErrs...)
+
+					// capture the cost of both types of runs and take whichever
+					// leaves less remaining cost
+					if rmCostWithoutOldObject < rmCost {
+						rmCost = rmCostWithoutOldObject
+					}
+				}
+
+				remainingCost = rmCost
+				if remainingCost < 0 {
+					return allErrs, nil, remainingCost
+				}
 			}
 		}
 	}
@@ -110,11 +168,15 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 	// do not follow additionalProperties because defaults are forbidden there
 
 	if s.Items != nil {
-		errs, err := validate(pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta, requirePrunedDefaults)
-		if err != nil {
-			return nil, err
-		}
+		errs, err, rCost := validate(ctx, pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta, requirePrunedDefaults, remainingCost)
+		remainingCost = rCost
 		allErrs = append(allErrs, errs...)
+		if err != nil {
+			return nil, err, remainingCost
+		}
+		if remainingCost < 0 {
+			return allErrs, nil, remainingCost
+		}
 	}
 
 	for k, subSchema := range s.Properties {
@@ -122,12 +184,16 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 		if s.XEmbeddedResource && (k == "metadata" || k == "apiVersion" || k == "kind") {
 			subInsideMeta = true
 		}
-		errs, err := validate(pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta, requirePrunedDefaults)
-		if err != nil {
-			return nil, err
-		}
+		errs, err, rCost := validate(ctx, pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta, requirePrunedDefaults, remainingCost)
+		remainingCost = rCost
 		allErrs = append(allErrs, errs...)
+		if err != nil {
+			return nil, err, remainingCost
+		}
+		if remainingCost < 0 {
+			return allErrs, nil, remainingCost
+		}
 	}
 
-	return allErrs, nil
+	return allErrs, nil, remainingCost
 }

@@ -63,8 +63,8 @@ func TestSkipDeletedFilter(t *testing.T) {
 		}
 
 		podDeleteStatus := h.skipDeletedFilter(pod)
-		if podDeleteStatus.delete != tc.expectedDelete {
-			t.Errorf("test %v: unexpected podDeleteStatus.delete; actual %v; expected %v", i, podDeleteStatus.delete, tc.expectedDelete)
+		if podDeleteStatus.Delete != tc.expectedDelete {
+			t.Errorf("test %v: unexpected podDeleteStatus.delete; actual %v; expected %v", i, podDeleteStatus.Delete, tc.expectedDelete)
 		}
 	}
 }

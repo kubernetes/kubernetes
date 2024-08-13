@@ -29,19 +29,23 @@ import (
 const (
 	// AzureDiskDriverName is the name of the CSI driver for Azure Disk
 	AzureDiskDriverName = "disk.csi.azure.com"
+	// AzureDiskTopologyKey is the topology key of Azure Disk CSI driver
+	AzureDiskTopologyKey = "topology.disk.csi.azure.com/zone"
 	// AzureDiskInTreePluginName is the name of the intree plugin for Azure Disk
 	AzureDiskInTreePluginName = "kubernetes.io/azure-disk"
 
 	// Parameter names defined in azure disk CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
 	azureDiskKind        = "kind"
-	azureDiskCachingMode = "cachingMode"
-	azureDiskFSType      = "fsType"
+	azureDiskCachingMode = "cachingmode"
+	azureDiskFSType      = "fstype"
 )
 
 var (
 	managedDiskPathRE   = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/disks/(.+)`)
 	unmanagedDiskPathRE = regexp.MustCompile(`http(?:.*)://(?:.*)/vhds/(.+)`)
+	managed             = string(v1.AzureManagedDisk)
+	unzonedCSIRegionRE  = regexp.MustCompile(`^[0-9]+$`)
 )
 
 var _ InTreePlugin = &azureDiskCSITranslator{}
@@ -55,31 +59,64 @@ func NewAzureDiskCSITranslator() InTreePlugin {
 	return &azureDiskCSITranslator{}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree Azure Disk storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree Azure Disk storage class parameters to CSI storage class
 func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	var (
+		generatedTopologies []v1.TopologySelectorTerm
+		params              = map[string]string{}
+	)
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case zoneKey:
+			generatedTopologies = generateToplogySelectors(AzureDiskTopologyKey, []string{v})
+		case zonesKey:
+			generatedTopologies = generateToplogySelectors(AzureDiskTopologyKey, strings.Split(v, ","))
+		default:
+			params[k] = v
+		}
+	}
+
+	if len(generatedTopologies) > 0 && len(sc.AllowedTopologies) > 0 {
+		return nil, fmt.Errorf("cannot simultaneously set allowed topologies and zone/zones parameters")
+	} else if len(generatedTopologies) > 0 {
+		sc.AllowedTopologies = generatedTopologies
+	} else if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, AzureDiskTopologyKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
+	sc.AllowedTopologies = t.replaceFailureDomainsToCSI(sc.AllowedTopologies)
+
+	sc.Parameters = params
+
 	return sc, nil
 }
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureDisk set from in-tree
 // and converts the AzureDisk source to a CSIPersistentVolumeSource
-func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureDisk == nil {
 		return nil, fmt.Errorf("volume is nil or Azure Disk not defined on volume")
 	}
 
 	azureSource := volume.AzureDisk
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// Must be unique per disk as it is used as the unique part of the
 			// staging path
-			Name: fmt.Sprintf("%s-%s", AzureDiskDriverName, azureSource.DiskName),
+			Name: azureSource.DataDiskURI,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
 					VolumeHandle:     azureSource.DataDiskURI,
-					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+					VolumeAttributes: map[string]string{azureDiskKind: managed},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -96,9 +133,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		pv.Spec.PersistentVolumeSource.CSI.FSType = *azureSource.FSType
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
-	if azureSource.Kind != nil {
-		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
-	}
+	pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskKind] = managed
 
 	return pv, nil
 }
@@ -116,10 +151,14 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		// refer to https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
 		csiSource = &v1.CSIPersistentVolumeSource{
 			Driver:           AzureDiskDriverName,
-			VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+			VolumeAttributes: map[string]string{azureDiskKind: managed},
 			VolumeHandle:     azureSource.DataDiskURI,
 		}
 	)
+
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 
 	if azureSource.CachingMode != nil {
 		csiSource.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
@@ -129,10 +168,7 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		csiSource.FSType = *azureSource.FSType
 		csiSource.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
-
-	if azureSource.Kind != nil {
-		csiSource.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
-	}
+	csiSource.VolumeAttributes[azureDiskKind] = managed
 
 	if azureSource.ReadOnly != nil {
 		csiSource.ReadOnly = *azureSource.ReadOnly
@@ -169,19 +205,21 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 	}
 
 	if csiSource.VolumeAttributes != nil {
-		if cachingMode, ok := csiSource.VolumeAttributes[azureDiskCachingMode]; ok {
-			mode := v1.AzureDataDiskCachingMode(cachingMode)
-			azureSource.CachingMode = &mode
+		for k, v := range csiSource.VolumeAttributes {
+			switch strings.ToLower(k) {
+			case azureDiskCachingMode:
+				if v != "" {
+					mode := v1.AzureDataDiskCachingMode(v)
+					azureSource.CachingMode = &mode
+				}
+			case azureDiskFSType:
+				if v != "" {
+					fsType := v
+					azureSource.FSType = &fsType
+				}
+			}
 		}
-
-		if fsType, ok := csiSource.VolumeAttributes[azureDiskFSType]; ok && fsType != "" {
-			azureSource.FSType = &fsType
-		}
-
-		if kind, ok := csiSource.VolumeAttributes[azureDiskKind]; ok && kind != "" {
-			diskKind := v1.AzureDataDiskKind(kind)
-			azureSource.Kind = &diskKind
-		}
+		azureSource.Kind = &managed
 	}
 
 	pv.Spec.CSI = nil
@@ -236,4 +274,35 @@ func getDiskName(diskURI string) (string, error) {
 		return "", fmt.Errorf("could not get disk name from %s, correct format: %s", diskURI, diskPathRE)
 	}
 	return matches[1], nil
+}
+
+// Replace topology values for failure domains ("<number>") to "",
+// as it's the value that the CSI driver expects.
+func (t *azureDiskCSITranslator) replaceFailureDomainsToCSI(terms []v1.TopologySelectorTerm) []v1.TopologySelectorTerm {
+	if terms == nil {
+		return nil
+	}
+
+	newTopologies := []v1.TopologySelectorTerm{}
+	for _, term := range terms {
+		newTerm := term.DeepCopy()
+		for i := range newTerm.MatchLabelExpressions {
+			exp := &newTerm.MatchLabelExpressions[i]
+			if exp.Key == AzureDiskTopologyKey {
+				for j := range exp.Values {
+					if unzonedCSIRegionRE.Match([]byte(exp.Values[j])) {
+						// Topologies "0", "1" etc are used when in-tree topology is translated to CSI in Azure
+						// regions that don't have availability zones. E.g.:
+						//    topology.kubernetes.io/region: westus
+						//    topology.kubernetes.io/zone: "0"
+						// The CSI driver uses zone "" instead of "0" in this case.
+						//    topology.disk.csi.azure.com/zone": ""
+						exp.Values[j] = ""
+					}
+				}
+			}
+		}
+		newTopologies = append(newTopologies, *newTerm)
+	}
+	return newTopologies
 }

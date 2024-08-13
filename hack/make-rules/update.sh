@@ -22,14 +22,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# If called directly, exit.
-if [[ "${CALLED_FROM_MAIN_MAKEFILE:-""}" == "" ]]; then
-    echo "ERROR: $0 should not be run directly." >&2
-    echo >&2
-    echo "Please run this command using \"make update\""
-    exit 1
-fi
-
 SILENT=${SILENT:-true}
 ALL=${FORCE_ALL:-false}
 
@@ -43,19 +35,17 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
-BASH_TARGETS="
-	update-generated-protobuf
+BASH_TARGETS=(
+	update-go-workspace
 	update-codegen
-	update-generated-runtime
-	update-generated-device-plugin
 	update-generated-api-compatibility-data
 	update-generated-docs
-	update-generated-swagger-docs
 	update-openapi-spec
-	update-bazel
-	update-gofmt"
+	update-gofmt
+	update-golangci-lint-config
+)
 
-for t in ${BASH_TARGETS}; do
+for t in "${BASH_TARGETS[@]}"; do
 	echo -e "${color_yellow:?}Running ${t}${color_norm:?}"
 	if ${SILENT} ; then
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then

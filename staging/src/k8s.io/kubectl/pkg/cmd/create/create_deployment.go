@@ -22,16 +22,18 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -41,68 +43,97 @@ var (
 	Create a deployment with the specified name.`))
 
 	deploymentExample = templates.Examples(i18n.T(`
-	# Create a new deployment named my-dep that runs the busybox image.
-	kubectl create deployment my-dep --image=busybox`))
+	# Create a deployment named my-dep that runs the busybox image
+	kubectl create deployment my-dep --image=busybox
+
+	# Create a deployment with a command
+	kubectl create deployment my-dep --image=busybox -- date
+
+	# Create a deployment named my-dep that runs the nginx image with 3 replicas
+	kubectl create deployment my-dep --image=nginx --replicas=3
+
+	# Create a deployment named my-dep that runs the busybox image and expose port 5701
+	kubectl create deployment my-dep --image=busybox --port=5701
+
+	# Create a deployment named my-dep that runs multiple containers
+	kubectl create deployment my-dep --image=busybox:latest --image=ubuntu:latest --image=nginx`))
 )
 
-// DeploymentOpts is returned by NewCmdCreateDeployment
-type DeploymentOpts struct {
+// CreateDeploymentOptions is returned by NewCmdCreateDeployment
+type CreateDeploymentOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
-	PrintObj   func(obj runtime.Object) error
+
+	PrintObj func(obj runtime.Object) error
 
 	Name             string
 	Images           []string
+	Port             int32
+	Replicas         int32
+	Command          []string
 	Namespace        string
 	EnforceNamespace bool
 	FieldManager     string
+	CreateAnnotation bool
 
-	Client         appsv1client.AppsV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	Client              appsv1client.AppsV1Interface
+	DryRunStrategy      cmdutil.DryRunStrategy
+	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
+}
+
+// NewCreateDeploymentOptions returns an initialized CreateDeploymentOptions instance
+func NewCreateDeploymentOptions(ioStreams genericiooptions.IOStreams) *CreateDeploymentOptions {
+	return &CreateDeploymentOptions{
+		Port:       -1,
+		Replicas:   1,
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
+	}
 }
 
 // NewCmdCreateDeployment is a macro command to create a new deployment.
 // This command is better known to users as `kubectl create deployment`.
-func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &DeploymentOpts{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		IOStreams:  ioStreams,
-	}
-
+func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+	o := NewCreateDeploymentOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:                   "deployment NAME --image=image [--dry-run=server|client|none]",
+		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
-		Short:                 deploymentLong,
+		Short:                 i18n.T("Create a deployment with the specified name"),
 		Long:                  deploymentLong,
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, "")
-	cmd.Flags().StringSliceVar(&options.Images, "image", []string{}, "Image name to run.")
-	_ = cmd.MarkFlagRequired("image")
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run. A deployment can have multiple images set for multi-container pod.")
+	cmd.MarkFlagRequired("image")
+	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The containerPort that this deployment exposes.")
+	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
 }
 
 // Complete completes all the options
-func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 	o.Name = name
+	if len(args) > 1 {
+		o.Command = args[1:]
+	}
 
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
@@ -118,19 +149,12 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -141,12 +165,50 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate makes sure there is no discrepency in provided option values
+func (o *CreateDeploymentOptions) Validate() error {
+	if len(o.Images) > 1 && len(o.Command) > 0 {
+		return fmt.Errorf("cannot specify multiple --image options and command")
+	}
 	return nil
 }
 
 // Run performs the execution of 'create deployment' sub command
-func (o *DeploymentOpts) Run() error {
-	one := int32(1)
+func (o *CreateDeploymentOptions) Run() error {
+	deploy := o.createDeployment()
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, deploy, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		createOptions.FieldValidation = o.ValidationDirective
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		var err error
+		deploy, err = o.Client.Deployments(o.Namespace).Create(context.TODO(), deploy, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create deployment: %v", err)
+		}
+	}
+
+	return o.PrintObj(deploy)
+}
+
+func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 	labels := map[string]string{"app": o.Name}
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	namespace := ""
@@ -162,9 +224,9 @@ func (o *DeploymentOpts) Run() error {
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &one,
+			Replicas: &o.Replicas,
 			Selector: &selector,
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
@@ -173,31 +235,16 @@ func (o *DeploymentOpts) Run() error {
 		},
 	}
 
-	if o.DryRunStrategy != cmdutil.DryRunClient {
-		createOptions := metav1.CreateOptions{}
-		if o.FieldManager != "" {
-			createOptions.FieldManager = o.FieldManager
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(deploy.GroupVersionKind()); err != nil {
-				return err
-			}
-			createOptions.DryRun = []string{metav1.DryRunAll}
-		}
-		var err error
-		deploy, err = o.Client.Deployments(o.Namespace).Create(context.TODO(), deploy, createOptions)
-		if err != nil {
-			return fmt.Errorf("failed to create deployment: %v", err)
-		}
+	if o.Port >= 0 && len(deploy.Spec.Template.Spec.Containers) > 0 {
+		deploy.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{ContainerPort: o.Port}}
 	}
-
-	return o.PrintObj(deploy)
+	return deploy
 }
 
 // buildPodSpec parses the image strings and assemble them into the Containers
 // of a PodSpec. This is all you need to create the PodSpec for a deployment.
-func (o *DeploymentOpts) buildPodSpec() v1.PodSpec {
-	podSpec := v1.PodSpec{Containers: []v1.Container{}}
+func (o *CreateDeploymentOptions) buildPodSpec() corev1.PodSpec {
+	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
 	for _, imageString := range o.Images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
@@ -210,7 +257,11 @@ func (o *DeploymentOpts) buildPodSpec() v1.PodSpec {
 			name = strings.Split(name, "@")[0]
 		}
 		name = sanitizeAndUniquify(name)
-		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
+		podSpec.Containers = append(podSpec.Containers, corev1.Container{
+			Name:    name,
+			Image:   imageString,
+			Command: o.Command,
+		})
 	}
 	return podSpec
 }

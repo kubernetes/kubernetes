@@ -18,9 +18,10 @@ package routes
 
 import (
 	"net/http"
+	"os"
 	"path"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 )
 
 // Logs adds handlers for the /logs path serving log files from /var/log.
@@ -29,7 +30,7 @@ type Logs struct{}
 // Install func registers the logs handler.
 func (l Logs) Install(c *restful.Container) {
 	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
+	// See github.com/emicklei/go-restful/blob/master/examples/static/restful-serve-static.go
 	ws := new(restful.WebService)
 	ws.Path("/logs")
 	ws.Doc("get log files")
@@ -42,10 +43,28 @@ func (l Logs) Install(c *restful.Container) {
 func logFileHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
 	actual := path.Join(logdir, req.PathParameter("logpath"))
+
+	// check filename length first, return 404 if it's oversize.
+	if logFileNameIsTooLong(actual) {
+		http.Error(resp, "file not found", http.StatusNotFound)
+		return
+	}
 	http.ServeFile(resp.ResponseWriter, req.Request, actual)
 }
 
 func logFileListHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
 	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
+}
+
+// logFileNameIsTooLong checks filename length, returns true if it's longer than 255.
+// cause http.ServeFile returns default error code 500 except for NotExist and Forbidden, but we need to separate the real 500 from oversize filename here.
+func logFileNameIsTooLong(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if err != nil {
+		if e, ok := err.(*os.PathError); ok && e.Err == fileNameTooLong {
+			return true
+		}
+	}
+	return false
 }

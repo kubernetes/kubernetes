@@ -31,7 +31,7 @@ if [[ -n "${KUBE_VERIFY_GIT_BRANCH:-}" ]]; then
     ARGHELP="BRANCH=${KUBE_VERIFY_GIT_BRANCH}"
 fi
 
-echo "NOTE: $0 has been replaced by 'make verify'"
+echo "NOTE: ${BASH_SOURCE[0]} has been replaced by 'make verify'"
 echo
 echo "The equivalent of this invocation is: "
 echo "    make verify ${ARGHELP}"

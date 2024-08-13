@@ -18,19 +18,23 @@ package responsewriters
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"go.opentelemetry.io/otel/attribute"
 
 	"k8s.io/apiserver/pkg/features"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -39,7 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
-	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/component-base/tracing"
 )
 
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
@@ -86,19 +90,32 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	ctx := req.Context()
+	ctx, span := tracing.Start(ctx, "SerializeObject",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("method", req.Method),
+		attribute.String("url", req.URL.Path),
+		attribute.String("protocol", req.Proto),
+		attribute.String("mediaType", mediaType),
+		attribute.String("encoder", string(encoder.Identifier())))
+	defer span.End(5 * time.Second)
+
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
 		contentEncoding: negotiateContentEncoding(req),
 		hw:              hw,
+		ctx:             ctx,
 	}
 
 	err := encoder.Encode(object, w)
 	if err == nil {
 		err = w.Close()
-		if err == nil {
-			return
+		if err != nil {
+			// we cannot write an error to the writer anymore as the Encode call was successful.
+			utilruntime.HandleError(fmt.Errorf("apiserver was unable to close cleanly the response writer: %v", err))
 		}
+		return
 	}
 
 	// make a best effort to write the object if a failure is detected
@@ -131,8 +148,10 @@ var gzipPool = &sync.Pool{
 }
 
 const (
-	// defaultGzipContentEncodingLevel is set to 4 which uses less CPU than the default level
-	defaultGzipContentEncodingLevel = 4
+	// defaultGzipContentEncodingLevel is set to 1 which uses least CPU compared to higher levels, yet offers
+	// similar compression ratios (off by at most 1.5x, but typically within 1.1x-1.3x). For further details see -
+	// https://github.com/kubernetes/kubernetes/issues/112296
+	defaultGzipContentEncodingLevel = 1
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
@@ -175,9 +194,31 @@ type deferredResponseWriter struct {
 	hasWritten bool
 	hw         http.ResponseWriter
 	w          io.Writer
+
+	ctx context.Context
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
+	ctx := w.ctx
+	span := tracing.SpanFromContext(ctx)
+	// This Step usually wraps in-memory object serialization.
+	span.AddEvent("About to start writing response", attribute.Int("size", len(p)))
+
+	firstWrite := !w.hasWritten
+	defer func() {
+		if err != nil {
+			span.AddEvent("Write call failed",
+				attribute.String("writer", fmt.Sprintf("%T", w.w)),
+				attribute.Int("size", len(p)),
+				attribute.Bool("firstWrite", firstWrite),
+				attribute.String("err", err.Error()))
+		} else {
+			span.AddEvent("Write call succeeded",
+				attribute.String("writer", fmt.Sprintf("%T", w.w)),
+				attribute.Int("size", len(p)),
+				attribute.Bool("firstWrite", firstWrite))
+		}
+	}()
 	if w.hasWritten {
 		return w.w.Write(p)
 	}
@@ -217,10 +258,8 @@ func (w *deferredResponseWriter) Close() error {
 	return err
 }
 
-var nopCloser = ioutil.NopCloser(nil)
-
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
@@ -230,7 +269,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	_, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
+	mediaType, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -243,12 +282,32 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	if ae := request.AuditEventFrom(req.Context()); ae != nil {
-		audit.LogResponseObject(ae, object, gv, s)
-	}
+	audit.LogResponseObject(req.Context(), object, gv, s)
 
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
-	SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
+		if listGVKInContentType {
+			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
+		} else {
+			SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+		}
+	})
+}
+
+func generateMediaTypeWithGVK(mediaType string, gvk *schema.GroupVersionKind) string {
+	if gvk == nil {
+		return mediaType
+	}
+	if gvk.Group != "" {
+		mediaType += ";g=" + gvk.Group
+	}
+	if gvk.Version != "" {
+		mediaType += ";v=" + gvk.Version
+	}
+	if gvk.Kind != "" {
+		mediaType += ";as=" + gvk.Kind
+	}
+	return mediaType
 }
 
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
@@ -267,7 +326,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		return code
 	}
 
-	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status)
+	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status, false)
 	return code
 }
 

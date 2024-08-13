@@ -30,7 +30,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: {{ pillar['dns_server'] }}
+  clusterIP: dns_server
   ports:
   - name: dns
     port: 53
@@ -82,12 +82,13 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
         prometheus.io/port: "10054"
         prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
       affinity:
@@ -104,8 +105,6 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
-      nodeSelector:
-        kubernetes.io/os: linux
       volumes:
       - name: kube-dns-config
         configMap:
@@ -115,14 +114,14 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-kube-dns:1.23.1
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            memory: {{ pillar['dns_memory_limit'] }}
+            memory: 'dns_memory_limit'
           requests:
             cpu: 100m
             memory: 70Mi
@@ -145,7 +144,7 @@ spec:
           initialDelaySeconds: 3
           timeoutSeconds: 5
         args:
-        - --domain={{ pillar['dns_domain'] }}.
+        - --domain=dns_domain.
         - --dns-port=10053
         - --config-dir=/kube-dns-config
         - --v=2
@@ -171,7 +170,7 @@ spec:
           runAsUser: 1001
           runAsGroup: 1001
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-dnsmasq-nanny:1.23.1
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -192,7 +191,7 @@ spec:
         - --no-negcache
         - --dns-loop-detect
         - --log-facility=-
-        - --server=/{{ pillar['dns_domain'] }}/127.0.0.1#10053
+        - --server=/dns_domain/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
         ports:
@@ -218,7 +217,7 @@ spec:
               - NET_BIND_SERVICE
               - SETGID
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar:1.15.10
+        image: registry.k8s.io/dns/k8s-dns-sidecar:1.23.1
         livenessProbe:
           httpGet:
             path: /metrics
@@ -231,8 +230,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{ pillar['dns_domain'] }},5,SRV
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{ pillar['dns_domain'] }},5,SRV
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.dns_domain,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.dns_domain,5,SRV
         ports:
         - containerPort: 10054
           name: metrics

@@ -13,7 +13,10 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
-FROM us.gcr.io/k8s-artifacts-prod/build-image/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
+ARG KUBE_CROSS_IMAGE
+ARG KUBE_CROSS_VERSION
+
+FROM ${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
@@ -27,14 +30,14 @@ RUN mkdir /var/run/kubernetes && chmod a+rwx /var/run/kubernetes
 
 # The kubernetes source is expected to be mounted here.  This will be the base
 # of operations.
-ENV HOME /go/src/k8s.io/kubernetes
+ENV HOME=/go/src/k8s.io/kubernetes
 WORKDIR ${HOME}
 
 # Make output from the dockerized build go someplace else
-ENV KUBE_OUTPUT_SUBPATH _output/dockerized
+ENV KUBE_OUTPUT_SUBPATH=_output/dockerized
 
 # Pick up version stuff here as we don't copy our .git over.
-ENV KUBE_GIT_VERSION_FILE ${HOME}/.dockerized-kube-version-defs
+ENV KUBE_GIT_VERSION_FILE=${HOME}/.dockerized-kube-version-defs
 
 # Add system-wide git user information
 RUN git config --system user.email "nobody@k8s.io" \

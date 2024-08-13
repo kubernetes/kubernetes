@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"fmt"
+
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -78,10 +79,26 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.PodInfoOnMount = new(bool)
 				*(obj.Spec.PodInfoOnMount) = false
 			}
+			if obj.Spec.StorageCapacity == nil {
+				obj.Spec.StorageCapacity = new(bool)
+				*(obj.Spec.StorageCapacity) = false
+			}
+			if obj.Spec.FSGroupPolicy == nil {
+				obj.Spec.FSGroupPolicy = new(storage.FSGroupPolicy)
+				*obj.Spec.FSGroupPolicy = storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+			}
+			if obj.Spec.RequiresRepublish == nil {
+				obj.Spec.RequiresRepublish = new(bool)
+				*(obj.Spec.RequiresRepublish) = false
+			}
 			if len(obj.Spec.VolumeLifecycleModes) == 0 {
 				obj.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				}
+			}
+			if obj.Spec.SELinuxMount == nil {
+				obj.Spec.SELinuxMount = new(bool)
+				*(obj.Spec.SELinuxMount) = false
 			}
 		},
 	}

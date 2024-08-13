@@ -39,6 +39,7 @@ func NewEtcdMigrateServer(cfg *EtcdMigrateCfg, client EtcdMigrateClient) *EtcdMi
 }
 
 // Start starts an etcd server as a separate process, waits until it has started, and returns a exec.Cmd.
+// TODO: Add support for listening to client via TLS.
 func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	etcdCmd := exec.Command(
 		fmt.Sprintf("%s/etcd-%s", r.cfg.binPath, version),
@@ -46,7 +47,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 		"--initial-cluster", r.cfg.initialCluster,
 		"--debug",
 		"--data-dir", r.cfg.dataDirectory,
-		"--listen-client-urls", fmt.Sprintf("http://127.0.0.1:%d", r.cfg.port),
+		"--listen-client-urls", r.cfg.clientListenUrls,
 		"--advertise-client-urls", fmt.Sprintf("http://127.0.0.1:%d", r.cfg.port),
 		"--listen-peer-urls", r.cfg.peerListenUrls,
 		"--initial-advertise-peer-urls", r.cfg.peerAdvertiseUrls,
@@ -68,7 +69,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	done := make(chan bool)
 	go func() {
 		time.Sleep(time.Minute * 2)
-		done <- true
+		close(done)
 	}()
 	for {
 		select {
@@ -107,7 +108,7 @@ func (r *EtcdMigrateServer) Stop() error {
 	timedout := make(chan bool)
 	go func() {
 		time.Sleep(gracefulWait)
-		timedout <- true
+		close(timedout)
 	}()
 	go func() {
 		select {
@@ -120,7 +121,7 @@ func (r *EtcdMigrateServer) Stop() error {
 		}
 	}()
 	err = r.cmd.Wait()
-	stopped <- true
+	close(stopped)
 	if exiterr, ok := err.(*exec.ExitError); ok {
 		klog.Infof("etcd server stopped (signal: %s)", exiterr.Error())
 		// stopped

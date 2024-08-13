@@ -1,0 +1,2 @@
+windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
+windows/amd64/ltsc2022=mcr.microsoft.com/windows/nanoserver:ltsc2022

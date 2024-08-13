@@ -33,6 +33,9 @@ func (FakeManager) AddPod(_ *v1.Pod) {}
 // RemovePod simulates removing a Pod.
 func (FakeManager) RemovePod(_ *v1.Pod) {}
 
+// Simulated stopping liveness and startup probes.
+func (FakeManager) StopLivenessAndStartup(_ *v1.Pod) {}
+
 // CleanupPods simulates cleaning up Pods.
 func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 
@@ -40,7 +43,7 @@ func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 func (FakeManager) Start() {}
 
 // UpdatePodStatus simulates updating the Pod Status.
-func (FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
+func (FakeManager) UpdatePodStatus(_ *v1.Pod, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {
 		podStatus.ContainerStatuses[i].Ready = true
 	}

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type mapConverter struct {
@@ -16,7 +16,7 @@ type mapConverter struct {
 	keyConv, valConv Converter
 }
 
-func newMapConverter(t reflect.Type, fd pref.FieldDescriptor) *mapConverter {
+func newMapConverter(t reflect.Type, fd protoreflect.FieldDescriptor) *mapConverter {
 	if t.Kind() != reflect.Map {
 		panic(fmt.Sprintf("invalid Go type %v for field %v", t, fd.FullName()))
 	}
@@ -27,18 +27,18 @@ func newMapConverter(t reflect.Type, fd pref.FieldDescriptor) *mapConverter {
 	}
 }
 
-func (c *mapConverter) PBValueOf(v reflect.Value) pref.Value {
+func (c *mapConverter) PBValueOf(v reflect.Value) protoreflect.Value {
 	if v.Type() != c.goType {
 		panic(fmt.Sprintf("invalid type: got %v, want %v", v.Type(), c.goType))
 	}
-	return pref.ValueOfMap(&mapReflect{v, c.keyConv, c.valConv})
+	return protoreflect.ValueOfMap(&mapReflect{v, c.keyConv, c.valConv})
 }
 
-func (c *mapConverter) GoValueOf(v pref.Value) reflect.Value {
+func (c *mapConverter) GoValueOf(v protoreflect.Value) reflect.Value {
 	return v.Map().(*mapReflect).v
 }
 
-func (c *mapConverter) IsValidPB(v pref.Value) bool {
+func (c *mapConverter) IsValidPB(v protoreflect.Value) bool {
 	mapv, ok := v.Interface().(*mapReflect)
 	if !ok {
 		return false
@@ -50,11 +50,11 @@ func (c *mapConverter) IsValidGo(v reflect.Value) bool {
 	return v.IsValid() && v.Type() == c.goType
 }
 
-func (c *mapConverter) New() pref.Value {
+func (c *mapConverter) New() protoreflect.Value {
 	return c.PBValueOf(reflect.MakeMap(c.goType))
 }
 
-func (c *mapConverter) Zero() pref.Value {
+func (c *mapConverter) Zero() protoreflect.Value {
 	return c.PBValueOf(reflect.Zero(c.goType))
 }
 
@@ -67,29 +67,29 @@ type mapReflect struct {
 func (ms *mapReflect) Len() int {
 	return ms.v.Len()
 }
-func (ms *mapReflect) Has(k pref.MapKey) bool {
+func (ms *mapReflect) Has(k protoreflect.MapKey) bool {
 	rk := ms.keyConv.GoValueOf(k.Value())
 	rv := ms.v.MapIndex(rk)
 	return rv.IsValid()
 }
-func (ms *mapReflect) Get(k pref.MapKey) pref.Value {
+func (ms *mapReflect) Get(k protoreflect.MapKey) protoreflect.Value {
 	rk := ms.keyConv.GoValueOf(k.Value())
 	rv := ms.v.MapIndex(rk)
 	if !rv.IsValid() {
-		return pref.Value{}
+		return protoreflect.Value{}
 	}
 	return ms.valConv.PBValueOf(rv)
 }
-func (ms *mapReflect) Set(k pref.MapKey, v pref.Value) {
+func (ms *mapReflect) Set(k protoreflect.MapKey, v protoreflect.Value) {
 	rk := ms.keyConv.GoValueOf(k.Value())
 	rv := ms.valConv.GoValueOf(v)
 	ms.v.SetMapIndex(rk, rv)
 }
-func (ms *mapReflect) Clear(k pref.MapKey) {
+func (ms *mapReflect) Clear(k protoreflect.MapKey) {
 	rk := ms.keyConv.GoValueOf(k.Value())
 	ms.v.SetMapIndex(rk, reflect.Value{})
 }
-func (ms *mapReflect) Mutable(k pref.MapKey) pref.Value {
+func (ms *mapReflect) Mutable(k protoreflect.MapKey) protoreflect.Value {
 	if _, ok := ms.valConv.(*messageConverter); !ok {
 		panic("invalid Mutable on map with non-message value type")
 	}
@@ -100,7 +100,7 @@ func (ms *mapReflect) Mutable(k pref.MapKey) pref.Value {
 	}
 	return v
 }
-func (ms *mapReflect) Range(f func(pref.MapKey, pref.Value) bool) {
+func (ms *mapReflect) Range(f func(protoreflect.MapKey, protoreflect.Value) bool) {
 	iter := mapRange(ms.v)
 	for iter.Next() {
 		k := ms.keyConv.PBValueOf(iter.Key()).MapKey()
@@ -110,12 +110,12 @@ func (ms *mapReflect) Range(f func(pref.MapKey, pref.Value) bool) {
 		}
 	}
 }
-func (ms *mapReflect) NewValue() pref.Value {
+func (ms *mapReflect) NewValue() protoreflect.Value {
 	return ms.valConv.New()
 }
 func (ms *mapReflect) IsValid() bool {
 	return !ms.v.IsNil()
 }
-func (ms *mapReflect) protoUnwrap() interface{} {
+func (ms *mapReflect) protoUnwrap() any {
 	return ms.v.Interface()
 }

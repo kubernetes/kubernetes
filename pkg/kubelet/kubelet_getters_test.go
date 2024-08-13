@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -35,8 +36,15 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPodLogsDir()
+	assert.Equal(t, kubelet.podLogsDirectory, got)
+
 	got = kubelet.getPluginsDir()
 	exp = filepath.Join(root, "plugins")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPluginsRegistrationDir()
+	exp = filepath.Join(root, "plugins_registry")
 	assert.Equal(t, exp, got)
 
 	got = kubelet.getPluginDir("foobar")
@@ -55,6 +63,14 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods/abc123/volumes/plugin/foobar")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPodVolumeDevicesDir("abc123")
+	exp = filepath.Join(root, "pods/abc123/volumeDevices")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodVolumeDeviceDir("abc123", "plugin")
+	exp = filepath.Join(root, "pods/abc123/volumeDevices/plugin")
+	assert.Equal(t, exp, got)
+
 	got = kubelet.getPodPluginsDir("abc123")
 	exp = filepath.Join(root, "pods/abc123/plugins")
 	assert.Equal(t, exp, got)
@@ -63,7 +79,56 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods/abc123/plugins/foobar")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getVolumeDevicePluginsDir()
+	exp = filepath.Join(root, "plugins")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getVolumeDevicePluginDir("foobar")
+	exp = filepath.Join(root, "plugins", "foobar", "volumeDevices")
+	assert.Equal(t, exp, got)
+
 	got = kubelet.getPodContainerDir("abc123", "def456")
 	exp = filepath.Join(root, "pods/abc123/containers/def456")
 	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodResourcesDir()
+	exp = filepath.Join(root, "pod-resources")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.GetHostname()
+	exp = "127.0.0.1"
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodVolumeSubpathsDir("abc123")
+	exp = filepath.Join(root, "pods/abc123/volume-subpaths")
+	assert.Equal(t, exp, got)
+}
+
+func TestHandlerSupportsUserNamespaces(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	kubelet.runtimeState.setRuntimeHandlers([]kubecontainer.RuntimeHandler{
+		{
+			Name:                   "has-support",
+			SupportsUserNamespaces: true,
+		},
+		{
+			Name:                   "has-no-support",
+			SupportsUserNamespaces: false,
+		},
+	})
+
+	got, err := kubelet.HandlerSupportsUserNamespaces("has-support")
+	assert.True(t, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support")
+	assert.False(t, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("unknown")
+	assert.False(t, got)
+	assert.Error(t, err)
 }

@@ -27,13 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/klog/v2/ktesting"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestDefaultBinder(t *testing.T) {
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"},
-	}
+	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
@@ -53,8 +53,12 @@ func TestDefaultBinder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			var gotBinding *v1.Binding
-			client := fake.NewSimpleClientset(testPod)
+			client := fake.NewClientset(testPod)
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				if action.GetSubresource() != "binding" {
 					return false, nil, nil
@@ -66,12 +70,12 @@ func TestDefaultBinder(t *testing.T) {
 				return true, gotBinding, nil
 			})
 
-			fh, err := framework.NewFramework(nil, nil, nil, framework.WithClientSet(client))
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}
 			binder := &DefaultBinder{handle: fh}
-			status := binder.Bind(context.Background(), nil, testPod, "foohost.kubernetes.mydomain.com")
+			status := binder.Bind(ctx, nil, testPod, testNode)
 			if got := status.AsError(); (tt.injectErr != nil) != (got != nil) {
 				t.Errorf("got error %q, want %q", got, tt.injectErr)
 			}

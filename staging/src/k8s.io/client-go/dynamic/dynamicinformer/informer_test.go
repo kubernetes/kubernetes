@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/tools/cache"
@@ -95,7 +95,12 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			if ts.existingObj != nil {
 				objs = append(objs, ts.existingObj)
 			}
-			fakeClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			// don't adjust the scheme to include deploymentlist. This is testing whether an informer can be created against using
+			// a client that doesn't have a type registered in the scheme.
+			gvrToListKind := map[schema.GroupVersionResource]string{
+				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+			}
+			fakeClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...)
 			target := dynamicinformer.NewFilteredDynamicSharedInformerFactory(fakeClient, 0, ts.informNS, nil)
 
 			// act
@@ -113,7 +118,7 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 					t.Errorf("informer received an object for namespace %s when watching namespace %s", ts.ns, ts.informNS)
 				}
 				if !equality.Semantic.DeepEqual(testObject, objFromInformer) {
-					t.Fatalf("%v", diff.ObjectDiff(testObject, objFromInformer))
+					t.Fatalf("%v", cmp.Diff(testObject, objFromInformer))
 				}
 			case <-ctx.Done():
 				if ts.ns == ts.informNS {
@@ -214,7 +219,12 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			if ts.existingObj != nil {
 				objs = append(objs, ts.existingObj)
 			}
-			fakeClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			// don't adjust the scheme to include deploymentlist. This is testing whether an informer can be created against using
+			// a client that doesn't have a type registered in the scheme.
+			gvrToListKind := map[schema.GroupVersionResource]string{
+				{Group: "extensions", Version: "v1beta1", Resource: "deployments"}: "DeploymentList",
+			}
+			fakeClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...)
 			target := dynamicinformer.NewDynamicSharedInformerFactory(fakeClient, 0)
 
 			// act
@@ -229,7 +239,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			select {
 			case objFromInformer := <-informerReciveObjectCh:
 				if !equality.Semantic.DeepEqual(testObject, objFromInformer) {
-					t.Fatalf("%v", diff.ObjectDiff(testObject, objFromInformer))
+					t.Fatalf("%v", cmp.Diff(testObject, objFromInformer))
 				}
 			case <-ctx.Done():
 				t.Errorf("tested informer haven't received an object, waited %v", timeout)

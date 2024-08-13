@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/utils/cpuset"
 )
 
 type fakeManager struct {
@@ -31,37 +32,57 @@ type fakeManager struct {
 }
 
 func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Info("[fake cpumanager] Start()")
+	klog.InfoS("Start()")
 	return nil
 }
 
 func (m *fakeManager) Policy() Policy {
-	klog.Info("[fake cpumanager] Policy()")
-	return NewNonePolicy()
+	klog.InfoS("Policy()")
+	pol, _ := NewNonePolicy(nil)
+	return pol
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	klog.Infof("[fake cpumanager] Allocate (pod: %s, container: %s", pod.Name, container.Name)
+	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	klog.Infof("[fake cpumanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
-	return nil
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	klog.InfoS("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.Infof("[fake cpumanager] RemoveContainer (container id: %s)", containerID)
+	klog.InfoS("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.Infof("[fake cpumanager] Get Topology Hints")
+	klog.InfoS("Get container topology hints")
+	return map[string][]topologymanager.TopologyHint{}
+}
+
+func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	klog.InfoS("Get pod topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) State() state.Reader {
 	return m.state
+}
+
+func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
+	klog.InfoS("GetExclusiveCPUs", "podUID", podUID, "containerName", containerName)
+	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
+	klog.InfoS("Get Allocatable CPUs")
+	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
+	klog.InfoS("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
+	return cpuset.CPUSet{}
 }
 
 // NewFakeManager creates empty/fake cpu manager

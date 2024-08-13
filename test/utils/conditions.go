@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -50,6 +50,10 @@ func PodRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
 		return true, nil
 	}
 	return PodRunningReady(p)
+}
+
+func PodSucceeded(p *v1.Pod) (bool, error) {
+	return p.Status.Phase == v1.PodSucceeded, nil
 }
 
 // FailedContainers inspects all containers in a pod and returns failure
@@ -98,14 +102,4 @@ func TerminatedContainers(pod *v1.Pod) map[string]string {
 		}
 	}
 	return states
-}
-
-// PodNotReady checks whether pod p's has a ready condition of status false.
-func PodNotReady(p *v1.Pod) (bool, error) {
-	// Check the ready condition is false.
-	if podutil.IsPodReady(p) {
-		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.NodeName, v1.PodReady, v1.ConditionFalse, p.Status.Conditions)
-	}
-	return true, nil
 }

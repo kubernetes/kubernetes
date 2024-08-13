@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,13 +40,13 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.NamespaceScoped)
 
 	assert.Equal(t, "v1beta1", noxuDefinition.Spec.Versions[0].Name)
 	assert.Equal(t, "v1beta2", noxuDefinition.Spec.Versions[1].Name)
 	assert.True(t, noxuDefinition.Spec.Versions[1].Storage)
 
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,18 +62,22 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// update validation via update because the cache priming in CreateNewCustomResourceDefinition will fail otherwise
+	// update validation via update because the cache priming in CreateCRDUsingRemovedAPI will fail otherwise
 	t.Logf("Updating CRD to validate apiVersion")
-	noxuDefinition, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
-		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-					"apiVersion": {
-						Pattern: "^mygroup.example.com/v1beta1$", // this means we can only patch via the v1beta1 handler version
+	noxuDefinition, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1.CustomResourceDefinition) {
+		for i := range crd.Spec.Versions {
+			crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"apiVersion": {
+							Pattern: "^mygroup.example.com/v1beta1$", // this means we can only patch via the v1beta1 handler version
+							Type:    "string",
+						},
 					},
+					Required: []string{"apiVersion"},
 				},
-				Required: []string{"apiVersion"},
-			},
+			}
 		}
 	})
 	assert.NoError(t, err)
@@ -112,7 +116,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			i++
 
 			_, err := noxuNamespacedResourceClientV1beta2.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 
 			// work around "grpc: the client connection is closing" error
 			// TODO: fix the grpc error
@@ -134,8 +138,8 @@ func TestVersionedNamespacedScopedCRD(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +155,8 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,40 +166,44 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 }
 
 func TestStoragedVersionInNamespacedCRDStatus(t *testing.T) {
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.NamespaceScoped)
 	ns := "not-the-default"
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
 
 func TestStoragedVersionInClusterScopedCRDStatus(t *testing.T) {
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.ClusterScoped)
 	ns := ""
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
 
-func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) {
-	versionsV1Beta1Storage := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *apiextensionsv1.CustomResourceDefinition) {
+	versionsV1Beta1Storage := []apiextensionsv1.CustomResourceDefinitionVersion{
 		{
 			Name:    "v1beta1",
 			Served:  true,
 			Storage: true,
+			Schema:  fixtures.AllowAllSchema(),
 		},
 		{
 			Name:    "v1beta2",
 			Served:  true,
 			Storage: false,
+			Schema:  fixtures.AllowAllSchema(),
 		},
 	}
-	versionsV1Beta2Storage := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+	versionsV1Beta2Storage := []apiextensionsv1.CustomResourceDefinitionVersion{
 		{
 			Name:    "v1beta1",
 			Served:  true,
 			Storage: false,
+			Schema:  fixtures.AllowAllSchema(),
 		},
 		{
 			Name:    "v1beta2",
 			Served:  true,
 			Storage: true,
+			Schema:  fixtures.AllowAllSchema(),
 		},
 	}
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
@@ -205,13 +213,13 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	defer tearDown()
 
 	noxuDefinition.Spec.Versions = versionsV1Beta1Storage
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// The storage version list should be initilized to storage version
-	crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
+	crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,11 +229,11 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 
 	// Changing CRD storage version should be reflected immediately
 	crd.Spec.Versions = versionsV1Beta2Storage
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +241,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+	err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 	if err != nil {
 		t.Fatal(err)
 	}

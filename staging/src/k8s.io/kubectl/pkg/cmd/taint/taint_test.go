@@ -17,7 +17,7 @@ limitations under the License.
 package taint
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -217,6 +217,12 @@ func TestTaint(t *testing.T) {
 			expectTaint: false,
 		},
 		{
+			description: "add and remove taint with same key and effect should be rejected",
+			args:        []string{"node", "node-name", "foo=:NoExcute", "foo=:NoExcute-"},
+			expectFatal: true,
+			expectTaint: false,
+		},
+		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
 			oldTaints: []corev1.Taint{{
 				Key:    "foo",
@@ -257,7 +263,7 @@ func TestTaint(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 					case m.isFor("PATCH", "/nodes/node-name"):
 						tainted = true
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
@@ -283,7 +289,7 @@ func TestTaint(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					case m.isFor("PUT", "/nodes/node-name"):
 						tainted = true
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
@@ -303,7 +309,7 @@ func TestTaint(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			cmd := NewCmdTaint(tf, genericclioptions.NewTestIOStreamsDiscard())
+			cmd := NewCmdTaint(tf, genericiooptions.NewTestIOStreamsDiscard())
 
 			sawFatal := false
 			func() {

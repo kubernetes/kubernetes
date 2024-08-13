@@ -1,3 +1,4 @@
+//go:build libpfm && cgo
 // +build libpfm,cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
@@ -23,18 +24,17 @@ import (
 	"unsafe"
 )
 
-const (
-	perfSampleIdentifier     = 1 << 16
-	perfAttrBitsInherit      = 1 << 1
-	perfAttrBitsExcludeGuest = 1 << 20
-)
-
-// ReadFormat allows to read perf event's value for non-grouped events
-type ReadFormat struct {
-	Value       uint64 /* The value of the event */
+// GroupReadFormat allows to read perf event's values for grouped events.
+// See https://man7.org/linux/man-pages/man2/perf_event_open.2.html section "Reading results" with PERF_FORMAT_GROUP specified.
+type GroupReadFormat struct {
+	Nr          uint64 /* The number of events */
 	TimeEnabled uint64 /* if PERF_FORMAT_TOTAL_TIME_ENABLED */
 	TimeRunning uint64 /* if PERF_FORMAT_TOTAL_TIME_RUNNING */
-	ID          uint64 /* if PERF_FORMAT_ID */
+}
+
+type Values struct {
+	Value uint64 /* The value of the event */
+	ID    uint64 /* if PERF_FORMAT_ID */
 }
 
 // pfmPerfEncodeArgT represents structure that is used to parse perf event nam

@@ -48,28 +48,21 @@ KUBEMARK_IMAGE_TAG=$(head /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1
 function create-and-upload-hollow-node-image {
   authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
-  if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
-    # Build+push the image through bazel.
-    touch WORKSPACE # Needed for bazel.
-    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
-    run-cmd-with-retries "${build_cmd[@]}"
-  else
-    # Build+push the image through makefile.
-    build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
-    MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
-    KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-    if [[ -z "${KUBEMARK_BIN}" ]]; then
-      echo 'Cannot find cmd/kubemark binary'
-      exit 1
-    fi
-    echo "Copying kubemark binary to ${MAKE_DIR}"
-    cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-    CURR_DIR=$(pwd)
-    cd "${MAKE_DIR}"
-    REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
-    rm kubemark
-    cd "$CURR_DIR"
+  # Build+push the image through makefile.
+  build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
+  MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+  KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+  if [[ -z "${KUBEMARK_BIN}" ]]; then
+    echo 'Cannot find cmd/kubemark binary'
+    exit 1
   fi
+  echo "Copying kubemark binary to ${MAKE_DIR}"
+  cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
+  CURR_DIR=$(pwd)
+  cd "${MAKE_DIR}"
+  REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
+  rm kubemark
+  cd "$CURR_DIR"
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
   # Cleanup the kubemark image after the script exits.
   if [[ "${CLEANUP_KUBEMARK_IMAGE:-}" == "true" ]]; then
@@ -90,7 +83,6 @@ function create-kube-hollow-node-resources {
 
   # Create configmap for configuring hollow- kubelet, proxy and npd.
   "${KUBECTL}" create configmap "node-configmap" --namespace="kubemark" \
-    --from-literal=content.type="${TEST_CLUSTER_API_CONTENT_TYPE}" \
     --from-file=kernel.monitor="${RESOURCE_DIRECTORY}/kernel-monitor.json"
 
   # Create secret for passing kubeconfigs to kubelet, kubeproxy and npd.
@@ -191,6 +183,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     # Fail it if it already took more than 30 minutes.
     if [ $((now - start)) -gt 1800 ]; then
       echo ""
+      "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" describe node
       # shellcheck disable=SC2154 # Color defined in sourced script
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
       # Try listing nodes again - if it fails it means that API server is not responding
@@ -238,7 +231,7 @@ function resize-node-objects {
   echo "Annotating node objects with ${annotation_size_bytes} byte label"
   label=$( (< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w "$annotation_size_bytes"; true) | head -n 1)
   "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get nodes -o name \
-    | xargs -n10 -P100 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label" > /dev/null
+    | xargs -P50 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label"
   echo "Annotating node objects completed"
 }
 

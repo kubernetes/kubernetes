@@ -17,15 +17,17 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -57,11 +59,11 @@ func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, av
 }
 
 // helper to create RS with given availableReplicas
-func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int) *apps.ReplicaSet {
+func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int32) *apps.ReplicaSet {
 	rs := rs(name, specReplicas, nil, metav1.Time{})
 	rs.Status = apps.ReplicaSetStatus{
-		Replicas:          int32(statusReplicas),
-		AvailableReplicas: int32(availableReplicas),
+		Replicas:          statusReplicas,
+		AvailableReplicas: availableReplicas,
 	}
 	return rs
 }
@@ -166,7 +168,12 @@ func TestRequeueStuckDeployment(t *testing.T) {
 	}
 
 	dc := &DeploymentController{
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "doesnt_matter"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "doesnt_matter",
+			},
+		),
 	}
 	dc.enqueueDeployment = dc.enqueue
 
@@ -175,7 +182,10 @@ func TestRequeueStuckDeployment(t *testing.T) {
 			if test.nowFn != nil {
 				nowFn = test.nowFn
 			}
-			got := dc.requeueStuckDeployment(test.d, test.status)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			got := dc.requeueStuckDeployment(ctx, test.d, test.status)
 			if got != test.expected {
 				t.Errorf("%s: got duration: %v, expected duration: %v", test.name, got, test.expected)
 			}
@@ -329,8 +339,8 @@ func TestSyncRolloutStatus(t *testing.T) {
 			if test.newRS != nil {
 				test.allRSs = append(test.allRSs, test.newRS)
 			}
-
-			err := dc.syncRolloutStatus(test.allRSs, test.newRS, test.d)
+			_, ctx := ktesting.NewTestContext(t)
+			err := dc.syncRolloutStatus(ctx, test.allRSs, test.newRS, test.d)
 			if err != nil {
 				t.Error(err)
 			}

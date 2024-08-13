@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -30,11 +31,12 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 func TestSafeMakeDir(t *testing.T) {
 	defaultPerm := os.FileMode(0750) + os.ModeDir
+	maxPerm := os.FileMode(0777) + os.ModeDir
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -53,6 +55,16 @@ func TestSafeMakeDir(t *testing.T) {
 			"test/directory",
 			"test/directory",
 			defaultPerm,
+			false,
+		},
+		{
+			"all-created-subpath-directory-with-permissions",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test",
+			maxPerm,
 			false,
 		},
 		{
@@ -909,6 +921,143 @@ func TestBindSubPath(t *testing.T) {
 	}
 }
 
+func TestSubpath_PrepareSafeSubpath(t *testing.T) {
+	//complete code
+	defaultPerm := os.FileMode(0750)
+
+	tests := []struct {
+		name string
+		// Function that prepares directory structure for the test under given
+		// base.
+		prepare      func(base string) ([]string, string, string, error)
+		expectError  bool
+		expectAction []mount.FakeAction
+		mountExists  bool
+	}{
+		{
+			name: "subpath-mount-already-exists-with-mismatching-mount",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				subpath := filepath.Join(volpath, "dir0")
+				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+			},
+			expectError:  false,
+			expectAction: []mount.FakeAction{{Action: "unmount"}},
+			mountExists:  false,
+		},
+		{
+			name: "subpath-mount-already-exists-with-samefile",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				subpathMountRoot := filepath.Dir(subpathMount)
+
+				if err := os.MkdirAll(subpathMountRoot, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+				targetFile, err := os.Create(subpathMount)
+				if err != nil {
+					return nil, "", "", err
+				}
+				defer targetFile.Close()
+
+				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+				subpath := filepath.Join(volpath, "file0")
+				// using hard link to simulate bind mounts
+				err = os.Link(subpathMount, subpath)
+				if err != nil {
+					return nil, "", "", err
+				}
+				return mounts, volpath, subpath, nil
+			},
+			expectError:  false,
+			expectAction: []mount.FakeAction{},
+			mountExists:  true,
+		},
+	}
+	for _, test := range tests {
+		klog.V(4).Infof("test %q", test.name)
+		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		defer os.RemoveAll(base)
+
+		mounts, volPath, subPath, err := test.prepare(base)
+		if err != nil {
+			os.RemoveAll(base)
+			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
+		}
+
+		fm := setupFakeMounter(mounts)
+
+		subpath := Subpath{
+			VolumeMountIndex: testSubpath,
+			Path:             subPath,
+			VolumeName:       testVol,
+			VolumePath:       volPath,
+			PodDir:           filepath.Join(base, "pod0"),
+			ContainerName:    testContainer,
+		}
+
+		_, subpathMount := getTestPaths(base)
+		bindMountExists, bindPathTarget, err := prepareSubpathTarget(fm, subpath)
+
+		if bindMountExists != test.mountExists {
+			t.Errorf("test %q failed: expected bindMountExists %v, got %v", test.name, test.mountExists, bindMountExists)
+		}
+
+		logActions := fm.GetLog()
+		if len(test.expectAction) == 0 && len(logActions) > 0 {
+			t.Errorf("test %q failed: expected no actions, got %v", test.name, logActions)
+		}
+
+		if len(test.expectAction) > 0 {
+			foundMatchingAction := false
+			testAction := test.expectAction[0]
+			for _, action := range logActions {
+				if action.Action == testAction.Action {
+					foundMatchingAction = true
+					break
+				}
+			}
+			if !foundMatchingAction {
+				t.Errorf("test %q failed: expected action %q, got %v", test.name, testAction.Action, logActions)
+			}
+		}
+
+		if test.expectError {
+			if err == nil {
+				t.Errorf("test %q failed: expected error, got success", test.name)
+			}
+			if bindPathTarget != "" {
+				t.Errorf("test %q failed: expected empty bindPathTarget, got %v", test.name, bindPathTarget)
+			}
+			if err = validateDirNotExists(subpathMount); err != nil {
+				t.Errorf("test %q failed: %v", test.name, err)
+			}
+		}
+		if !test.expectError {
+			if err != nil {
+				t.Errorf("test %q failed: %v", test.name, err)
+			}
+			if bindPathTarget != subpathMount {
+				t.Errorf("test %q failed: expected bindPathTarget %v, got %v", test.name, subpathMount, bindPathTarget)
+			}
+			if err = validateFileExists(subpathMount); err != nil {
+				t.Errorf("test %q failed: %v", test.name, err)
+			}
+		}
+	}
+}
+
 func TestSafeOpen(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
 
@@ -1045,7 +1194,7 @@ func TestSafeOpen(t *testing.T) {
 				socketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", socketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", socketFile, socketError)
 				}
 				return nil
 			},
@@ -1058,7 +1207,7 @@ func TestSafeOpen(t *testing.T) {
 				testSocketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", testSocketFile, socketError)
 				}
 				return nil
 			},
@@ -1251,7 +1400,7 @@ func validateDirEmpty(dir string) error {
 	}
 
 	if len(files) != 0 {
-		return fmt.Errorf("Directory %q is not empty", dir)
+		return fmt.Errorf("directory %q is not empty", dir)
 	}
 	return nil
 }

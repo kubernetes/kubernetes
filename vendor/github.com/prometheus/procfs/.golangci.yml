@@ -1,4 +1,22 @@
 ---
 linters:
   enable:
-  - golint
+  - errcheck
+  - godot
+  - gosimple
+  - govet
+  - ineffassign
+  - misspell
+  - revive
+  - staticcheck
+  - testifylint
+  - unused
+
+linter-settings:
+  godot:
+    capital: true
+    exclude:
+    # Ignore "See: URL"
+    - 'See:'
+  misspell:
+    locale: US

@@ -198,10 +198,35 @@ func (e *Runner) Run(args []string) error {
 		return err
 	}
 
-	// builds the runner data
-	var data RunData
-	if data, err = e.InitData(args); err != nil {
-		return err
+	// precheck phase dependencies before actual execution
+	missedDeps := make(map[string][]string)
+	visited := make(map[string]struct{})
+	for _, p := range e.phaseRunners {
+		if run, ok := phaseRunFlags[p.generatedName]; !run || !ok {
+			continue
+		}
+		for _, dep := range p.Phase.Dependencies {
+			if _, ok := visited[dep]; !ok {
+				missedDeps[p.Phase.Name] = append(missedDeps[p.Phase.Name], dep)
+			}
+		}
+		visited[p.Phase.Name] = struct{}{}
+	}
+	if len(missedDeps) > 0 {
+		var msg strings.Builder
+		msg.WriteString("unresolved dependencies:")
+		for phase, missedPhases := range missedDeps {
+			msg.WriteString(fmt.Sprintf("\n\tmissing %v phase(s) needed by %q phase", missedPhases, phase))
+		}
+		return errors.New(msg.String())
+	}
+
+	// builds the runner data if the runtime data is not initialized
+	data := e.runData
+	if data == nil {
+		if data, err = e.InitData(args); err != nil {
+			return err
+		}
 	}
 
 	err = e.visitAll(func(p *phaseRunner) error {
@@ -213,7 +238,7 @@ func (e *Runner) Run(args []string) error {
 		// Errors if phases that are meant to create special subcommands only
 		// are wrongly assigned Run Methods
 		if p.RunAllSiblings && (p.RunIf != nil || p.Run != nil) {
-			return errors.Wrapf(err, "phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
+			return errors.Errorf("phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
 		}
 
 		// If the phase defines a condition to be checked before executing the phase action.
@@ -338,8 +363,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				// if the phase has subphases, print the help and exits
 				if len(p.Phases) > 0 {
-					cmd.Help()
-					return nil
+					return cmd.Help()
 				}
 
 				// overrides the command triggering the Runner using the phaseCmd

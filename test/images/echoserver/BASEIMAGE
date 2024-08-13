@@ -1,5 +1,0 @@
-linux/amd64=nginx:1.15-alpine
-linux/arm=arm32v6/nginx:1.15-alpine
-linux/arm64=arm64v8/nginx:1.15-alpine
-linux/ppc64le=ppc64le/nginx:1.15-alpine
-linux/s390x=s390x/nginx:1.15-alpine

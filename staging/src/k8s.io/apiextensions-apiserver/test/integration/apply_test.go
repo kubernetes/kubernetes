@@ -21,20 +21,15 @@ import (
 	"fmt"
 	"testing"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestApplyBasic(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -50,14 +45,14 @@ func TestApplyBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 
 	rest := apiExtensionClient.Discovery().RESTClient()
 	yamlBody := []byte(fmt.Sprintf(`
@@ -70,7 +65,7 @@ values:
   boolVal: true
   stringVal: "1"`, apiVersion, kind))
 	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -80,7 +75,7 @@ values:
 	}
 
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Body([]byte(`{"values":{"numVal": 5}}`)).
 		DoRaw(context.TODO())
@@ -90,7 +85,7 @@ values:
 
 	// Re-apply the same object, we should get conflicts now.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -108,7 +103,7 @@ values:
 
 	// Re-apply with force, should work fine.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Param("force", "true").
 		Param("fieldManager", "apply_test").

@@ -19,6 +19,7 @@ package upgrade
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
 	"github.com/pkg/errors"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -53,10 +54,7 @@ func (c CoreDNSCheck) Check() (warnings, errors []error) {
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.String, dnsType kubeadmapi.DNSAddOnType) error {
-	if dnsType != kubeadmapi.CoreDNS {
-		return nil
-	}
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
 			name:   "CoreDNSUnsupportedPlugins",
@@ -81,7 +79,13 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, currentInstalledCoreDNSversion, corefile)
+
+	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
+	targetCoreDNSVersion := strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v")
+	if currentInstalledCoreDNSversion == targetCoreDNSVersion {
+		return nil
+	}
+	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, targetCoreDNSVersion, corefile)
 	if err != nil {
 		return err
 	}
@@ -108,9 +112,7 @@ func checkMigration(client clientset.Interface) error {
 		return err
 	}
 
-	_, err = migration.Migrate(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile, false)
-	if err != nil {
-		return errors.Wrap(err, "CoreDNS will not be upgraded")
-	}
-	return nil
+	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
+	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
+	return errors.Wrap(err, "CoreDNS will not be upgraded")
 }

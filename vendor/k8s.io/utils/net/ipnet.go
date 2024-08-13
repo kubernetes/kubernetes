@@ -30,7 +30,7 @@ func ParseIPNets(specs ...string) (IPNetSet, error) {
 	ipnetset := make(IPNetSet)
 	for _, spec := range specs {
 		spec = strings.TrimSpace(spec)
-		_, ipnet, err := net.ParseCIDR(spec)
+		_, ipnet, err := ParseCIDRSloppy(spec)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +128,7 @@ type IPSet map[string]net.IP
 func ParseIPSet(items ...string) (IPSet, error) {
 	ipset := make(IPSet)
 	for _, item := range items {
-		ip := net.ParseIP(strings.TrimSpace(item))
+		ip := ParseIPSloppy(strings.TrimSpace(item))
 		if ip == nil {
 			return nil, fmt.Errorf("error parsing IP %q", item)
 		}

@@ -46,6 +46,7 @@ import (
 
 // PluginName indicates name of admission plugin.
 const PluginName = "ImagePolicyWebhook"
+const ephemeralcontainers = "ephemeralcontainers"
 
 // AuditKeyPrefix is used as the prefix for all audit keys handled by this
 // pluggin. Some well known suffixes are listed below.
@@ -132,8 +133,9 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 
 // Validate makes an admission decision based on the request attributes
 func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources or resources other than pods.
-	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore all calls to subresources other than ephemeralcontainers or calls to resources other than pods.
+	subresource := attributes.GetSubresource()
+	if (subresource != "" && subresource != ephemeralcontainers) || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -144,13 +146,21 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 
 	// Build list of ImageReviewContainerSpec
 	var imageReviewContainerSpecs []v1alpha1.ImageReviewContainerSpec
-	containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
-	containers = append(containers, pod.Spec.Containers...)
-	containers = append(containers, pod.Spec.InitContainers...)
-	for _, c := range containers {
-		imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
-			Image: c.Image,
-		})
+	if subresource == "" {
+		containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
+		containers = append(containers, pod.Spec.Containers...)
+		containers = append(containers, pod.Spec.InitContainers...)
+		for _, c := range containers {
+			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
+				Image: c.Image,
+			})
+		}
+	} else if subresource == ephemeralcontainers {
+		for _, c := range pod.Spec.EphemeralContainers {
+			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
+				Image: c.Image,
+			})
+		}
 	}
 	imageReview := v1alpha1.ImageReview{
 		Spec: v1alpha1.ImageReviewSpec{
@@ -210,15 +220,15 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 // The config file is specified by --admission-control-config-file and has the
 // following format for a webhook:
 //
-//   {
-//     "imagePolicy": {
-//        "kubeConfigFile": "path/to/kubeconfig/for/backend",
-//        "allowTTL": 30,           # time in s to cache approval
-//        "denyTTL": 30,            # time in s to cache denial
-//        "retryBackoff": 500,      # time in ms to wait between retries
-//        "defaultAllow": true      # determines behavior if the webhook backend fails
-//     }
-//   }
+//	{
+//	  "imagePolicy": {
+//	     "kubeConfigFile": "path/to/kubeconfig/for/backend",
+//	     "allowTTL": 30,           # time in s to cache approval
+//	     "denyTTL": 30,            # time in s to cache denial
+//	     "retryBackoff": 500,      # time in ms to wait between retries
+//	     "defaultAllow": true      # determines behavior if the webhook backend fails
+//	  }
+//	}
 //
 // The config file may be json or yaml.
 //
@@ -227,19 +237,19 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 //
 // The kubeconfig's cluster field is used to refer to the remote service, user refers to the returned authorizer.
 //
-//     # clusters refers to the remote service.
-//     clusters:
-//     - name: name-of-remote-imagepolicy-service
-//       cluster:
-//         certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
-//         server: https://images.example.com/policy # URL of remote service to query. Must use 'https'.
+//	# clusters refers to the remote service.
+//	clusters:
+//	- name: name-of-remote-imagepolicy-service
+//	  cluster:
+//	    certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
+//	    server: https://images.example.com/policy # URL of remote service to query. Must use 'https'.
 //
-//     # users refers to the API server's webhook configuration.
-//     users:
-//     - name: name-of-api-server
-//       user:
-//         client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
-//         client-key: /path/to/key.pem          # key matching the cert
+//	# users refers to the API server's webhook configuration.
+//	users:
+//	- name: name-of-api-server
+//	  user:
+//	    client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
+//	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
@@ -261,7 +271,12 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff, nil)
+	clientConfig, err := webhook.LoadKubeconfig(whConfig.KubeConfigFile, nil)
+	if err != nil {
+		return nil, err
+	}
+	retryBackoff := webhook.DefaultRetryBackoffWithInitialDelay(whConfig.RetryBackoff)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, clientConfig, groupVersions, retryBackoff)
 	if err != nil {
 		return nil, err
 	}

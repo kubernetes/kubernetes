@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 	"text/template"
 
 	"k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/exec"
@@ -74,6 +76,45 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
+// NOTE: Typically, Windows requires file extensions for executable files. If a file does not
+// have a file extension, Windows will check if there is a file with the given name + one of the
+// extensions from $env:PATHEXT (in order) and run that file with that extension.
+// For example, if we have the file C:\\foo.bat, we can run C:\\foo.
+// For these tests, .bat was chosen since it's one of the default values in $env.PATHEXT. .ps1 is
+// not in that list, but it might be useful for flexvolumes to be able to handle powershell scripts.
+// There's no argument count variable in batch. Instead, we can check that the n-th argument
+// is an empty string.
+const execScriptTemplBat = `
+@echo off
+
+if "%1"=="init" if "%2"=="" (
+    echo {"status": "Success"}
+    exit 0
+)
+if "%1"=="attach" if "%3"=="" (
+    echo {"device": "{{.DevicePath}}", "status": "Success"}
+    exit 0
+)
+
+if "%1"=="detach" if "%3"=="" (
+    echo {"status": "Success"}
+    exit 0
+)
+
+if "%1"=="getvolumename" if "%5"=="" (
+    echo {"status": "Success", "volume": "fakevolume"}
+    exit 0
+)
+
+if "%1"=="isattached" if "%3"=="" (
+    echo {"status": "Success", "attached": true}
+    exit 0
+)
+
+echo {"status": "Not supported"}
+exit 1
+`
+
 func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, execScriptTempl string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {
@@ -85,6 +126,9 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 		t.Errorf("Failed to create plugin: %v", err)
 	}
 	pluginExec := filepath.Join(pluginDir, plugName)
+	if goruntime.GOOS == "windows" {
+		pluginExec = pluginExec + ".bat"
+	}
 	f, err := os.Create(pluginExec)
 	if err != nil {
 		t.Errorf("Failed to install plugin")
@@ -122,8 +166,14 @@ func TestCanSupport(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()
-	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(t, "fake", nil, nil))
+	execScriptTempl := execScriptTempl1
+	if goruntime.GOOS == "windows" {
+		execScriptTempl = execScriptTemplBat
+	}
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl, nil)
+	if err := plugMgr.InitPlugins(nil, GetDynamicPluginProberWithoutWatcher(tmpDir, runner), volumetest.NewFakeVolumeHost(t, "fake", nil, nil)); err != nil {
+		t.Fatalf("Could not initialize plugins: %v", err)
+	}
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
@@ -151,14 +201,29 @@ func TestGetAccessModes(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()
-	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
-
+	execScriptTempl := execScriptTempl1
+	if goruntime.GOOS == "windows" {
+		execScriptTempl = execScriptTemplBat
+	}
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl, nil)
+	if err := plugMgr.InitPlugins(nil, GetDynamicPluginProberWithoutWatcher(tmpDir, runner), volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil)); err != nil {
+		t.Fatalf("Could not initialize plugins: %v", err)
+	}
 	plugin, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if !volumetest.ContainsAccessMode(plugin.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plugin.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected two AccessModeTypes:  %s and %s", v1.ReadWriteOnce, v1.ReadOnlyMany)
+	}
+}
+
+func GetDynamicPluginProberWithoutWatcher(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+	return &flexVolumeProber{
+		pluginDir: pluginDir,
+		watcher:   newFakeWatcher(),
+		factory:   pluginFactory{},
+		runner:    runner,
+		fs:        &utilfs.DefaultFs{},
 	}
 }

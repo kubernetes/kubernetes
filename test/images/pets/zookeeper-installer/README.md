@@ -4,9 +4,7 @@ The image in this directory is the init container for contrib/pets/zookeeper but
 
 You can execute the image locally via:
 ```
-docker run -it k8s.gcr.io/zookeeper-install-3.5.0-alpha:e2e --cmd --install-into=/opt --work-dir=/work-dir
+docker run -it registry.k8s.io/zookeeper-install-3.5.0-alpha:e2e --cmd --install-into=/opt --work-dir=/work-dir
 ```
 To share the installation with other containers mount the appropriate volumes as `--install-into` and `--work-dir`, where `install-into` is the directory to install zookeeper into, and `work-dir` is the directory to install the user/admin supplied on-{start,change} hook scripts.
 
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/pets/zookeeper/README.md?pixel)]()

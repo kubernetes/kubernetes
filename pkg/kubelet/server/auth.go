@@ -59,10 +59,10 @@ func isSubpath(subpath, path string) bool {
 // GetRequestAttributes populates authorizer attributes for the requests to the kubelet API.
 // Default attributes are: {apiVersion=v1,verb=<http verb from request>,resource=nodes,name=<node name>,subresource=proxy}
 // More specific verb/resource is set for the following request patterns:
-//    /stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
-//    /metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
-//    /logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
-//    /spec/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=spec
+//
+//	/stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
+//	/metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
+//	/logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
 func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
 
 	apiVerb := ""
@@ -105,11 +105,11 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 	case isSubpath(requestPath, logsPath):
 		// "log" to match other log subresources (pods/log, etc)
 		attrs.Subresource = "log"
-	case isSubpath(requestPath, specPath):
-		attrs.Subresource = "spec"
+	case isSubpath(requestPath, checkpointPath):
+		attrs.Subresource = "checkpoint"
 	}
 
-	klog.V(5).Infof("Node request attributes: user=%#v attrs=%#v", attrs.GetUser(), attrs)
+	klog.V(5).InfoS("Node request attributes", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
 
 	return attrs
 }

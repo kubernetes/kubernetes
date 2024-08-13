@@ -19,6 +19,7 @@ import (
 	"time"
 
 	info "github.com/google/cadvisor/info/v1"
+	v2 "github.com/google/cadvisor/info/v2"
 )
 
 type testSubcontainersInfoProvider struct{}
@@ -152,6 +153,10 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						},
 					},
 				},
+				Distances: []uint64{
+					10,
+					12,
+				},
 			},
 			{
 				Id:     1,
@@ -259,14 +264,18 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						Level: 3,
 					},
 				},
+				Distances: []uint64{
+					12,
+					10,
+				},
 			},
 		},
 	}, nil
 }
 
-func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.ContainerInfoRequest) ([]*info.ContainerInfo, error) {
-	return []*info.ContainerInfo{
-		{
+func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.RequestOptions) (map[string]*info.ContainerInfo, error) {
+	return map[string]*info.ContainerInfo{
+		"testcontainer": {
 			ContainerReference: info.ContainerReference{
 				Name:    "testcontainer",
 				Aliases: []string{"testcontaineralias"},
@@ -326,15 +335,26 @@ func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.Container
 						ContainerData: info.MemoryStatsMemoryData{
 							Pgfault:    10,
 							Pgmajfault: 11,
+							NumaStats: info.MemoryNumaStats{
+								File:        map[uint8]uint64{0: 16649, 1: 10000},
+								Anon:        map[uint8]uint64{0: 10000, 1: 7109},
+								Unevictable: map[uint8]uint64{0: 8900, 1: 10000},
+							},
 						},
 						HierarchicalData: info.MemoryStatsMemoryData{
 							Pgfault:    12,
 							Pgmajfault: 13,
+							NumaStats: info.MemoryNumaStats{
+								File:        map[uint8]uint64{0: 36649, 1: 10000},
+								Anon:        map[uint8]uint64{0: 20000, 1: 7109},
+								Unevictable: map[uint8]uint64{0: 8900, 1: 20000},
+							},
 						},
-						Cache:      14,
-						RSS:        15,
-						MappedFile: 16,
-						Swap:       8192,
+						Cache:       14,
+						RSS:         15,
+						MappedFile:  16,
+						KernelUsage: 17,
+						Swap:        8192,
 					},
 					Hugetlb: map[string]info.HugetlbStats{
 						"2Mi": {
@@ -513,6 +533,21 @@ func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.Container
 							TxQueued: 0,
 						},
 					},
+					DiskIo: info.DiskIoStats{
+						IoServiceBytes: []info.PerDiskStats{{
+							Device: "/dev/sdb",
+							Major:  8,
+							Minor:  0,
+							Stats: map[string]uint64{
+								"Async":   1,
+								"Discard": 2,
+								"Read":    3,
+								"Sync":    4,
+								"Total":   5,
+								"Write":   6,
+							},
+						}},
+					},
 					Filesystem: []info.FsStats{
 						{
 							Device:          "sda1",
@@ -624,31 +659,80 @@ func (p testSubcontainersInfoProvider) SubcontainersInfo(string, *info.Container
 					},
 					PerfStats: []info.PerfStat{
 						{
-							ScalingRatio: 1.0,
-							Value:        123,
-							Name:         "instructions",
-							Cpu:          0,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        123,
+								Name:         "instructions",
+							},
+							Cpu: 0,
 						},
 						{
-							ScalingRatio: 0.5,
-							Value:        456,
-							Name:         "instructions",
-							Cpu:          1,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.5,
+								Value:        456,
+								Name:         "instructions",
+							},
+							Cpu: 1,
 						},
 						{
-							ScalingRatio: 0.66666666666,
-							Value:        321,
-							Name:         "instructions_retired",
-							Cpu:          0,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.66666666666,
+								Value:        321,
+								Name:         "instructions_retired",
+							},
+							Cpu: 0,
 						},
 						{
-							ScalingRatio: 0.33333333333,
-							Value:        789,
-							Name:         "instructions_retired",
-							Cpu:          1,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.33333333333,
+								Value:        789,
+								Name:         "instructions_retired",
+							},
+							Cpu: 1,
+						},
+					},
+					PerfUncoreStats: []info.PerfUncoreStat{
+						{
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        1231231512.0,
+								Name:         "cas_count_read",
+							},
+							Socket: 0,
+							PMU:    "uncore_imc_0",
+						},
+						{
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        1111231331.0,
+								Name:         "cas_count_read",
+							},
+							Socket: 1,
+							PMU:    "uncore_imc_0",
 						},
 					},
 					ReferencedMemory: 1234,
+					Resctrl: info.ResctrlStats{
+						MemoryBandwidth: []info.MemoryBandwidthStats{
+							{
+								TotalBytes: 4512312,
+								LocalBytes: 2390393,
+							},
+							{
+								TotalBytes: 2173713,
+								LocalBytes: 1231233,
+							},
+						},
+						Cache: []info.CacheStats{
+							{
+								LLCOccupancy: 162626,
+							},
+							{
+								LLCOccupancy: 213777,
+							},
+						},
+					},
+					CpuSet: info.CPUSetStats{MemoryMigrate: 1},
 				},
 			},
 		},
@@ -674,10 +758,10 @@ func (p *erroringSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo,
 	return p.successfulProvider.GetMachineInfo()
 }
 
-func (p *erroringSubcontainersInfoProvider) SubcontainersInfo(
-	a string, r *info.ContainerInfoRequest) ([]*info.ContainerInfo, error) {
+func (p *erroringSubcontainersInfoProvider) GetRequestedContainersInfo(
+	a string, opt v2.RequestOptions) (map[string]*info.ContainerInfo, error) {
 	if p.shouldFail {
-		return []*info.ContainerInfo{}, errors.New("Oops 3")
+		return map[string]*info.ContainerInfo{}, errors.New("Oops 3")
 	}
-	return p.successfulProvider.SubcontainersInfo(a, r)
+	return p.successfulProvider.GetRequestedContainersInfo(a, opt)
 }

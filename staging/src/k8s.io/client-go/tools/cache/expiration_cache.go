@@ -20,18 +20,18 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // ExpirationCache implements the store interface
-//	1. All entries are automatically time stamped on insert
-//		a. The key is computed based off the original item/keyFunc
-//		b. The value inserted under that key is the timestamped item
-//	2. Expiration happens lazily on read based on the expiration policy
-//      a. No item can be inserted into the store while we're expiring
-//		   *any* item in the cache.
-//	3. Time-stamps are stripped off unexpired entries before return
+//  1. All entries are automatically time stamped on insert
+//     a. The key is computed based off the original item/keyFunc
+//     b. The value inserted under that key is the timestamped item
+//  2. Expiration happens lazily on read based on the expiration policy
+//     a. No item can be inserted into the store while we're expiring
+//     *any* item in the cache.
+//  3. Time-stamps are stripped off unexpired entries before return
+//
 // Note that the ExpirationCache is inherently slower than a normal
 // threadSafeStore because it takes a write lock every time it checks if
 // an item has expired.
@@ -99,7 +99,6 @@ func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
 		return nil, false
 	}
 	if c.expirationPolicy.IsExpired(timestampedItem) {
-		klog.V(4).Infof("Entry %v: %+v has expired", key, timestampedItem.Obj)
 		c.cacheStorage.Delete(key)
 		return nil, false
 	}

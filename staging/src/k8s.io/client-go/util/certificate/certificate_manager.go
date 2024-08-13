@@ -21,9 +21,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -31,20 +33,87 @@ import (
 
 	"k8s.io/klog/v2"
 
-	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	certificates "k8s.io/api/certificates/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
 )
 
-// certificateWaitTimeout controls the amount of time we wait for certificate
-// approval in one iteration.
-var certificateWaitTimeout = 15 * time.Minute
+var (
+	// certificateWaitTimeout controls the amount of time we wait for certificate
+	// approval in one iteration.
+	certificateWaitTimeout = 15 * time.Minute
+
+	kubeletServingUsagesWithEncipherment = []certificates.KeyUsage{
+		// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+		//
+		// Digital signature allows the certificate to be used to verify
+		// digital signatures used during TLS negotiation.
+		certificates.UsageDigitalSignature,
+		// KeyEncipherment allows the cert/key pair to be used to encrypt
+		// keys, including the symmetric keys negotiated during TLS setup
+		// and used for data transfer.
+		certificates.UsageKeyEncipherment,
+		// ServerAuth allows the cert to be used by a TLS server to
+		// authenticate itself to a TLS client.
+		certificates.UsageServerAuth,
+	}
+	kubeletServingUsagesNoEncipherment = []certificates.KeyUsage{
+		// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+		//
+		// Digital signature allows the certificate to be used to verify
+		// digital signatures used during TLS negotiation.
+		certificates.UsageDigitalSignature,
+		// ServerAuth allows the cert to be used by a TLS server to
+		// authenticate itself to a TLS client.
+		certificates.UsageServerAuth,
+	}
+	DefaultKubeletServingGetUsages = func(privateKey interface{}) []certificates.KeyUsage {
+		switch privateKey.(type) {
+		case *rsa.PrivateKey:
+			return kubeletServingUsagesWithEncipherment
+		default:
+			return kubeletServingUsagesNoEncipherment
+		}
+	}
+	kubeletClientUsagesWithEncipherment = []certificates.KeyUsage{
+		// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+		//
+		// Digital signature allows the certificate to be used to verify
+		// digital signatures used during TLS negotiation.
+		certificates.UsageDigitalSignature,
+		// KeyEncipherment allows the cert/key pair to be used to encrypt
+		// keys, including the symmetric keys negotiated during TLS setup
+		// and used for data transfer.
+		certificates.UsageKeyEncipherment,
+		// ClientAuth allows the cert to be used by a TLS client to
+		// authenticate itself to the TLS server.
+		certificates.UsageClientAuth,
+	}
+	kubeletClientUsagesNoEncipherment = []certificates.KeyUsage{
+		// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+		//
+		// Digital signature allows the certificate to be used to verify
+		// digital signatures used during TLS negotiation.
+		certificates.UsageDigitalSignature,
+		// ClientAuth allows the cert to be used by a TLS client to
+		// authenticate itself to the TLS server.
+		certificates.UsageClientAuth,
+	}
+	DefaultKubeletClientGetUsages = func(privateKey interface{}) []certificates.KeyUsage {
+		switch privateKey.(type) {
+		case *rsa.PrivateKey:
+			return kubeletClientUsagesWithEncipherment
+		default:
+			return kubeletClientUsagesNoEncipherment
+		}
+	}
+)
 
 // Manager maintains and updates the certificates in use by this certificate
 // manager. In the background it communicates with the API server to get new
@@ -68,11 +137,11 @@ type Manager interface {
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
-	// ClientFn will be used to create a client for
-	// signing new certificate requests generated when a key rotation occurs.
-	// It must be set at initialization. The function will never be invoked
-	// in parallel. It is passed the current client certificate if one exists.
-	ClientFn CSRClientFunc
+	// ClientsetFn will be used to create a clientset for
+	// creating/fetching new certificate requests generated when a key rotation occurs.
+	// The function will never be invoked in parallel.
+	// It is passed the current client certificate if one exists.
+	ClientsetFn ClientsetFunc
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
 	// part of rotation. It follows the same rules as the template parameter of
@@ -88,9 +157,18 @@ type Config struct {
 	// SignerName is the name of the certificate signer that should sign certificates
 	// generated by the manager.
 	SignerName string
+	// RequestedCertificateLifetime is the requested lifetime length for certificates generated by the manager.
+	// Optional.
+	// This will set the spec.expirationSeconds field on the CSR.  Controlling the lifetime of
+	// the issued certificate is not guaranteed as the signer may choose to ignore the request.
+	RequestedCertificateLifetime *time.Duration
 	// Usages is the types of usages that certificates generated by the manager
-	// can be used for.
+	// can be used for. It is mutually exclusive with GetUsages.
 	Usages []certificates.KeyUsage
+	// GetUsages is dynamic way to get the types of usages that certificates generated by the manager
+	// can be used for. If Usages is not nil, GetUsages has to be nil, vice versa.
+	// It is mutually exclusive with Usages.
+	GetUsages func(privateKey interface{}) []certificates.KeyUsage
 	// CertificateStore is a persistent store where the current cert/key is
 	// kept and future cert/key pairs will be persisted after they are
 	// generated.
@@ -114,7 +192,7 @@ type Config struct {
 	// This is intended to allow the first boot of a component to be
 	// initialized using a generic, multi-use cert/key pair which will be
 	// quickly replaced with a unique cert/key pair.
-	BootstrapKeyPEM []byte
+	BootstrapKeyPEM []byte `datapolicy:"security-key"`
 	// CertificateRotation will record a metric showing the time in seconds
 	// that certificates lived before being rotated. This metric is a histogram
 	// because there is value in keeping a history of rotation cadences. It
@@ -124,6 +202,14 @@ type Config struct {
 	// CertifcateRenewFailure will record a metric that keeps track of
 	// certificate renewal failures.
 	CertificateRenewFailure Counter
+	// Name is an optional string that will be used when writing log output
+	// or returning errors from manager methods. If not set, SignerName will
+	// be used, if SignerName is not set, if Usages includes client auth the
+	// name will be "client auth", otherwise the value will be "server".
+	Name string
+	// Logf is an optional function that log output will be sent to from the
+	// certificate manager. If not set it will use klog.V(2)
+	Logf func(format string, args ...interface{})
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -162,9 +248,9 @@ type Counter interface {
 // NoCertKeyError indicates there is no cert/key currently available.
 type NoCertKeyError string
 
-// CSRClientFunc returns a new client for requesting CSRs. It passes the
-// current certificate if one is available and valid.
-type CSRClientFunc func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error)
+// ClientsetFunc returns a new clientset for discovering CSR API availability and requesting CSRs.
+// It is passed the current certificate if one is available and valid.
+type ClientsetFunc func(current *tls.Certificate) (clientset.Interface, error)
 
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
@@ -176,10 +262,11 @@ type manager struct {
 	lastRequestCancel context.CancelFunc
 	lastRequest       *x509.CertificateRequest
 
-	dynamicTemplate bool
-	signerName      string
-	usages          []certificates.KeyUsage
-	forceRotation   bool
+	dynamicTemplate              bool
+	signerName                   string
+	requestedCertificateLifetime *time.Duration
+	getUsages                    func(privateKey interface{}) []certificates.KeyUsage
+	forceRotation                bool
 
 	certStore Store
 
@@ -193,12 +280,15 @@ type manager struct {
 
 	// the clientFn must only be accessed under the clientAccessLock
 	clientAccessLock sync.Mutex
-	clientFn         CSRClientFunc
+	clientsetFn      ClientsetFunc
 	stopCh           chan struct{}
 	stopped          bool
 
 	// Set to time.Now but can be stubbed out for testing
 	now func() time.Time
+
+	name string
+	logf func(format string, args ...interface{})
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -218,19 +308,52 @@ func NewManager(config *Config) (Manager, error) {
 		getTemplate = func() *x509.CertificateRequest { return config.Template }
 	}
 
+	if config.GetUsages != nil && config.Usages != nil {
+		return nil, errors.New("cannot specify both GetUsages and Usages")
+	}
+	if config.GetUsages == nil && config.Usages == nil {
+		return nil, errors.New("either GetUsages or Usages should be specified")
+	}
+	var getUsages func(interface{}) []certificates.KeyUsage
+	if config.GetUsages != nil {
+		getUsages = config.GetUsages
+	} else {
+		getUsages = func(interface{}) []certificates.KeyUsage { return config.Usages }
+	}
 	m := manager{
-		stopCh:                  make(chan struct{}),
-		clientFn:                config.ClientFn,
-		getTemplate:             getTemplate,
-		dynamicTemplate:         config.GetTemplate != nil,
-		signerName:              config.SignerName,
-		usages:                  config.Usages,
-		certStore:               config.CertificateStore,
-		cert:                    cert,
-		forceRotation:           forceRotation,
-		certificateRotation:     config.CertificateRotation,
-		certificateRenewFailure: config.CertificateRenewFailure,
-		now:                     time.Now,
+		stopCh:                       make(chan struct{}),
+		clientsetFn:                  config.ClientsetFn,
+		getTemplate:                  getTemplate,
+		dynamicTemplate:              config.GetTemplate != nil,
+		signerName:                   config.SignerName,
+		requestedCertificateLifetime: config.RequestedCertificateLifetime,
+		getUsages:                    getUsages,
+		certStore:                    config.CertificateStore,
+		cert:                         cert,
+		forceRotation:                forceRotation,
+		certificateRotation:          config.CertificateRotation,
+		certificateRenewFailure:      config.CertificateRenewFailure,
+		now:                          time.Now,
+	}
+
+	name := config.Name
+	if len(name) == 0 {
+		name = m.signerName
+	}
+	if len(name) == 0 {
+		usages := getUsages(nil)
+		switch {
+		case hasKeyUsage(usages, certificates.UsageClientAuth):
+			name = string(certificates.UsageClientAuth)
+		default:
+			name = "certificate"
+		}
+	}
+
+	m.name = name
+	m.logf = config.Logf
+	if m.logf == nil {
+		m.logf = func(format string, args ...interface{}) { klog.V(2).Infof(format, args...) }
 	}
 
 	return &m, nil
@@ -244,7 +367,7 @@ func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	if m.cert != nil && m.cert.Leaf != nil && m.now().After(m.cert.Leaf.NotAfter) {
-		klog.V(2).Infof("Current certificate is expired.")
+		m.logf("%s: Current certificate is expired", m.name)
 		return nil
 	}
 	return m.cert
@@ -274,18 +397,17 @@ func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
-	if m.clientFn == nil {
-		klog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
+	if m.clientsetFn == nil {
+		m.logf("%s: Certificate rotation is not enabled, no connection to the apiserver", m.name)
 		return
 	}
-
-	klog.V(2).Infof("Certificate rotation is enabled.")
+	m.logf("%s: Certificate rotation is enabled", m.name)
 
 	templateChanged := make(chan struct{})
 	go wait.Until(func() {
 		deadline := m.nextRotationDeadline()
 		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
-			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
+			m.logf("%s: Waiting %v for next certificate rotation", m.name, sleepInterval)
 
 			timer := time.NewTimer(sleepInterval)
 			defer timer.Stop()
@@ -299,7 +421,7 @@ func (m *manager) Start() {
 					// if the template now matches what we last requested, restart the rotation deadline loop
 					return
 				}
-				klog.V(2).Infof("Certificate template changed, rotating")
+				m.logf("%s: Certificate template changed, rotating", m.name)
 			}
 		}
 
@@ -315,7 +437,7 @@ func (m *manager) Start() {
 			Steps:    5,
 		}
 		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
+			utilruntime.HandleError(fmt.Errorf("%s: Reached backoff limit, still unable to rotate certs: %v", m.name, err))
 			wait.PollInfinite(32*time.Second, m.rotateCerts)
 		}
 	}, time.Second, m.stopCh)
@@ -374,22 +496,23 @@ func getCurrentCertificateOrBootstrap(
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
+	if len(certs) < 1 {
+		return nil, false, fmt.Errorf("no cert data found")
+	}
 	bootstrapCert.Leaf = certs[0]
 
 	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to set the cert/key pair to the bootstrap certificate: %v", err))
-	} else {
-		klog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
+		utilruntime.HandleError(fmt.Errorf("unable to set the cert/key pair to the bootstrap certificate: %v", err))
 	}
 
 	return &bootstrapCert, true, nil
 }
 
-func (m *manager) getClient() (certificatesclient.CertificateSigningRequestInterface, error) {
+func (m *manager) getClientset() (clientset.Interface, error) {
 	current := m.Current()
 	m.clientAccessLock.Lock()
 	defer m.clientAccessLock.Unlock()
-	return m.clientFn(current)
+	return m.clientsetFn(current)
 }
 
 // RotateCerts is exposed for testing only and is not a part of the public interface.
@@ -406,11 +529,11 @@ func (m *manager) RotateCerts() (bool, error) {
 // from the server on the various calls it makes.
 // TODO: return errors, have callers handle and log them correctly
 func (m *manager) rotateCerts() (bool, error) {
-	klog.V(2).Infof("Rotating certificates")
+	m.logf("%s: Rotating certificates", m.name)
 
 	template, csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to generate a certificate signing request: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: Unable to generate a certificate signing request: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
@@ -418,20 +541,25 @@ func (m *manager) rotateCerts() (bool, error) {
 	}
 
 	// request the client each time
-	client, err := m.getClient()
+	clientSet, err := m.getClientset()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to load a client to request certificates: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: Unable to load a client to request certificates: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
 		return false, nil
 	}
 
+	getUsages := m.getUsages
+	if m.getUsages == nil {
+		getUsages = DefaultKubeletClientGetUsages
+	}
+	usages := getUsages(privateKey)
 	// Call the Certificate Signing Request API to get a certificate for the
-	// new private key.
-	req, err := csr.RequestCertificate(client, csrPEM, "", m.signerName, m.usages, privateKey)
+	// new private key
+	reqName, reqUID, err := csr.RequestCertificate(clientSet, csrPEM, "", m.signerName, m.requestedCertificateLifetime, usages, privateKey)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the master: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: Failed while requesting a signed certificate from the control plane: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
@@ -446,9 +574,9 @@ func (m *manager) rotateCerts() (bool, error) {
 
 	// Wait for the certificate to be signed. This interface and internal timout
 	// is a remainder after the old design using raw watch wrapped with backoff.
-	crtPEM, err := csr.WaitForCertificate(ctx, client, req)
+	crtPEM, err := csr.WaitForCertificate(ctx, clientSet, reqName, reqUID)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("certificate request was not signed: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: certificate request was not signed: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
@@ -457,7 +585,7 @@ func (m *manager) rotateCerts() (bool, error) {
 
 	cert, err := m.certStore.Update(crtPEM, keyPEM)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to store the new cert/key pair: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: Unable to store the new cert/key pair: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
@@ -485,7 +613,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 
 	if template := m.getTemplate(); template != nil {
 		if template.Subject.CommonName != m.cert.Leaf.Subject.CommonName {
-			klog.V(2).Infof("Current certificate CN (%s) does not match requested CN (%s)", m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
+			m.logf("%s: Current certificate CN (%s) does not match requested CN (%s)", m.name, m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
 			return false
 		}
 
@@ -493,7 +621,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredDNSNames := sets.NewString(template.DNSNames...)
 		missingDNSNames := desiredDNSNames.Difference(currentDNSNames)
 		if len(missingDNSNames) > 0 {
-			klog.V(2).Infof("Current certificate is missing requested DNS names %v", missingDNSNames.List())
+			m.logf("%s: Current certificate is missing requested DNS names %v", m.name, missingDNSNames.List())
 			return false
 		}
 
@@ -507,7 +635,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		}
 		missingIPs := desiredIPs.Difference(currentIPs)
 		if len(missingIPs) > 0 {
-			klog.V(2).Infof("Current certificate is missing requested IP addresses %v", missingIPs.List())
+			m.logf("%s: Current certificate is missing requested IP addresses %v", m.name, missingIPs.List())
 			return false
 		}
 
@@ -515,7 +643,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredOrgs := sets.NewString(template.Subject.Organization...)
 		missingOrgs := desiredOrgs.Difference(currentOrgs)
 		if len(missingOrgs) > 0 {
-			klog.V(2).Infof("Current certificate is missing requested orgs %v", missingOrgs.List())
+			m.logf("%s: Current certificate is missing requested orgs %v", m.name, missingOrgs.List())
 			return false
 		}
 	}
@@ -550,7 +678,7 @@ func (m *manager) nextRotationDeadline() time.Time {
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
 	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
-	klog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
+	m.logf("%s: Certificate expiration is %v, rotation deadline is %v", m.name, notAfter, deadline)
 	return deadline
 }
 
@@ -585,17 +713,17 @@ func (m *manager) updateServerError(err error) error {
 	m.certAccessLock.Lock()
 	defer m.certAccessLock.Unlock()
 	switch {
-	case errors.IsUnauthorized(err):
+	case apierrors.IsUnauthorized(err):
 		// SSL terminating proxies may report this error instead of the master
 		m.serverHealth = true
-	case errors.IsUnexpectedServerError(err):
+	case apierrors.IsUnexpectedServerError(err):
 		// generally indicates a proxy or other load balancer problem, rather than a problem coming
 		// from the master
 		m.serverHealth = false
 	default:
 		// Identify known errors that could be expected for a cert request that
 		// indicate everything is working normally
-		m.serverHealth = errors.IsNotFound(err) || errors.IsForbidden(err)
+		m.serverHealth = apierrors.IsNotFound(err) || apierrors.IsForbidden(err)
 	}
 	return nil
 }
@@ -604,22 +732,22 @@ func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byt
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("%s: unable to generate a new private key: %v", m.name, err)
 	}
 	der, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("%s: unable to marshal the new key to DER: %v", m.name, err)
 	}
 
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: keyutil.ECPrivateKeyBlockType, Bytes: der})
 
 	template = m.getTemplate()
 	if template == nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to create a csr, no template available")
+		return nil, nil, nil, nil, fmt.Errorf("%s: unable to create a csr, no template available", m.name)
 	}
 	csrPEM, err = cert.MakeCSRFromTemplate(privateKey, template)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("%s: unable to create a csr from the private key: %v", m.name, err)
 	}
 	return template, csrPEM, keyPEM, privateKey, nil
 }
@@ -635,4 +763,13 @@ func (m *manager) setLastRequest(cancel context.CancelFunc, r *x509.CertificateR
 	defer m.lastRequestLock.Unlock()
 	m.lastRequestCancel = cancel
 	m.lastRequest = r
+}
+
+func hasKeyUsage(usages []certificates.KeyUsage, usage certificates.KeyUsage) bool {
+	for _, u := range usages {
+		if u == usage {
+			return true
+		}
+	}
+	return false
 }

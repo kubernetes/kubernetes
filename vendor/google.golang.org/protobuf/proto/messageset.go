@@ -9,28 +9,33 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-func sizeMessageSet(m protoreflect.Message) (size int) {
+func (o MarshalOptions) sizeMessageSet(m protoreflect.Message) (size int) {
 	m.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		size += messageset.SizeField(fd.Number())
 		size += protowire.SizeTag(messageset.FieldMessage)
-		size += protowire.SizeBytes(sizeMessage(v.Message()))
+		size += protowire.SizeBytes(o.size(v.Message()))
 		return true
 	})
 	size += messageset.SizeUnknown(m.GetUnknown())
 	return size
 }
 
-func marshalMessageSet(b []byte, m protoreflect.Message, o MarshalOptions) ([]byte, error) {
+func (o MarshalOptions) marshalMessageSet(b []byte, m protoreflect.Message) ([]byte, error) {
 	if !flags.ProtoLegacy {
 		return b, errors.New("no support for message_set_wire_format")
 	}
+	fieldOrder := order.AnyFieldOrder
+	if o.Deterministic {
+		fieldOrder = order.NumberFieldOrder
+	}
 	var err error
-	o.rangeFields(m, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
-		b, err = marshalMessageSetField(b, fd, v, o)
+	order.RangeFields(m, fieldOrder, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		b, err = o.marshalMessageSetField(b, fd, v)
 		return err == nil
 	})
 	if err != nil {
@@ -39,24 +44,29 @@ func marshalMessageSet(b []byte, m protoreflect.Message, o MarshalOptions) ([]by
 	return messageset.AppendUnknown(b, m.GetUnknown())
 }
 
-func marshalMessageSetField(b []byte, fd protoreflect.FieldDescriptor, value protoreflect.Value, o MarshalOptions) ([]byte, error) {
+func (o MarshalOptions) marshalMessageSetField(b []byte, fd protoreflect.FieldDescriptor, value protoreflect.Value) ([]byte, error) {
 	b = messageset.AppendFieldStart(b, fd.Number())
 	b = protowire.AppendTag(b, messageset.FieldMessage, protowire.BytesType)
-	b = protowire.AppendVarint(b, uint64(o.Size(value.Message().Interface())))
+	calculatedSize := o.Size(value.Message().Interface())
+	b = protowire.AppendVarint(b, uint64(calculatedSize))
+	before := len(b)
 	b, err := o.marshalMessage(b, value.Message())
 	if err != nil {
 		return b, err
+	}
+	if measuredSize := len(b) - before; calculatedSize != measuredSize {
+		return nil, errors.MismatchedSizeCalculation(calculatedSize, measuredSize)
 	}
 	b = messageset.AppendFieldEnd(b)
 	return b, nil
 }
 
-func unmarshalMessageSet(b []byte, m protoreflect.Message, o UnmarshalOptions) error {
+func (o UnmarshalOptions) unmarshalMessageSet(b []byte, m protoreflect.Message) error {
 	if !flags.ProtoLegacy {
 		return errors.New("no support for message_set_wire_format")
 	}
 	return messageset.Unmarshal(b, false, func(num protowire.Number, v []byte) error {
-		err := unmarshalMessageSetField(m, num, v, o)
+		err := o.unmarshalMessageSetField(m, num, v)
 		if err == errUnknown {
 			unknown := m.GetUnknown()
 			unknown = protowire.AppendTag(unknown, num, protowire.BytesType)
@@ -68,7 +78,7 @@ func unmarshalMessageSet(b []byte, m protoreflect.Message, o UnmarshalOptions) e
 	})
 }
 
-func unmarshalMessageSetField(m protoreflect.Message, num protowire.Number, v []byte, o UnmarshalOptions) error {
+func (o UnmarshalOptions) unmarshalMessageSetField(m protoreflect.Message, num protowire.Number, v []byte) error {
 	md := m.Descriptor()
 	if !md.ExtensionRanges().Has(num) {
 		return errUnknown

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This file should be consistent with pkg/api/annotation_key_constants.go.
+// This file should be consistent with pkg/apis/core/annotation_key_constants.go.
 
 package v1
 
@@ -22,9 +22,6 @@ const (
 	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy
 	// webhook backend fails.
 	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
-
-	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
-	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
 
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
@@ -39,40 +36,46 @@ const (
 
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
+	// Deprecated: set a pod security context `seccompProfile` field.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
 
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
+	// Deprecated: set a container security context `seccompProfile` field.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 
 	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	SeccompProfileRuntimeDefault string = "runtime/default"
 
-	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
-	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
-	// AppArmorBetaDefaultProfileAnnotatoinKey is the annotation key specifying the default AppArmor profile.
-	AppArmorBetaDefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
-	// AppArmorBetaAllowedProfileAnnotationKey is the annotation key specifying the allowed AppArmor profiles.
-	AppArmorBetaAllowedProfilesAnnotationKey = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
+	// SeccompProfileNameUnconfined is the unconfined seccomp profile.
+	SeccompProfileNameUnconfined string = "unconfined"
 
-	// AppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
-	AppArmorBetaProfileRuntimeDefault = "runtime/default"
+	// SeccompLocalhostProfileNamePrefix is the prefix for specifying profiles loaded from the node's disk.
+	SeccompLocalhostProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
-	AppArmorBetaProfileNamePrefix = "localhost/"
+	// DeprecatedAppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
+	DeprecatedAppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 
-	// AppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
-	AppArmorBetaProfileNameUnconfined = "unconfined"
+	// DeprecatedAppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
+	DeprecatedAppArmorBetaProfileRuntimeDefault = "runtime/default"
+
+	// DeprecatedAppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
+	DeprecatedAppArmorBetaProfileNamePrefix = "localhost/"
+
+	// DeprecatedAppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
+	DeprecatedAppArmorBetaProfileNameUnconfined = "unconfined"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
-	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
 
-	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
+	// ObjectTTLAnnotationKey represents a suggestion for kubelet for how long it can cache
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
@@ -114,9 +117,43 @@ const (
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 
+	// EndpointsOverCapacity will be set on an Endpoints resource when it
+	// exceeds the maximum capacity of 1000 addresses. Initially the Endpoints
+	// controller will set this annotation with a value of "warning". In a
+	// future release, the controller may set this annotation with a value of
+	// "truncated" to indicate that any addresses exceeding the limit of 1000
+	// have been truncated from the Endpoints resource.
+	EndpointsOverCapacity = "endpoints.kubernetes.io/over-capacity"
+
 	// MigratedPluginsAnnotationKey is the annotation key, set for CSINode objects, that is a comma-separated
 	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
 	// CSI Backend for a volume plugin on a specific node.
 	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+
+	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
+	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
+	// deletion cost are preferred to be deleted before pods with higher deletion cost.
+	// Note that this is honored on a best-effort basis, and so it does not offer guarantees on
+	// pod deletion order.
+	// The implicit deletion cost for pods that don't set the annotation is 0, negative values are permitted.
+	//
+	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
+	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
+
+	// DeprecatedAnnotationTopologyAwareHints can be used to enable or disable
+	// Topology Aware Hints for a Service. This may be set to "Auto" or
+	// "Disabled". Any other value is treated as "Disabled". This annotation has
+	// been deprecated in favor of the "service.kubernetes.io/topology-mode"
+	// annotation.
+	DeprecatedAnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
+
+	// AnnotationTopologyMode can be used to enable or disable Topology Aware
+	// Routing for a Service. Well known values are "Auto" and "Disabled".
+	// Implementations may choose to develop new topology approaches, exposing
+	// them with domain-prefixed values. For example, "example.com/lowest-rtt"
+	// could be a valid implementation-specific value for this annotation. These
+	// heuristics will often populate topology hints on EndpointSlices, but that
+	// is not a requirement.
+	AnnotationTopologyMode = "service.kubernetes.io/topology-mode"
 )

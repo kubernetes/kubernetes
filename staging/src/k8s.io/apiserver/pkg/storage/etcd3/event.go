@@ -18,17 +18,29 @@ package etcd3
 
 import (
 	"fmt"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/mvcc/mvccpb"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type event struct {
-	key       string
-	value     []byte
-	prevValue []byte
-	rev       int64
-	isDeleted bool
-	isCreated bool
+	key              string
+	value            []byte
+	prevValue        []byte
+	rev              int64
+	isDeleted        bool
+	isCreated        bool
+	isProgressNotify bool
+	// isInitialEventsEndBookmark helps us keep track
+	// of whether we have sent an annotated bookmark event.
+	//
+	// when this variable is set to true,
+	// a special annotation will be added
+	// to the bookmark event.
+	//
+	// note that we decided to extend the event
+	// struct field to eliminate contention
+	// between startWatching and processEvent
+	isInitialEventsEndBookmark bool
 }
 
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
@@ -60,4 +72,11 @@ func parseEvent(e *clientv3.Event) (*event, error) {
 		ret.prevValue = e.PrevKv.Value
 	}
 	return ret, nil
+}
+
+func progressNotifyEvent(rev int64) *event {
+	return &event{
+		rev:              rev,
+		isProgressNotify: true,
+	}
 }

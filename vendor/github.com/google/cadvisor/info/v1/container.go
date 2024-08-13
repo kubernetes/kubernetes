@@ -395,13 +395,28 @@ type MemoryStats struct {
 
 	Failcnt uint64 `json:"failcnt"`
 
+	// Size of kernel memory allocated in bytes.
+	// Units: Bytes.
+	KernelUsage uint64 `json:"kernel"`
+
 	ContainerData    MemoryStatsMemoryData `json:"container_data,omitempty"`
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 }
 
+type CPUSetStats struct {
+	MemoryMigrate uint64 `json:"memory_migrate"`
+}
+
+type MemoryNumaStats struct {
+	File        map[uint8]uint64 `json:"file,omitempty"`
+	Anon        map[uint8]uint64 `json:"anon,omitempty"`
+	Unevictable map[uint8]uint64 `json:"unevictable,omitempty"`
+}
+
 type MemoryStatsMemoryData struct {
-	Pgfault    uint64 `json:"pgfault"`
-	Pgmajfault uint64 `json:"pgmajfault"`
+	Pgfault    uint64          `json:"pgfault"`
+	Pgmajfault uint64          `json:"pgmajfault"`
+	NumaStats  MemoryNumaStats `json:"numa_stats,omitempty"`
 }
 
 type InterfaceStats struct {
@@ -827,6 +842,13 @@ type AcceleratorStats struct {
 
 // PerfStat represents value of a single monitored perf event.
 type PerfStat struct {
+	PerfValue
+
+	// CPU that perf event was measured on.
+	Cpu int `json:"cpu"`
+}
+
+type PerfValue struct {
 	// Indicates scaling ratio for an event: time_running/time_enabled
 	// (amount of time that event was being measured divided by
 	// amount of time that event was enabled for).
@@ -843,9 +865,43 @@ type PerfStat struct {
 
 	// Name is human readable name of an event.
 	Name string `json:"name"`
+}
 
-	// CPU that perf event was measured on.
-	Cpu int `json:"cpu"`
+// MemoryBandwidthStats corresponds to MBM (Memory Bandwidth Monitoring).
+// See: https://01.org/cache-monitoring-technology
+// See: https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
+type MemoryBandwidthStats struct {
+	// The 'mbm_total_bytes'.
+	TotalBytes uint64 `json:"mbm_total_bytes,omitempty"`
+
+	// The 'mbm_local_bytes'.
+	LocalBytes uint64 `json:"mbm_local_bytes,omitempty"`
+}
+
+// CacheStats corresponds to CMT (Cache Monitoring Technology).
+// See: https://01.org/cache-monitoring-technology
+// See: https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
+type CacheStats struct {
+	// The 'llc_occupancy'.
+	LLCOccupancy uint64 `json:"llc_occupancy,omitempty"`
+}
+
+// ResctrlStats corresponds to statistics from Resource Control.
+type ResctrlStats struct {
+	// Each NUMA Node statistics corresponds to one element in the array.
+	MemoryBandwidth []MemoryBandwidthStats `json:"memory_bandwidth,omitempty"`
+	Cache           []CacheStats           `json:"cache,omitempty"`
+}
+
+// PerfUncoreStat represents value of a single monitored perf uncore event.
+type PerfUncoreStat struct {
+	PerfValue
+
+	// Socket that perf event was measured on.
+	Socket int `json:"socket"`
+
+	// PMU is Performance Monitoring Unit which collected these stats.
+	PMU string `json:"pmu"`
 }
 
 type UlimitSpec struct {
@@ -900,8 +956,19 @@ type ContainerStats struct {
 	// Statistics originating from perf events
 	PerfStats []PerfStat `json:"perf_stats,omitempty"`
 
+	// Statistics originating from perf uncore events.
+	// Applies only for root container.
+	PerfUncoreStats []PerfUncoreStat `json:"perf_uncore_stats,omitempty"`
+
 	// Referenced memory
 	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
+
+	// Resource Control (resctrl) statistics
+	Resctrl ResctrlStats `json:"resctrl,omitempty"`
+
+	CpuSet CPUSetStats `json:"cpuset,omitempty"`
+
+	OOMEvents uint64 `json:"oom_events,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {

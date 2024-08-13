@@ -61,9 +61,9 @@ function usage() {
   local release_latest
   local ci_latest
 
-  release_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
-  release_latest=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-  ci_latest=$(gsutil cat gs://kubernetes-release-dev/ci/latest.txt)
+  release_stable=$(curl -sL https://dl.k8s.io/release/stable.txt)
+  release_latest=$(curl -sL https://dl.k8s.io/release/latest.txt)
+  ci_latest=$(curl -sL https://dl.k8s.io/ci/latest.txt)
 
   echo "Right now, versions are as follows:"
   echo "  release/stable: ${0} ${release_stable}"
@@ -258,6 +258,7 @@ function prepare-node-upgrade() {
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
   export KUBE_PROXY_TOKEN
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
+  export NODE_PROBLEM_DETECTOR_TOKEN
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
   export CA_CERT_BASE64
   EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
@@ -313,7 +314,7 @@ function do-single-node-upgrade() {
   # Drain node
   echo "== Draining ${instance}. == " >&2
   local drain_rc
-  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
+  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-emptydir-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
   if [[ "${drain_rc}" != 0 ]]; then
     echo "== FAILED to drain ${instance} =="
@@ -402,17 +403,17 @@ function do-node-upgrade() {
     if [[ "${set_instance_template_rc}" != 0 ]]; then
       echo "== FAILED to set-instance-template for ${group} to ${template_name} =="
       echo "${set_instance_template_out}"
-      return ${set_instance_template_rc}
+      return "${set_instance_template_rc}"
     fi
     instances=()
     while IFS='' read -r line; do instances+=("$line"); done < <(gcloud compute instance-groups managed list-instances "${group}" \
-        --format='value(instance)' \
+        --format='value(name)' \
         --project="${PROJECT}" \
         --zone="${ZONE}" 2>&1) && list_instances_rc=$? || list_instances_rc=$?
     if [[ "${list_instances_rc}" != 0 ]]; then
       echo "== FAILED to list instances in group ${group} =="
       echo "${instances[@]}"
-      return ${list_instances_rc}
+      return "${list_instances_rc}"
     fi
 
     process_count_left=${node_upgrade_parallelism}
@@ -462,50 +463,58 @@ function update-coredns-config() {
 
   # clean up
   cleanup() {
-    rm -rf "${download_dir}"
+    if [ -n "${download_dir:-}" ]; then
+      rm -rf "${download_dir}"
+    fi
   }
-  trap cleanup EXIT
+  trap cleanup RETURN
 
   # Get the new installed CoreDNS version
-  echo "Waiting for CoreDNS to update"
-  until [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; do
+  echo "== Waiting for CoreDNS to update =="
+  local -r endtime=$(date -ud "3 minute" +%s)
+  until [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]] || [[ $(date -u +%s) -gt $endtime ]]; do
      sleep 1
   done
-  echo "Fetching the latest installed CoreDNS version"
-  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+
+  if [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; then
+    echo "== CoreDNS ResourceVersion changed =="
+  fi
+
+  echo "== Fetching the latest installed CoreDNS version =="
+  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 
   case "$(uname -m)" in
       x86_64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="686792ec91ad52e0761839845c7e09e02234c959b5c459b2cd358d24474c5c66"
         ;;
       i?86_64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="686792ec91ad52e0761839845c7e09e02234c959b5c459b2cd358d24474c5c66"
         ;;
       amd64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="686792ec91ad52e0761839845c7e09e02234c959b5c459b2cd358d24474c5c66"
         ;;
       aarch64*)
         host_arch=arm64
-        corefile_tool_SHA="d8be194de0f430e364da9de148693b11bcbaf31751f6aa77ea2c8a4e2418503a"
+        corefile_tool_SHA="a968593d68c5564663f9068efa8c34f1baa7bd263be542a71b0b8d8dd44ad124"
         ;;
       arm64*)
         host_arch=arm64
-        corefile_tool_SHA="d8be194de0f430e364da9de148693b11bcbaf31751f6aa77ea2c8a4e2418503a"
+        corefile_tool_SHA="a968593d68c5564663f9068efa8c34f1baa7bd263be542a71b0b8d8dd44ad124"
         ;;
       arm*)
         host_arch=arm
-        corefile_tool_SHA="d7ba2ebe740382ed7c5f00bc00eda3d383b2bbbe3554ffb12b912946d28ceb59"
+        corefile_tool_SHA="721dbfcabda71a2648fd7d4d9241930313397a07d72828b2054315f85b177794"
         ;;
       s390x*)
         host_arch=s390x
-        corefile_tool_SHA="77eac119aef08fcf1541f3594138838fbfe4669e309b20d530247dff408a67c0"
+        corefile_tool_SHA="56452a00a703afd4f816d558f78f279af5f29f1940a478baa694da20f4586698"
         ;;
       ppc64le*)
         host_arch=ppc64le
-         corefile_tool_SHA="f1bd00d9f3846c3fbedb4dd53fd61c5daf6d09a75c0d24fe8744f4f7b7252acb"
+        corefile_tool_SHA="8a5118cb0c998a79ad1d7e4b001af2e23c2cfa83b5489c2823d04ab1c9e33498"
         ;;
       *)
         echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
@@ -515,7 +524,7 @@ function update-coredns-config() {
 
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
-  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.6/corefile-tool-${host_arch}" >/dev/null 2>&1
+  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.17/corefile-tool-${host_arch}" >/dev/null 2>&1
 
   local -r checkSHA=$(sha256sum "${download_dir}/corefile-tool-${host_arch}" | cut -d " " -f 1)
   if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then
@@ -544,7 +553,7 @@ function update-coredns-config() {
 }
 
 echo "Fetching the previously installed CoreDNS version"
-CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 COREDNS_DEPLOY_RESOURCE_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
 
 master_upgrade=true

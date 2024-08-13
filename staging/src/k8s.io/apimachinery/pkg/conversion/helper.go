@@ -26,7 +26,7 @@ import (
 // Returns an error if this is not possible.
 func EnforcePtr(obj interface{}) (reflect.Value, error) {
 	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() != reflect.Pointer {
 		if v.Kind() == reflect.Invalid {
 			return reflect.Value{}, fmt.Errorf("expected pointer, but got invalid kind")
 		}

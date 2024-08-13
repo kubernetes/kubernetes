@@ -63,6 +63,6 @@ echo "Uploading gci mounter ACI in ${ACI_DIR} to ${MOUNTER_GCS_DIR}"
 gsutil cp "${ACI_DIR}/${MOUNTER_ACI_IMAGE}" "${MOUNTER_GCS_DIR}"
 
 echo "Upload completed"
-echo "Updated gci-mounter ACI version and SHA1 in cluster/gce/gci/configure.sh"
-ACI_HASH=$(sha1sum "${ACI_DIR}/${MOUNTER_ACI_IMAGE}")
+echo "Updated gci-mounter ACI version and SH512 in cluster/gce/gci/configure.sh"
+ACI_HASH=$(sha512sum "${ACI_DIR}/${MOUNTER_ACI_IMAGE}")
 echo "${MOUNTER_ACI_IMAGE} hash: ${ACI_HASH}"

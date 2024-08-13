@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+
+FROM ${BASEIMAGE}
 
 RUN clean-install bash
 
 ADD kube-addons.sh /opt/
+ADD kube-addons-main.sh /opt/
 ADD kubectl /usr/local/bin/
 
-CMD ["/opt/kube-addons.sh"]
+CMD ["/opt/kube-addons-main.sh"]

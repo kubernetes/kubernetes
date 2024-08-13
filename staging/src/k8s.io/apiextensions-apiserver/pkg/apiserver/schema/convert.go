@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // NewStructural converts an OpenAPI v3 schema into a structural schema. A pre-validated JSONSchemaProps will
@@ -62,10 +63,16 @@ func NewStructural(s *apiextensions.JSONSchemaProps) (*Structural, error) {
 		return nil, err
 	}
 
+	vx, err := newValidationExtensions(s)
+	if err != nil {
+		return nil, err
+	}
+
 	ss := &Structural{
-		Generic:         *g,
-		Extensions:      *x,
-		ValueValidation: vv,
+		Generic:              *g,
+		Extensions:           *x,
+		ValueValidation:      vv,
+		ValidationExtensions: *vx,
 	}
 
 	if s.Items != nil {
@@ -91,6 +98,18 @@ func NewStructural(s *apiextensions.JSONSchemaProps) (*Structural, error) {
 		}
 	}
 
+	if s.AdditionalProperties != nil {
+		if s.AdditionalProperties.Schema != nil {
+			additionalPropertiesSchema, err := NewStructural(s.AdditionalProperties.Schema)
+			if err != nil {
+				return nil, err
+			}
+			ss.AdditionalProperties = &StructuralOrBool{Structural: additionalPropertiesSchema, Bool: true}
+		} else {
+			ss.AdditionalProperties = &StructuralOrBool{Bool: s.AdditionalProperties.Allows}
+		}
+	}
+
 	return ss, nil
 }
 
@@ -106,18 +125,6 @@ func newGenerics(s *apiextensions.JSONSchemaProps) (*Generic, error) {
 	}
 	if s.Default != nil {
 		g.Default = JSON{interface{}(*s.Default)}
-	}
-
-	if s.AdditionalProperties != nil {
-		if s.AdditionalProperties.Schema != nil {
-			ss, err := NewStructural(s.AdditionalProperties.Schema)
-			if err != nil {
-				return nil, err
-			}
-			g.AdditionalProperties = &StructuralOrBool{Structural: ss, Bool: true}
-		} else {
-			g.AdditionalProperties = &StructuralOrBool{Bool: s.AdditionalProperties.Allows}
-		}
 	}
 
 	return g, nil
@@ -205,10 +212,16 @@ func newNestedValueValidation(s *apiextensions.JSONSchemaProps) (*NestedValueVal
 		return nil, err
 	}
 
+	vx, err := newValidationExtensions(s)
+	if err != nil {
+		return nil, err
+	}
+
 	v := &NestedValueValidation{
-		ValueValidation:     *vv,
-		ForbiddenGenerics:   *g,
-		ForbiddenExtensions: *x,
+		ValueValidation:      *vv,
+		ValidationExtensions: *vx,
+		ForbiddenGenerics:    *g,
+		ForbiddenExtensions:  *x,
 	}
 
 	if s.Items != nil {
@@ -232,6 +245,18 @@ func newNestedValueValidation(s *apiextensions.JSONSchemaProps) (*NestedValueVal
 			v.Properties[k] = *nvv
 		}
 	}
+	if s.AdditionalProperties != nil {
+		if s.AdditionalProperties.Schema != nil {
+			additionalPropertiesSchema, err := newNestedValueValidation(s.AdditionalProperties.Schema)
+			if err != nil {
+				return nil, err
+			}
+			v.AdditionalProperties = additionalPropertiesSchema
+		} else if s.AdditionalProperties.Allows {
+			v.AdditionalProperties = &NestedValueValidation{}
+		}
+
+	}
 
 	return v, nil
 }
@@ -254,6 +279,19 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 			return nil, fmt.Errorf("internal error: 'x-kubernetes-preserve-unknown-fields' must be true or undefined")
 		}
 		ret.XPreserveUnknownFields = true
+	}
+
+	return ret, nil
+}
+
+func newValidationExtensions(s *apiextensions.JSONSchemaProps) (*ValidationExtensions, error) {
+	if s == nil {
+		return nil, nil
+	}
+
+	ret := &ValidationExtensions{}
+	if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&s.XValidations, &ret.XValidations, nil); err != nil {
+		return nil, err
 	}
 
 	return ret, nil

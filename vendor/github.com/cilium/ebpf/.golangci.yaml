@@ -1,0 +1,28 @@
+---
+issues:
+  exclude-rules:
+    # syscall param structs will have unused fields in Go code.
+    - path: syscall.*.go
+      linters:
+        - structcheck
+
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - errcheck
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unused
+    - varcheck
+
+    # Could be enabled later:
+    # - gocyclo
+    # - maligned
+    # - gosec

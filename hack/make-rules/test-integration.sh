@@ -29,22 +29,29 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
+KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
+if [[ ${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY} -gt 0 ]]; then
+  GOMAXPROCS=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}
+  export GOMAXPROCS
+  kube::log::status "Setting parallelism to ${GOMAXPROCS}"
+fi
+
 # Give integration tests longer to run by default.
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=600s}
-KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
-KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
+KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 
 kube::test::find_integration_test_dirs() {
   (
     cd "${KUBE_ROOT}"
-    find test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    # The "./" syntax here produces Go-compatible package names.
+    find ./test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
-    find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    find ./staging/src/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
   )
 }
@@ -64,18 +71,22 @@ runTests() {
   kube::log::status "Starting etcd instance"
   CLEANUP_REQUIRED=1
   kube::etcd::start
+  # shellcheck disable=SC2034
+  local ETCD_SCRAPE_PID # Set in kube::etcd::start_scraping, used in cleanup
+  kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
-  # export KUBE_RACE
-  #
-  # Enable the Go race detector.
-  export KUBE_RACE="-race"
-  make -C "${KUBE_ROOT}" test \
+  # shellcheck disable=SC2034
+  # KUBE_RACE and MAKEFLAGS are used in the downstream make, and we set them to
+  # empty here to ensure that we aren't unintentionally consuming them from the
+  # previous make invocation.
+  KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="--alsologtostderr=true ${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE}" \
+      KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE="" \
-      KUBE_TIMEOUT="${KUBE_TIMEOUT}"
+      MAKEFLAGS="" \
+      make -C "${KUBE_ROOT}" test
 
   cleanup
 }

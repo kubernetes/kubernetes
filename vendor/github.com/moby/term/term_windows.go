@@ -1,101 +1,96 @@
-package term // import "github.com/moby/term"
+package term
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
-	"syscall" // used for STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and STD_ERROR_HANDLE
 
-	"github.com/Azure/go-ansiterm/winterm"
 	windowsconsole "github.com/moby/term/windows"
+	"golang.org/x/sys/windows"
 )
 
-// State holds the console mode for the terminal.
-type State struct {
+// terminalState holds the platform-specific state / console mode for the terminal.
+type terminalState struct {
 	mode uint32
-}
-
-// Winsize is used for window size.
-type Winsize struct {
-	Height uint16
-	Width  uint16
 }
 
 // vtInputSupported is true if winterm.ENABLE_VIRTUAL_TERMINAL_INPUT is supported by the console
 var vtInputSupported bool
 
-// StdStreams returns the standard streams (stdin, stdout, stderr).
-func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
+func stdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 	// Turn on VT handling on all std handles, if possible. This might
 	// fail, in which case we will fall back to terminal emulation.
-	var emulateStdin, emulateStdout, emulateStderr bool
-	fd := os.Stdin.Fd()
-	if mode, err := winterm.GetConsoleMode(fd); err == nil {
+	var (
+		emulateStdin, emulateStdout, emulateStderr bool
+
+		mode uint32
+	)
+
+	fd := windows.Handle(os.Stdin.Fd())
+	if err := windows.GetConsoleMode(fd, &mode); err == nil {
 		// Validate that winterm.ENABLE_VIRTUAL_TERMINAL_INPUT is supported, but do not set it.
-		if err = winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_INPUT); err != nil {
+		if err = windows.SetConsoleMode(fd, mode|windows.ENABLE_VIRTUAL_TERMINAL_INPUT); err != nil {
 			emulateStdin = true
 		} else {
 			vtInputSupported = true
 		}
 		// Unconditionally set the console mode back even on failure because SetConsoleMode
 		// remembers invalid bits on input handles.
-		winterm.SetConsoleMode(fd, mode)
+		_ = windows.SetConsoleMode(fd, mode)
 	}
 
-	fd = os.Stdout.Fd()
-	if mode, err := winterm.GetConsoleMode(fd); err == nil {
+	fd = windows.Handle(os.Stdout.Fd())
+	if err := windows.GetConsoleMode(fd, &mode); err == nil {
 		// Validate winterm.DISABLE_NEWLINE_AUTO_RETURN is supported, but do not set it.
-		if err = winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_PROCESSING|winterm.DISABLE_NEWLINE_AUTO_RETURN); err != nil {
+		if err = windows.SetConsoleMode(fd, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING|windows.DISABLE_NEWLINE_AUTO_RETURN); err != nil {
 			emulateStdout = true
 		} else {
-			winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+			_ = windows.SetConsoleMode(fd, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 		}
 	}
 
-	fd = os.Stderr.Fd()
-	if mode, err := winterm.GetConsoleMode(fd); err == nil {
+	fd = windows.Handle(os.Stderr.Fd())
+	if err := windows.GetConsoleMode(fd, &mode); err == nil {
 		// Validate winterm.DISABLE_NEWLINE_AUTO_RETURN is supported, but do not set it.
-		if err = winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_PROCESSING|winterm.DISABLE_NEWLINE_AUTO_RETURN); err != nil {
+		if err = windows.SetConsoleMode(fd, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING|windows.DISABLE_NEWLINE_AUTO_RETURN); err != nil {
 			emulateStderr = true
 		} else {
-			winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+			_ = windows.SetConsoleMode(fd, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 		}
 	}
 
-	// Temporarily use STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and
-	// STD_ERROR_HANDLE from syscall rather than x/sys/windows as long as
-	// go-ansiterm hasn't switch to x/sys/windows.
-	// TODO: switch back to x/sys/windows once go-ansiterm has switched
 	if emulateStdin {
-		stdIn = windowsconsole.NewAnsiReader(syscall.STD_INPUT_HANDLE)
+		h := uint32(windows.STD_INPUT_HANDLE)
+		stdIn = windowsconsole.NewAnsiReader(int(h))
 	} else {
 		stdIn = os.Stdin
 	}
 
 	if emulateStdout {
-		stdOut = windowsconsole.NewAnsiWriter(syscall.STD_OUTPUT_HANDLE)
+		h := uint32(windows.STD_OUTPUT_HANDLE)
+		stdOut = windowsconsole.NewAnsiWriter(int(h))
 	} else {
 		stdOut = os.Stdout
 	}
 
 	if emulateStderr {
-		stdErr = windowsconsole.NewAnsiWriter(syscall.STD_ERROR_HANDLE)
+		h := uint32(windows.STD_ERROR_HANDLE)
+		stdErr = windowsconsole.NewAnsiWriter(int(h))
 	} else {
 		stdErr = os.Stderr
 	}
 
-	return
+	return stdIn, stdOut, stdErr
 }
 
-// GetFdInfo returns the file descriptor for an os.File and indicates whether the file represents a terminal.
-func GetFdInfo(in interface{}) (uintptr, bool) {
+func getFdInfo(in interface{}) (uintptr, bool) {
 	return windowsconsole.GetHandleInfo(in)
 }
 
-// GetWinsize returns the window size based on the specified file descriptor.
-func GetWinsize(fd uintptr) (*Winsize, error) {
-	info, err := winterm.GetConsoleScreenBufferInfo(fd)
-	if err != nil {
+func getWinsize(fd uintptr) (*Winsize, error) {
+	var info windows.ConsoleScreenBufferInfo
+	if err := windows.GetConsoleScreenBufferInfo(windows.Handle(fd), &info); err != nil {
 		return nil, err
 	}
 
@@ -107,34 +102,36 @@ func GetWinsize(fd uintptr) (*Winsize, error) {
 	return winsize, nil
 }
 
-// IsTerminal returns true if the given file descriptor is a terminal.
-func IsTerminal(fd uintptr) bool {
-	return windowsconsole.IsConsole(fd)
+func setWinsize(fd uintptr, ws *Winsize) error {
+	return fmt.Errorf("not implemented on Windows")
 }
 
-// RestoreTerminal restores the terminal connected to the given file descriptor
-// to a previous state.
-func RestoreTerminal(fd uintptr, state *State) error {
-	return winterm.SetConsoleMode(fd, state.mode)
+func isTerminal(fd uintptr) bool {
+	var mode uint32
+	err := windows.GetConsoleMode(windows.Handle(fd), &mode)
+	return err == nil
 }
 
-// SaveState saves the state of the terminal connected to the given file descriptor.
-func SaveState(fd uintptr) (*State, error) {
-	mode, e := winterm.GetConsoleMode(fd)
-	if e != nil {
-		return nil, e
+func restoreTerminal(fd uintptr, state *State) error {
+	return windows.SetConsoleMode(windows.Handle(fd), state.mode)
+}
+
+func saveState(fd uintptr) (*State, error) {
+	var mode uint32
+
+	if err := windows.GetConsoleMode(windows.Handle(fd), &mode); err != nil {
+		return nil, err
 	}
 
 	return &State{mode: mode}, nil
 }
 
-// DisableEcho disables echo for the terminal connected to the given file descriptor.
-// -- See https://msdn.microsoft.com/en-us/library/windows/desktop/ms683462(v=vs.85).aspx
-func DisableEcho(fd uintptr, state *State) error {
+func disableEcho(fd uintptr, state *State) error {
+	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms683462(v=vs.85).aspx
 	mode := state.mode
-	mode &^= winterm.ENABLE_ECHO_INPUT
-	mode |= winterm.ENABLE_PROCESSED_INPUT | winterm.ENABLE_LINE_INPUT
-	err := winterm.SetConsoleMode(fd, mode)
+	mode &^= windows.ENABLE_ECHO_INPUT
+	mode |= windows.ENABLE_PROCESSED_INPUT | windows.ENABLE_LINE_INPUT
+	err := windows.SetConsoleMode(windows.Handle(fd), mode)
 	if err != nil {
 		return err
 	}
@@ -144,69 +141,27 @@ func DisableEcho(fd uintptr, state *State) error {
 	return nil
 }
 
-// SetRawTerminal puts the terminal connected to the given file descriptor into
-// raw mode and returns the previous state. On UNIX, this puts both the input
-// and output into raw mode. On Windows, it only puts the input into raw mode.
-func SetRawTerminal(fd uintptr) (*State, error) {
-	state, err := MakeRaw(fd)
+func setRawTerminal(fd uintptr) (*State, error) {
+	oldState, err := MakeRaw(fd)
 	if err != nil {
 		return nil, err
 	}
 
 	// Register an interrupt handler to catch and restore prior state
-	restoreAtInterrupt(fd, state)
-	return state, err
+	restoreAtInterrupt(fd, oldState)
+	return oldState, err
 }
 
-// SetRawTerminalOutput puts the output of terminal connected to the given file
-// descriptor into raw mode. On UNIX, this does nothing and returns nil for the
-// state. On Windows, it disables LF -> CRLF translation.
-func SetRawTerminalOutput(fd uintptr) (*State, error) {
-	state, err := SaveState(fd)
+func setRawTerminalOutput(fd uintptr) (*State, error) {
+	oldState, err := saveState(fd)
 	if err != nil {
 		return nil, err
 	}
 
 	// Ignore failures, since winterm.DISABLE_NEWLINE_AUTO_RETURN might not be supported on this
 	// version of Windows.
-	winterm.SetConsoleMode(fd, state.mode|winterm.DISABLE_NEWLINE_AUTO_RETURN)
-	return state, err
-}
-
-// MakeRaw puts the terminal (Windows Console) connected to the given file descriptor into raw
-// mode and returns the previous state of the terminal so that it can be restored.
-func MakeRaw(fd uintptr) (*State, error) {
-	state, err := SaveState(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	mode := state.mode
-
-	// See
-	// -- https://msdn.microsoft.com/en-us/library/windows/desktop/ms686033(v=vs.85).aspx
-	// -- https://msdn.microsoft.com/en-us/library/windows/desktop/ms683462(v=vs.85).aspx
-
-	// Disable these modes
-	mode &^= winterm.ENABLE_ECHO_INPUT
-	mode &^= winterm.ENABLE_LINE_INPUT
-	mode &^= winterm.ENABLE_MOUSE_INPUT
-	mode &^= winterm.ENABLE_WINDOW_INPUT
-	mode &^= winterm.ENABLE_PROCESSED_INPUT
-
-	// Enable these modes
-	mode |= winterm.ENABLE_EXTENDED_FLAGS
-	mode |= winterm.ENABLE_INSERT_MODE
-	mode |= winterm.ENABLE_QUICK_EDIT_MODE
-	if vtInputSupported {
-		mode |= winterm.ENABLE_VIRTUAL_TERMINAL_INPUT
-	}
-
-	err = winterm.SetConsoleMode(fd, mode)
-	if err != nil {
-		return nil, err
-	}
-	return state, nil
+	_ = windows.SetConsoleMode(windows.Handle(fd), oldState.mode|windows.DISABLE_NEWLINE_AUTO_RETURN)
+	return oldState, err
 }
 
 func restoreAtInterrupt(fd uintptr, state *State) {
@@ -215,7 +170,7 @@ func restoreAtInterrupt(fd uintptr, state *State) {
 
 	go func() {
 		_ = <-sigchan
-		RestoreTerminal(fd, state)
+		_ = RestoreTerminal(fd, state)
 		os.Exit(0)
 	}()
 }

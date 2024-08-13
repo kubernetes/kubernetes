@@ -17,29 +17,35 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	utilnet "k8s.io/utils/net"
 )
 
 // ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
@@ -50,20 +56,28 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
 	// TODO(Arvinderpal): update advertiseAddress validation for dual-stack once it's implemented.
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
-	// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
+	allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, field.NewPath("certificateKey"))...)
 	return allErrs
 }
 
 // ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
 func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateDNS(&c.DNS, field.NewPath("dns"))...)
 	allErrs = append(allErrs, ValidateNetworking(c, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServer(&c.APIServer, field.NewPath("apiServer"))...)
+	allErrs = append(allErrs, ValidateControllerManager(&c.ControllerManager, field.NewPath("controllerManager"))...)
+	allErrs = append(allErrs, ValidateScheduler(&c.Scheduler, field.NewPath("scheduler"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
+	allErrs = append(allErrs, ValidateImageRepository(c.ImageRepository, field.NewPath("imageRepository"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
+	allErrs = append(allErrs, ValidateEncryptionAlgorithm(c.EncryptionAlgorithm, field.NewPath("encryptionAlgorithm"))...)
 	allErrs = append(allErrs, componentconfigs.Validate(c)...)
+	for _, certError := range ValidateCertValidity(c) {
+		klog.Warningf("WARNING: %s", certError.Error())
+	}
 	return allErrs
 }
 
@@ -71,6 +85,21 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 func ValidateAPIServer(a *kubeadm.APIServer, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCertSANs(a.CertSANs, fldPath.Child("certSANs"))...)
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
+	return allErrs
+}
+
+// ValidateControllerManager validates the controller manager object and collects all encountered errors
+func ValidateControllerManager(a *kubeadm.ControlPlaneComponent, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
+	return allErrs
+}
+
+// ValidateScheduler validates the scheduler object and collects all encountered errors
+func ValidateScheduler(a *kubeadm.ControlPlaneComponent, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
 	return allErrs
 }
 
@@ -81,7 +110,7 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateJoinControlPlane(c.ControlPlane, field.NewPath("controlPlane"))...)
 
-	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
+	if !isAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
 	}
 	return allErrs
@@ -92,7 +121,7 @@ func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if c != nil {
 		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
-		// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
+		allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, fldPath.Child("certificateKey"))...)
 	}
 	return allErrs
 }
@@ -109,6 +138,8 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 		}
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
+	allErrs = append(allErrs, ValidateExtraArgs(nro.KubeletExtraArgs, fldPath.Child("kubeletExtraArgs"))...)
+	allErrs = append(allErrs, ValidateImagePullPolicy(nro.ImagePullPolicy, fldPath.Child("imagePullPolicy"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
@@ -149,7 +180,7 @@ func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath
 	}
 
 	if len(b.CACertHashes) == 0 && !b.UnsafeSkipCAVerification {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification as true in your kubeadm config file or pass --discovery-token-unsafe-skip-ca-verification flag to continue"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("caCertHashes"), "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification as true in your kubeadm config file or pass --discovery-token-unsafe-skip-ca-verification flag to continue"))
 	}
 
 	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child(kubeadmcmdoptions.TokenStr))...)
@@ -201,7 +232,7 @@ func ValidateDiscoveryKubeConfigPath(discoveryFile string, fldPath *field.Path) 
 }
 
 // ValidateBootstrapTokens validates a slice of BootstrapToken objects
-func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) field.ErrorList {
+func ValidateBootstrapTokens(bts []bootstraptokenv1.BootstrapToken, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, bt := range bts {
 		btPath := fldPath.Child(fmt.Sprintf("%d", i))
@@ -232,7 +263,7 @@ func ValidateTokenGroups(usages []string, groups []string, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 
 	// adding groups only makes sense for authentication
-	usagesSet := sets.NewString(usages...)
+	usagesSet := sets.New(usages...)
 	usageAuthentication := strings.TrimPrefix(bootstrapapi.BootstrapTokenUsageAuthentication, bootstrapapi.BootstrapTokenUsagePrefix)
 	if len(groups) > 0 && !usagesSet.Has(usageAuthentication) {
 		allErrs = append(allErrs, field.Invalid(fldPath, groups, fmt.Sprintf("token groups cannot be specified unless --usages includes %q", usageAuthentication)))
@@ -278,6 +309,10 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, ValidateAbsolutePath(e.Local.DataDir, localPath.Child("dataDir"))...)
 		allErrs = append(allErrs, ValidateCertSANs(e.Local.ServerCertSANs, localPath.Child("serverCertSANs"))...)
 		allErrs = append(allErrs, ValidateCertSANs(e.Local.PeerCertSANs, localPath.Child("peerCertSANs"))...)
+		if len(e.Local.ImageRepository) > 0 {
+			allErrs = append(allErrs, ValidateImageRepository(e.Local.ImageRepository, localPath.Child("imageRepository"))...)
+		}
+		allErrs = append(allErrs, ValidateExtraArgs(e.Local.ExtraArgs, localPath.Child("extraArgs"))...)
 	}
 	if e.External != nil {
 		requireHTTPS := true
@@ -289,7 +324,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		if (e.External.CertFile == "" && e.External.KeyFile != "") || (e.External.CertFile != "" && e.External.KeyFile == "") {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set"))
 		}
-		// If the cert and key are specified, require the VA as well
+		// If the cert and key are specified, require the CA as well
 		if e.External.CertFile != "" && e.External.KeyFile != "" && e.External.CAFile == "" {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
 		}
@@ -308,13 +343,29 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateEncryptionAlgorithm validates the public key algorithm
+func ValidateEncryptionAlgorithm(algo kubeadm.EncryptionAlgorithmType, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	knownAlgorithms := sets.New(
+		kubeadm.EncryptionAlgorithmECDSAP256,
+		kubeadm.EncryptionAlgorithmRSA2048,
+		kubeadm.EncryptionAlgorithmRSA3072,
+		kubeadm.EncryptionAlgorithmRSA4096,
+	)
+	if !knownAlgorithms.Has(algo) {
+		msg := fmt.Sprintf("Invalid encryption algorithm %q. Must be one of %v", algo, sets.List(knownAlgorithms))
+		allErrs = append(allErrs, field.Invalid(fldPath, algo, msg))
+	}
+	return allErrs
+}
+
 // ValidateCertSANs validates alternative names
 func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
 		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
 			if errs2 := validation.IsWildcardDNS1123Subdomain(altname); len(errs2) != 0 {
-				if net.ParseIP(altname) == nil {
+				if netutils.ParseIPSloppy(altname) == nil {
 					allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address, DNS label or a DNS label with subdomain wildcards: %s; %s", strings.Join(errs, "; "), strings.Join(errs2, "; "))))
 				}
 			}
@@ -345,7 +396,7 @@ func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.E
 // ValidateIPFromString validates ip address
 func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if net.ParseIP(ipaddr) == nil {
+	if netutils.ParseIPSloppy(ipaddr) == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipaddr, "ip address is not valid"))
 	}
 	return allErrs
@@ -370,54 +421,151 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateIPNetFromString validates network portion of ip address
-func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
+func ValidateIPNetFromString(subnetStr string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, err := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
 		return allErrs
 	}
 	switch {
 	// if DualStack only 2 CIDRs allowed
-	case isDualStack && len(subnets) > 2:
+	case len(subnets) > 2:
 		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
-	case isDualStack && len(subnets) == 2:
-		areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
+	case len(subnets) == 2:
+		areDualStackCIDRs, err := netutils.IsDualStackCIDRs(subnets)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
 		} else if !areDualStackCIDRs {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 		}
-	// if not DualStack only one CIDR allowed
-	case !isDualStack && len(subnets) > 1:
-		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "only one CIDR allowed for single-stack networking"))
 	}
 	// validate the subnet/s
 	for _, s := range subnets {
-		numAddresses := utilnet.RangeSize(s)
+		numAddresses := netutils.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), fmt.Sprintf("subnet with %d address(es) is too small, the minimum is %d", numAddresses, minAddrs)))
+		}
+
+		// Warn when the subnet is in site-local range - i.e. contains addresses that belong to fec0::/10
+		_, siteLocalNet, _ := netutils.ParseCIDRSloppy("fec0::/10")
+		if siteLocalNet.Contains(s.IP) || s.Contains(siteLocalNet.IP) {
+			klog.Warningf("the subnet %v contains IPv6 site-local addresses that belong to fec0::/10 which has been deprecated by rfc3879", s)
 		}
 	}
+	return allErrs
+}
+
+// ValidateServiceSubnetSize validates that the maximum subnet size is not exceeded
+// Should be a small cidr due to how it is stored in etcd.
+// bigger cidr (specially those offered by IPv6) will add no value
+// and significantly increase snapshotting time.
+// NOTE: This is identical to validation performed in the apiserver.
+func ValidateServiceSubnetSize(subnetStr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// subnets were already validated
+	subnets, _ := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
+	for _, serviceSubnet := range subnets {
+		ones, bits := serviceSubnet.Mask.Size()
+		if bits-ones > constants.MaximumBitsForServiceSubnet {
+			errMsg := fmt.Sprintf("specified service subnet is too large; for %d-bit addresses, the mask must be >= %d", bits, bits-constants.MaximumBitsForServiceSubnet)
+			allErrs = append(allErrs, field.Invalid(fldPath, serviceSubnet.String(), errMsg))
+		}
+	}
+	return allErrs
+}
+
+// ValidatePodSubnetNodeMask validates that the relation between podSubnet and node-masks is correct
+func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// subnets were already validated
+	subnets, _ := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
+	for _, podSubnet := range subnets {
+		// obtain podSubnet mask
+		mask := podSubnet.Mask
+		maskSize, _ := mask.Size()
+		// obtain node-cidr-mask
+		nodeMask, err := getClusterNodeMask(c, netutils.IsIPv6(podSubnet.IP))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), err.Error()))
+			continue
+		}
+		// the pod subnet mask needs to allow one or multiple node-masks
+		// i.e. if it has a /24 the node mask must be between 24 and 32 for ipv4
+		if maskSize > nodeMask {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("the size of pod subnet with mask %d is smaller than the size of node subnet with mask %d", maskSize, nodeMask)))
+		} else if (nodeMask - maskSize) > constants.PodSubnetNodeMaskMaxDiff {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("pod subnet mask (%d) and node-mask (%d) difference is greater than %d", maskSize, nodeMask, constants.PodSubnetNodeMaskMaxDiff)))
+		}
+	}
+	return allErrs
+}
+
+// getClusterNodeMask returns the corresponding node-cidr-mask
+// based on the Cluster configuration and the IP family
+// Default is 24 for IPv4 and 64 for IPv6
+func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, error) {
+	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr for use by the controller manager
+	const defaultNodeMaskCIDRIPv4 = 24
+	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr for use by the controller manager
+	const defaultNodeMaskCIDRIPv6 = 64
+	var maskSize int
+	var maskArg string
+	var err error
+
+	if isIPv6 {
+		maskArg = "node-cidr-mask-size-ipv6"
+	} else {
+		maskArg = "node-cidr-mask-size-ipv4"
+	}
+
+	maskValue, _ := kubeadm.GetArgValue(c.ControllerManager.ExtraArgs, maskArg, -1)
+	if len(maskValue) != 0 {
+		// assume it is an integer, if not it will fail later
+		maskSize, err = strconv.Atoi(maskValue)
+		if err != nil {
+			return 0, errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer", maskArg)
+		}
+	} else if isIPv6 {
+		maskSize = defaultNodeMaskCIDRIPv6
+	} else {
+		maskSize = defaultNodeMaskCIDRIPv4
+	}
+	return maskSize, nil
+}
+
+// ValidateDNS validates the DNS object and collects all encountered errors
+func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(dns.ImageRepository) > 0 {
+		allErrs = append(allErrs, ValidateImageRepository(dns.ImageRepository, fldPath.Child("imageRepository"))...)
+	}
+
 	return allErrs
 }
 
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	dnsDomainFldPath := field.NewPath("dnsDomain")
+	dnsDomainFldPath := fldPath.Child("dnsDomain")
 	for _, err := range validation.IsDNS1123Subdomain(c.Networking.DNSDomain) {
 		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.Networking.DNSDomain, err))
 	}
-	// check if dual-stack feature-gate is enabled
-	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
 
 	if len(c.Networking.ServiceSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, fldPath.Child("serviceSubnet"))...)
+		// Service subnet was already validated, we need to validate now the subnet size
+		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, fldPath.Child("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, fldPath.Child("podSubnet"))...)
+		val, _ := kubeadm.GetArgValue(c.ControllerManager.ExtraArgs, "allocate-node-cidrs", -1)
+		if val != "false" {
+			// Pod subnet was already validated, we need to validate now against the node-mask
+			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, fldPath.Child("podSubnet"))...)
+		}
 	}
 	return allErrs
 }
@@ -425,7 +573,7 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 // ValidateAbsolutePath validates whether provided path is absolute or not
 func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !filepath.IsAbs(path) {
+	if !isAbs(path) {
 		allErrs = append(allErrs, field.Invalid(fldPath, path, "path is not absolute"))
 	}
 	return allErrs
@@ -454,17 +602,18 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 func isAllowedFlag(flagName string) bool {
-	knownFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
+	allowedFlags := sets.New(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
 		kubeadmcmdoptions.DryRun,
 		kubeadmcmdoptions.KubeconfigPath,
 		kubeadmcmdoptions.NodeName,
-		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.Kustomize,
-		"print-join-command", "rootfs", "v")
-	if knownFlags.Has(flagName) {
+		kubeadmcmdoptions.FeatureGatesString,                                       // TODO: remove this line when --feature-gates flag is deprecated and dropped from "kubeadm upgrade apply/plan"
+		"api-server-manifest", "controller-manager-manifest", "scheduler-manifest", // TODO: remove this line when these flags are deprecated and dropped from "kubeadm upgrade diff"
+		"allow-missing-template-keys", "output", "show-managed-fields",
+		"print-join-command", "rootfs", "v", "log-file", "yes")
+	if allowedFlags.Has(flagName) {
 		return true
 	}
 	return strings.HasPrefix(flagName, "skip-")
@@ -492,22 +641,34 @@ func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
+// ValidateCertificateKey validates the certificate key is a valid hex encoded AES key
+func ValidateCertificateKey(certificateKey string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(certificateKey) > 0 {
+		decodedKey, err := hex.DecodeString(certificateKey)
+		if err != nil {
+			return append(allErrs, field.Invalid(fldPath, certificateKey, fmt.Sprintf("certificate key decoding error: %v", err)))
+		}
+
+		k := len(decodedKey)
+		if k != constants.CertificateKeySize {
+			allErrs = append(allErrs, field.Invalid(fldPath, certificateKey, fmt.Sprintf("invalid certificate key size %d, the key must be an AES key of size %d", k, constants.CertificateKeySize)))
+		}
+	}
+
+	return allErrs
+}
+
 // ValidateIgnorePreflightErrors validates duplicates in:
 // - ignore-preflight-errors flag and
 // - ignorePreflightErrors field in {Init,Join}Configuration files.
-func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.String, error) {
-	ignoreErrors := sets.NewString()
+func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.Set[string], error) {
+	ignoreErrors := sets.New[string]()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrorsFromConfigFile {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
-	}
-
-	if ignoreErrors.Has("all") {
-		// "all" is forbidden in config files. Administrators should use an
-		// explicit list of errors they want to ignore, as it can be risky to
-		// mask all errors in such a way. Hence, we return an error:
-		allErrs = append(allErrs, field.Invalid(field.NewPath("ignorePreflightErrors"), "all", "'all' cannot be used in configuration file"))
 	}
 
 	for _, item := range ignorePreflightErrorsFromCLI {
@@ -515,7 +676,7 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-preflight-errors"), strings.Join(ignoreErrors.List(), ","), "don't specify individual checks if 'all' is used"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-preflight-errors"), strings.Join(sets.List(ignoreErrors), ","), "don't specify individual checks if 'all' is used"))
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
@@ -525,18 +686,115 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if len(socket) == 0 { // static and dynamic defaulting should have added a value to the field already
+		return append(allErrs, field.Invalid(fldPath, socket, "empty CRI socket"))
+	}
+
 	u, err := url.Parse(socket)
 	if err != nil {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL parsing error: %v", err)))
 	}
 
-	if u.Scheme == "" {
-		if !filepath.IsAbs(u.Path) {
-			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
-		}
-	} else if u.Scheme != kubeadmapiv1beta2.DefaultUrlScheme {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
+	// static and dynamic defaulting should have ensured that an URL scheme is used
+	if u.Scheme != kubeadmapiv1.DefaultContainerRuntimeURLScheme {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("only URL scheme %q is supported, got %q", kubeadmapiv1.DefaultContainerRuntimeURLScheme, u.Scheme)))
 	}
 
+	return allErrs
+}
+
+// ValidateImageRepository validates the image repository format
+func ValidateImageRepository(imageRepository string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	image := fmt.Sprintf("%s/%s:%s", imageRepository, "name", "tag")
+	if !reference.ReferenceRegexp.MatchString(image) {
+		return append(allErrs, field.Invalid(fldPath, imageRepository, "invalid image repository format"))
+	}
+
+	return allErrs
+}
+
+// ValidateResetConfiguration validates a ResetConfiguration object and collects all encountered errors
+func ValidateResetConfiguration(c *kubeadm.ResetConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateSocketPath(c.CRISocket, field.NewPath("criSocket"))...)
+	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
+	allErrs = append(allErrs, ValidateUnmountFlags(c.UnmountFlags, field.NewPath("unmountFlags"))...)
+	return allErrs
+}
+
+// ValidateExtraArgs validates a set of arguments and collects all encountered errors
+func ValidateExtraArgs(args []kubeadm.Arg, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for idx, arg := range args {
+		if len(arg.Name) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has no name"))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateUnmountFlags validates a set of unmount flags and collects all encountered errors
+func ValidateUnmountFlags(flags []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for idx, flag := range flags {
+		switch flag {
+		case kubeadm.UnmountFlagMNTForce, kubeadm.UnmountFlagMNTDetach, kubeadm.UnmountFlagMNTExpire, kubeadm.UnmountFlagUmountNoFollow:
+			continue
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), fmt.Sprintf("unknown unmount flag %s", flag)))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateImagePullPolicy validates if the user specified pull policy is correct
+func ValidateImagePullPolicy(policy corev1.PullPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch policy {
+	case "", corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
+		return allErrs
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, policy, "invalid pull policy"))
+		return allErrs
+	}
+}
+
+// ValidateUpgradeConfiguration validates a UpgradeConfiguration object and collects all encountered errors
+func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.Apply.Patches != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Apply.Patches.Directory,
+			field.NewPath("apply").Child("patches").Child("directory"))...)
+	}
+	if c.Node.Patches != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory,
+			field.NewPath("node").Child("patches").Child("directory"))...)
+	}
+	allErrs = append(allErrs, ValidateImagePullPolicy(c.Apply.ImagePullPolicy,
+		field.NewPath("apply").Child("imagePullPolicy"))...)
+	allErrs = append(allErrs, ValidateImagePullPolicy(c.Node.ImagePullPolicy,
+		field.NewPath("node").Child("imagePullPolicy"))...)
+	return allErrs
+}
+
+// ValidateCertValidity validates if the values for cert validity are too big
+func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
+	var allErrs []error
+	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
+				cfg.CertificateValidityPeriod.Duration, constants.CertificateValidityPeriod))
+	}
+	if cfg.CACertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod.Duration > constants.CACertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
+				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
+	}
 	return allErrs
 }

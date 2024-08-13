@@ -1,35 +1,18 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- yujuhong
-- brendandburns
-- derekwaynecarr
-- caesarxuchao
-- vishh
-- mikedanese
-- nikhiljindal
-- erictune
-- pmorie
-- dchen1107
-- saad-ali
-- zmerlynn
-- justinsb
-- pwittrock
-- tallclair
-- yifan-gu
-- eparis
-- soltysh
-- jsafrane
-- madhusudancs
-- hongchaodeng
-- rootfs
-- aveshagarwal
-- david-mcmahon
-- pweil-
-- rata
-- sdminonne
+  - thockin
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - yujuhong
+  - derekwaynecarr
+  - caesarxuchao
+  - mikedanese
+  - dchen1107
+  - saad-ali
+  - justinsb
+  - pwittrock
+  - soltysh
+  - jsafrane
+  - rata

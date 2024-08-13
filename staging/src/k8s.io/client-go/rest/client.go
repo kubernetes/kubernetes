@@ -52,7 +52,7 @@ type Interface interface {
 // ClientContentConfig controls how RESTClient communicates with the server.
 //
 // TODO: ContentConfig will be updated to accept a Negotiator instead of a
-//   NegotiatedSerializer and NegotiatedSerializer will be removed.
+// NegotiatedSerializer and NegotiatedSerializer will be removed.
 type ClientContentConfig struct {
 	// AcceptContentTypes specifies the types the client will accept and is optional.
 	// If not set, ContentType will be used to define the Accept header
@@ -94,6 +94,10 @@ type RESTClient struct {
 	// overridden.
 	rateLimiter flowcontrol.RateLimiter
 
+	// warningHandler is shared among all requests created by this client.
+	// If not set, defaultWarningHandler is used.
+	warningHandler WarningHandler
+
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
 }
@@ -123,7 +127,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	}, nil
 }
 
-// GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
+// GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
 func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	if c == nil {
 		return nil
@@ -155,13 +159,14 @@ func readExpBackoffConfig() BackoffManager {
 // c, err := NewRESTClient(...)
 // if err != nil { ... }
 // resp, err := c.Verb("GET").
-//  Path("pods").
-//  SelectorParam("labels", "area=staging").
-//  Timeout(10*time.Second).
-//  Do()
+//
+//	Path("pods").
+//	SelectorParam("labels", "area=staging").
+//	Timeout(10*time.Second).
+//	Do()
+//
 // if err != nil { ... }
 // list, ok := resp.(*api.PodList)
-//
 func (c *RESTClient) Verb(verb string) *Request {
 	return NewRequest(c).Verb(verb)
 }

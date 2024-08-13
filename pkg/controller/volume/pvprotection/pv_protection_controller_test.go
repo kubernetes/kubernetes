@@ -17,23 +17,23 @@ limitations under the License.
 package pvprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -111,30 +111,21 @@ func TestPVProtectionController(t *testing.T) {
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
-		expectedActions                     []clienttesting.Action
-		storageObjectInUseProtectionEnabled bool
+		expectedActions []clienttesting.Action
 	}{
 		// PV events
 		//
 		{
-			name:      "StorageObjectInUseProtection Enabled, PV without finalizer -> finalizer is added",
+			name:      "PV without finalizer -> finalizer is added",
 			updatedPV: pv(),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "StorageObjectInUseProtection Disabled, PV without finalizer -> finalizer is added",
-			updatedPV:                           pv(),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: false,
-		},
-		{
-			name:                                "PVC with finalizer -> no action",
-			updatedPV:                           withProtectionFinalizer(pv()),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			name:            "PVC with finalizer -> no action",
+			updatedPV:       withProtectionFinalizer(pv()),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name:      "saving PVC finalizer fails -> controller retries",
@@ -154,23 +145,13 @@ func TestPVProtectionController(t *testing.T) {
 				// This succeeds
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:      "StorageObjectInUseProtection Enabled, deleted PV with finalizer -> finalizer is removed",
+			name:      "deleted PV with finalizer -> finalizer is removed",
 			updatedPV: deleted(withProtectionFinalizer(pv())),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
-		},
-		{
-			name:      "StorageObjectInUseProtection Disabled, deleted PV with finalizer -> finalizer is removed",
-			updatedPV: deleted(withProtectionFinalizer(pv())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
-			},
-			storageObjectInUseProtectionEnabled: false,
 		},
 		{
 			name:      "finalizer removal fails -> controller retries",
@@ -190,13 +171,11 @@ func TestPVProtectionController(t *testing.T) {
 				// Succeeds
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
-			updatedPV:                           deleted(withProtectionFinalizer(boundPV())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			name:            "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
+			updatedPV:       deleted(withProtectionFinalizer(boundPV())),
+			expectedActions: []clienttesting.Action{},
 		},
 	}
 
@@ -230,11 +209,12 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		ctrl := NewPVProtectionController(pvInformer, client, test.storageObjectInUseProtectionEnabled)
+		logger, _ := ktesting.NewTestContext(t)
+		ctrl := NewPVProtectionController(logger, pvInformer, client)
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {
-			ctrl.pvAddedUpdated(test.updatedPV)
+			ctrl.pvAddedUpdated(logger, test.updatedPV)
 		}
 
 		// Process the controller queue until we get expected results
@@ -246,8 +226,8 @@ func TestPVProtectionController(t *testing.T) {
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
-				ctrl.processNextWorkItem()
+				logger.V(5).Info("Non-empty events queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
+				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
 				// There is still some work in the queue, process it now
@@ -257,7 +237,7 @@ func TestPVProtectionController(t *testing.T) {
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log evey wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					logger.V(5).Info("Waiting for the remaining actions", "test", test.name, "currentActionCount", currentActionCount, "expectedActionCount", len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.
@@ -270,7 +250,7 @@ func TestPVProtectionController(t *testing.T) {
 		actions := client.Actions()
 
 		if !reflect.DeepEqual(actions, test.expectedActions) {
-			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
+			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, dump.Pretty(test.expectedActions), dump.Pretty(actions))
 		}
 
 	}

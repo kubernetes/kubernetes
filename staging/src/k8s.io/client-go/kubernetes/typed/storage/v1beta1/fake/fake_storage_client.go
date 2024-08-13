@@ -36,12 +36,20 @@ func (c *FakeStorageV1beta1) CSINodes() v1beta1.CSINodeInterface {
 	return &FakeCSINodes{c}
 }
 
+func (c *FakeStorageV1beta1) CSIStorageCapacities(namespace string) v1beta1.CSIStorageCapacityInterface {
+	return &FakeCSIStorageCapacities{c, namespace}
+}
+
 func (c *FakeStorageV1beta1) StorageClasses() v1beta1.StorageClassInterface {
 	return &FakeStorageClasses{c}
 }
 
 func (c *FakeStorageV1beta1) VolumeAttachments() v1beta1.VolumeAttachmentInterface {
 	return &FakeVolumeAttachments{c}
+}
+
+func (c *FakeStorageV1beta1) VolumeAttributesClasses() v1beta1.VolumeAttributesClassInterface {
+	return &FakeVolumeAttributesClasses{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

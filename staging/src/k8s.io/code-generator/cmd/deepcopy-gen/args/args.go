@@ -20,35 +20,33 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/deepcopy-gen/generators"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs generators.CustomArgs
+type Args struct {
+	OutputFile   string
+	BoundingDirs []string // Only deal with types rooted under these dirs.
+	GoHeaderFile string
+}
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{}
-	genericArgs.CustomArgs = (*generators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
-	genericArgs.OutputFileBaseName = "deepcopy_generated"
-	return genericArgs, customArgs
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{}
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.CommandLine.StringSliceVar(&ca.BoundingDirs, "bounding-dirs", ca.BoundingDirs,
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputFile, "output-file", "generated.deepcopy.go",
+		"the name of the file to be generated")
+	fs.StringSliceVar(&args.BoundingDirs, "bounding-dirs", args.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*generators.CustomArgs)
-
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+func (args *Args) Validate() error {
+	if len(args.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
-
 	return nil
 }

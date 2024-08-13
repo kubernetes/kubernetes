@@ -21,10 +21,11 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -34,9 +35,10 @@ func TestExtraArgsFail(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	c := NewCmdCreate(f, genericclioptions.NewTestIOStreamsDiscard())
-	options := CreateOptions{}
-	if options.ValidateArgs(c, []string{"rc"}) == nil {
+	c := NewCmdCreate(f, genericiooptions.NewTestIOStreamsDiscard())
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+	options := NewCreateOptions(ioStreams)
+	if options.Complete(f, c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -65,7 +67,7 @@ func TestCreateObject(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
@@ -102,7 +104,7 @@ func TestCreateMultipleObject(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
@@ -139,7 +141,7 @@ func TestCreateDirectory(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/replace/legacy")
 	cmd.Flags().Set("output", "name")
@@ -147,5 +149,37 @@ func TestCreateDirectory(t *testing.T) {
 
 	if buf.String() != "replicationcontroller/name\nreplicationcontroller/name\nreplicationcontroller/name\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestMissingFilenameError(t *testing.T) {
+	var errStr string
+	var exitCode int
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		if errStr == "" {
+			errStr = str
+			exitCode = code
+		}
+	})
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdCreate(tf, ioStreams)
+	cmd.Run(cmd, []string{})
+
+	if buf.Len() > 0 {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	if len(errStr) == 0 {
+		t.Errorf("unexpected non-error")
+	} else if errStr != "error: must specify one of -f and -k" {
+		t.Errorf("unexpected error: %s", errStr)
+	}
+
+	if exitCode != 1 {
+		t.Errorf("unexpected exit code: %d", exitCode)
 	}
 }

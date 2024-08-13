@@ -18,13 +18,15 @@ package kubeadm
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -43,15 +45,16 @@ var _ = Describe("bootstrap token", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("bootstrap token")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
-			List(context.TODO(), metav1.ListOptions{})
+			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading Secrets")
 
 		tokenNum := 0
@@ -68,7 +71,7 @@ var _ = Describe("bootstrap token", func() {
 		gomega.Expect(tokenNum).Should(gomega.BeNumerically(">", 0), "At least one bootstrap token should exist")
 	})
 
-	ginkgo.It("should be allowed to post CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to post CSR for kubelet certificates on joining nodes", func(ctx context.Context) {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensAllowPostCSRClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,
@@ -76,7 +79,7 @@ var _ = Describe("bootstrap token", func() {
 		)
 	})
 
-	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func(ctx context.Context) {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensCSRAutoApprovalClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,

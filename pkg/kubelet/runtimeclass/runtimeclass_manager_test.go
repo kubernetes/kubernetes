@@ -33,10 +33,10 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		expected    string
 		expectError bool
 	}{
-		{rcn: pointer.StringPtr(""), expected: ""},
-		{rcn: pointer.StringPtr(rctest.EmptyRuntimeClass), expected: ""},
-		{rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expected: "kata-containers"},
-		{rcn: pointer.StringPtr("phantom"), expectError: true},
+		{rcn: pointer.String(""), expected: ""},
+		{rcn: pointer.String(rctest.EmptyRuntimeClass), expected: ""},
+		{rcn: pointer.String(rctest.SandboxRuntimeClass), expected: "kata-containers"},
+		{rcn: pointer.String("phantom"), expectError: true},
 	}
 
 	manager := runtimeclass.NewManager(rctest.NewPopulatedClient())

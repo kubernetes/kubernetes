@@ -18,7 +18,6 @@ package replace
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -40,13 +40,14 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
 
 var (
 	replaceLong = templates.LongDesc(i18n.T(`
-		Replace a resource by filename or stdin.
+		Replace a resource by file name or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
 		complete resource spec must be provided. This can be obtained by
@@ -54,10 +55,10 @@ var (
 		    $ kubectl get TYPE NAME -o yaml`))
 
 	replaceExample = templates.Examples(i18n.T(`
-		# Replace a pod using the data in pod.json.
+		# Replace a pod using the data in pod.json
 		kubectl replace -f ./pod.json
 
-		# Replace a pod based on the JSON passed into stdin.
+		# Replace a pod based on the JSON passed into stdin
 		cat pod.json | kubectl replace -f -
 
 		# Update a single-container pod's image version (tag) to v4
@@ -67,6 +68,8 @@ var (
 		kubectl replace --force -f ./pod.json`))
 )
 
+var supportedSubresources = []string{"status", "scale"}
+
 type ReplaceOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
@@ -74,13 +77,12 @@ type ReplaceOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunStrategy      cmdutil.DryRunStrategy
+	validationDirective string
 
 	PrintObj func(obj runtime.Object) error
 
 	createAnnotation bool
-	validate         bool
 
 	Schema      validation.Schema
 	Builder     func() *resource.Builder
@@ -92,32 +94,34 @@ type ReplaceOptions struct {
 
 	Recorder genericclioptions.Recorder
 
-	genericclioptions.IOStreams
+	Subresource string
+
+	genericiooptions.IOStreams
 
 	fieldManager string
 }
 
-func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
+func NewReplaceOptions(streams genericiooptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
-		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
 
 		IOStreams: streams,
 	}
 }
 
-func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdReplace(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{
 		Use:                   "replace -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Replace a resource by filename or stdin"),
+		Short:                 i18n.T("Replace a resource by file name or stdin"),
 		Long:                  replaceLong,
 		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f))
 		},
 	}
@@ -132,6 +136,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, replace will operate on the subresource of the requested object.", supportedSubresources...)
 
 	return cmd
 }
@@ -145,7 +150,10 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	o.validate = cmdutil.GetFlagBool(cmd, "validate")
+	o.validationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
@@ -156,11 +164,6 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -171,7 +174,10 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	deleteOpts, err := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	if err != nil {
+		return err
+	}
 
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	deleteOpts.IgnoreNotFound = true
@@ -191,7 +197,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	schema, err := f.Validator(o.validate)
+	schema, err := f.Validator(o.validationDirective)
 	if err != nil {
 		return err
 	}
@@ -208,7 +214,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
-func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
+func (o *ReplaceOptions) Validate() error {
 	if o.DeleteOptions.GracePeriod >= 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--grace-period must have --force specified")
 	}
@@ -217,26 +223,34 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
+	if o.DeleteOptions.ForceDeletion && o.DryRunStrategy != cmdutil.DryRunNone {
+		return fmt.Errorf("--dry-run can not be used when --force is set")
+	}
+
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
-		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+		return fmt.Errorf("must specify --filename to replace")
 	}
 
 	if len(o.Raw) > 0 {
 		if len(o.DeleteOptions.FilenameOptions.Filenames) != 1 {
-			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+			return fmt.Errorf("--raw can only use a single local file or stdin")
 		}
 		if strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "https://") == 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+			return fmt.Errorf("--raw cannot read from a url")
 		}
 		if o.DeleteOptions.FilenameOptions.Recursive {
-			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+			return fmt.Errorf("--raw and --recursive are mutually exclusive")
 		}
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		if o.PrintFlags.OutputFormat != nil && len(*o.PrintFlags.OutputFormat) > 0 {
+			return fmt.Errorf("--raw and --output are mutually exclusive")
 		}
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
-			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
+	}
+
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 
 	return nil
@@ -263,6 +277,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.Subresource).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -285,17 +300,14 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		if o.DryRunStrategy == cmdutil.DryRunClient {
 			return o.PrintObj(info.Object)
 		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 
 		// Serialize the object with the annotation applied.
 		obj, err := resource.
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
+			WithFieldValidation(o.validationDirective).
+			WithSubresource(o.Subresource).
 			Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
@@ -307,9 +319,10 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 }
 
 func (o *ReplaceOptions) forceReplace() error {
+	stdinInUse := false
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
-			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
+			tempDir, err := os.MkdirTemp("", "kubectl_replace_")
 			if err != nil {
 				return err
 			}
@@ -320,17 +333,22 @@ func (o *ReplaceOptions) forceReplace() error {
 				return err
 			}
 			o.DeleteOptions.FilenameOptions.Filenames[i] = tempFilename
+			stdinInUse = true
 		}
 	}
 
-	r := o.Builder().
+	b := o.Builder().
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
-		Flatten().
-		Do()
+		Subresource(o.Subresource).
+		Flatten()
+	if stdinInUse {
+		b = b.StdinInUse()
+	}
+	r := b.Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -359,14 +377,18 @@ func (o *ReplaceOptions) forceReplace() error {
 		return err
 	}
 
-	r = o.Builder().
+	b = o.Builder().
 		Unstructured().
 		Schema(o.Schema).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
-		Flatten().
-		Do()
+		Subresource(o.Subresource).
+		Flatten()
+	if stdinInUse {
+		b = b.StdinInUse()
+	}
+	r = b.Do()
 	err = r.Err()
 	if err != nil {
 		return err
@@ -388,6 +410,7 @@ func (o *ReplaceOptions) forceReplace() error {
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).
 			WithFieldManager(o.fieldManager).
+			WithFieldValidation(o.validationDirective).
 			Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err

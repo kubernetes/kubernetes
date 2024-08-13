@@ -18,15 +18,16 @@ package raw
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
+	inotify "k8s.io/utils/inotify"
+
+	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/watcher"
-	inotify "k8s.io/utils/inotify"
 
 	"k8s.io/klog/v2"
 )
@@ -35,8 +36,6 @@ type rawContainerWatcher struct {
 	// Absolute path to the root of the cgroup hierarchies
 	cgroupPaths map[string]string
 
-	cgroupSubsystems *libcontainer.CgroupSubsystems
-
 	// Inotify event watcher.
 	watcher *common.InotifyWatcher
 
@@ -44,12 +43,12 @@ type rawContainerWatcher struct {
 	stopWatcher chan error
 }
 
-func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
-	cgroupSubsystems, err := libcontainer.GetAllCgroupSubsystems()
+func NewRawContainerWatcher(includedMetrics container.MetricSet) (watcher.ContainerWatcher, error) {
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
-	if len(cgroupSubsystems.Mounts) == 0 {
+	if len(cgroupSubsystems) == 0 {
 		return nil, fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
@@ -59,10 +58,9 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 	}
 
 	rawWatcher := &rawContainerWatcher{
-		cgroupPaths:      common.MakeCgroupPaths(cgroupSubsystems.MountPoints, "/"),
-		cgroupSubsystems: &cgroupSubsystems,
-		watcher:          watcher,
-		stopWatcher:      make(chan error),
+		cgroupPaths: cgroupSubsystems,
+		watcher:     watcher,
+		stopWatcher: make(chan error),
 	}
 
 	return rawWatcher, nil
@@ -70,11 +68,19 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 
 func (w *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error {
 	// Watch this container (all its cgroups) and all subdirectories.
+	watched := make([]string, 0)
 	for _, cgroupPath := range w.cgroupPaths {
 		_, err := w.watchDirectory(events, cgroupPath, "/")
 		if err != nil {
+			for _, watchedCgroupPath := range watched {
+				_, removeErr := w.watcher.RemoveWatch("/", watchedCgroupPath)
+				if removeErr != nil {
+					klog.Warningf("Failed to remove inotify watch for %q with error: %v", watchedCgroupPath, removeErr)
+				}
+			}
 			return err
 		}
+		watched = append(watched, cgroupPath)
 	}
 
 	// Process the events received from the kernel.
@@ -133,7 +139,7 @@ func (w *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent,
 
 	// TODO(vmarmol): We should re-do this once we're done to ensure directories were not added in the meantime.
 	// Watch subdirectories as well.
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return alreadyWatching, err
 	}
@@ -187,8 +193,8 @@ func (w *rawContainerWatcher) processEvent(event *inotify.Event, events chan wat
 
 	// Derive the container name from the path name.
 	var containerName string
-	for _, mount := range w.cgroupSubsystems.Mounts {
-		mountLocation := path.Clean(mount.Mountpoint) + "/"
+	for _, mount := range w.cgroupPaths {
+		mountLocation := path.Clean(mount) + "/"
 		if strings.HasPrefix(event.Name, mountLocation) {
 			containerName = event.Name[len(mountLocation)-1:]
 			break

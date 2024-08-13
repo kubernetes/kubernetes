@@ -3,26 +3,27 @@ package hcn
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Microsoft/hcsshim/internal/guid"
+
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
 )
 
-// Route is assoicated with a subnet.
+// Route is associated with a subnet.
 type Route struct {
 	NextHop           string `json:",omitempty"`
 	DestinationPrefix string `json:",omitempty"`
 	Metric            uint16 `json:",omitempty"`
 }
 
-// Subnet is assoicated with a Ipam.
+// Subnet is associated with a Ipam.
 type Subnet struct {
 	IpAddressPrefix string            `json:",omitempty"`
 	Policies        []json.RawMessage `json:",omitempty"`
 	Routes          []Route           `json:",omitempty"`
 }
 
-// Ipam (Internet Protocol Addres Management) is assoicated with a network
+// Ipam (Internet Protocol Address Management) is associated with a network
 // and represents the address space(s) of a network.
 type Ipam struct {
 	Type    string   `json:",omitempty"` // Ex: Static, DHCP
@@ -35,12 +36,12 @@ type MacRange struct {
 	EndMacAddress   string `json:",omitempty"`
 }
 
-// MacPool is assoicated with a network and represents pool of MacRanges.
+// MacPool is associated with a network and represents pool of MacRanges.
 type MacPool struct {
 	Ranges []MacRange `json:",omitempty"`
 }
 
-// Dns (Domain Name System is associated with a network.
+// Dns (Domain Name System is associated with a network).
 type Dns struct {
 	Domain     string   `json:",omitempty"`
 	Search     []string `json:",omitempty"`
@@ -81,6 +82,7 @@ type HostComputeNetwork struct {
 	Dns           Dns             `json:",omitempty"`
 	Ipams         []Ipam          `json:",omitempty"`
 	Flags         NetworkFlags    `json:",omitempty"` // 0: None
+	Health        Health          `json:",omitempty"`
 	SchemaVersion SchemaVersion   `json:",omitempty"`
 }
 
@@ -132,6 +134,12 @@ func getNetwork(networkGuid guid.GUID, query string) (*HostComputeNetwork, error
 	}
 	// Convert output to HostComputeNetwork
 	var outputNetwork HostComputeNetwork
+
+	// If HNS sets the network type to NAT (i.e. '0' in HNS.Schema.Network.NetworkMode),
+	// the value will be omitted from the JSON blob. We therefore need to initialize NAT here before
+	// unmarshaling the JSON blob.
+	outputNetwork.Type = NAT
+
 	if err := json.Unmarshal([]byte(properties), &outputNetwork); err != nil {
 		return nil, err
 	}
@@ -196,6 +204,12 @@ func createNetwork(settings string) (*HostComputeNetwork, error) {
 	}
 	// Convert output to HostComputeNetwork
 	var outputNetwork HostComputeNetwork
+
+	// If HNS sets the network type to NAT (i.e. '0' in HNS.Schema.Network.NetworkMode),
+	// the value will be omitted from the JSON blob. We therefore need to initialize NAT here before
+	// unmarshaling the JSON blob.
+	outputNetwork.Type = NAT
+
 	if err := json.Unmarshal([]byte(properties), &outputNetwork); err != nil {
 		return nil, err
 	}
@@ -203,7 +217,10 @@ func createNetwork(settings string) (*HostComputeNetwork, error) {
 }
 
 func modifyNetwork(networkId string, settings string) (*HostComputeNetwork, error) {
-	networkGuid := guid.FromString(networkId)
+	networkGuid, err := guid.FromString(networkId)
+	if err != nil {
+		return nil, errInvalidNetworkID
+	}
 	// Open Network
 	var (
 		networkHandle    hcnNetwork
@@ -237,6 +254,12 @@ func modifyNetwork(networkId string, settings string) (*HostComputeNetwork, erro
 	}
 	// Convert output to HostComputeNetwork
 	var outputNetwork HostComputeNetwork
+
+	// If HNS sets the network type to NAT (i.e. '0' in HNS.Schema.Network.NetworkMode),
+	// the value will be omitted from the JSON blob. We therefore need to initialize NAT here before
+	// unmarshaling the JSON blob.
+	outputNetwork.Type = NAT
+
 	if err := json.Unmarshal([]byte(properties), &outputNetwork); err != nil {
 		return nil, err
 	}
@@ -244,7 +267,10 @@ func modifyNetwork(networkId string, settings string) (*HostComputeNetwork, erro
 }
 
 func deleteNetwork(networkId string) error {
-	networkGuid := guid.FromString(networkId)
+	networkGuid, err := guid.FromString(networkId)
+	if err != nil {
+		return errInvalidNetworkID
+	}
 	var resultBuffer *uint16
 	hr := hcnDeleteNetwork(&networkGuid, &resultBuffer)
 	if err := checkForErrors("hcnDeleteNetwork", hr, resultBuffer); err != nil {

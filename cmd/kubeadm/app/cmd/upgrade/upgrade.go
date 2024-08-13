@@ -17,11 +17,13 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -54,13 +56,13 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Upgrade your cluster smoothly to a newer version with this command",
-		RunE:  cmdutil.SubCmdRunE("upgrade"),
+		Run:   cmdutil.SubCmdRun(),
 	}
 
-	cmd.AddCommand(NewCmdApply(flags))
-	cmd.AddCommand(NewCmdPlan(flags))
-	cmd.AddCommand(NewCmdDiff(out))
-	cmd.AddCommand(NewCmdNode())
+	cmd.AddCommand(newCmdApply(flags))
+	cmd.AddCommand(newCmdPlan(flags))
+	cmd.AddCommand(newCmdDiff(out))
+	cmd.AddCommand(newCmdNode(out))
 	return cmd
 }
 
@@ -71,6 +73,8 @@ func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	fs.BoolVar(&flags.allowExperimentalUpgrades, "allow-experimental-upgrades", flags.allowExperimentalUpgrades, "Show unstable versions of Kubernetes as an upgrade alternative and allow upgrading to an alpha/beta/release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
-	options.AddFeatureGatesStringFlag(fs, &flags.featureGatesString)
+	options.AddFeatureGatesStringFlag(fs, &flags.featureGatesString) // TODO: remove in 1.32
+	_ = fs.MarkDeprecated(options.FeatureGatesString, fmt.Sprintf("This flag is deprecated and no-op now. It will be removed in a future release. The upgrade workflow is not designed to reconfigure the cluster. "+
+		"Please edit the 'featureGates' field of ClusterConfiguration which is defined in the %s/%s ConfigMap instead.", metav1.NamespaceSystem, kubeadmconstants.KubeadmConfigConfigMap))
 	options.AddIgnorePreflightErrorsFlag(fs, &flags.ignorePreflightErrors)
 }

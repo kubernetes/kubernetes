@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,29 +28,20 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"k8s.io/klog/v2"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/webhook"
 	pluginbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
-	plugindynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
-	pluginenforced "k8s.io/apiserver/plugin/pkg/audit/dynamic/enforced"
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 	plugintruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	pluginwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -80,7 +72,6 @@ type AuditOptions struct {
 	// Plugin options
 	LogOptions     AuditLogOptions
 	WebhookOptions AuditWebhookOptions
-	DynamicOptions AuditDynamicOptions
 }
 
 const (
@@ -130,6 +121,7 @@ type AuditLogOptions struct {
 	MaxBackups int
 	MaxSize    int
 	Format     string
+	Compress   bool
 
 	BatchOptions    AuditBatchOptions
 	TruncateOptions AuditTruncateOptions
@@ -150,20 +142,10 @@ type AuditWebhookOptions struct {
 	GroupVersionString string
 }
 
-// AuditDynamicOptions control the configuration of dynamic backends for audit events
-type AuditDynamicOptions struct {
-	// Enabled tells whether the dynamic audit capability is enabled.
-	Enabled bool
-
-	// Configuration for batching backend. This is currently only used as an override
-	// for integration tests
-	BatchConfig *pluginbuffered.BatchConfig
-}
-
 func NewAuditOptions() *AuditOptions {
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{
-			InitialBackoff: pluginwebhook.DefaultInitialBackoff,
+			InitialBackoff: pluginwebhook.DefaultInitialBackoffDelay,
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBatch,
 				BatchConfig: defaultWebhookBatchConfig(),
@@ -179,10 +161,6 @@ func NewAuditOptions() *AuditOptions {
 			},
 			TruncateOptions:    NewAuditTruncateOptions(),
 			GroupVersionString: "audit.k8s.io/v1",
-		},
-		DynamicOptions: AuditDynamicOptions{
-			Enabled:     false,
-			BatchConfig: plugindynamic.NewDefaultWebhookBatchConfig(),
 		},
 	}
 }
@@ -206,7 +184,6 @@ func (o *AuditOptions) Validate() []error {
 	var allErrors []error
 	allErrors = append(allErrors, o.LogOptions.Validate()...)
 	allErrors = append(allErrors, o.WebhookOptions.Validate()...)
-	allErrors = append(allErrors, o.DynamicOptions.Validate()...)
 
 	return allErrors
 }
@@ -247,8 +224,6 @@ func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) e
 }
 
 var knownGroupVersions = []schema.GroupVersion{
-	auditv1alpha1.SchemeGroupVersion,
-	auditv1beta1.SchemeGroupVersion,
 	auditv1.SchemeGroupVersion,
 }
 
@@ -259,6 +234,9 @@ func validateGroupVersionString(groupVersion string) error {
 	}
 	if !knownGroupVersion(gv) {
 		return fmt.Errorf("invalid group version, allowed versions are %q", knownGroupVersions)
+	}
+	if gv != auditv1.SchemeGroupVersion {
+		klog.Warningf("%q is deprecated and will be removed in a future release, use %q instead", gv, auditv1.SchemeGroupVersion)
 	}
 	return nil
 }
@@ -286,15 +264,10 @@ func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 	o.WebhookOptions.AddFlags(fs)
 	o.WebhookOptions.BatchOptions.AddFlags(pluginwebhook.PluginName, fs)
 	o.WebhookOptions.TruncateOptions.AddFlags(pluginwebhook.PluginName, fs)
-	o.DynamicOptions.AddFlags(fs)
 }
 
 func (o *AuditOptions) ApplyTo(
 	c *server.Config,
-	kubeClientConfig *restclient.Config,
-	informers informers.SharedInformerFactory,
-	processInfo *ProcessInfo,
-	webhookOptions *WebhookOptions,
 ) error {
 	if o == nil {
 		return nil
@@ -303,16 +276,20 @@ func (o *AuditOptions) ApplyTo(
 		return fmt.Errorf("server config must be non-nil")
 	}
 
-	// 1. Build policy checker
-	checker, err := o.newPolicyChecker()
+	// 1. Build policy evaluator
+	evaluator, err := o.newPolicyRuleEvaluator()
 	if err != nil {
 		return err
 	}
 
 	// 2. Build log backend
 	var logBackend audit.Backend
-	if w := o.LogOptions.getWriter(); w != nil {
-		if checker == nil {
+	w, err := o.LogOptions.getWriter()
+	if err != nil {
+		return err
+	}
+	if w != nil {
+		if evaluator == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for log backend")
 		} else {
 			logBackend = o.LogOptions.newBackend(w)
@@ -322,11 +299,12 @@ func (o *AuditOptions) ApplyTo(
 	// 3. Build webhook backend
 	var webhookBackend audit.Backend
 	if o.WebhookOptions.enabled() {
-		if checker == nil {
+		if evaluator == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for webhook backend")
 		} else {
 			if c.EgressSelector != nil {
-				egressDialer, err := c.EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
+				var egressDialer utilnet.DialFunc
+				egressDialer, err = c.EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 				if err != nil {
 					return err
 				}
@@ -347,29 +325,13 @@ func (o *AuditOptions) ApplyTo(
 
 	// 4. Apply dynamic options.
 	var dynamicBackend audit.Backend
-	if o.DynamicOptions.enabled() {
-		// if dynamic is enabled the webhook and log backends need to be wrapped in an enforced backend with the static policy
-		if webhookBackend != nil {
-			webhookBackend = pluginenforced.NewBackend(webhookBackend, checker)
-		}
-		if logBackend != nil {
-			logBackend = pluginenforced.NewBackend(logBackend, checker)
-		}
-		// build dynamic backend
-		dynamicBackend, checker, err = o.DynamicOptions.newBackend(c.ExternalAddress, kubeClientConfig, informers, processInfo, webhookOptions)
-		if err != nil {
-			return err
-		}
-		// union dynamic and webhook backends so that truncate options can be applied to both
-		dynamicBackend = appendBackend(webhookBackend, dynamicBackend)
-		dynamicBackend = o.WebhookOptions.TruncateOptions.wrapBackend(dynamicBackend, groupVersion)
-	} else if webhookBackend != nil {
+	if webhookBackend != nil {
 		// if only webhook is enabled wrap it in the truncate options
 		dynamicBackend = o.WebhookOptions.TruncateOptions.wrapBackend(webhookBackend, groupVersion)
 	}
 
-	// 5. Set the policy checker
-	c.AuditPolicyChecker = checker
+	// 5. Set the policy rule evaluator
+	c.AuditPolicyRuleEvaluator = evaluator
 
 	// 6. Join the log backend with the webhooks
 	c.AuditBackend = appendBackend(logBackend, dynamicBackend)
@@ -380,7 +342,7 @@ func (o *AuditOptions) ApplyTo(
 	return nil
 }
 
-func (o *AuditOptions) newPolicyChecker() (policy.Checker, error) {
+func (o *AuditOptions) newPolicyRuleEvaluator() (audit.PolicyRuleEvaluator, error) {
 	if o.PolicyFile == "" {
 		return nil, nil
 	}
@@ -389,7 +351,7 @@ func (o *AuditOptions) newPolicyChecker() (policy.Checker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading audit policy file: %v", err)
 	}
-	return policy.NewChecker(p), nil
+	return policy.NewPolicyRuleEvaluator(p), nil
 }
 
 func (o *AuditBatchOptions) AddFlags(pluginName string, fs *pflag.FlagSet) {
@@ -476,7 +438,7 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.MaxAge, "audit-log-maxage", o.MaxAge,
 		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
-		"The maximum number of old audit log files to retain.")
+		"The maximum number of old audit log files to retain. Setting a value of 0 will mean there's no restriction on the number of files.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
 	fs.StringVar(&o.Format, "audit-log-format", o.Format,
@@ -485,6 +447,7 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 			strings.Join(pluginlog.AllowedFormats, ",")+".")
 	fs.StringVar(&o.GroupVersionString, "audit-log-version", o.GroupVersionString,
 		"API group and version used for serializing audit events written to log.")
+	fs.BoolVar(&o.Compress, "audit-log-compress", o.Compress, "If set, the rotated log files will be compressed using gzip.")
 }
 
 func (o *AuditLogOptions) Validate() []error {
@@ -507,14 +470,7 @@ func (o *AuditLogOptions) Validate() []error {
 	}
 
 	// Check log format
-	validFormat := false
-	for _, f := range pluginlog.AllowedFormats {
-		if f == o.Format {
-			validFormat = true
-			break
-		}
-	}
-	if !validFormat {
+	if !sets.NewString(pluginlog.AllowedFormats...).Has(o.Format) {
 		allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 	}
 
@@ -537,21 +493,38 @@ func (o *AuditLogOptions) enabled() bool {
 	return o != nil && o.Path != ""
 }
 
-func (o *AuditLogOptions) getWriter() io.Writer {
+func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 	if !o.enabled() {
-		return nil
+		return nil, nil
 	}
 
-	var w io.Writer = os.Stdout
-	if o.Path != "-" {
-		w = &lumberjack.Logger{
-			Filename:   o.Path,
-			MaxAge:     o.MaxAge,
-			MaxBackups: o.MaxBackups,
-			MaxSize:    o.MaxSize,
-		}
+	if o.Path == "-" {
+		return os.Stdout, nil
 	}
-	return w
+
+	if err := o.ensureLogFile(); err != nil {
+		return nil, fmt.Errorf("ensureLogFile: %w", err)
+	}
+
+	return &lumberjack.Logger{
+		Filename:   o.Path,
+		MaxAge:     o.MaxAge,
+		MaxBackups: o.MaxBackups,
+		MaxSize:    o.MaxSize,
+		Compress:   o.Compress,
+	}, nil
+}
+
+func (o *AuditLogOptions) ensureLogFile() error {
+	if err := os.MkdirAll(filepath.Dir(o.Path), 0700); err != nil {
+		return err
+	}
+	mode := os.FileMode(0600)
+	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 func (o *AuditLogOptions) newBackend(w io.Writer) audit.Backend {
@@ -602,72 +575,12 @@ func (o *AuditWebhookOptions) enabled() bool {
 // this is done so that the same trucate backend can wrap both the webhook and dynamic backends
 func (o *AuditWebhookOptions) newUntruncatedBackend(customDial utilnet.DialFunc) (audit.Backend, error) {
 	groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, groupVersion, o.InitialBackoff, customDial)
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, groupVersion, webhook.DefaultRetryBackoffWithInitialDelay(o.InitialBackoff), customDial)
 	if err != nil {
 		return nil, fmt.Errorf("initializing audit webhook: %v", err)
 	}
 	webhook = o.BatchOptions.wrapBackend(webhook)
 	return webhook, nil
-}
-
-func (o *AuditDynamicOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Enabled, "audit-dynamic-configuration", o.Enabled,
-		"Enables dynamic audit configuration. This feature also requires the DynamicAuditing feature flag")
-}
-
-func (o *AuditDynamicOptions) enabled() bool {
-	return o.Enabled && utilfeature.DefaultFeatureGate.Enabled(features.DynamicAuditing)
-}
-
-func (o *AuditDynamicOptions) Validate() []error {
-	var allErrors []error
-	if o.Enabled && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicAuditing) {
-		allErrors = append(allErrors, fmt.Errorf("--audit-dynamic-configuration set, but DynamicAuditing feature gate is not enabled"))
-	}
-	return allErrors
-}
-
-func (o *AuditDynamicOptions) newBackend(
-	hostname string,
-	kubeClientConfig *restclient.Config,
-	informers informers.SharedInformerFactory,
-	processInfo *ProcessInfo,
-	webhookOptions *WebhookOptions,
-) (audit.Backend, policy.Checker, error) {
-	if err := validateProcessInfo(processInfo); err != nil {
-		return nil, nil, err
-	}
-	clientset, err := kubernetes.NewForConfig(kubeClientConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-	if webhookOptions == nil {
-		webhookOptions = NewWebhookOptions()
-	}
-	checker := policy.NewDynamicChecker()
-	informer := informers.Auditregistration().V1alpha1().AuditSinks()
-	eventSink := &v1core.EventSinkImpl{Interface: clientset.CoreV1().Events(processInfo.Namespace)}
-
-	dc := &plugindynamic.Config{
-		Informer:       informer,
-		BufferedConfig: o.BatchConfig,
-		EventConfig: plugindynamic.EventConfig{
-			Sink: eventSink,
-			Source: corev1.EventSource{
-				Component: processInfo.Name,
-				Host:      hostname,
-			},
-		},
-		WebhookConfig: plugindynamic.WebhookConfig{
-			AuthInfoResolverWrapper: webhookOptions.AuthInfoResolverWrapper,
-			ServiceResolver:         webhookOptions.ServiceResolver,
-		},
-	}
-	backend, err := plugindynamic.NewBackend(dc)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not create dynamic audit backend: %v", err)
-	}
-	return backend, checker, nil
 }
 
 // defaultWebhookBatchConfig returns the default BatchConfig used by the Webhook backend.

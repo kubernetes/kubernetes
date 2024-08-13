@@ -2,41 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris
+//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris || zos
 
 // Socket control messages
 
 package unix
 
 import (
-	"runtime"
 	"unsafe"
 )
-
-// Round the length of a raw sockaddr up to align it properly.
-func cmsgAlignOf(salen int) int {
-	salign := SizeofPtr
-
-	switch runtime.GOOS {
-	case "aix":
-		// There is no alignment on AIX.
-		salign = 1
-	case "darwin", "dragonfly", "solaris", "illumos":
-		// NOTE: It seems like 64-bit Darwin, DragonFly BSD,
-		// illumos, and Solaris kernels still require 32-bit
-		// aligned access to network subsystem.
-		if SizeofPtr == 8 {
-			salign = 4
-		}
-	case "netbsd", "openbsd":
-		// NetBSD and OpenBSD armv7 require 64-bit alignment.
-		if runtime.GOARCH == "arm" {
-			salign = 8
-		}
-	}
-
-	return (salen + salign - 1) & ^(salign - 1)
-}
 
 // CmsgLen returns the value to store in the Len field of the Cmsghdr
 // structure, taking into account any necessary alignment.
@@ -50,8 +24,8 @@ func CmsgSpace(datalen int) int {
 	return cmsgAlignOf(SizeofCmsghdr) + cmsgAlignOf(datalen)
 }
 
-func cmsgData(h *Cmsghdr) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(unsafe.Pointer(h)) + uintptr(cmsgAlignOf(SizeofCmsghdr)))
+func (h *Cmsghdr) data(offset uintptr) unsafe.Pointer {
+	return unsafe.Pointer(uintptr(unsafe.Pointer(h)) + uintptr(cmsgAlignOf(SizeofCmsghdr)) + offset)
 }
 
 // SocketControlMessage represents a socket control message.
@@ -77,6 +51,20 @@ func ParseSocketControlMessage(b []byte) ([]SocketControlMessage, error) {
 	return msgs, nil
 }
 
+// ParseOneSocketControlMessage parses a single socket control message from b, returning the message header,
+// message data (a slice of b), and the remainder of b after that single message.
+// When there are no remaining messages, len(remainder) == 0.
+func ParseOneSocketControlMessage(b []byte) (hdr Cmsghdr, data []byte, remainder []byte, err error) {
+	h, dbuf, err := socketControlMessageHeaderAndData(b)
+	if err != nil {
+		return Cmsghdr{}, nil, nil, err
+	}
+	if i := cmsgAlignOf(int(h.Len)); i < len(b) {
+		remainder = b[i:]
+	}
+	return *h, dbuf, remainder, nil
+}
+
 func socketControlMessageHeaderAndData(b []byte) (*Cmsghdr, []byte, error) {
 	h := (*Cmsghdr)(unsafe.Pointer(&b[0]))
 	if h.Len < SizeofCmsghdr || uint64(h.Len) > uint64(len(b)) {
@@ -94,10 +82,8 @@ func UnixRights(fds ...int) []byte {
 	h.Level = SOL_SOCKET
 	h.Type = SCM_RIGHTS
 	h.SetLen(CmsgLen(datalen))
-	data := cmsgData(h)
-	for _, fd := range fds {
-		*(*int32)(data) = int32(fd)
-		data = unsafe.Pointer(uintptr(data) + 4)
+	for i, fd := range fds {
+		*(*int32)(h.data(4 * uintptr(i))) = int32(fd)
 	}
 	return b
 }

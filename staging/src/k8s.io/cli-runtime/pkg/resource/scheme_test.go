@@ -27,6 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+func gvk(group, version, kind string) *schema.GroupVersionKind {
+	return &schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
+}
+
 func TestDynamicCodecDecode(t *testing.T) {
 	testcases := []struct {
 		name string
@@ -41,25 +45,25 @@ func TestDynamicCodecDecode(t *testing.T) {
 		{
 			name:      "v1 Status",
 			data:      []byte(`{"apiVersion":"v1","kind":"Status"}`),
-			expectGVK: &schema.GroupVersionKind{"", "v1", "Status"},
+			expectGVK: gvk("", "v1", "Status"),
 			expectObj: &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}},
 		},
 		{
 			name:      "meta.k8s.io/v1 Status",
 			data:      []byte(`{"apiVersion":"meta.k8s.io/v1","kind":"Status"}`),
-			expectGVK: &schema.GroupVersionKind{"meta.k8s.io", "v1", "Status"},
+			expectGVK: gvk("meta.k8s.io", "v1", "Status"),
 			expectObj: &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "meta.k8s.io/v1", Kind: "Status"}},
 		},
 		{
 			name:      "example.com/v1 Status",
 			data:      []byte(`{"apiVersion":"example.com/v1","kind":"Status"}`),
-			expectGVK: &schema.GroupVersionKind{"example.com", "v1", "Status"},
+			expectGVK: gvk("example.com", "v1", "Status"),
 			expectObj: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "example.com/v1", "kind": "Status"}},
 		},
 		{
 			name:      "example.com/v1 Foo",
 			data:      []byte(`{"apiVersion":"example.com/v1","kind":"Foo"}`),
-			expectGVK: &schema.GroupVersionKind{"example.com", "v1", "Foo"},
+			expectGVK: gvk("example.com", "v1", "Foo"),
 			expectObj: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "example.com/v1", "kind": "Foo"}},
 		},
 	}

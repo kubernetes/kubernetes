@@ -1,18 +1,5 @@
 rules:
-  - selectorRegexp: k8s[.]io/kubelet/
-    allowedPrefixes:
-      - k8s.io/kubelet/config/v1beta1
-  - selectorRegexp: k8s[.]io/kube-openapi/
-    allowedPrefixes:
-      - k8s.io/kube-openapi/pkg/util/proto
-  - selectorRegexp: k8s[.]io/kube-proxy/
-    allowedPrefixes:
-      - k8s.io/kube-proxy/config/v1alpha1
+  # prevent any k8s.io/kubernetes imports outside of this package
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
       - k8s.io/kubernetes/cmd/kubeadm
-  - selectorRegexp: gopkg[.]in
-    allowedPrefixes:
-      - gopkg.in/inf.v0
-      - gopkg.in/square/go-jose.v2
-      - gopkg.in/yaml.v2

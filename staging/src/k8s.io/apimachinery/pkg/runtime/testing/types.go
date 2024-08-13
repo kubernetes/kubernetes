@@ -261,6 +261,11 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 	return nil
 }
 
+func (obj *Unstructured) EachListItemWithAlloc(fn func(runtime.Object) error) error {
+	// EachListItem has allocated a new Object for the user, we can use it directly.
+	return obj.EachListItem(fn)
+}
+
 func (obj *Unstructured) NewEmptyInstance() runtime.Unstructured {
 	out := new(Unstructured)
 	if obj != nil {

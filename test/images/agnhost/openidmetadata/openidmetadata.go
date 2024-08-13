@@ -21,14 +21,19 @@ package openidmetadata
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"runtime"
+	"time"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
 
@@ -43,32 +48,58 @@ var CmdTestServiceAccountIssuerDiscovery = &cobra.Command{
 }
 
 var (
-	tokenPath          string
-	audience           string
-	inClusterDiscovery bool
+	tokenPath string
+	audience  string
 )
 
 func init() {
 	fs := CmdTestServiceAccountIssuerDiscovery.Flags()
 	fs.StringVar(&tokenPath, "token-path", "", "Path to read service account token from.")
 	fs.StringVar(&audience, "audience", "", "Audience to check on received token.")
-	fs.BoolVar(&inClusterDiscovery, "in-cluster-discovery", false,
-		"Includes the in-cluster bearer token in request headers. "+
-			"Use when validating against API server's discovery endpoints, "+
-			"which require authentication.")
 }
 
 func main(cmd *cobra.Command, args []string) {
-	ctx, err := withOAuth2Client(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	raw, err := gettoken()
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("OK: Got token")
+
+	/*
+		  To support both in-cluster discovery and external (non kube-apiserver)
+		  discovery:
+		  1. Attempt with in-cluster discovery. Only trust Cluster CA.
+		     If pass, exit early, successfully. This attempt includes the bearer
+			 token, so we only trust the Cluster CA to avoid sending tokens to
+			 some external endpoint by accident.
+		  2. If in-cluster discovery doesn't pass, then try again assuming both
+		     discovery doc and JWKS endpoints are external rather than being
+			 served from kube-apiserver. This attempt does not pass the bearer
+			 token at all.
+	*/
+
+	log.Print("validating with in-cluster discovery")
+	inClusterCtx, err := withInClusterOauth2Client(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := validate(inClusterCtx, raw); err == nil {
+		os.Exit(0)
+	} else {
+		log.Print("failed to validate with in-cluster discovery: ", err)
+	}
+
+	log.Print("falling back to validating with external discovery")
+	externalCtx, err := withExternalOAuth2Client(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := validate(externalCtx, raw); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func validate(ctx context.Context, raw string) error {
 	tok, err := jwt.ParseSigned(raw)
 	if err != nil {
 		log.Fatal(err)
@@ -80,24 +111,34 @@ func main(cmd *cobra.Command, args []string) {
 	log.Printf("OK: got issuer %s", unsafeClaims.Issuer)
 	log.Printf("Full, not-validated claims: \n%#v", unsafeClaims)
 
+	if runtime.GOOS == "windows" {
+		if err := ensureWindowsDNSAvailability(unsafeClaims.Issuer); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	iss, err := oidc.NewProvider(ctx, unsafeClaims.Issuer)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Printf("OK: Constructed OIDC provider for issuer %v", unsafeClaims.Issuer)
 
-	validTok, err := iss.Verifier(&oidc.Config{ClientID: audience}).Verify(ctx, raw)
+	validTok, err := iss.Verifier(&oidc.Config{
+		ClientID:             audience,
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
+	}).Verify(ctx, raw)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Print("OK: Validated signature on JWT")
 
 	var safeClaims claims
 	if err := validTok.Claims(&safeClaims); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Print("OK: Got valid claims from token!")
 	log.Printf("Full, validated claims: \n%#v", &safeClaims)
+	return nil
 }
 
 type kubeName struct {
@@ -121,44 +162,61 @@ func (k *claims) String() string {
 }
 
 func gettoken() (string, error) {
-	b, err := ioutil.ReadFile(tokenPath)
+	b, err := os.ReadFile(tokenPath)
 	return string(b), err
 }
 
-// withOAuth2Client returns a context that includes an HTTP Client, under the
-// oauth2.HTTPClient key. If  --in-cluster-discovery is true, the client will
-// use the Kubernetes InClusterConfig. Otherwise it will use
-// http.DefaultTransport.
-// The `oidc` library respects the oauth2.HTTPClient context key; if it is set,
-// the library will use the provided http.Client rather than the default
-// HTTP client.
-// This allows us to ensure requests get routed to the API server for
-// --in-cluster-discovery, in a client configured with the appropriate CA.
-func withOAuth2Client(context.Context) (context.Context, error) {
-	// TODO(mtaufen): Someday, might want to change this so that we can test
-	// TokenProjection with an API audience set to the external provider with
-	// requests against external endpoints (in which case we'd send
-	// a different token with a non-Kubernetes audience).
-
-	// By default, use the default http transport with the system root bundle,
+func withExternalOAuth2Client(ctx context.Context) (context.Context, error) {
+	// Use the default http transport with the system root bundle,
 	// since it's validating against the external internet.
-	rt := http.DefaultTransport
-	if inClusterDiscovery {
-		// If in-cluster discovery, then use the in-cluster config so we can
-		// authenticate with the API server.
-		cfg, err := rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-		rt, err = rest.TransportFor(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("could not get roundtripper: %v", err)
-		}
+	return context.WithValue(ctx,
+		// The `oidc` library respects the oauth2.HTTPClient context key; if it is set,
+		// the library will use the provided http.Client rather than the default HTTP client.
+		oauth2.HTTPClient, &http.Client{
+			Transport: http.DefaultTransport,
+		}), nil
+}
+
+func withInClusterOauth2Client(ctx context.Context) (context.Context, error) {
+	// Use the in-cluster config so we can trust and authenticate with kube-apiserver
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
 	}
 
-	ctx := context.WithValue(context.Background(),
+	rt, err := rest.TransportFor(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not get roundtripper: %v", err)
+	}
+
+	return context.WithValue(ctx,
+		// The `oidc` library respects the oauth2.HTTPClient context key; if it is set,
+		// the library will use the provided http.Client rather than the default HTTP client.
 		oauth2.HTTPClient, &http.Client{
 			Transport: rt,
-		})
-	return ctx, nil
+		}), nil
+}
+
+// DNS can be available sometime after the container starts due to the way
+// networking is set up for Windows nodes with dockershim as the container runtime.
+// In this case, we should make sure we are able to resolve the issuer before
+// invoking oidc.NewProvider.
+// See https://github.com/kubernetes/kubernetes/issues/99470 for more details.
+func ensureWindowsDNSAvailability(issuer string) error {
+	log.Println("Ensuring Windows DNS availability")
+
+	u, err := url.Parse(issuer)
+	if err != nil {
+		return err
+	}
+
+	return wait.PollImmediate(5*time.Second, 20*time.Second, func() (bool, error) {
+		ips, err := net.LookupHost(u.Host)
+		if err != nil {
+			log.Println(err)
+			return false, nil
+		}
+		log.Printf("OK: Resolved host %s: %v", u.Host, ips)
+		return true, nil
+	})
 }

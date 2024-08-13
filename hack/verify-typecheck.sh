@@ -23,17 +23,27 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-
-kube::golang::verify_go_version
-
 cd "${KUBE_ROOT}"
 
-make --no-print-directory -C "${KUBE_ROOT}" generated_files
+kube::golang::setup_env
+kube::util::require-jq
+
+if [[ $# == 0 ]]; then
+  # Doing it this way is MUCH faster than simply saying "all", and there doesn't
+  # seem to be a simpler way to express "this whole workspace".
+  packages=()
+  kube::util::read-array packages < <(
+      go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+  )
+  set -- "${packages[@]}"
+fi
 
 ret=0
-go run test/typecheck/main.go "$@" || ret=$?
+TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
+go run ./test/typecheck "$@" "--serial=$TYPECHECK_SERIAL" || ret=$?
+
 if [[ $ret -ne 0 ]]; then
-  echo "!!! Type Check has failed. This may cause cross platform build failures." >&2
+  echo "!!! Typecheck has failed. This may cause cross platform build failures." >&2
   echo "!!! Please see https://git.k8s.io/kubernetes/test/typecheck for more information." >&2
   exit 1
 fi

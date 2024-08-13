@@ -14,31 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockery
 package container
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
-var (
-	// TODO(yifan): Maybe set the them as parameters for NewCache().
-	defaultCachePeriod = time.Second * 2
-)
-
+// RuntimeCache is in interface for obtaining cached Pods.
 type RuntimeCache interface {
-	GetPods() ([]*Pod, error)
-	ForceUpdateIfOlder(time.Time) error
+	GetPods(context.Context) ([]*Pod, error)
+	ForceUpdateIfOlder(context.Context, time.Time) error
 }
 
 type podsGetter interface {
-	GetPods(bool) ([]*Pod, error)
+	GetPods(context.Context, bool) ([]*Pod, error)
 }
 
 // NewRuntimeCache creates a container runtime cache.
-func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
+func NewRuntimeCache(getter podsGetter, cachePeriod time.Duration) (RuntimeCache, error) {
 	return &runtimeCache{
-		getter: getter,
+		getter:      getter,
+		cachePeriod: cachePeriod,
 	}, nil
 }
 
@@ -50,6 +49,8 @@ type runtimeCache struct {
 	sync.Mutex
 	// The underlying container runtime used to update the cache.
 	getter podsGetter
+	// The interval after which the cache should be refreshed.
+	cachePeriod time.Duration
 	// Last time when cache was updated.
 	cacheTime time.Time
 	// The content of the cache.
@@ -58,28 +59,28 @@ type runtimeCache struct {
 
 // GetPods returns the cached pods if they are not outdated; otherwise, it
 // retrieves the latest pods and return them.
-func (r *runtimeCache) GetPods() ([]*Pod, error) {
+func (r *runtimeCache) GetPods(ctx context.Context) ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
-	if time.Since(r.cacheTime) > defaultCachePeriod {
-		if err := r.updateCache(); err != nil {
+	if time.Since(r.cacheTime) > r.cachePeriod {
+		if err := r.updateCache(ctx); err != nil {
 			return nil, err
 		}
 	}
 	return r.pods, nil
 }
 
-func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
+func (r *runtimeCache) ForceUpdateIfOlder(ctx context.Context, minExpectedCacheTime time.Time) error {
 	r.Lock()
 	defer r.Unlock()
 	if r.cacheTime.Before(minExpectedCacheTime) {
-		return r.updateCache()
+		return r.updateCache(ctx)
 	}
 	return nil
 }
 
-func (r *runtimeCache) updateCache() error {
-	pods, timestamp, err := r.getPodsWithTimestamp()
+func (r *runtimeCache) updateCache(ctx context.Context) error {
+	pods, timestamp, err := r.getPodsWithTimestamp(ctx)
 	if err != nil {
 		return err
 	}
@@ -88,9 +89,9 @@ func (r *runtimeCache) updateCache() error {
 }
 
 // getPodsWithTimestamp records a timestamp and retrieves pods from the getter.
-func (r *runtimeCache) getPodsWithTimestamp() ([]*Pod, time.Time, error) {
+func (r *runtimeCache) getPodsWithTimestamp(ctx context.Context) ([]*Pod, time.Time, error) {
 	// Always record the timestamp before getting the pods to avoid stale pods.
 	timestamp := time.Now()
-	pods, err := r.getter.GetPods(false)
+	pods, err := r.getter.GetPods(ctx, false)
 	return pods, timestamp, err
 }

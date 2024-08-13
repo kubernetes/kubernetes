@@ -1,5 +1,3 @@
-// +build !race
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -25,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -46,36 +45,36 @@ func TestMutationDetector(t *testing.T) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	addReceived := make(chan bool)
 	mutationFound := make(chan bool)
 
 	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
-	informer.cacheMutationDetector = &defaultCacheMutationDetector{
-		name:   "name",
-		period: 1 * time.Second,
+	detector := &defaultCacheMutationDetector{
+		name:           "name",
+		period:         1 * time.Second,
+		retainDuration: 2 * time.Minute,
 		failureFunc: func(message string) {
 			mutationFound <- true
 		},
 	}
-	informer.AddEventHandler(
-		ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				addReceived <- true
-			},
-		},
-	)
+	informer.cacheMutationDetector = detector
 	go informer.Run(stopCh)
 
 	fakeWatch.Add(pod)
 
-	select {
-	case <-addReceived:
-	}
+	wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		detector.addedObjsLock.Lock()
+		defer detector.addedObjsLock.Unlock()
+		return len(detector.addedObjs) > 0, nil
+	})
 
+	detector.compareObjectsLock.Lock()
 	pod.Labels["change"] = "true"
+	detector.compareObjectsLock.Unlock()
 
 	select {
 	case <-mutationFound:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("failed waiting for mutating detector")
 	}
 
 }

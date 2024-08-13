@@ -14,195 +14,235 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+// Package runtime provides the kubeadm container runtime implementation.
+package runtime
 
 import (
-	"path/filepath"
-	goruntime "runtime"
+	"context"
+	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
-
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	criapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	utilsexec "k8s.io/utils/exec"
 )
+
+// defaultKnownCRISockets holds the set of known CRI endpoints
+var defaultKnownCRISockets = []string{
+	constants.CRISocketContainerd,
+	constants.CRISocketCRIO,
+	constants.CRISocketDocker,
+}
 
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
-	IsDocker() bool
+	Connect() error
+	SetImpl(impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
 	PullImage(image string) error
-	ImageExists(image string) (bool, error)
+	PullImagesInParallel(images []string, ifNotPresent bool) error
+	ImageExists(image string) bool
+	SandboxImage() (string, error)
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
 type CRIRuntime struct {
-	exec      utilsexec.Interface
-	criSocket string
+	impl           impl
+	criSocket      string
+	runtimeService criapi.RuntimeService
+	imageService   criapi.ImageManagerService
 }
 
-// DockerRuntime is a struct that interfaces with the Docker daemon
-type DockerRuntime struct {
-	exec utilsexec.Interface
-}
+// defaultTimeout is the default timeout inherited by crictl
+const defaultTimeout = 2 * time.Second
 
 // NewContainerRuntime sets up and returns a ContainerRuntime struct
-func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (ContainerRuntime, error) {
-	var toolName string
-	var runtime ContainerRuntime
-
-	if criSocket != constants.DefaultDockerCRISocket {
-		toolName = "crictl"
-		// !!! temporary work around crictl warning:
-		// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
-		// please consider using full url format "unix:///var/run/crio/crio.sock"
-		if filepath.IsAbs(criSocket) && goruntime.GOOS != "windows" {
-			criSocket = "unix://" + criSocket
-		}
-		runtime = &CRIRuntime{execer, criSocket}
-	} else {
-		toolName = "docker"
-		runtime = &DockerRuntime{execer}
+func NewContainerRuntime(criSocket string) ContainerRuntime {
+	return &CRIRuntime{
+		impl:      &defaultImpl{},
+		criSocket: criSocket,
 	}
-
-	if _, err := execer.LookPath(toolName); err != nil {
-		return nil, errors.Wrapf(err, "%s is required for container runtime", toolName)
-	}
-
-	return runtime, nil
 }
 
-// IsDocker returns true if the runtime is docker
-func (runtime *CRIRuntime) IsDocker() bool {
-	return false
+// SetImpl can be used to set the internal implementation for testing purposes.
+func (runtime *CRIRuntime) SetImpl(impl impl) {
+	runtime.impl = impl
 }
 
-// IsDocker returns true if the runtime is docker
-func (runtime *DockerRuntime) IsDocker() bool {
-	return true
-}
-
-// IsRunning checks if runtime is running
-func (runtime *CRIRuntime) IsRunning() error {
-	if out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "info").CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
+// Connect establishes a connection with the CRI runtime.
+func (runtime *CRIRuntime) Connect() error {
+	runtimeService, err := runtime.impl.NewRemoteRuntimeService(runtime.criSocket, defaultTimeout)
+	if err != nil {
+		return errors.Wrap(err, "failed to create new CRI runtime service")
 	}
+	runtime.runtimeService = runtimeService
+
+	imageService, err := runtime.impl.NewRemoteImageService(runtime.criSocket, defaultTimeout)
+	if err != nil {
+		return errors.Wrap(err, "failed to create new CRI image service")
+	}
+	runtime.imageService = imageService
+
 	return nil
 }
 
-// IsRunning checks if runtime is running
-func (runtime *DockerRuntime) IsRunning() error {
-	if out, err := runtime.exec.Command("docker", "info").CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
+// IsRunning checks if runtime is running.
+func (runtime *CRIRuntime) IsRunning() error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	res, err := runtime.impl.Status(ctx, runtime.runtimeService, false)
+	if err != nil {
+		return errors.Wrap(err, "container runtime is not running")
 	}
+
+	for _, condition := range res.GetStatus().GetConditions() {
+		if condition.GetType() == runtimeapi.RuntimeReady && // NetworkReady will not be tested on purpose
+			!condition.GetStatus() {
+			return errors.Errorf(
+				"container runtime condition %q is not true. reason: %s, message: %s",
+				condition.GetType(), condition.GetReason(), condition.GetMessage(),
+			)
+		}
+	}
+
 	return nil
 }
 
 // ListKubeContainers lists running k8s CRI pods
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
-	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "pods", "-q").CombinedOutput()
-	if err != nil {
-		return nil, errors.Wrapf(err, "output: %s, error", string(out))
-	}
-	pods := []string{}
-	pods = append(pods, strings.Fields(string(out))...)
-	return pods, nil
-}
+	ctx, cancel := defaultContext()
+	defer cancel()
 
-// ListKubeContainers lists running k8s containers
-func (runtime *DockerRuntime) ListKubeContainers() ([]string, error) {
-	output, err := runtime.exec.Command("docker", "ps", "-a", "--filter", "name=k8s_", "-q").CombinedOutput()
-	return strings.Fields(string(output)), err
+	sandboxes, err := runtime.impl.ListPodSandbox(ctx, runtime.runtimeService, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list pod sandboxes")
+	}
+
+	pods := []string{}
+	for _, sandbox := range sandboxes {
+		pods = append(pods, sandbox.GetId())
+	}
+	return pods, nil
 }
 
 // RemoveContainers removes running k8s pods
 func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
-		out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "stopp", container).CombinedOutput()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
-		} else {
-			out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "rmp", container).CombinedOutput()
-			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+		var lastErr error
+		for i := 0; i < constants.RemoveContainerRetry; i++ {
+			klog.V(5).Infof("Attempting to remove container %v", container)
+
+			ctx, cancel := defaultContext()
+			if err := runtime.impl.StopPodSandbox(ctx, runtime.runtimeService, container); err != nil {
+				lastErr = errors.Wrapf(err, "failed to stop running pod %s", container)
+				cancel()
+				continue
 			}
-		}
-	}
-	return errorsutil.NewAggregate(errs)
-}
+			cancel()
 
-// RemoveContainers removes running containers
-func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
-	errs := []error{}
-	for _, container := range containers {
-		out, err := runtime.exec.Command("docker", "rm", "--force", "--volumes", container).CombinedOutput()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+			ctx, cancel = defaultContext()
+			if err := runtime.impl.RemovePodSandbox(ctx, runtime.runtimeService, container); err != nil {
+				lastErr = errors.Wrapf(err, "failed to remove pod %s", container)
+				cancel()
+				continue
+			}
+			cancel()
+
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			errs = append(errs, lastErr)
 		}
 	}
 	return errorsutil.NewAggregate(errs)
 }
 
 // PullImage pulls the image
-func (runtime *CRIRuntime) PullImage(image string) error {
-	var err error
-	var out []byte
+func (runtime *CRIRuntime) PullImage(image string) (err error) {
 	for i := 0; i < constants.PullImageRetry; i++ {
-		out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).CombinedOutput()
-		if err == nil {
+		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
 	}
-	return errors.Wrapf(err, "output: %s, error", out)
+	return errors.Wrapf(err, "failed to pull image %s", image)
 }
 
-// PullImage pulls the image
-func (runtime *DockerRuntime) PullImage(image string) error {
-	var err error
-	var out []byte
-	for i := 0; i < constants.PullImageRetry; i++ {
-		out, err = runtime.exec.Command("docker", "pull", image).CombinedOutput()
-		if err == nil {
-			return nil
+// PullImagesInParallel pulls a list of images in parallel
+func (runtime *CRIRuntime) PullImagesInParallel(images []string, ifNotPresent bool) error {
+	errs := pullImagesInParallelImpl(images, ifNotPresent, runtime.ImageExists, runtime.PullImage)
+	return errorsutil.NewAggregate(errs)
+}
+
+func defaultContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), defaultTimeout)
+}
+
+func pullImagesInParallelImpl(images []string, ifNotPresent bool,
+	imageExistsFunc func(string) bool, pullImageFunc func(string) error) []error {
+
+	var errs []error
+	errChan := make(chan error, len(images))
+
+	klog.V(1).Info("pulling all images in parallel")
+	for _, img := range images {
+		image := img
+		go func() {
+			if ifNotPresent {
+				exists := imageExistsFunc(image)
+				if exists {
+					klog.V(1).Infof("image exists: %s", image)
+					errChan <- nil
+					return
+				}
+			}
+			err := pullImageFunc(image)
+			if err != nil {
+				err = errors.WithMessagef(err, "failed to pull image %s", image)
+			} else {
+				klog.V(1).Infof("done pulling: %s", image)
+			}
+			errChan <- err
+		}()
+	}
+
+	for i := 0; i < len(images); i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
 		}
 	}
-	return errors.Wrapf(err, "output: %s, error", out)
+
+	return errs
 }
 
 // ImageExists checks to see if the image exists on the system
-func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
-	err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).Run()
-	return err == nil, nil
-}
-
-// ImageExists checks to see if the image exists on the system
-func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
-	err := runtime.exec.Command("docker", "inspect", image).Run()
-	return err == nil, nil
+func (runtime *CRIRuntime) ImageExists(image string) bool {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	resp, err := runtime.impl.ImageStatus(ctx, runtime.imageService, &runtimeapi.ImageSpec{Image: image}, false)
+	if err != nil {
+		klog.Warningf("Failed to get image status, image: %q, error: %v", image, err)
+		return false
+	}
+	if resp == nil || resp.Image == nil {
+		return false
+	}
+	return true
 }
 
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
-func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
+func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (string, error) {
 	foundCRISockets := []string{}
-	knownCRISockets := []string{
-		// Docker and containerd sockets are special cased below, hence not to be included here
-		"/var/run/crio/crio.sock",
-	}
-
-	if isSocket(dockerSocket) {
-		// the path in dockerSocket is not CRI compatible, hence we should replace it with a CRI compatible socket
-		foundCRISockets = append(foundCRISockets, constants.DefaultDockerCRISocket)
-	} else if isSocket(containerdSocket) {
-		// Docker 18.09 gets bundled together with containerd, thus having both dockerSocket and containerdSocket present.
-		// For compatibility reasons, we use the containerd socket only if Docker is not detected.
-		foundCRISockets = append(foundCRISockets, containerdSocket)
-	}
 
 	for _, socket := range knownCRISockets {
 		if isSocket(socket) {
@@ -212,18 +252,46 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 
 	switch len(foundCRISockets) {
 	case 0:
-		// Fall back to Docker if no CRI is detected, we can error out later on if we need it
-		return constants.DefaultDockerCRISocket, nil
+		// Fall back to the default socket if no CRI is detected, we can error out later on if we need it
+		return constants.DefaultCRISocket, nil
 	case 1:
 		// Precisely one CRI found, use that
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("Found multiple CRI sockets, please use --cri-socket to select one: %s", strings.Join(foundCRISockets, ", "))
+		return "", errors.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
+			"to use by setting the 'criSocket' field in the kubeadm configuration file: %s",
+			strings.Join(foundCRISockets, ", "))
 	}
 }
 
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
-	return detectCRISocketImpl(isExistingSocket)
+	return detectCRISocketImpl(isExistingSocket, defaultKnownCRISockets)
+}
+
+// SandboxImage returns the sandbox image used by the container runtime
+func (runtime *CRIRuntime) SandboxImage() (string, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	status, err := runtime.impl.Status(ctx, runtime.runtimeService, true)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get runtime status")
+	}
+
+	infoConfig, ok := status.GetInfo()["config"]
+	if !ok {
+		return "", errors.Errorf("no 'config' field in CRI info: %+v", status)
+	}
+
+	type config struct {
+		SandboxImage string `json:"sandboxImage,omitempty"`
+	}
+	c := config{}
+
+	if err := json.Unmarshal([]byte(infoConfig), &c); err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal CRI info config")
+	}
+
+	return c.SandboxImage, nil
 }

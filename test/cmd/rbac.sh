@@ -41,7 +41,7 @@ run_clusterroles_tests() {
   kubectl create "${kube_flags[@]:?}" clusterrole pod-admin --verb=* --resource=pods
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   output_message=$(kubectl delete clusterrole pod-admin -n test 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'Warning: deleting cluster-scoped resources'
   kube::test::if_has_string "${output_message}" 'clusterrole.rbac.authorization.k8s.io "pod-admin" deleted'
 
   kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
@@ -134,6 +134,10 @@ run_clusterroles_tests() {
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert clusterrolebindings
+  kube::test::describe_resource_chunk_size_assert clusterroles
+
   set +o nounset
   set +o errexit
 }
@@ -187,6 +191,10 @@ run_role_tests() {
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:deployments:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':apps:'
+
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert roles
+  kube::test::describe_resource_chunk_size_assert rolebindings
 
   set +o nounset
   set +o errexit

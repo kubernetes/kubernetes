@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//This code has been taken from containerd repo to avoid large library import
+// This code has been taken from containerd repo to avoid large library import
 package containerd
 
 import (
-	"github.com/containerd/containerd/namespaces"
+	"github.com/google/cadvisor/container/containerd/namespaces"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

@@ -17,7 +17,7 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 type GenericCollector struct {
@@ -145,7 +145,7 @@ func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (t
 
 	defer response.Body.Close()
 
-	pageContent, err := ioutil.ReadAll(response.Body)
+	pageContent, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nextCollectionTime, nil, err
 	}

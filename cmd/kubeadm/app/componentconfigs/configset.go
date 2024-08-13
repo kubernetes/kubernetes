@@ -17,8 +17,6 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"sort"
-
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,8 +28,10 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
 // handler is a package internal type that handles component config factory and common functionality.
@@ -61,6 +61,8 @@ func (h *handler) FromDocumentMap(docmap kubeadmapi.DocumentMap) (kubeadmapi.Com
 			if err := cfg.Unmarshal(docmap); err != nil {
 				return nil, err
 			}
+			// consider all successfully loaded configs from a document map as user supplied
+			cfg.SetUserSupplied(true)
 			return cfg, nil
 		}
 	}
@@ -70,7 +72,7 @@ func (h *handler) FromDocumentMap(docmap kubeadmapi.DocumentMap) (kubeadmapi.Com
 // fromConfigMap is an utility function, which will load the value of a key of a config map and use h.FromDocumentMap() to perform the parsing
 // This is an utility func. Used by the component config support implementations. Don't use it outside of that context.
 func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string, mustExist bool) (kubeadmapi.ComponentConfig, error) {
-	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, cmName)
+	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, cmName)
 	if err != nil {
 		if !mustExist && (apierrors.IsNotFound(err) || apierrors.IsForbidden(err)) {
 			klog.Warningf("Warning: No %s config is loaded. Continuing without it: %v", h.GroupVersion, err)
@@ -89,7 +91,24 @@ func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string
 		return nil, err
 	}
 
-	return h.FromDocumentMap(gvkmap)
+	// If the checksum comes up neatly we assume the config was generated
+	generatedConfig := VerifyConfigMapSignature(configMap)
+
+	componentCfg, err := h.FromDocumentMap(gvkmap)
+	if err != nil {
+		// If the config was generated and we get UnsupportedConfigVersionError, we skip loading it.
+		// This will force us to use the generated default current version (effectively regenerating the config with the current version).
+		if _, ok := err.(*UnsupportedConfigVersionError); ok && generatedConfig {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if componentCfg != nil {
+		componentCfg.SetUserSupplied(!generatedConfig)
+	}
+
+	return componentCfg, nil
 }
 
 // FromCluster loads a component from a config map in the cluster
@@ -97,25 +116,65 @@ func (h *handler) FromCluster(clientset clientset.Interface, clusterCfg *kubeadm
 	return h.fromCluster(h, clientset, clusterCfg)
 }
 
+// known holds the known component config handlers. Add new component configs here.
+var known = []*handler{
+	&kubeProxyHandler,
+	&kubeletHandler,
+}
+
+// configBase is the base type for all component config implementations
+type configBase struct {
+	// GroupVersion holds the supported GroupVersion for the inheriting config
+	GroupVersion schema.GroupVersion
+
+	// userSupplied tells us if the config is user supplied (invalid checksum) or not
+	userSupplied bool
+}
+
+func (cb *configBase) IsUserSupplied() bool {
+	return cb.userSupplied
+}
+
+func (cb *configBase) SetUserSupplied(userSupplied bool) {
+	cb.userSupplied = userSupplied
+}
+
+func (cb *configBase) DeepCopyInto(other *configBase) {
+	*other = *cb
+}
+
+func cloneBytes(in []byte) []byte {
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out
+}
+
 // Marshal is an utility function, used by the component config support implementations to marshal a runtime.Object to YAML with the
 // correct group and version
-func (h *handler) Marshal(object runtime.Object) ([]byte, error) {
-	return kubeadmutil.MarshalToYamlForCodecs(object, h.GroupVersion, Codecs)
+func (cb *configBase) Marshal(object runtime.Object) ([]byte, error) {
+	return kubeadmutil.MarshalToYamlForCodecs(object, cb.GroupVersion, Codecs)
 }
 
 // Unmarshal attempts to unmarshal a runtime.Object from a document map. If no object is found, no error is returned.
 // If a matching group is found, but no matching version an error is returned indicating that users should do manual conversion.
-func (h *handler) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object) error {
+func (cb *configBase) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object) error {
 	for gvk, yaml := range from {
 		// If this is a different group, we ignore it
-		if gvk.Group != h.GroupVersion.Group {
+		if gvk.Group != cb.GroupVersion.Group {
 			continue
 		}
 
-		// If this is the correct group, but different version, we return an error
-		if gvk.Version != h.GroupVersion.Version {
-			// TODO: Replace this with a special error type and make UX better around it
-			return errors.Errorf("unexpected apiVersion %q, you may have to do manual conversion to %q and execute kubeadm again", gvk.GroupVersion(), h.GroupVersion)
+		if gvk.Version != cb.GroupVersion.Version {
+			return &UnsupportedConfigVersionError{
+				OldVersion:     gvk.GroupVersion(),
+				CurrentVersion: cb.GroupVersion,
+				Document:       cloneBytes(yaml),
+			}
+		}
+
+		// Print warnings for strict errors
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{Scheme}, gvk, yaml); err != nil {
+			klog.Warning(err.Error())
 		}
 
 		// As long as we support only component configs with a single kind, this is allowed
@@ -123,12 +182,6 @@ func (h *handler) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object) er
 	}
 
 	return nil
-}
-
-// known holds the known component config handlers. Add new component configs here.
-var known = []*handler{
-	&kubeProxyHandler,
-	&kubeletHandler,
 }
 
 // ensureInitializedComponentConfigs is an utility func to initialize the ComponentConfigMap in ClusterConfiguration prior to possible writes to it
@@ -191,14 +244,46 @@ func FetchFromDocumentMap(clusterCfg *kubeadmapi.ClusterConfiguration, docmap ku
 	return nil
 }
 
-// Validate is a placeholder for performing a validation on an already loaded component configs in a ClusterConfiguration
-// Currently it prints a warning that no validation was performed
-func Validate(clusterCfg *kubeadmapi.ClusterConfiguration) field.ErrorList {
-	groups := []string{}
-	for group := range clusterCfg.ComponentConfigs {
-		groups = append(groups, group)
+// GetVersionStates returns a slice of ComponentConfigVersionState structs
+// describing all supported component config groups that were identified on the cluster
+func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) ([]outputapiv1alpha3.ComponentConfigVersionState, error) {
+	// We don't want to modify clusterCfg so we make a working deep copy of it.
+	// Also, we don't want the defaulted component configs so we get rid of them.
+	scratchClusterCfg := clusterCfg.DeepCopy()
+	scratchClusterCfg.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
+
+	err := FetchFromCluster(scratchClusterCfg, client)
+	if err != nil {
+		// This seems to be a genuine error so we end here
+		return nil, err
 	}
-	sort.Strings(groups) // The sort is needed to make the output predictable
-	klog.Warningf("WARNING: kubeadm cannot validate component configs for API groups %v", groups)
+
+	results := []outputapiv1alpha3.ComponentConfigVersionState{}
+	for _, handler := range known {
+		group := handler.GroupVersion.Group
+		if _, ok := scratchClusterCfg.ComponentConfigs[group]; ok {
+			// Normally loaded component config. No manual upgrade required on behalf of users.
+			results = append(results, outputapiv1alpha3.ComponentConfigVersionState{
+				Group:            group,
+				CurrentVersion:   handler.GroupVersion.Version, // Currently kubeadm supports only one version per API
+				PreferredVersion: handler.GroupVersion.Version, // group so we can get away with these being the same
+			})
+		} else {
+			// This config was either not present (user did not install an addon) or the config was unsupported kubeadm
+			// generated one and is therefore skipped so we can automatically re-generate it (no action required on
+			// behalf of the user).
+			results = append(results, outputapiv1alpha3.ComponentConfigVersionState{
+				Group:            group,
+				PreferredVersion: handler.GroupVersion.Version,
+			})
+		}
+	}
+
+	return results, nil
+}
+
+// Validate is a placeholder for performing a validation on an already loaded component configs in a ClusterConfiguration
+// TODO: investigate if the function can be repurposed for validating component config via CLI
+func Validate(clusterCfg *kubeadmapi.ClusterConfiguration) field.ErrorList {
 	return field.ErrorList{}
 }

@@ -22,29 +22,26 @@ import (
 
 	"github.com/spf13/pflag"
 
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
 // Run creates and executes new kubeadm command
 func Run() error {
-	klog.InitFlags(nil)
+	var allFlags flag.FlagSet
+	klog.InitFlags(&allFlags)
+	// only add the flags that are still supported for kubeadm
+	allFlags.VisitAll(func(f *flag.Flag) {
+		switch f.Name {
+		case "v", "add_dir_header", "skip_headers":
+			flag.CommandLine.Var(f.Value, f.Name, f.Usage)
+		}
+	})
+
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-
-	pflag.Set("logtostderr", "true")
-	// We do not want these flags to show up in --help
-	// These MarkHidden calls must be after the lines above
-	pflag.CommandLine.MarkHidden("version")
-	pflag.CommandLine.MarkHidden("log-flush-frequency")
-	pflag.CommandLine.MarkHidden("alsologtostderr")
-	pflag.CommandLine.MarkHidden("log-backtrace-at")
-	pflag.CommandLine.MarkHidden("log-dir")
-	pflag.CommandLine.MarkHidden("logtostderr")
-	pflag.CommandLine.MarkHidden("stderrthreshold")
-	pflag.CommandLine.MarkHidden("vmodule")
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()

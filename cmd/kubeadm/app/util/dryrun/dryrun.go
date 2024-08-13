@@ -19,13 +19,15 @@ package dryrun
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -59,7 +61,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 			continue
 		}
 
-		fileBytes, err := ioutil.ReadFile(file.RealPath)
+		fileBytes, err := os.ReadFile(file.RealPath)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -87,6 +89,11 @@ func NewWaiter() apiclient.Waiter {
 	return &Waiter{}
 }
 
+// WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
+func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+	return nil
+}
+
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForAPI() error {
 	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
@@ -105,14 +112,9 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 	return nil
 }
 
-// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
-	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
-	return nil
-}
-
-// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
-func (w *Waiter) WaitForKubeletAndFunc(f func() error) error {
+// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
+	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at http://%s:%d/healthz\n", healthzAddress, healthzPort)
 	return nil
 }
 
@@ -122,9 +124,9 @@ func (w *Waiter) SetTimeout(_ time.Duration) {}
 // WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images;
 func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
 	return map[string]string{
-		constants.KubeAPIServer:         "",
-		constants.KubeControllerManager: "",
-		constants.KubeScheduler:         "",
+		kubeadmconstants.KubeAPIServer:         "",
+		kubeadmconstants.KubeControllerManager: "",
+		kubeadmconstants.KubeScheduler:         "",
 	}, nil
 }
 
@@ -137,4 +139,33 @@ func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) 
 // WaitForStaticPodHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
 func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return nil
+}
+
+// PrintFilesIfDryRunning prints the static pod manifests to stdout and informs about the temporary directory to go and lookup when dry running
+func PrintFilesIfDryRunning(needPrintManifest bool, manifestDir string, outputWriter io.Writer) error {
+	var files []FileToPrint
+	// Print static pod manifests if it is a control plane
+	if needPrintManifest {
+		fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+		for _, component := range kubeadmconstants.ControlPlaneComponents {
+			realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
+			outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
+			files = append(files, NewFileToPrint(realPath, outputPath))
+		}
+	} else {
+		fmt.Printf("[dryrun] Wrote certificates and kubeconfig files to the %q directory\n", manifestDir)
+	}
+
+	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
+	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
+
+	// Print kubelet config manifests
+	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
+	for _, filename := range kubeletConfigFiles {
+		realPath := filepath.Join(manifestDir, filename)
+		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
+		files = append(files, NewFileToPrint(realPath, outputPath))
+	}
+
+	return PrintDryRunFiles(files, outputWriter)
 }

@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +29,10 @@ import (
 
 // NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The following fields define time interval from which metrics were
@@ -61,7 +64,10 @@ type NodeMetricsList struct {
 
 // PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The following fields define time interval from which metrics were
@@ -70,6 +76,7 @@ type PodMetrics struct {
 	Window    metav1.Duration `json:"window" protobuf:"bytes,3,opt,name=window"`
 
 	// Metrics for all containers are collected within the same time window.
+	// +listType=atomic
 	Containers []ContainerMetrics `json:"containers" protobuf:"bytes,4,rep,name=containers"`
 }
 

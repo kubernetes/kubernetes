@@ -97,9 +97,7 @@ data:
         reload
         loop
         bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
-        forward . __PILLAR__UPSTREAM__SERVERS__ {
-                force_tcp
-        }
+        forward . __PILLAR__UPSTREAM__SERVERS__
         prometheus :9253
         }
 ---
@@ -140,14 +138,16 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.13
+        image: registry.k8s.io/dns/k8s-dns-node-cache:1.23.1
         resources:
           requests:
             cpu: 25m
             memory: 5Mi
         args: [ "-localip", "__PILLAR__LOCAL__DNS__,__PILLAR__DNS__SERVER__", "-conf", "/etc/Corefile", "-upstreamsvc", "kube-dns-upstream" ]
         securityContext:
-          privileged: true
+          capabilities:
+            add:
+            - NET_ADMIN
         ports:
         - containerPort: 53
           name: dns
@@ -188,3 +188,24 @@ spec:
           items:
             - key: Corefile
               path: Corefile.base
+---
+# A headless service is a service with a service IP but instead of load-balancing it will return the IPs of our associated Pods.
+# We use this to expose metrics to Prometheus.
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/port: "9253"
+    prometheus.io/scrape: "true"
+  labels:
+    k8s-app: node-local-dns
+  name: node-local-dns
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: 9253
+      targetPort: 9253
+  selector:
+    k8s-app: node-local-dns

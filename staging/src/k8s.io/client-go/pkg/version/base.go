@@ -43,7 +43,8 @@ var (
 	gitMinor string = "" // minor version, numeric possibly followed by "+"
 
 	// semantic version, derived by build scripts (see
-	// https://git.k8s.io/community/contributors/design-proposals/release/versioning.md
+	// https://github.com/kubernetes/sig-release/blob/master/release-engineering/versioning.md#kubernetes-release-versioning
+	// https://kubernetes.io/releases/version-skew-policy/
 	// for a detailed discussion of this field)
 	//
 	// TODO: This field is still called "gitVersion" for legacy
@@ -55,7 +56,7 @@ var (
 	// NOTE: The $Format strings are replaced during 'git archive' thanks to the
 	// companion .gitattributes file containing 'export-subst' in this same
 	// directory.  See also https://git-scm.com/docs/gitattributes
-	gitVersion   string = "v0.0.0-master+$Format:%h$"
+	gitVersion   string = "v0.0.0-master+$Format:%H$"
 	gitCommit    string = "$Format:%H$" // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = ""            // state of git tree, either "clean" or "dirty"
 

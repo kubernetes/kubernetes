@@ -17,20 +17,35 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"os"
+	"strings"
 	"time"
+
+	netutils "k8s.io/utils/net"
 )
 
+// TCP port to listen
+const port = 9000
+
 func main() {
-	ip := getIP().String()
-	log.Printf("external ip: %v", ip)
+	ips := getIPs()
+	if len(ips) == 0 {
+		panic("No valid IP found")
+	}
 
-	go probe(ip)
+	// listen TCP packets to inject the out of order TCP packets
+	for _, ip := range ips {
+		log.Printf("external ip: %v", ip.String())
+		go probe(ip.String())
+	}
 
-	log.Printf("listen on %v:9000", "0.0.0.0")
+	log.Printf("listen on %v:%d", "0.0.0.0", port)
 
-	listener, err := net.Listen("tcp", "0.0.0.0:9000")
+	// open a server listening to establish the TCP connections
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		panic(err)
 	}
@@ -42,6 +57,7 @@ func main() {
 		}
 
 		go func(conn net.Conn) {
+			// Close the connection after 10 secs
 			time.Sleep(10 * time.Second)
 			conn.Close()
 		}(conn)
@@ -51,12 +67,12 @@ func main() {
 func probe(ip string) {
 	log.Printf("probing %v", ip)
 
-	ipAddr, err := net.ResolveIPAddr("ip4:tcp", ip)
+	ipAddr, err := net.ResolveIPAddr("ip:tcp", ip)
 	if err != nil {
 		panic(err)
 	}
 
-	conn, err := net.ListenIP("ip4:tcp", ipAddr)
+	conn, err := net.ListenIP("ip:tcp", ipAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -89,7 +105,7 @@ func probe(ip string) {
 			continue
 		}
 		if pkt.Flags&RST != 0 {
-			panic("RST received")
+			log.Println("ERROR: RST received")
 		}
 		if pkt.Flags&ACK != 0 {
 			if seq, ok := pending[addr.String()]; ok {
@@ -106,25 +122,31 @@ func probe(ip string) {
 				}
 
 				data := []byte("boom!!!")
-				remoteIP := net.ParseIP(addr.String())
-				localIP := net.ParseIP(conn.LocalAddr().String())
+				remoteIP := netutils.ParseIPSloppy(addr.String())
+				localIP := netutils.ParseIPSloppy(conn.LocalAddr().String())
 				_, err := conn.WriteTo(badPkt.encode(localIP, remoteIP, data[:]), addr)
 				if err != nil {
 					log.Printf("conn.WriteTo() error: %v", err)
+				} else {
+					log.Println("boom packet injected")
 				}
 			}
 		}
 	}
 }
 
-func getIP() net.IP {
-	conn, err := net.Dial("udp", "8.8.8.8:53")
-	if err != nil {
-		log.Fatal(err)
+// getIPs gets the IPs from the downward API
+// we don't have to validate the IPs because
+// they are validated previously by kubernetes/CNI
+func getIPs() []net.IP {
+	var ips []net.IP
+	podIP, podIPs := os.Getenv("POD_IP"), os.Getenv("POD_IPS")
+	if podIPs != "" {
+		for _, ip := range strings.Split(podIPs, ",") {
+			ips = append(ips, netutils.ParseIPSloppy(ip))
+		}
+	} else if podIP != "" {
+		ips = append(ips, netutils.ParseIPSloppy(podIP))
 	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP
+	return ips
 }

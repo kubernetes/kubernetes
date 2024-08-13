@@ -22,37 +22,36 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/yaml"
-
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/yaml"
 )
 
-var listTypeResourceFixture = &apiextensionsv1beta1.CustomResourceDefinition{
+var listTypeResourceFixture = &apiextensionsv1.CustomResourceDefinition{
 	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 		Group: "tests.example.com",
-		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 			{
 				Name:    "v1beta1",
 				Storage: true,
 				Served:  true,
+				Schema:  fixtures.AllowAllSchema(),
 			},
 		},
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:   "foos",
 			Singular: "foo",
 			Kind:     "Foo",
 			ListKind: "FooList",
 		},
-		Scope:      apiextensionsv1beta1.ClusterScoped,
-		Validation: &apiextensionsv1beta1.CustomResourceValidation{},
+		Scope: apiextensionsv1.ClusterScoped,
 	},
 }
 
@@ -128,17 +127,17 @@ func TestListTypes(t *testing.T) {
 	defer tearDownFn()
 
 	crd := listTypeResourceFixture.DeepCopy()
-	if err := yaml.Unmarshal([]byte(listTypeResourceSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	if err := yaml.Unmarshal([]byte(listTypeResourceSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect list-type errors")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
 	invalidInstance := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(listTypeResourceInstance), &invalidInstance.Object); err != nil {
 		t.Fatal(err)
@@ -195,14 +194,14 @@ func TestListTypes(t *testing.T) {
 
 	t.Logf("Remove \"b\" from the keys in the schema which renders the valid instance invalid")
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		s := crd.Spec.Validation.OpenAPIV3Schema.Properties["correct-map"]
+		s := crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["correct-map"]
 		s.XListMapKeys = []string{"a"}
-		crd.Spec.Validation.OpenAPIV3Schema.Properties["correct-map"] = s
-		_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["correct-map"] = s
+		_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		return err
 	})
 	if err != nil {

@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build windows
+//go:build windows
 
 package mgr
 
 import (
 	"syscall"
-	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -46,28 +45,21 @@ type Config struct {
 	DelayedAutoStart bool   // the service is started after other auto-start services are started plus a short delay
 }
 
-func toString(p *uint16) string {
-	if p == nil {
-		return ""
-	}
-	return syscall.UTF16ToString((*[4096]uint16)(unsafe.Pointer(p))[:])
-}
-
 func toStringSlice(ps *uint16) []string {
-	if ps == nil {
-		return nil
-	}
 	r := make([]string, 0)
-	for from, i, p := 0, 0, (*[1 << 24]uint16)(unsafe.Pointer(ps)); true; i++ {
-		if p[i] == 0 {
-			// empty string marks the end
-			if i <= from {
-				break
-			}
-			r = append(r, string(utf16.Decode(p[from:i])))
-			from = i + 1
+	p := unsafe.Pointer(ps)
+
+	for {
+		s := windows.UTF16PtrToString((*uint16)(p))
+		if len(s) == 0 {
+			break
 		}
+
+		r = append(r, s)
+		offset := unsafe.Sizeof(uint16(0)) * (uintptr)(len(s)+1)
+		p = unsafe.Pointer(uintptr(p) + offset)
 	}
+
 	return r
 }
 
@@ -106,18 +98,25 @@ func (s *Service) Config() (Config, error) {
 		delayedStart = true
 	}
 
+	b, err = s.queryServiceConfig2(windows.SERVICE_CONFIG_SERVICE_SID_INFO)
+	if err != nil {
+		return Config{}, err
+	}
+	sidType := *(*uint32)(unsafe.Pointer(&b[0]))
+
 	return Config{
 		ServiceType:      p.ServiceType,
 		StartType:        p.StartType,
 		ErrorControl:     p.ErrorControl,
-		BinaryPathName:   toString(p.BinaryPathName),
-		LoadOrderGroup:   toString(p.LoadOrderGroup),
+		BinaryPathName:   windows.UTF16PtrToString(p.BinaryPathName),
+		LoadOrderGroup:   windows.UTF16PtrToString(p.LoadOrderGroup),
 		TagId:            p.TagId,
 		Dependencies:     toStringSlice(p.Dependencies),
-		ServiceStartName: toString(p.ServiceStartName),
-		DisplayName:      toString(p.DisplayName),
-		Description:      toString(p2.Description),
+		ServiceStartName: windows.UTF16PtrToString(p.ServiceStartName),
+		DisplayName:      windows.UTF16PtrToString(p.DisplayName),
+		Description:      windows.UTF16PtrToString(p2.Description),
 		DelayedAutoStart: delayedStart,
+		SidType:          sidType,
 	}, nil
 }
 

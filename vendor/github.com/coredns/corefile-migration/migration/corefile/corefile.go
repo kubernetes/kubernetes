@@ -3,7 +3,7 @@ package corefile
 import (
 	"strings"
 
-	"github.com/caddyserver/caddy/caddyfile"
+	"github.com/coredns/caddy/caddyfile"
 )
 
 type Corefile struct {
@@ -76,7 +76,7 @@ func (c *Corefile) ToString() (out string) {
 }
 
 func (s *Server) ToString() (out string) {
-	str := strings.Join(s.DomPorts, " ")
+	str := strings.Join(escapeArgs(s.DomPorts), " ")
 	strs := []string{}
 	for _, p := range s.Plugins {
 		strs = append(strs, strings.Repeat(" ", indent)+p.ToString())
@@ -88,7 +88,7 @@ func (s *Server) ToString() (out string) {
 }
 
 func (p *Plugin) ToString() (out string) {
-	str := strings.Join(append([]string{p.Name}, p.Args...), " ")
+	str := strings.Join(append([]string{p.Name}, escapeArgs(p.Args)...), " ")
 	strs := []string{}
 	for _, o := range p.Options {
 		strs = append(strs, strings.Repeat(" ", indent*2)+o.ToString())
@@ -100,8 +100,24 @@ func (p *Plugin) ToString() (out string) {
 }
 
 func (o *Option) ToString() (out string) {
-	str := strings.Join(append([]string{o.Name}, o.Args...), " ")
+	str := strings.Join(append([]string{o.Name}, escapeArgs(o.Args)...), " ")
 	return str
+}
+
+// escapeArgs returns the arguments list escaping and wrapping any argument containing whitespace in quotes
+func escapeArgs(args []string) []string {
+	var escapedArgs []string
+	for _, a := range args {
+		// if there is white space, wrap argument with quotes
+		if len(strings.Fields(a)) > 1 {
+			// escape quotes
+			a = strings.Replace(a, "\"", "\\\"", -1)
+			// wrap with quotes
+			a = "\"" + a + "\""
+		}
+		escapedArgs = append(escapedArgs, a)
+	}
+	return escapedArgs
 }
 
 func (s *Server) FindMatch(def []*Server) (*Server, bool) {

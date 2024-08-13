@@ -40,7 +40,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*node.RuntimeClass).Name, nil
 		},
-		DefaultQualifiedResource: node.Resource("runtimeclasses"),
+		DefaultQualifiedResource:  node.Resource("runtimeclasses"),
+		SingularQualifiedResource: node.Resource("runtimeclass"),
 
 		CreateStrategy: runtimeclass.Strategy,
 		UpdateStrategy: runtimeclass.Strategy,

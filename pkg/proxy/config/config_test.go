@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,6 +32,8 @@ import (
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
+	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 type sortedServices []*v1.Service
@@ -128,102 +131,103 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []*
 	}
 }
 
-type sortedEndpoints []*v1.Endpoints
+type sortedEndpointSlices []*discoveryv1.EndpointSlice
 
-func (s sortedEndpoints) Len() int {
+func (s sortedEndpointSlices) Len() int {
 	return len(s)
 }
-func (s sortedEndpoints) Swap(i, j int) {
+func (s sortedEndpointSlices) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
-func (s sortedEndpoints) Less(i, j int) bool {
+func (s sortedEndpointSlices) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
 
-type EndpointsHandlerMock struct {
+type EndpointSliceHandlerMock struct {
 	lock sync.Mutex
 
-	state   map[types.NamespacedName]*v1.Endpoints
+	state   map[types.NamespacedName]*discoveryv1.EndpointSlice
 	synced  bool
-	updated chan []*v1.Endpoints
-	process func([]*v1.Endpoints)
+	updated chan []*discoveryv1.EndpointSlice
+	process func([]*discoveryv1.EndpointSlice)
 }
 
-func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	ehm := &EndpointsHandlerMock{
-		state:   make(map[types.NamespacedName]*v1.Endpoints),
-		updated: make(chan []*v1.Endpoints, 5),
+func NewEndpointSliceHandlerMock() *EndpointSliceHandlerMock {
+	ehm := &EndpointSliceHandlerMock{
+		state:   make(map[types.NamespacedName]*discoveryv1.EndpointSlice),
+		updated: make(chan []*discoveryv1.EndpointSlice, 5),
 	}
-	ehm.process = func(endpoints []*v1.Endpoints) {
+	ehm.process = func(endpoints []*discoveryv1.EndpointSlice) {
 		ehm.updated <- endpoints
 	}
 	return ehm
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsAdd(endpoints *v1.Endpoints) {
+func (h *EndpointSliceHandlerMock) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	h.state[namespacedName] = endpoints
-	h.sendEndpoints()
+	namespacedName := types.NamespacedName{Namespace: slice.Namespace, Name: slice.Name}
+	h.state[namespacedName] = slice
+	h.sendEndpointSlices()
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
+func (h *EndpointSliceHandlerMock) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	h.state[namespacedName] = endpoints
-	h.sendEndpoints()
+	namespacedName := types.NamespacedName{Namespace: slice.Namespace, Name: slice.Name}
+	h.state[namespacedName] = slice
+	h.sendEndpointSlices()
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsDelete(endpoints *v1.Endpoints) {
+func (h *EndpointSliceHandlerMock) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	namespacedName := types.NamespacedName{Namespace: slice.Namespace, Name: slice.Name}
 	delete(h.state, namespacedName)
-	h.sendEndpoints()
+	h.sendEndpointSlices()
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsSynced() {
+func (h *EndpointSliceHandlerMock) OnEndpointSlicesSynced() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.synced = true
-	h.sendEndpoints()
+	h.sendEndpointSlices()
 }
 
-func (h *EndpointsHandlerMock) sendEndpoints() {
+func (h *EndpointSliceHandlerMock) sendEndpointSlices() {
 	if !h.synced {
 		return
 	}
-	endpoints := make([]*v1.Endpoints, 0, len(h.state))
+	slices := make([]*discoveryv1.EndpointSlice, 0, len(h.state))
 	for _, eps := range h.state {
-		endpoints = append(endpoints, eps)
+		slices = append(slices, eps)
 	}
-	sort.Sort(sortedEndpoints(endpoints))
-	h.process(endpoints)
+	sort.Sort(sortedEndpointSlices(slices))
+	h.process(slices)
 }
 
-func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []*v1.Endpoints) {
-	// We might get 1 or more updates for N endpoint updates, because we
-	// over write older snapshots of endpoints from the producer go-routine
+func (h *EndpointSliceHandlerMock) ValidateEndpointSlices(t *testing.T, expectedSlices []*discoveryv1.EndpointSlice) {
+	// We might get 1 or more updates for N endpointslice updates, because we
+	// over write older snapshots of endpointslices from the producer go-routine
 	// if the consumer falls behind. Unittests will hard timeout in 5m.
-	var endpoints []*v1.Endpoints
+	var slices []*discoveryv1.EndpointSlice
 	for {
 		select {
-		case endpoints = <-h.updated:
-			if reflect.DeepEqual(endpoints, expectedEndpoints) {
+		case slices = <-h.updated:
+			if reflect.DeepEqual(slices, expectedSlices) {
 				return
 			}
 		// Unittests will hard timeout in 5m with a stack trace, prevent that
 		// and surface a clearer reason for failure.
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Timed out. Expected %#v, Got %#v", expectedEndpoints, endpoints)
+			t.Errorf("Timed out. Expected %#v, Got %#v", expectedSlices, slices)
 			return
 		}
 	}
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -233,10 +237,10 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service := &v1.Service{
@@ -248,6 +252,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -257,10 +262,10 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &v1.Service{
@@ -284,6 +289,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 }
 
 func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -293,12 +299,12 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &v1.Service{
@@ -318,115 +324,133 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
+	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), time.Minute)
-	handler := NewEndpointsHandlerMock()
-	handler2 := NewEndpointsHandlerMock()
+	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	handler := NewEndpointSliceHandlerMock()
+	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
-	endpoints1 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints1 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+		}, {
+			Addresses: []string{"2.2.2.2"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
-	endpoints2 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints2 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"3.3.3.3"},
+		}, {
+			Addresses: []string{"4.4.4.4"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
 
-	endpoints := []*v1.Endpoints{endpoints2, endpoints1}
-	handler.ValidateEndpoints(t, endpoints)
-	handler2.ValidateEndpoints(t, endpoints)
+	endpoints := []*discoveryv1.EndpointSlice{endpoints2, endpoints1}
+	handler.ValidateEndpointSlices(t, endpoints)
+	handler2.ValidateEndpointSlices(t, endpoints)
 }
 
 func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
+	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), time.Minute)
-	handler := NewEndpointsHandlerMock()
-	handler2 := NewEndpointsHandlerMock()
+	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	handler := NewEndpointSliceHandlerMock()
+	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
-	endpoints1 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints1 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+		}, {
+			Addresses: []string{"2.2.2.2"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
-	endpoints2 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints2 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"3.3.3.3"},
+		}, {
+			Addresses: []string{"4.4.4.4"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
 
-	endpoints := []*v1.Endpoints{endpoints2, endpoints1}
-	handler.ValidateEndpoints(t, endpoints)
-	handler2.ValidateEndpoints(t, endpoints)
+	endpoints := []*discoveryv1.EndpointSlice{endpoints2, endpoints1}
+	handler.ValidateEndpointSlices(t, endpoints)
+	handler2.ValidateEndpointSlices(t, endpoints)
 
 	// Add one more
-	endpoints3 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints3 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"5.5.5.5"},
+		}, {
+			Addresses: []string{"6.6.6.6"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints3)
-	endpoints = []*v1.Endpoints{endpoints2, endpoints1, endpoints3}
-	handler.ValidateEndpoints(t, endpoints)
-	handler2.ValidateEndpoints(t, endpoints)
+	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1, endpoints3}
+	handler.ValidateEndpointSlices(t, endpoints)
+	handler2.ValidateEndpointSlices(t, endpoints)
 
 	// Update the "foo" service with new endpoints
-	endpoints1v2 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{IP: "7.7.7.7"}},
-			Ports:     []v1.EndpointPort{{Port: 80}},
+	endpoints1v2 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{"7.7.7.7"},
 		}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Modify(endpoints1v2)
-	endpoints = []*v1.Endpoints{endpoints2, endpoints1v2, endpoints3}
-	handler.ValidateEndpoints(t, endpoints)
-	handler2.ValidateEndpoints(t, endpoints)
+	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1v2, endpoints3}
+	handler.ValidateEndpointSlices(t, endpoints)
+	handler2.ValidateEndpointSlices(t, endpoints)
 
 	// Remove "bar" endpoints
 	fakeWatch.Delete(endpoints2)
-	endpoints = []*v1.Endpoints{endpoints1v2, endpoints3}
-	handler.ValidateEndpoints(t, endpoints)
-	handler2.ValidateEndpoints(t, endpoints)
+	endpoints = []*discoveryv1.EndpointSlice{endpoints1v2, endpoints3}
+	handler.ValidateEndpointSlices(t, endpoints)
+	handler2.ValidateEndpointSlices(t, endpoints)
 }
 
 // TODO: Add a unittest for interrupts getting processed in a timely manner.

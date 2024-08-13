@@ -47,6 +47,11 @@ func TestAdmission(t *testing.T) {
 				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
 				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
 			},
+			Volumes: []api.Volume{
+				{Name: "volume1", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullNever}}},
+				{Name: "volume2", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullIfNotPresent}}},
+				{Name: "volume3", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullAlways}}},
+			},
 		},
 	}
 	err := handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -61,6 +66,11 @@ func TestAdmission(t *testing.T) {
 	for _, c := range pod.Spec.Containers {
 		if c.ImagePullPolicy != api.PullAlways {
 			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+	for _, v := range pod.Spec.Volumes {
+		if v.Image.PullPolicy != api.PullAlways {
+			t.Errorf("Image volume %v: expected pull always, got %v", v, v.Image.PullPolicy)
 		}
 	}
 }
@@ -83,6 +93,12 @@ func TestValidate(t *testing.T) {
 				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
 				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
 			},
+			Volumes: []api.Volume{
+				{Name: "volume1", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: ""}}},
+				{Name: "volume2", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullNever}}},
+				{Name: "volume3", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullIfNotPresent}}},
+				{Name: "volume4", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullAlways}}},
+			},
 		},
 	}
 	expectedError := `[` +
@@ -91,7 +107,11 @@ func TestValidate(t *testing.T) {
 		`pods "123" is forbidden: spec.initContainers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always", ` +
 		`pods "123" is forbidden: spec.containers[0].imagePullPolicy: Unsupported value: "": supported values: "Always", ` +
 		`pods "123" is forbidden: spec.containers[1].imagePullPolicy: Unsupported value: "Never": supported values: "Always", ` +
-		`pods "123" is forbidden: spec.containers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always"]`
+		`pods "123" is forbidden: spec.containers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[0].image.pullPolicy: Unsupported value: "": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[1].image.pullPolicy: Unsupported value: "Never": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[2].image.pullPolicy: Unsupported value: "IfNotPresent": supported values: "Always"` +
+		`]`
 	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Fatal("missing expected error")
@@ -165,4 +185,104 @@ func TestOtherResources(t *testing.T) {
 			t.Errorf("%s: image pull policy was changed to %s", tc.name, a)
 		}
 	}
+
+}
+
+// TestUpdatePod ensures that this admission controller is a no-op for update pod if no
+// images were changed in the new pod spec.
+func TestUpdatePod(t *testing.T) {
+	namespace := "testnamespace"
+	name := "testname"
+	oldPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+			},
+		},
+	}
+	// only add new annotation
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"test": "test",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+			},
+		},
+	}
+	// add new label and change image
+	podWithNewImage := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"test": "test",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "ctr2", Image: "image2", ImagePullPolicy: api.PullIfNotPresent},
+			},
+		},
+	}
+	tests := []struct {
+		name         string
+		kind         string
+		resource     string
+		subresource  string
+		object       runtime.Object
+		oldObject    runtime.Object
+		expectError  bool
+		expectIgnore bool
+	}{
+		{
+			name:         "update IfNotPresent pod annotations",
+			kind:         "Pod",
+			resource:     "pods",
+			subresource:  "finalizers",
+			object:       pod,
+			oldObject:    oldPod,
+			expectIgnore: true,
+		},
+		{
+			name:        "update IfNotPresent pod image",
+			kind:        "Pod",
+			resource:    "pods",
+			subresource: "finalizers",
+			object:      podWithNewImage,
+			oldObject:   oldPod,
+		},
+	}
+
+	for _, tc := range tests {
+		handler := admissiontesting.WithReinvocationTesting(t, &AlwaysPullImages{})
+
+		err := handler.Admit(context.TODO(), admission.NewAttributesRecord(tc.object, tc.oldObject, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, &metav1.UpdateOptions{}, false, nil), nil)
+
+		if tc.expectError {
+			if err == nil {
+				t.Errorf("%s: unexpected nil error", tc.name)
+			}
+			continue
+		}
+		if tc.expectIgnore {
+			if e, a := api.PullIfNotPresent, pod.Spec.Containers[0].ImagePullPolicy; e != a {
+				t.Errorf("%s: image pull policy was changed to %s", tc.name, a)
+			}
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.name, err)
+			continue
+		}
+
+	}
+
 }

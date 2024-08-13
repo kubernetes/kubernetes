@@ -19,12 +19,13 @@ import (
 
 	// TODO(rjnagal): Remove dependency after moving all stats structs from v1.
 	// using v1 now for easy conversion.
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 const (
 	TypeName   = "name"
 	TypeDocker = "docker"
+	TypePodman = "podman"
 )
 
 type CpuSpec struct {
@@ -120,7 +121,8 @@ type DeprecatedContainerStats struct {
 	HasMemory bool           `json:"has_memory"`
 	Memory    v1.MemoryStats `json:"memory,omitempty"`
 	// Hugepage statistics
-	HasHugetlb bool `json:"has_hugetlb"`
+	HasHugetlb bool                       `json:"has_hugetlb"`
+	Hugetlb    map[string]v1.HugetlbStats `json:"hugetlb,omitempty"`
 	// Network statistics
 	HasNetwork bool         `json:"has_network"`
 	Network    NetworkStats `json:"network,omitempty"`
@@ -136,8 +138,15 @@ type DeprecatedContainerStats struct {
 	// Custom Metrics
 	HasCustomMetrics bool                      `json:"has_custom_metrics"`
 	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+	// Perf events counters
+	PerfStats []v1.PerfStat `json:"perf_stats,omitempty"`
+	// Statistics originating from perf uncore events.
+	// Applies only for root container.
+	PerfUncoreStats []v1.PerfUncoreStat `json:"perf_uncore_stats,omitempty"`
 	// Referenced memory
 	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
+	// Resource Control (resctrl) statistics
+	Resctrl v1.ResctrlStats `json:"resctrl,omitempty"`
 }
 
 type ContainerStats struct {
@@ -168,8 +177,13 @@ type ContainerStats struct {
 	CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 	// Perf events counters
 	PerfStats []v1.PerfStat `json:"perf_stats,omitempty"`
+	// Statistics originating from perf uncore events.
+	// Applies only for root container.
+	PerfUncoreStats []v1.PerfUncoreStat `json:"perf_uncore_stats,omitempty"`
 	// Referenced memory
 	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
+	// Resource Control (resctrl) statistics
+	Resctrl v1.ResctrlStats `json:"resctrl,omitempty"`
 }
 
 type Percentiles struct {
@@ -250,9 +264,9 @@ type FsInfo struct {
 }
 
 type RequestOptions struct {
-	// Type of container identifier specified - "name", "dockerid", dockeralias"
+	// Type of container identifier specified - TypeName (default) or TypeDocker
 	IdType string `json:"type"`
-	// Number of stats to return
+	// Number of stats to return, -1 means no limit.
 	Count int `json:"count"`
 	// Whether to include stats for child subcontainers.
 	Recursive bool `json:"recursive"`
@@ -275,6 +289,7 @@ type ProcessInfo struct {
 	CgroupPath    string  `json:"cgroup_path"`
 	Cmd           string  `json:"cmd"`
 	FdCount       int     `json:"fd_count"`
+	Psr           int     `json:"psr"`
 }
 
 type TcpStat struct {

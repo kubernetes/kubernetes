@@ -19,6 +19,7 @@ package bootstrap
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -31,12 +32,12 @@ import (
 
 	"k8s.io/klog/v2"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -61,7 +62,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
-		klog.V(2).Infof("No bootstrapping requested, will use kubeconfig")
+		klog.V(2).InfoS("No bootstrapping requested, will use kubeconfig")
 		return clientConfig, restclient.CopyConfig(clientConfig), nil
 	}
 
@@ -81,7 +82,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
-		klog.V(2).Infof("Current kubeconfig file contents are still valid, no bootstrap necessary")
+		klog.V(2).InfoS("Current kubeconfig file contents are still valid, no bootstrap necessary")
 		return clientConfig, restclient.CopyConfig(clientConfig), nil
 	}
 
@@ -97,7 +98,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 	if err := writeKubeconfigFromBootstrapping(clientConfig, kubeconfigPath, pemPath); err != nil {
 		return nil, nil, err
 	}
-	klog.V(2).Infof("Use the bootstrap credentials to request a cert, and set kubeconfig to point to the certificate dir")
+	klog.V(2).InfoS("Use the bootstrap credentials to request a cert, and set kubeconfig to point to the certificate dir")
 	return bootstrapClientConfig, clientConfig, nil
 }
 
@@ -105,25 +106,25 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
 // On success, a kubeconfig file referencing the generated key and obtained certificate is written to kubeconfigPath.
 // The certificate and key file are stored in certDir.
-func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName types.NodeName) error {
+func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file exists and is valid.
 	ok, err := isClientConfigStillValid(kubeconfigPath)
 	if err != nil {
 		return err
 	}
 	if ok {
-		klog.V(2).Infof("Kubeconfig %s exists and is valid, skipping bootstrap", kubeconfigPath)
+		klog.V(2).InfoS("Kubeconfig exists and is valid, skipping bootstrap", "path", kubeconfigPath)
 		return nil
 	}
 
-	klog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
+	klog.V(2).InfoS("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
 
-	bootstrapClient, err := certificatesv1beta1.NewForConfig(bootstrapClientConfig)
+	bootstrapClient, err := clientset.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
@@ -147,7 +148,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 	// managed by the store.
 	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
 	if !verifyKeyData(keyData) {
-		klog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		klog.V(2).InfoS("No valid private key and/or certificate found, reusing existing private key or creating a new one")
 		// Note: always call LoadOrGenerateKeyFile so that private key is
 		// reused on next startup if CSR request fails.
 		keyData, _, err = keyutil.LoadOrGenerateKeyFile(privKeyPath)
@@ -156,11 +157,11 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		}
 	}
 
-	if err := waitForServer(*bootstrapClientConfig, 1*time.Minute); err != nil {
-		klog.Warningf("Error waiting for apiserver to come up: %v", err)
+	if err := waitForServer(ctx, *bootstrapClientConfig, 1*time.Minute); err != nil {
+		klog.InfoS("Error waiting for apiserver to come up", "err", err)
 	}
 
-	certData, err := requestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+	certData, err := requestNodeCertificate(ctx, bootstrapClient, keyData, nodeName)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		return err
 	}
 	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
-		klog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
+		klog.V(2).InfoS("Failed cleaning up private key file", "path", privKeyPath, "err", err)
 	}
 
 	return writeKubeconfigFromBootstrapping(bootstrapClientConfig, kubeconfigPath, store.CurrentPath())
@@ -237,32 +238,32 @@ func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
 	}
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	transportConfig, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	if len(certs) == 0 {
-		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	now := time.Now()
 	for _, cert := range certs {
 		if now.After(cert.NotAfter) {
-			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate is expired: %s", cert.NotAfter))
+			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate in %s is expired: %v", kubeconfigPath, cert.NotAfter))
 			return false, nil
 		}
 	}
@@ -278,7 +279,7 @@ func verifyKeyData(data []byte) bool {
 	return err == nil
 }
 
-func waitForServer(cfg restclient.Config, deadline time.Duration) error {
+func waitForServer(ctx context.Context, cfg restclient.Config, deadline time.Duration) error {
 	cfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	cfg.Timeout = 1 * time.Second
 	cli, err := restclient.UnversionedRESTClientFor(&cfg)
@@ -286,13 +287,13 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 		return fmt.Errorf("couldn't create client: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), deadline)
+	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 
 	var connected bool
 	wait.JitterUntil(func() {
-		if _, err := cli.Get().AbsPath("/healthz").Do(context.TODO()).Raw(); err != nil {
-			klog.Infof("Failed to connect to apiserver: %v", err)
+		if _, err := cli.Get().AbsPath("/healthz").Do(ctx).Raw(); err != nil {
+			klog.InfoS("Failed to connect to apiserver", "err", err)
 			return
 		}
 		cancel()
@@ -312,7 +313,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error. This is intended for use on nodes (kubelet and
 // kubeadm).
-func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
+func requestNodeCertificate(ctx context.Context, client clientset.Interface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   "system:node:" + string(nodeName),
@@ -327,10 +328,12 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
 
-	usages := []certificates.KeyUsage{
-		certificates.UsageDigitalSignature,
-		certificates.UsageKeyEncipherment,
-		certificates.UsageClientAuth,
+	usages := []certificatesv1.KeyUsage{
+		certificatesv1.UsageDigitalSignature,
+		certificatesv1.UsageClientAuth,
+	}
+	if _, ok := privateKey.(*rsa.PrivateKey); ok {
+		usages = append(usages, certificatesv1.UsageKeyEncipherment)
 	}
 
 	// The Signer interface contains the Public() method to get the public key.
@@ -344,16 +347,16 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		return nil, err
 	}
 
-	req, err := csr.RequestCertificate(client, csrData, name, certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey)
+	reqName, reqUID, err := csr.RequestCertificate(client, csrData, name, certificatesv1.KubeAPIServerClientKubeletSignerName, nil, usages, privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3600*time.Second)
 	defer cancel()
 
-	klog.V(2).Infof("Waiting for client certificate to be issued")
-	return csr.WaitForCertificate(ctx, client, req)
+	klog.V(2).InfoS("Waiting for client certificate to be issued")
+	return csr.WaitForCertificate(ctx, client, reqName, reqUID)
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.
@@ -361,7 +364,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 // regenerate every loop and we include usages which are not contained in the
 // CSR. This needs to be kept up to date as we add new fields to the node
 // certificates and with ensureCompatible.
-func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificates.KeyUsage) (string, error) {
+func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificatesv1.KeyUsage) (string, error) {
 	hash := sha512.New512_256()
 
 	// Here we make sure two different inputs can't write the same stream

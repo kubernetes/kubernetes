@@ -17,69 +17,221 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
+	policyv1 "k8s.io/api/policy/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func TestCreatePdb(t *testing.T) {
-	pdbName := "my-pdb"
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+func TestCreatePdbValidation(t *testing.T) {
+	selectorOpts := "app=nginx"
+	podAmountNumber := "3"
+	podAmountPercent := "50%"
 
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "policy", Version: "v1beta1"},
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
-			}, nil
-		}),
-	}
-	tf.ClientConfigVal = &restclient.Config{}
-
-	outputFormat := "name"
-
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdCreatePodDisruptionBudget(tf, ioStreams)
-	cmd.Flags().Set("min-available", "1")
-	cmd.Flags().Set("selector", "app=rails")
-	cmd.Flags().Set("dry-run", "true")
-	cmd.Flags().Set("output", outputFormat)
-
-	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
-	printFlags.OutputFormat = &outputFormat
-
-	options := &PodDisruptionBudgetOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: printFlags,
-			Name:       pdbName,
-			IOStreams:  ioStreams,
+	tests := map[string]struct {
+		options  *PodDisruptionBudgetOpts
+		expected string
+	}{
+		"test-missing-name-param": {
+			options: &PodDisruptionBudgetOpts{
+				Selector:     selectorOpts,
+				MinAvailable: podAmountNumber,
+			},
+			expected: "name must be specified",
+		},
+		"test-missing-selector-param": {
+			options: &PodDisruptionBudgetOpts{
+				Name:         "my-pdb",
+				MinAvailable: podAmountNumber,
+			},
+			expected: "a selector must be specified",
+		},
+		"test-missing-max-unavailable-max-unavailable-param": {
+			options: &PodDisruptionBudgetOpts{
+				Name:     "my-pdb",
+				Selector: selectorOpts,
+			},
+			expected: "one of min-available or max-unavailable must be specified",
+		},
+		"test-both-min-available-max-unavailable-param": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MinAvailable:   podAmountNumber,
+				MaxUnavailable: podAmountPercent,
+			},
+			expected: "min-available and max-unavailable cannot be both specified",
+		},
+		"test-invalid-min-available-format": {
+			options: &PodDisruptionBudgetOpts{
+				Name:         "my-pdb",
+				Selector:     selectorOpts,
+				MinAvailable: "10GB",
+			},
+			expected: "invalid format specified for min-available",
+		},
+		"test-invalid-max-unavailable-format": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: "10GB",
+			},
+			expected: "invalid format specified for max-unavailable",
+		},
+		"test-valid-min-available-format": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountNumber,
+			},
+			expected: "",
+		},
+		"test-valid-max-unavailable-format": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountPercent,
+			},
+			expected: "",
 		},
 	}
-	err := options.Complete(tf, cmd, []string{pdbName})
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+
+			o := &PodDisruptionBudgetOpts{
+				Name:           tc.options.Name,
+				Selector:       tc.options.Selector,
+				MinAvailable:   tc.options.MinAvailable,
+				MaxUnavailable: tc.options.MaxUnavailable,
+			}
+
+			err := o.Validate()
+			if err != nil && err.Error() != tc.expected {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tc.expected != "" && err == nil {
+				t.Errorf("expected error, got no error")
+			}
+		})
+	}
+}
+
+func TestCreatePdb(t *testing.T) {
+	selectorOpts := "app=nginx"
+	podAmountNumber := "3"
+	podAmountPercent := "50%"
+
+	selector, err := metav1.ParseToLabelSelector(selectorOpts)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
 
-	err = options.Run()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	minAvailableNumber := intstr.Parse(podAmountNumber)
+	minAvailablePercent := intstr.Parse(podAmountPercent)
+
+	maxUnavailableNumber := intstr.Parse(podAmountNumber)
+	maxUnavailablePercent := intstr.Parse(podAmountPercent)
+
+	tests := map[string]struct {
+		options  *PodDisruptionBudgetOpts
+		expected *policyv1.PodDisruptionBudget
+	}{
+		"test-valid-min-available-pods-number": {
+			options: &PodDisruptionBudgetOpts{
+				Name:         "my-pdb",
+				Selector:     selectorOpts,
+				MinAvailable: podAmountNumber,
+			},
+			expected: &policyv1.PodDisruptionBudget{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PodDisruptionBudget",
+					APIVersion: "policy/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pdb",
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					Selector:     selector,
+					MinAvailable: &minAvailableNumber,
+				},
+			},
+		},
+		"test-valid-min-available-pods-percentage": {
+			options: &PodDisruptionBudgetOpts{
+				Name:         "my-pdb",
+				Selector:     selectorOpts,
+				MinAvailable: podAmountPercent,
+			},
+			expected: &policyv1.PodDisruptionBudget{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PodDisruptionBudget",
+					APIVersion: "policy/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pdb",
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					Selector:     selector,
+					MinAvailable: &minAvailablePercent,
+				},
+			},
+		},
+		"test-valid-max-unavailable-pods-number": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountNumber,
+			},
+			expected: &policyv1.PodDisruptionBudget{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PodDisruptionBudget",
+					APIVersion: "policy/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pdb",
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					Selector:       selector,
+					MaxUnavailable: &maxUnavailableNumber,
+				},
+			},
+		},
+		"test-valid-max-unavailable-pods-percentage": {
+			options: &PodDisruptionBudgetOpts{
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountPercent,
+			},
+			expected: &policyv1.PodDisruptionBudget{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PodDisruptionBudget",
+					APIVersion: "policy/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pdb",
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					Selector:       selector,
+					MaxUnavailable: &maxUnavailablePercent,
+				},
+			},
+		},
 	}
 
-	expectedOutput := "poddisruptionbudget.policy/" + pdbName + "\n"
-	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+
+			podDisruptionBudget, err := tc.options.createPodDisruptionBudgets()
+			if err != nil {
+				t.Errorf("unexpected error:\n%#v\n", err)
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(podDisruptionBudget, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, podDisruptionBudget)
+			}
+		})
 	}
 }

@@ -47,10 +47,10 @@ func LogResult(result Result) {
 
 // HostExec represents interface we require to execute commands on remote host.
 type HostExec interface {
-	Execute(cmd string, node *v1.Node) (Result, error)
-	IssueCommandWithResult(cmd string, node *v1.Node) (string, error)
-	IssueCommand(cmd string, node *v1.Node) error
-	Cleanup()
+	Execute(ctx context.Context, cmd string, node *v1.Node) (Result, error)
+	IssueCommandWithResult(ctx context.Context, cmd string, node *v1.Node) (string, error)
+	IssueCommand(ctx context.Context, cmd string, node *v1.Node) error
+	Cleanup(ctx context.Context)
 }
 
 // hostExecutor implements HostExec
@@ -69,18 +69,25 @@ func NewHostExec(framework *framework.Framework) HostExec {
 
 // launchNodeExecPod launches a hostexec pod for local PV and waits
 // until it's Running.
-func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
+func (h *hostExecutor) launchNodeExecPod(ctx context.Context, node string) *v1.Pod {
 	f := h.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	hostExecPod := e2epod.NewExecPodSpec(ns.Name, "", true)
 	hostExecPod.GenerateName = fmt.Sprintf("hostexec-%s-", node)
-	// Use NodeAffinity instead of NodeName so that pods will not
-	// be immediately Failed by kubelet if it's out of space. Instead
-	// Pods will be pending in the scheduler until there is space freed
-	// up.
-	e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
+
+	if framework.TestContext.NodeE2E {
+		// E2E node tests do not run a scheduler, so set the node name directly
+		hostExecPod.Spec.NodeName = node
+	} else {
+		// Use NodeAffinity instead of NodeName so that pods will not
+		// be immediately Failed by kubelet if it's out of space. Instead
+		// Pods will be pending in the scheduler until there is space freed
+		// up.
+		e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
+
+	}
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
 			// Required to enter into host mount namespace via nsenter.
@@ -104,9 +111,9 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 			return &privileged
 		}(true),
 	}
-	pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
+	pod, err := cs.CoreV1().Pods(ns.Name).Create(ctx, hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	err = e2epod.WaitForPodRunningInNamespace(cs, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -115,8 +122,8 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 // performing the remote command execution, the stdout, stderr and exit code
 // are returned.
 // This works like ssh.SSH(...) utility.
-func (h *hostExecutor) Execute(cmd string, node *v1.Node) (Result, error) {
-	result, err := h.exec(cmd, node)
+func (h *hostExecutor) Execute(ctx context.Context, cmd string, node *v1.Node) (Result, error) {
+	result, err := h.exec(ctx, cmd, node)
 	if codeExitErr, ok := err.(exec.CodeExitError); ok {
 		// extract the exit code of remote command and silence the command
 		// non-zero exit code error
@@ -126,14 +133,14 @@ func (h *hostExecutor) Execute(cmd string, node *v1.Node) (Result, error) {
 	return result, err
 }
 
-func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
+func (h *hostExecutor) exec(ctx context.Context, cmd string, node *v1.Node) (Result, error) {
 	result := Result{
 		Host: node.Name,
 		Cmd:  cmd,
 	}
 	pod, ok := h.nodeExecPods[node.Name]
 	if !ok {
-		pod = h.launchNodeExecPod(node.Name)
+		pod = h.launchNodeExecPod(ctx, node.Name)
 		if pod == nil {
 			return result, fmt.Errorf("failed to create hostexec pod for node %q", node)
 		}
@@ -149,7 +156,7 @@ func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
 	}
 	containerName := pod.Spec.Containers[0].Name
 	var err error
-	result.Stdout, result.Stderr, err = h.Framework.ExecWithOptions(framework.ExecOptions{
+	result.Stdout, result.Stderr, err = e2epod.ExecWithOptions(h.Framework, e2epod.ExecOptions{
 		Command:            args,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,
@@ -165,8 +172,8 @@ func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
 // IssueCommandWithResult issues command on the given node and returns stdout as
 // result. It returns error if there are some issues executing the command or
 // the command exits non-zero.
-func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string, error) {
-	result, err := h.exec(cmd, node)
+func (h *hostExecutor) IssueCommandWithResult(ctx context.Context, cmd string, node *v1.Node) (string, error) {
+	result, err := h.exec(ctx, cmd, node)
 	if err != nil {
 		LogResult(result)
 	}
@@ -174,17 +181,17 @@ func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string
 }
 
 // IssueCommand works like IssueCommandWithResult, but discards result.
-func (h *hostExecutor) IssueCommand(cmd string, node *v1.Node) error {
-	_, err := h.IssueCommandWithResult(cmd, node)
+func (h *hostExecutor) IssueCommand(ctx context.Context, cmd string, node *v1.Node) error {
+	_, err := h.IssueCommandWithResult(ctx, cmd, node)
 	return err
 }
 
 // Cleanup cleanup resources it created during test.
 // Note that in most cases it is not necessary to call this because we create
 // pods under test namespace which will be destroyed in teardown phase.
-func (h *hostExecutor) Cleanup() {
+func (h *hostExecutor) Cleanup(ctx context.Context) {
 	for _, pod := range h.nodeExecPods {
-		e2epod.DeletePodOrFail(h.Framework.ClientSet, pod.Namespace, pod.Name)
+		e2epod.DeletePodOrFail(ctx, h.Framework.ClientSet, pod.Namespace, pod.Name)
 	}
 	h.nodeExecPods = make(map[string]*v1.Pod)
 }

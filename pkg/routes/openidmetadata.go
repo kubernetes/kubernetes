@@ -17,9 +17,10 @@ limitations under the License.
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -34,7 +35,8 @@ const (
 	// cacheControl is the value of the Cache-Control header. Overrides the
 	// global `private, no-cache` setting.
 	headerCacheControl = "Cache-Control"
-	cacheControl       = "public, max-age=3600" // 1 hour
+
+	cacheControlTemplate = "public, max-age=%d"
 
 	// mimeJWKS is the content type of the keyset response
 	mimeJWKS = "application/jwk-set+json"
@@ -42,18 +44,14 @@ const (
 
 // OpenIDMetadataServer is an HTTP server for metadata of the KSA token issuer.
 type OpenIDMetadataServer struct {
-	configJSON []byte
-	keysetJSON []byte
+	provider serviceaccount.OpenIDMetadataProvider
 }
 
 // NewOpenIDMetadataServer creates a new OpenIDMetadataServer.
 // The issuer is the OIDC issuer; keys are the keys that may be used to sign
 // KSA tokens.
-func NewOpenIDMetadataServer(configJSON, keysetJSON []byte) *OpenIDMetadataServer {
-	return &OpenIDMetadataServer{
-		configJSON: configJSON,
-		keysetJSON: keysetJSON,
-	}
+func NewOpenIDMetadataServer(provider serviceaccount.OpenIDMetadataProvider) *OpenIDMetadataServer {
+	return &OpenIDMetadataServer{provider: provider}
 }
 
 // Install adds this server to the request router c.
@@ -95,19 +93,21 @@ func fromStandard(h http.HandlerFunc) restful.RouteFunction {
 }
 
 func (s *OpenIDMetadataServer) serveConfiguration(w http.ResponseWriter, req *http.Request) {
+	configJSON, maxAge := s.provider.GetConfigJSON()
 	w.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
-	w.Header().Set(headerCacheControl, cacheControl)
-	if _, err := w.Write(s.configJSON); err != nil {
+	w.Header().Set(headerCacheControl, fmt.Sprintf(cacheControlTemplate, maxAge))
+	if _, err := w.Write(configJSON); err != nil {
 		klog.Errorf("failed to write service account issuer metadata response: %v", err)
 		return
 	}
 }
 
 func (s *OpenIDMetadataServer) serveKeys(w http.ResponseWriter, req *http.Request) {
+	keysetJSON, maxAge := s.provider.GetKeysetJSON()
 	// Per RFC7517 : https://tools.ietf.org/html/rfc7517#section-8.5.1
 	w.Header().Set(restful.HEADER_ContentType, mimeJWKS)
-	w.Header().Set(headerCacheControl, cacheControl)
-	if _, err := w.Write(s.keysetJSON); err != nil {
+	w.Header().Set(headerCacheControl, fmt.Sprintf(cacheControlTemplate, maxAge))
+	if _, err := w.Write(keysetJSON); err != nil {
 		klog.Errorf("failed to write service account issuer JWKS response: %v", err)
 		return
 	}

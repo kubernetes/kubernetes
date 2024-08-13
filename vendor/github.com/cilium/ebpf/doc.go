@@ -12,6 +12,14 @@
 // eBPF code should be compiled ahead of time using clang, and shipped with
 // your application as any other resource.
 //
-// This package doesn't include code required to attach eBPF to Linux
-// subsystems, since this varies per subsystem.
+// Use the link subpackage to attach a loaded program to a hook in the kernel.
+//
+// Note that losing all references to Map and Program resources will cause
+// their underlying file descriptors to be closed, potentially removing those
+// objects from the kernel. Always retain a reference by e.g. deferring a
+// Close() of a Collection or LoadAndAssign object until application exit.
+//
+// Special care needs to be taken when handling maps of type ProgramArray,
+// as the kernel erases its contents when the last userspace or bpffs
+// reference disappears, regardless of the map being in active use.
 package ebpf

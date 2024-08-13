@@ -17,14 +17,19 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -150,14 +155,14 @@ func TestConfigMapCreation(t *testing.T) {
 				cmStore.Add(tc.UpdatedConfigMap)
 				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
 			}
-
+			ctx := context.TODO()
 			for controller.queue.Len() != 0 {
-				controller.processNextWorkItem()
+				controller.processNextWorkItem(ctx)
 			}
 
 			actions := client.Actions()
 			if reflect.DeepEqual(actions, tc.ExpectActions) {
-				t.Errorf("Unexpected actions:\n%s", diff.ObjectGoPrintDiff(actions, tc.ExpectActions))
+				t.Errorf("Unexpected actions:\n%s", cmp.Diff(actions, tc.ExpectActions))
 			}
 		})
 	}
@@ -174,4 +179,97 @@ func defaultCrtConfigMapPtr(rootCA []byte) *v1.ConfigMap {
 	}
 	tmp.Namespace = metav1.NamespaceDefault
 	return &tmp
+}
+
+func TestConfigMapUpdateNoHotLoop(t *testing.T) {
+	testcases := map[string]struct {
+		ExistingConfigMaps []runtime.Object
+		ExpectActions      func(t *testing.T, actions []clienttesting.Action)
+	}{
+		"update-configmap-annotation": {
+			ExistingConfigMaps: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      RootCACertConfigMapName,
+					},
+					Data: map[string]string{"ca.crt": "fake"},
+				},
+			},
+			ExpectActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(actions)
+				}
+				if actions[0].GetVerb() != "update" {
+					t.Fatal(actions)
+				}
+				actualObj := actions[0].(clienttesting.UpdateAction).GetObject()
+				if actualObj.(*v1.ConfigMap).Annotations[DescriptionAnnotation] != Description {
+					t.Fatal(actions)
+				}
+				if !reflect.DeepEqual(actualObj.(*v1.ConfigMap).Data["ca.crt"], "fake") {
+					t.Fatal(actions)
+				}
+			},
+		},
+		"no-update-configmap-if-annotation-present-and-equal": {
+			ExistingConfigMaps: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:   "default",
+						Name:        RootCACertConfigMapName,
+						Annotations: map[string]string{DescriptionAnnotation: Description},
+					},
+					Data: map[string]string{"ca.crt": "fake"},
+				},
+			},
+			ExpectActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(actions)
+				}
+			},
+		},
+		"no-update-configmap-if-annotation-present-and-different": {
+			ExistingConfigMaps: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:   "default",
+						Name:        RootCACertConfigMapName,
+						Annotations: map[string]string{DescriptionAnnotation: "different"},
+					},
+					Data: map[string]string{"ca.crt": "fake"},
+				},
+			},
+			ExpectActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(actions)
+				}
+			},
+		},
+	}
+
+	for k, tc := range testcases {
+		t.Run(k, func(t *testing.T) {
+			client := fake.NewSimpleClientset(tc.ExistingConfigMaps...)
+			configMapIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			for _, obj := range tc.ExistingConfigMaps {
+				configMapIndexer.Add(obj)
+			}
+
+			// Publisher manages certificate ConfigMap objects inside Namespaces
+			controller := Publisher{
+				client:         client,
+				rootCA:         []byte("fake"),
+				cmLister:       corev1listers.NewConfigMapLister(configMapIndexer),
+				cmListerSynced: func() bool { return true },
+				nsListerSynced: func() bool { return true },
+			}
+			ctx := context.TODO()
+			err := controller.syncNamespace(ctx, "default")
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.ExpectActions(t, client.Actions())
+		})
+	}
 }

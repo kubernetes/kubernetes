@@ -18,19 +18,19 @@ package generators
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genGroup struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage string
 	group         string
 	version       string
@@ -40,7 +40,7 @@ type genGroup struct {
 	types            []*types.Type
 	imports          namer.ImportTracker
 	inputPackage     string
-	clientsetPackage string
+	clientsetPackage string // must be a Go import-path
 	// If the genGroup has been called. This generator should only execute once.
 	called bool
 }
@@ -64,45 +64,41 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	imports = append(imports, filepath.Join(g.clientsetPackage, "scheme"))
+	imports = append(imports, path.Join(g.clientsetPackage, "scheme"))
 	return
 }
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	apiPath := func(group string) string {
-		if group == "core" {
-			return `"/api"`
-		}
-		return `"` + g.apiPath + `"`
-	}
-
-	groupName := g.group
-	if g.group == "core" {
-		groupName = ""
-	}
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(path.Vendorless(g.inputPackage))
-	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+	p := c.Universe.Package(g.inputPackage)
+	groupName := g.group
+	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
 
+	apiPath := `"` + g.apiPath + `"`
+	if groupName == "" {
+		apiPath = `"/api"`
+	}
+
 	m := map[string]interface{}{
-		"group":                          g.group,
-		"version":                        g.version,
-		"groupName":                      groupName,
-		"GroupGoName":                    g.groupGoName,
-		"Version":                        namer.IC(g.version),
-		"types":                          g.types,
-		"apiPath":                        apiPath(g.group),
-		"schemaGroupVersion":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
-		"runtimeAPIVersionInternal":      c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
-		"restConfig":                     c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
-		"restDefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
-		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"restRESTClientFor":              c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
-		"SchemeGroupVersion":             c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
+		"version":                          g.version,
+		"groupName":                        groupName,
+		"GroupGoName":                      g.groupGoName,
+		"Version":                          namer.IC(g.version),
+		"types":                            g.types,
+		"apiPath":                          apiPath,
+		"schemaGroupVersion":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
+		"runtimeAPIVersionInternal":        c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
+		"restConfig":                       c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"restDefaultKubernetesUserAgent":   c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
+		"restRESTClientInterface":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"RESTHTTPClientFor":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "HTTPClientFor"}),
+		"restRESTClientFor":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
+		"restRESTClientForConfigAndClient": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientForConfigAndClient"}),
+		"SchemeGroupVersion":               c.Universe.Variable(types.Name{Package: g.inputPackage, Name: "SchemeGroupVersion"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -123,6 +119,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		}
 	}
 	sw.Do(newClientForConfigTemplate, m)
+	sw.Do(newClientForConfigAndClientTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
 	if g.version == "" {
@@ -164,12 +161,30 @@ func (c *$.GroupGoName$$.Version$Client) $.type|publicPlural$() $.type|public$In
 
 var newClientForConfigTemplate = `
 // NewForConfig creates a new $.GroupGoName$$.Version$Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *$.restConfig|raw$) (*$.GroupGoName$$.Version$Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := $.restRESTClientFor|raw$(&config)
+	httpClient, err := $.RESTHTTPClientFor|raw$(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+`
+
+var newClientForConfigAndClientTemplate = `
+// NewForConfigAndClient creates a new $.GroupGoName$$.Version$Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *$.restConfig|raw$, h *http.Client) (*$.GroupGoName$$.Version$Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := $.restRESTClientForConfigAndClient|raw$(&config, h)
 	if err != nil {
 		return nil, err
 	}

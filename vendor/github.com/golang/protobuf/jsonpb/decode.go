@@ -56,6 +56,7 @@ type Unmarshaler struct {
 // implement JSONPBMarshaler so that the custom format can be produced.
 //
 // The JSON unmarshaling must follow the JSON to proto specification:
+//
 //	https://developers.google.com/protocol-buffers/docs/proto3#json
 //
 // Deprecated: Custom types should implement protobuf reflection instead.
@@ -135,12 +136,12 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 	md := m.Descriptor()
 	fds := md.Fields()
 
-	if string(in) == "null" && md.FullName() != "google.protobuf.Value" {
-		return nil
-	}
-
 	if jsu, ok := proto.MessageV1(m.Interface()).(JSONPBUnmarshaler); ok {
 		return jsu.UnmarshalJSONPB(u, in)
+	}
+
+	if string(in) == "null" && md.FullName() != "google.protobuf.Value" {
+		return nil
 	}
 
 	switch wellKnownType(md.FullName()) {
@@ -332,11 +333,12 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 			raw = v
 		}
 
+		field := m.NewField(fd)
 		// Unmarshal the field value.
-		if raw == nil || (string(raw) == "null" && !isSingularWellKnownValue(fd)) {
+		if raw == nil || (string(raw) == "null" && !isSingularWellKnownValue(fd) && !isSingularJSONPBUnmarshaler(field, fd)) {
 			continue
 		}
-		v, err := u.unmarshalValue(m.NewField(fd), raw, fd)
+		v, err := u.unmarshalValue(field, raw, fd)
 		if err != nil {
 			return err
 		}
@@ -364,11 +366,12 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 			return fmt.Errorf("extension field %q does not extend message %q", xname, m.Descriptor().FullName())
 		}
 
+		field := m.NewField(fd)
 		// Unmarshal the field value.
-		if raw == nil || (string(raw) == "null" && !isSingularWellKnownValue(fd)) {
+		if raw == nil || (string(raw) == "null" && !isSingularWellKnownValue(fd) && !isSingularJSONPBUnmarshaler(field, fd)) {
 			continue
 		}
-		v, err := u.unmarshalValue(m.NewField(fd), raw, fd)
+		v, err := u.unmarshalValue(field, raw, fd)
 		if err != nil {
 			return err
 		}
@@ -384,8 +387,22 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 }
 
 func isSingularWellKnownValue(fd protoreflect.FieldDescriptor) bool {
+	if fd.Cardinality() == protoreflect.Repeated {
+		return false
+	}
 	if md := fd.Message(); md != nil {
-		return md.FullName() == "google.protobuf.Value" && fd.Cardinality() != protoreflect.Repeated
+		return md.FullName() == "google.protobuf.Value"
+	}
+	if ed := fd.Enum(); ed != nil {
+		return ed.FullName() == "google.protobuf.NullValue"
+	}
+	return false
+}
+
+func isSingularJSONPBUnmarshaler(v protoreflect.Value, fd protoreflect.FieldDescriptor) bool {
+	if fd.Message() != nil && fd.Cardinality() != protoreflect.Repeated {
+		_, ok := proto.MessageV1(v.Interface()).(JSONPBUnmarshaler)
+		return ok
 	}
 	return false
 }

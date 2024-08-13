@@ -17,6 +17,7 @@ limitations under the License.
 package endpoints
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
@@ -395,7 +397,7 @@ func TestWatchRead(t *testing.T) {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
 					if e, a := object, gotObj; !apiequality.Semantic.DeepEqual(e, a) {
-						t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
+						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
 					}
 				}
 				w.Stop()
@@ -610,7 +612,7 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch will serve a watch response according to the watcher and watchServer.
-// Before watchServer.ServeHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
+// Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer watcher.Stop()
@@ -620,7 +622,7 @@ func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preS
 			return
 		}
 
-		watchServer.ServeHTTP(w, req)
+		watchServer.HandleHTTP(w, req)
 	}
 }
 
@@ -645,7 +647,6 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -710,7 +711,6 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -769,7 +769,6 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -812,7 +811,6 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -844,7 +842,16 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	close(timeoutCh)
 	select {
 	case <-done:
-		if !watcher.IsStopped() {
+		eventCh := watcher.ResultChan()
+		select {
+		case _, opened := <-eventCh:
+			if opened {
+				t.Errorf("Watcher received unexpected event")
+			}
+			if !watcher.IsStopped() {
+				t.Errorf("Watcher is not stopped")
+			}
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Leaked watch on timeout")
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -869,7 +876,7 @@ func BenchmarkWatchHTTP(b *testing.B) {
 		item.Name = fmt.Sprintf("reasonable-name-%d", i)
 	}
 
-	runWatchHTTPBenchmark(b, items)
+	runWatchHTTPBenchmark(b, toObjectSlice(items), "")
 }
 
 func BenchmarkWatchHTTP_UTF8(b *testing.B) {
@@ -882,10 +889,18 @@ func BenchmarkWatchHTTP_UTF8(b *testing.B) {
 		item.Name = fmt.Sprintf("翏Ŏ熡韐-%d", i)
 	}
 
-	runWatchHTTPBenchmark(b, items)
+	runWatchHTTPBenchmark(b, toObjectSlice(items), "")
 }
 
-func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
+func toObjectSlice(in []example.Pod) []runtime.Object {
+	var res []runtime.Object
+	for _, pod := range in {
+		res = append(res, &pod)
+	}
+	return res
+}
+
+func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType string) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
@@ -900,6 +915,8 @@ func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}
+	request.Header.Add("Accept", contentType)
+
 	response, err := client.Do(request)
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
@@ -913,7 +930,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 	go func() {
 		defer response.Body.Close()
 		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		wg.Done()
 	}()
@@ -922,7 +939,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+		simpleStorage.fakeWatch.Action(actions[i%len(actions)], items[i%len(items)])
 	}
 	simpleStorage.fakeWatch.Stop()
 	wg.Wait()
@@ -953,7 +970,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	go func() {
 		defer ws.Close()
 		if _, err := io.Copy(ioutil.Discard, ws); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		wg.Done()
 	}()
@@ -973,47 +990,63 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 func BenchmarkWatchProtobuf(b *testing.B) {
 	items := benchmarkItems(b)
 
-	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-	client := http.Client{}
+	runWatchHTTPBenchmark(b, toObjectSlice(items), "application/vnd.kubernetes.protobuf")
+}
 
-	dest, _ := url.Parse(server.URL)
-	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
-	dest.RawQuery = ""
+type fakeCachingObject struct {
+	obj runtime.Object
 
-	request, err := http.NewRequest("GET", dest.String(), nil)
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
-	request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
-	response, err := client.Do(request)
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(response.Body)
-		b.Fatalf("Unexpected response %#v\n%s", response, body)
+	once sync.Once
+	raw  []byte
+	err  error
+}
+
+func (f *fakeCachingObject) CacheEncode(_ runtime.Identifier, encode func(runtime.Object, io.Writer) error, w io.Writer) error {
+	f.once.Do(func() {
+		buffer := bytes.NewBuffer(nil)
+		f.err = encode(f.obj, buffer)
+		f.raw = buffer.Bytes()
+	})
+
+	if f.err != nil {
+		return f.err
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer response.Body.Close()
-		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
-			b.Fatal(err)
-		}
-		wg.Done()
-	}()
+	_, err := w.Write(f.raw)
+	return err
+}
 
-	actions := []watch.EventType{watch.Added, watch.Modified, watch.Deleted}
+func (f *fakeCachingObject) GetObject() runtime.Object {
+	return f.obj
+}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+func (f *fakeCachingObject) GetObjectKind() schema.ObjectKind {
+	return f.obj.GetObjectKind()
+}
+
+func (f *fakeCachingObject) DeepCopyObject() runtime.Object {
+	return &fakeCachingObject{obj: f.obj.DeepCopyObject()}
+}
+
+var _ runtime.CacheableObject = &fakeCachingObject{}
+var _ runtime.Object = &fakeCachingObject{}
+
+func wrapCachingObject(in []example.Pod) []runtime.Object {
+	var res []runtime.Object
+	for _, pod := range in {
+		res = append(res, &fakeCachingObject{obj: &pod})
 	}
-	simpleStorage.fakeWatch.Stop()
-	wg.Wait()
-	b.StopTimer()
+	return res
+}
+
+func BenchmarkWatchCachingObjectJSON(b *testing.B) {
+	items := benchmarkItems(b)
+
+	runWatchHTTPBenchmark(b, wrapCachingObject(items), "")
+}
+
+func BenchmarkWatchCachingObjectProtobuf(b *testing.B) {
+	items := benchmarkItems(b)
+
+	runWatchHTTPBenchmark(b, wrapCachingObject(items), "application/vnd.kubernetes.protobuf")
 }

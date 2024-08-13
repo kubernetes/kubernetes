@@ -1,10 +1,16 @@
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package imports implements a Go pretty-printer (like package "go/format")
 // that also adds or removes import statements as necessary.
 package imports // import "golang.org/x/tools/imports"
 
 import (
-	"go/build"
+	"log"
+	"os"
 
+	"golang.org/x/tools/internal/gocommand"
 	intimp "golang.org/x/tools/internal/imports"
 )
 
@@ -29,28 +35,37 @@ var Debug = false
 var LocalPrefix string
 
 // Process formats and adjusts imports for the provided file.
-// If opt is nil the defaults are used.
+// If opt is nil the defaults are used, and if src is nil the source
+// is read from the filesystem.
 //
 // Note that filename's directory influences which imports can be chosen,
 // so it is important that filename be accurate.
-// To process data ``as if'' it were in filename, pass the data as a non-nil src.
+// To process data “as if” it were in filename, pass the data as a non-nil src.
 func Process(filename string, src []byte, opt *Options) ([]byte, error) {
+	var err error
+	if src == nil {
+		src, err = os.ReadFile(filename)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if opt == nil {
 		opt = &Options{Comments: true, TabIndent: true, TabWidth: 8}
 	}
 	intopt := &intimp.Options{
 		Env: &intimp.ProcessEnv{
-			GOPATH:      build.Default.GOPATH,
-			GOROOT:      build.Default.GOROOT,
-			Debug:       Debug,
-			LocalPrefix: LocalPrefix,
+			GocmdRunner: &gocommand.Runner{},
 		},
-		AllErrors:  opt.AllErrors,
-		Comments:   opt.Comments,
-		FormatOnly: opt.FormatOnly,
-		Fragment:   opt.Fragment,
-		TabIndent:  opt.TabIndent,
-		TabWidth:   opt.TabWidth,
+		LocalPrefix: LocalPrefix,
+		AllErrors:   opt.AllErrors,
+		Comments:    opt.Comments,
+		FormatOnly:  opt.FormatOnly,
+		Fragment:    opt.Fragment,
+		TabIndent:   opt.TabIndent,
+		TabWidth:    opt.TabWidth,
+	}
+	if Debug {
+		intopt.Env.Logf = log.Printf
 	}
 	return intimp.Process(filename, src, intopt)
 }

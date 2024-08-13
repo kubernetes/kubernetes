@@ -17,8 +17,12 @@ limitations under the License.
 package protobuf
 
 import (
+	"bytes"
+	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
@@ -65,4 +69,112 @@ func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, 
 
 func (t *mockTyper) Recognizes(_ schema.GroupVersionKind) bool {
 	return false
+}
+
+func TestSerializerEncodeWithAllocator(t *testing.T) {
+	testCases := []struct {
+		name string
+		obj  runtime.Object
+	}{
+		{
+			name: "encode a bufferedMarshaller obj",
+			obj: &testapigroupv1.Carp{
+				TypeMeta: metav1.TypeMeta{APIVersion: "group/version", Kind: "Carp"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: testapigroupv1.CarpSpec{
+					Subdomain: "carp.k8s.io",
+				},
+			},
+		},
+
+		{
+			name: "encode a runtime.Unknown obj",
+			obj:  &runtime.Unknown{TypeMeta: runtime.TypeMeta{APIVersion: "group/version", Kind: "Unknown"}, Raw: []byte("hello world")},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			target := NewSerializer(nil, nil)
+
+			writer := &bytes.Buffer{}
+			if err := target.Encode(tc.obj, writer); err != nil {
+				t.Fatal(err)
+			}
+
+			writer2 := &bytes.Buffer{}
+			alloc := &testAllocator{}
+			if err := target.EncodeWithAllocator(tc.obj, writer2, alloc); err != nil {
+				t.Fatal(err)
+			}
+			if alloc.allocateCount != 1 {
+				t.Fatalf("expected the Allocate method to be called exactly 1 but it was executed: %v times ", alloc.allocateCount)
+			}
+
+			// to ensure compatibility of the new method with the old one, serialized data must be equal
+			// also we are not testing decoding since "roundtripping" is tested elsewhere for all known types
+			if !reflect.DeepEqual(writer.Bytes(), writer2.Bytes()) {
+				t.Fatal("data mismatch, data serialized with the Encode method is different than serialized with the EncodeWithAllocator method")
+			}
+		})
+	}
+}
+
+func TestRawSerializerEncodeWithAllocator(t *testing.T) {
+	testCases := []struct {
+		name string
+		obj  runtime.Object
+	}{
+		{
+			name: "encode a bufferedReverseMarshaller obj",
+			obj: &testapigroupv1.Carp{
+				TypeMeta: metav1.TypeMeta{APIVersion: "group/version", Kind: "Carp"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: testapigroupv1.CarpSpec{
+					Subdomain: "carp.k8s.io",
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &bytes.Buffer{}
+			target := NewRawSerializer(nil, nil)
+
+			if err := target.Encode(tc.obj, writer); err != nil {
+				t.Fatal(err)
+			}
+
+			writer2 := &bytes.Buffer{}
+			alloc := &testAllocator{}
+			if err := target.EncodeWithAllocator(tc.obj, writer2, alloc); err != nil {
+				t.Fatal(err)
+			}
+			if alloc.allocateCount != 1 {
+				t.Fatalf("expected the Allocate method to be called exactly 1 but it was executed: %v times ", alloc.allocateCount)
+			}
+
+			// to ensure compatibility of the new method with the old one, serialized data must be equal
+			// also we are not testing decoding since "roundtripping" is tested elsewhere for all known types
+			if !reflect.DeepEqual(writer.Bytes(), writer2.Bytes()) {
+				t.Fatal("data mismatch, data serialized with the Encode method is different than serialized with the EncodeWithAllocator method")
+			}
+		})
+	}
+}
+
+type testAllocator struct {
+	buf           []byte
+	allocateCount int
+}
+
+func (ta *testAllocator) Allocate(n uint64) []byte {
+	ta.buf = make([]byte, n)
+	ta.allocateCount++
+	return ta.buf
 }

@@ -67,6 +67,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		username := ""
 		groups := []string{}
 		userExtra := map[string][]string{}
+		uid := ""
 		for _, impersonationRequest := range impersonationRequests {
 			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
 			actingAsAttributes := &authorizer.AttributesRecord{
@@ -103,42 +104,75 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				actingAsAttributes.Subresource = extraKey
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
 
+			case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
+				uid = string(impersonationRequest.Name)
+				actingAsAttributes.Resource = "uids"
+
 			default:
-				klog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
-				klog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
+				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}
 		}
 
-		if !groupsSpecified && username != user.Anonymous {
-			// When impersonating a non-anonymous user, if no groups were specified
-			// include the system:authenticated group in the impersonated user info
-			groups = append(groups, user.AllAuthenticated)
+		if username != user.Anonymous {
+			// When impersonating a non-anonymous user, include the 'system:authenticated' group
+			// in the impersonated user info:
+			// - if no groups were specified
+			// - if a group has been specified other than 'system:authenticated'
+			//
+			// If 'system:unauthenticated' group has been specified we should not include
+			// the 'system:authenticated' group.
+			addAuthenticated := true
+			for _, group := range groups {
+				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
+					addAuthenticated = false
+					break
+				}
+			}
+
+			if addAuthenticated {
+				groups = append(groups, user.AllAuthenticated)
+			}
+		} else {
+			addUnauthenticated := true
+			for _, group := range groups {
+				if group == user.AllUnauthenticated {
+					addUnauthenticated = false
+					break
+				}
+			}
+
+			if addUnauthenticated {
+				groups = append(groups, user.AllUnauthenticated)
+			}
 		}
 
 		newUser := &user.DefaultInfo{
 			Name:   username,
 			Groups: groups,
 			Extra:  userExtra,
+			UID:    uid,
 		}
 		req = req.WithContext(request.WithUser(ctx, newUser))
 
 		oldUser, _ := request.UserFrom(ctx)
-		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
+		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
 
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		audit.LogImpersonatedUser(ae, newUser)
 
 		// clear all the impersonation headers from the request
 		req.Header.Del(authenticationv1.ImpersonateUserHeader)
 		req.Header.Del(authenticationv1.ImpersonateGroupHeader)
+		req.Header.Del(authenticationv1.ImpersonateUIDHeader)
 		for headerName := range req.Header {
 			if strings.HasPrefix(headerName, authenticationv1.ImpersonateUserExtraHeaderPrefix) {
 				req.Header.Del(headerName)
@@ -147,6 +181,24 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 
 		handler.ServeHTTP(w, req)
 	})
+}
+
+func userString(u user.Info) string {
+	if u == nil {
+		return "<none>"
+	}
+	b := strings.Builder{}
+	if name := u.GetName(); name == "" {
+		b.WriteString("<empty>")
+	} else {
+		b.WriteString(name)
+	}
+	if groups := u.GetGroups(); len(groups) > 0 {
+		b.WriteString("[")
+		b.WriteString(strings.Join(groups, ","))
+		b.WriteString("]")
+	}
+	return b.String()
 }
 
 func unescapeExtraKey(encodedKey string) string {
@@ -204,7 +256,17 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 		}
 	}
 
-	if (hasGroups || hasUserExtra) && !hasUser {
+	requestedUID := headers.Get(authenticationv1.ImpersonateUIDHeader)
+	hasUID := len(requestedUID) > 0
+	if hasUID {
+		impersonationRequests = append(impersonationRequests, v1.ObjectReference{
+			Kind:       "UID",
+			Name:       requestedUID,
+			APIVersion: authenticationv1.SchemeGroupVersion.String(),
+		})
+	}
+
+	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
 		return nil, fmt.Errorf("requested %v without impersonating a user", impersonationRequests)
 	}
 

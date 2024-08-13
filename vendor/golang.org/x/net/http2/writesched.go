@@ -32,7 +32,8 @@ type WriteScheduler interface {
 
 	// Pop dequeues the next frame to write. Returns false if no frames can
 	// be written. Frames with a given wr.StreamID() are Pop'd in the same
-	// order they are Push'd. No frames should be discarded except by CloseStream.
+	// order they are Push'd, except RST_STREAM frames. No frames should be
+	// discarded except by CloseStream.
 	Pop() (wr FrameWriteRequest, ok bool)
 }
 
@@ -52,6 +53,7 @@ type FrameWriteRequest struct {
 
 	// stream is the stream on which this frame will be written.
 	// nil for non-stream frames like PING and SETTINGS.
+	// nil for RST_STREAM streams, which use the StreamError.StreamID field instead.
 	stream *stream
 
 	// done, if non-nil, must be a buffered channel with space for
@@ -182,7 +184,8 @@ func (wr *FrameWriteRequest) replyToWriter(err error) {
 
 // writeQueue is used by implementations of WriteScheduler.
 type writeQueue struct {
-	s []FrameWriteRequest
+	s          []FrameWriteRequest
+	prev, next *writeQueue
 }
 
 func (q *writeQueue) empty() bool { return len(q.s) == 0 }

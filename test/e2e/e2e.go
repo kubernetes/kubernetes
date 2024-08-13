@@ -20,10 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,38 +29,31 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
-	testutils "k8s.io/kubernetes/test/utils"
 	utilnet "k8s.io/utils/net"
 
 	clientset "k8s.io/client-go/kubernetes"
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	// ensure that cloud providers are loaded
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
+	// Ensure that logging flags are part of the command line.
+	_ "k8s.io/component-base/logs/testinit"
 )
 
 const (
@@ -73,20 +64,23 @@ const (
 	namespaceCleanupTimeout = 15 * time.Minute
 )
 
-var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+var progressReporter = &e2ereporters.ProgressReporter{}
+
+var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
-	setupSuite()
+	progressReporter.SetStartMsg()
+	setupSuite(ctx)
 	return nil
-}, func(data []byte) {
+}, func(ctx context.Context, data []byte) {
 	// Run on all Ginkgo nodes
-	setupSuitePerGinkgoNode()
+	setupSuitePerGinkgoNode(ctx)
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
-	CleanupSuite()
-}, func() {
-	AfterSuiteActions()
+	progressReporter.SetEndMsg()
+}, func(ctx context.Context) {
+	AfterSuiteActions(ctx)
 })
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
@@ -95,72 +89,25 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
-	runtimeutils.ReallyCrash = true
+	// InitLogs disables contextual logging, without a way to enable it again
+	// in the E2E test suite because it has no feature gates. It used to have a
+	// misleading --feature-gates parameter but that didn't do what users
+	// and developers expected (define which features the cluster supports)
+	// and therefore got removed.
+	//
+	// Because contextual logging is useful and should get tested, it gets
+	// re-enabled here unconditionally.
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	klog.EnableContextualLogging(true)
 
+	progressReporter = e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL)
 	gomega.RegisterFailHandler(framework.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
-		// TODO: we should probably only be trying to create this directory once
-		// rather than once-per-Ginkgo-node.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
-		}
-	}
-
-	// Stream the progress to stdout and optionally a URL accepting progress updates.
-	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
-
-	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
-	// when documenting our tests.
-	if len(framework.TestContext.SpecSummaryOutput) > 0 {
-		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
-	}
-
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
-}
-
-// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
-// to flip to Ready, log its output and delete it.
-func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
-	path := "test/images/clusterapi-tester/pod.yaml"
-	framework.Logf("Parsing pod from %v", path)
-	p, err := e2emanifest.PodFromManifest(path)
-	if err != nil {
-		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
-		return
-	}
-	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{}); err != nil {
-		framework.Logf("Failed to create %v: %v", p.Name, err)
-		return
-	}
-	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
-		}
-	}()
-	timeout := 5 * time.Minute
-	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		framework.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
-		return
-	}
-	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
-	if err != nil {
-		framework.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
-	} else {
-		framework.Logf("Output of clusterapi-tester:\n%v", logs)
-	}
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, suiteConfig.ParallelProcess)
+	ginkgo.RunSpecs(t, "Kubernetes e2e suite", suiteConfig, reporterConfig)
 }
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
@@ -168,9 +115,9 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 // This unequivocally identifies the default IP family because services are single family
 // TODO: dual-stack may support multiple families per service
 // but we can detect if a cluster is dual stack because pods have two addresses (one per family)
-func getDefaultClusterIPFamily(c clientset.Interface) string {
+func getDefaultClusterIPFamily(ctx context.Context, c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
-	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get kubernetes service ClusterIP: %v", err)
 	}
@@ -184,18 +131,21 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 // waitForDaemonSets for all daemonsets in the given namespace to be ready
 // (defined as all but 'allowedNotReadyNodes' pods associated with that
 // daemonset are ready).
-func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
+//
+// If allowedNotReadyNodes is -1, this method returns immediately without waiting.
+func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
+	if allowedNotReadyNodes == -1 {
+		return nil
+	}
+
 	start := time.Now()
 	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
 		timeout, ns)
 
-	return wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		dsList, err := c.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		dsList, err := c.AppsV1().DaemonSets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		var notReadyDaemonSets []string
@@ -224,7 +174,7 @@ func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 // This function takes two parameters: one function which runs on only the first Ginkgo node,
 // returning an opaque byte array, and then a second function which runs on all Ginkgo nodes,
 // accepting the byte array.
-func setupSuite() {
+func setupSuite(ctx context.Context) {
 	// Run only on Ginkgo node 1
 
 	switch framework.TestContext.Provider {
@@ -233,14 +183,12 @@ func setupSuite() {
 	}
 
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
+	framework.ExpectNoError(err, "Error loading client")
 
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
-		deleted, err := framework.DeleteNamespaces(c, nil, /* deleteFilter */
+		deleted, err := framework.DeleteNamespaces(ctx, c, nil, /* deleteFilter */
 			[]string{
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
@@ -250,20 +198,21 @@ func setupSuite() {
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
-		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
-		if err := framework.WaitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
+		if err := framework.WaitForNamespacesDeleted(ctx, c, deleted, namespaceCleanupTimeout); err != nil {
 			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
 
+	timeouts := framework.NewTimeoutContext()
+
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, timeouts.NodeSchedulable))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
 		framework.TestContext.CloudConfig.NumNodes = len(nodes.Items)
 	}
@@ -272,20 +221,24 @@ func setupSuite() {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
+	//
 	// TODO: In large clusters, we often observe a non-starting pods due to
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
-		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		e2ekubectl.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
-		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
+	if err := e2epod.WaitForAlmostAllPodsReady(ctx, c, metav1.NamespaceSystem, framework.TestContext.MinStartupPods, framework.TestContext.AllowedNotReadyNodes, timeouts.SystemPodsStartup); err != nil {
+		e2edebug.DumpAllNamespaceInfo(ctx, c, metav1.NamespaceSystem)
+		e2ekubectl.LogFailedContainers(ctx, c, metav1.NamespaceSystem, framework.Logf)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := waitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := waitForDaemonSets(ctx, c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), timeouts.SystemDaemonsetStartup); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
+	}
+
+	if framework.TestContext.PrepullImages {
+		framework.Logf("Pre-pulling images so that they are cached for the tests.")
+		prepullImages(ctx, c)
 	}
 
 	// Log the version of the server and this client.
@@ -302,29 +255,29 @@ func setupSuite() {
 	}
 
 	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
-		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
+		nodeKiller := e2enode.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCtx)
 	}
 }
 
 // logClusterImageSources writes out cluster image sources.
 func logClusterImageSources() {
-	masterImg, nodeImg, err := lookupClusterImageSources()
+	controlPlaneNodeImg, workerNodeImg, err := lookupClusterImageSources()
 	if err != nil {
 		framework.Logf("Cluster image sources lookup failed: %v\n", err)
 		return
 	}
-	framework.Logf("cluster-master-image: %s", masterImg)
-	framework.Logf("cluster-node-image: %s", nodeImg)
+	framework.Logf("cluster-control-plane-node-image: %s", controlPlaneNodeImg)
+	framework.Logf("cluster-worker-node-image: %s", workerNodeImg)
 
 	images := map[string]string{
-		"master_os_image": masterImg,
-		"node_os_image":   nodeImg,
+		"control_plane_node_os_image": controlPlaneNodeImg,
+		"worker_node_os_image":        workerNodeImg,
 	}
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(framework.TestContext.ReportDir, "images.json")
-	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
+	if err := os.WriteFile(filePath, outputBytes, 0644); err != nil {
 		framework.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }
@@ -332,7 +285,7 @@ func logClusterImageSources() {
 // TODO: These should really just use the GCE API client library or at least use
 // better formatted output from the --format flag.
 
-// Returns master & node image string, or error
+// Returns control plane node & worker node image string, or error
 func lookupClusterImageSources() (string, string, error) {
 	// Given args for a gcloud compute command, run it with other args, and return the values,
 	// whether separated by newlines, commas or semicolons.
@@ -381,35 +334,35 @@ func lookupClusterImageSources() (string, string, error) {
 	}
 
 	// gcloud compute instance-groups list-instances {GROUPNAME} --format="get(instance)"
-	nodeName := ""
+	workerNodeName := ""
 	instGroupName := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
 	if lines, err := gcloudf("instance-groups", "list-instances", instGroupName, "--format=get(instance)"); err != nil {
 		return "", "", err
 	} else if len(lines) == 0 {
 		return "", "", fmt.Errorf("no instances inside instance-group %q", instGroupName)
 	} else {
-		nodeName = lines[0]
+		workerNodeName = lines[0]
 	}
 
-	nodeImg, err := host2image(nodeName)
+	workerNodeImg, err := host2image(workerNodeName)
 	if err != nil {
 		return "", "", err
 	}
-	frags := strings.Split(nodeImg, "/")
-	nodeImg = frags[len(frags)-1]
+	frags := strings.Split(workerNodeImg, "/")
+	workerNodeImg = frags[len(frags)-1]
 
-	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
-	masterImg := ""
-	if masterName := framework.TestContext.CloudConfig.MasterName; masterName != "" {
-		img, err := host2image(masterName)
+	// For GKE clusters, controlPlaneNodeName will not be defined; we just leave controlPlaneNodeImg blank.
+	controlPlaneNodeImg := ""
+	if controlPlaneNodeName := framework.TestContext.CloudConfig.MasterName; controlPlaneNodeName != "" {
+		img, err := host2image(controlPlaneNodeName)
 		if err != nil {
 			return "", "", err
 		}
 		frags = strings.Split(img, "/")
-		masterImg = frags[len(frags)-1]
+		controlPlaneNodeImg = frags[len(frags)-1]
 	}
 
-	return masterImg, nodeImg, nil
+	return controlPlaneNodeImg, workerNodeImg, nil
 }
 
 // setupSuitePerGinkgoNode is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
@@ -417,7 +370,7 @@ func lookupClusterImageSources() (string, string, error) {
 // such as making some global variables accessible to all parallel executions
 // Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
 // Ref: https://onsi.github.io/ginkgo/#parallel-specs
-func setupSuitePerGinkgoNode() {
+func setupSuitePerGinkgoNode(ctx context.Context) {
 	// Obtain the default IP family of the cluster
 	// Some e2e test are designed to work on IPv4 only, this global variable
 	// allows to adapt those tests to work on both IPv4 and IPv6
@@ -425,9 +378,46 @@ func setupSuitePerGinkgoNode() {
 	// the dual stack clusters can be ipv4-ipv6 or ipv6-ipv4, order matters,
 	// and services use the primary IP family by default
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
-	framework.TestContext.IPFamily = getDefaultClusterIPFamily(c)
+	framework.ExpectNoError(err, "Error loading client")
+	framework.TestContext.IPFamily = getDefaultClusterIPFamily(ctx, c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
+}
+
+func prepullImages(ctx context.Context, c clientset.Interface) {
+	namespace, err := framework.CreateTestingNS(ctx, "img-puller", c, map[string]string{
+		"e2e-framework": "img-puller",
+	})
+	framework.ExpectNoError(err)
+	ns := namespace.Name
+	ginkgo.DeferCleanup(c.CoreV1().Namespaces().Delete, ns, metav1.DeleteOptions{})
+
+	images := commontest.PrePulledImages
+	if framework.NodeOSDistroIs("windows") {
+		images = commontest.WindowsPrePulledImages
+	}
+
+	label := map[string]string{"app": "prepull-daemonset"}
+	var imgPullers []*appsv1.DaemonSet
+	for _, img := range images.List() {
+		dsName := fmt.Sprintf("img-pull-%s", strings.ReplaceAll(strings.ReplaceAll(img, "/", "-"), ":", "-"))
+
+		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ctx, dsSpec, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		imgPullers = append(imgPullers, ds)
+	}
+
+	// this should not be a multiple of 5, because node status updates
+	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
+	dsRetryPeriod := 9 * time.Second
+	dsRetryTimeout := 5 * time.Minute
+
+	for _, imgPuller := range imgPullers {
+		checkDaemonset := func(ctx context.Context) (bool, error) {
+			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
+		}
+		framework.Logf("Waiting for %s", imgPuller.Name)
+		err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkDaemonset)
+		framework.ExpectNoError(err, "error waiting for image to be pulled")
+	}
 }

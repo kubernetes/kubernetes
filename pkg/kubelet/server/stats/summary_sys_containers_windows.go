@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -22,17 +23,21 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats
 }
 
 func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats
 }
 
@@ -94,4 +99,28 @@ func (sp *summaryProviderImpl) getSystemPodsCPUAndMemoryStats(nodeConfig cm.Node
 	}
 
 	return podsSummary
+}
+
+func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats() statsapi.ContainerStats {
+	now := metav1.NewTime(time.Now())
+	globalMemorySummary := statsapi.ContainerStats{
+		StartTime: now,
+		Memory:    &statsapi.MemoryStats{},
+		Name:      statsapi.SystemContainerWindowsGlobalCommitMemory,
+	}
+
+	perfInfo, err := winstats.GetPerformanceInfo()
+	if err != nil {
+		klog.Errorf("Failed to get Windows performance info: %v", err)
+		return globalMemorySummary
+	}
+
+	commitLimitBytes := perfInfo.CommitLimitPages * perfInfo.PageSize
+	commitTotalBytes := perfInfo.CommitTotalPages * perfInfo.PageSize
+	commitAvailableBytes := commitLimitBytes - commitTotalBytes
+	globalMemorySummary.Memory.Time = now
+	globalMemorySummary.Memory.AvailableBytes = &commitAvailableBytes
+	globalMemorySummary.Memory.UsageBytes = &commitTotalBytes
+
+	return globalMemorySummary
 }

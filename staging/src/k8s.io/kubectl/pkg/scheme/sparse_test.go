@@ -19,18 +19,17 @@ package scheme
 import (
 	"testing"
 
-	"k8s.io/api/batch/v1"
-	"k8s.io/api/batch/v1beta1"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestCronJob(t *testing.T) {
-	src := &v1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	src := &v1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
-	encoder := Codecs.LegacyCodec(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion)
+	encoder := Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	cronjobBytes, err := runtime.Encode(encoder, src)
 	if err != nil {
 		t.Fatal(err)
@@ -46,9 +45,9 @@ func TestCronJob(t *testing.T) {
 	}
 
 	// clear typemeta
-	uncastDst.(*v1beta1.CronJob).TypeMeta = metav1.TypeMeta{}
+	uncastDst.(*v1.CronJob).TypeMeta = metav1.TypeMeta{}
 
 	if !equality.Semantic.DeepEqual(src, uncastDst) {
-		t.Fatal(diff.ObjectDiff(src, uncastDst))
+		t.Fatal(cmp.Diff(src, uncastDst))
 	}
 }

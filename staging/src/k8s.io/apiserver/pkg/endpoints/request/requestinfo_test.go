@@ -25,6 +25,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestGetAPIRequestInfo(t *testing.T) {
@@ -190,64 +193,129 @@ func newTestRequestInfoResolver() *RequestInfoFactory {
 	}
 }
 
-func TestFieldSelectorParsing(t *testing.T) {
+func TestSelectorParsing(t *testing.T) {
 	tests := []struct {
-		name         string
-		url          string
-		expectedName string
-		expectedErr  error
-		expectedVerb string
+		name                  string
+		method                string
+		url                   string
+		expectedName          string
+		expectedErr           error
+		expectedVerb          string
+		expectedFieldSelector string
+		expectedLabelSelector string
 	}{
 		{
-			name:         "no selector",
-			url:          "/apis/group/version/resource",
-			expectedVerb: "list",
+			name:                  "no selector",
+			method:                "GET",
+			url:                   "/apis/group/version/resource",
+			expectedVerb:          "list",
+			expectedFieldSelector: "",
 		},
 		{
-			name:         "metadata.name selector",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1",
-			expectedName: "name1",
-			expectedVerb: "list",
+			name:                  "metadata.name selector",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1",
+			expectedName:          "name1",
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1",
 		},
 		{
-			name:         "metadata.name selector with watch",
-			url:          "/apis/group/version/resource?watch=true&fieldSelector=metadata.name=name1",
-			expectedName: "name1",
-			expectedVerb: "watch",
+			name:                  "metadata.name selector with watch",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?watch=true&fieldSelector=metadata.name=name1",
+			expectedName:          "name1",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "metadata.name=name1",
 		},
 		{
-			name:         "random selector",
-			url:          "/apis/group/version/resource?fieldSelector=foo=bar",
-			expectedName: "",
-			expectedVerb: "list",
+			name:                  "random selector",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=foo=bar&labelSelector=baz=qux",
+			expectedName:          "",
+			expectedVerb:          "list",
+			expectedFieldSelector: "foo=bar",
+			expectedLabelSelector: "baz=qux",
 		},
 		{
-			name:         "invalid selector with metadata.name",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "list",
+			name:                  "invalid selector with metadata.name",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1,foo",
 		},
 		{
-			name:         "invalid selector with metadata.name with watch",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=true",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "watch",
+			name:                  "invalid selector with metadata.name with watch",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=true",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "watch",
+			expectedFieldSelector: "metadata.name=name1,foo",
 		},
 		{
-			name:         "invalid selector with metadata.name with watch false",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=false",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "list",
+			name:                  "invalid selector with metadata.name with watch false",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=false",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1,foo",
+		},
+		{
+			name:                  "selector on deletecollection is honored",
+			method:                "DELETE",
+			url:                   "/apis/group/version/resource?fieldSelector=foo=bar&labelSelector=baz=qux",
+			expectedName:          "",
+			expectedVerb:          "deletecollection",
+			expectedFieldSelector: "foo=bar",
+			expectedLabelSelector: "baz=qux",
+		},
+		{
+			name:                  "selector on repeated param matches parsed param",
+			method:                "GET",
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=foo&fieldSelector=metadata.name=bar&labelSelector=foo=bar&labelSelector=foo=baz",
+			expectedName:          "foo",
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=foo",
+			expectedLabelSelector: "foo=bar",
+		},
+		{
+			name:                  "selector on other verb is ignored",
+			method:                "GET",
+			url:                   "/apis/group/version/resource/name?fieldSelector=foo=bar&labelSelector=foo=bar",
+			expectedName:          "name",
+			expectedVerb:          "get",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
+		},
+		{
+			name:                  "selector on deprecated root type watch is not parsed",
+			method:                "GET",
+			url:                   "/apis/group/version/watch/resource?fieldSelector=metadata.name=foo&labelSelector=foo=bar",
+			expectedName:          "",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
+		},
+		{
+			name:                  "selector on deprecated root item watch is not parsed",
+			method:                "GET",
+			url:                   "/apis/group/version/watch/resource/name?fieldSelector=metadata.name=foo&labelSelector=foo=bar",
+			expectedName:          "name",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
 		},
 	}
 
 	resolver := newTestRequestInfoResolver()
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
+
 	for _, tc := range tests {
-		req, _ := http.NewRequest("GET", tc.url, nil)
+		req, _ := http.NewRequest(tc.method, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -260,6 +328,12 @@ func TestFieldSelectorParsing(t *testing.T) {
 		}
 		if e, a := tc.expectedVerb, apiRequestInfo.Verb; e != a {
 			t.Errorf("%s: expected verb %v, actual %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedFieldSelector, apiRequestInfo.FieldSelector; e != a {
+			t.Errorf("%s: expected fieldSelector %v, actual %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedLabelSelector, apiRequestInfo.LabelSelector; e != a {
+			t.Errorf("%s: expected labelSelector %v, actual %v", tc.name, e, a)
 		}
 	}
 }

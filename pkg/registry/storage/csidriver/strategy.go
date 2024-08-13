@@ -19,6 +19,7 @@ package csidriver
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -43,21 +44,23 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// PrepareForCreate clears the VolumeLifecycleModes field if the corresponding feature is disabled.
+// PrepareForCreate clears the fields for which the corresponding feature is disabled.
 func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		csiDriver := obj.(*storage.CSIDriver)
-		csiDriver.Spec.VolumeLifecycleModes = nil
+	csiDriver := obj.(*storage.CSIDriver)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		csiDriver.Spec.SELinuxMount = nil
 	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
 
-	errs := validation.ValidateCSIDriver(csiDriver)
-	errs = append(errs, validation.ValidateCSIDriver(csiDriver)...)
+	return validation.ValidateCSIDriver(csiDriver)
+}
 
-	return errs
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -68,22 +71,33 @@ func (csiDriverStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// PrepareForUpdate clears the VolumeLifecycleModes field if the corresponding feature is disabled and
+// PrepareForUpdate clears the fields for which the corresponding feature is disabled and
 // existing object does not already have that field set. This allows the field to remain when
 // downgrading to a version that has the feature disabled.
 func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if old.(*storage.CSIDriver).Spec.VolumeLifecycleModes == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		newCSIDriver := obj.(*storage.CSIDriver)
-		newCSIDriver.Spec.VolumeLifecycleModes = nil
+	newCSIDriver := obj.(*storage.CSIDriver)
+	oldCSIDriver := old.(*storage.CSIDriver)
+
+	if oldCSIDriver.Spec.SELinuxMount == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		newCSIDriver.Spec.SELinuxMount = nil
+	}
+
+	// Any changes to the spec increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec, newCSIDriver.Spec) {
+		newCSIDriver.Generation = oldCSIDriver.Generation + 1
 	}
 }
 
 func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
-	errorList := validation.ValidateCSIDriver(newCSIDriverObj)
-	return append(errorList, validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)...)
+	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiDriverStrategy) AllowUnconditionalUpdate() bool {

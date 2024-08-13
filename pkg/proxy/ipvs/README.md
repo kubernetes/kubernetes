@@ -62,7 +62,7 @@ IPVS proxier will fall back on IPTABLES in the following scenarios.
 
 **1. kube-proxy starts with --masquerade-all=true**
 
-If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy have flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
+If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy has flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -133,7 +133,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLU
 For loadBalancer type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-LOAD-BALANCER`.
 Specially when service's  `LoadBalancerSourceRanges` is specified or specified `externalTrafficPolicy=local`,
 IPVS proxier will create ipset sets `KUBE-LOAD-BALANCER-LOCAL`/`KUBE-LOAD-BALANCER-FW`/`KUBE-LOAD-BALANCER-SOURCE-CIDR`
-and install IPTABLES accordingly, which should looks like what is shown below.
+and install IPTABLES accordingly, which should look like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -184,7 +184,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOA
 
 For NodePort type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
 When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TCP/KUBE-NODE-PORT-LOCAL-UDP`
-and install IPTABLES accordingly, which should looks like what is shown below.
+and install IPTABLES accordingly, which should look like what is shown below.
 
 Suppose service with TCP type nodePort.
 
@@ -223,7 +223,7 @@ KUBE-NODE-PORT  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUB
 **5. Service with externalIPs specified**
 
 For service with `externalIPs` specified, IPVS proxier will install IPTABLES with match of ipset `KUBE-EXTERNAL-IP`,
-Suppose we have service with `externalIPs` specified, IPTABLES rules should looks like what is shown below.
+Suppose we have service with `externalIPs` specified, IPTABLES rules should look like what is shown below.
 
 ```shell
 Chain PREROUTING (policy ACCEPT)
@@ -334,28 +334,19 @@ export KUBE_PROXY_MODE=ipvs
 
 ### Cluster Created by Kubeadm
 
-If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` and also add `SupportIPVSProxyMode: true` below the `kubeProxy` field as part of the kubeadm configuration.
+If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add mode: ipvs in a KubeProxyConfiguration (separated by -- that is also passed to kubeadm init).
 
 ```yaml
 ...
-kubeProxy:
-  config:
-    featureGates:
-      SupportIPVSProxyMode: true
-    mode: ipvs
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: ipvs
 ...
 ```
-Note that in Kubernetes 1.11 and later, `SupportIPVSProxyMode` is set to `true` by default.
 
 before running
 
-`kube init --config <path_to_configuration_file>`
-
-If you are using Kubernetes v1.8, you can also add the flag `--feature-gates=SupportIPVSProxyMode=true` (deprecated since v1.9) in `kubeadm init` command
-
-```
-kubeadm init --feature-gates=SupportIPVSProxyMode=true
-```
+`kubeadm init --config <path_to_configuration_file>`
 
 to specify the ipvs mode before deploying the cluster.
 
@@ -374,7 +365,7 @@ or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for
 Using ipvs Proxier.
 ```
 
-While there is no IPVS proxy rules or the following logs ocuurs indicate that the kube-proxy fails to use IPVS mode:
+While there is no IPVS proxy rules or the following logs occurs indicate that the kube-proxy fails to use IPVS mode:
 ```
 Can't use ipvs proxier, trying iptables proxier
 Using iptables Proxier.
@@ -412,14 +403,10 @@ UDP  10.0.0.10:53 rr
 
 Use the following check list to help you solve the problems:
 
-**1. Enable IPVS feature gateway**
-
-For Kubernetes v1.10 and later, feature gate `SupportIPVSProxyMode` is set to `true` by default. However, you need to enable `--feature-gates=SupportIPVSProxyMode=true` explicitly for Kubernetes before v1.10.
-
-**2. Specify proxy-mode=ipvs**
+**1. Specify proxy-mode=ipvs**
 
 Check whether the kube-proxy mode has been set to `ipvs`.
 
-**3. Install required kernel modules and packages**
+**2. Install required kernel modules and packages**
 
 Check whether the IPVS required kernel modules have been compiled into the kernel and packages installed. (see Prerequisite)

@@ -18,8 +18,8 @@ package testing
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -28,30 +28,44 @@ import (
 
 	"github.com/spf13/pflag"
 
+	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/openapi"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
-	// DisableStorageCleanup Disable the automatic storage cleanup
-	DisableStorageCleanup bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	ClientConfig *restclient.Config                              // Rest client config
-	ServerOpts   *options.CustomResourceDefinitionsServerOptions // ServerOpts
-	TearDownFn   TearDownFunc                                    // TearDown function
-	TmpDir       string                                          // Temp Dir used, by the apiserver
+	ClientConfig    *restclient.Config                              // Rest client config
+	ServerOpts      *options.CustomResourceDefinitionsServerOptions // ServerOpts
+	TearDownFn      TearDownFunc                                    // TearDown function
+	TmpDir          string                                          // Temp Dir used, by the apiserver
+	CompletedConfig extensionsapiserver.CompletedConfig
 }
 
 // Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
@@ -63,35 +77,35 @@ type Logger interface {
 
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
-	return &TestServerInstanceOptions{
-		DisableStorageCleanup: false,
-	}
+	return &TestServerInstanceOptions{}
 }
 
 // StartTestServer starts a apiextensions-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-// 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
-// 		 enough time to remove temporary files.
-func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
-	if instanceOptions == nil {
-		instanceOptions = NewDefaultTestServerOptions()
-	}
-
-	// TODO : Remove TrackStorageCleanup below when PR
-	// https://github.com/kubernetes/kubernetes/pull/50690
-	// merges as that shuts down storage properly
-	if !instanceOptions.DisableStorageCleanup {
-		registry.TrackStorageCleanup()
-	}
-
-	stopCh := make(chan struct{})
+// files that because Golang testing's call to os.Exit will not give a stop channel go routine
+// enough time to remove temporary files.
+func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	// TODO: this is a candidate for using what is now test/utils/ktesting,
+	// should that become a staging repo.
+	ctx, cancel := context.WithCancelCause(context.Background())
+	var errCh chan error
 	tearDown := func() {
-		if !instanceOptions.DisableStorageCleanup {
-			registry.CleanupStorage()
+		// Cancel is stopping apiextensions apiserver and its
+		// delegates, which itself is cleaning up after itself,
+		// including shutting down its storage layer.
+		cancel(errors.New("tearing down"))
+
+		// If the apiextensions apiserver was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
 		}
-		close(stopCh)
+
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -102,13 +116,17 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "apiextensions-apiserver")
+	result.TmpDir, err = os.MkdirTemp("", "apiextensions-apiserver")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
+	featureGate := utilfeature.DefaultMutableFeatureGate
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	utilversion.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	s.AddFlags(fs)
 
@@ -132,6 +150,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	fs.Parse(customFlags)
 
+	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+		return result, err
+	}
+
 	if err := s.Complete(); err != nil {
 		return result, fmt.Errorf("failed to set default options: %v", err)
 	}
@@ -146,17 +168,25 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
-	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
+
+	getOpenAPIDefinitions := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)
+	namer := openapinamer.NewDefinitionNamer(extensionsapiserver.Scheme)
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(getOpenAPIDefinitions, namer)
+
+	completedConfig := config.Complete()
+	server, err := completedConfig.New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return result, fmt.Errorf("failed to create server: %v", err)
 	}
 
-	errCh := make(chan error)
-	go func(stopCh <-chan struct{}) {
-		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
+	errCh = make(chan error)
+	go func() {
+		defer close(errCh)
+
+		if err := server.GenericAPIServer.PrepareRun().RunWithContext(ctx); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}()
 
 	t.Logf("Waiting for /healthz to be ok...")
 
@@ -164,7 +194,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -187,6 +217,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	result.ClientConfig = server.GenericAPIServer.LoopbackClientConfig
 	result.ServerOpts = s
 	result.TearDownFn = tearDown
+	result.CompletedConfig = completedConfig
 
 	return result, nil
 }

@@ -50,6 +50,12 @@ func (r *ProxyREST) New() runtime.Object {
 	return &api.NodeProxyOptions{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *ProxyREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // ConnectMethods returns the list of HTTP methods that can be proxied
 func (r *ProxyREST) ConnectMethods() []string {
 	return proxyMethods

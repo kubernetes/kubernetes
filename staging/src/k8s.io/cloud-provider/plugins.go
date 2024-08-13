@@ -40,11 +40,7 @@ var (
 		external bool
 		detail   string
 	}{
-		{"aws", false, "The AWS provider is deprecated and will be removed in a future release"},
-		{"azure", false, "The Azure provider is deprecated and will be removed in a future release"},
-		{"gce", false, "The GCE provider is deprecated and will be removed in a future release"},
-		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
-		{"vsphere", false, "The vSphere provider is deprecated and will be removed in a future release"},
+		{"gce", false, "The GCE provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-gcp"},
 	}
 )
 
@@ -91,31 +87,61 @@ func IsExternal(name string) bool {
 	return name == externalCloudProvider
 }
 
+// IsDeprecatedInternal is responsible for preventing cloud.Interface
+// from being initialized in kubelet, kube-controller-manager or kube-api-server
+func IsDeprecatedInternal(name string) bool {
+	for _, provider := range deprecatedCloudProviders {
+		if provider.name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+// DisableWarningForProvider logs information about disabled cloud provider state
+func DisableWarningForProvider(providerName string) {
+	for _, provider := range deprecatedCloudProviders {
+		if provider.name == providerName {
+			klog.Infof("INFO: Please make sure you are running external cloud controller manager binary for provider %q."+
+				"In-tree cloud providers are currently disabled. Refer to https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cloud-provider/sample"+
+				"for example implementation.", providerName)
+			detail := fmt.Sprintf("Please reach to sig-cloud-provider and use 'external' cloud provider for %q: %s", providerName, provider.detail)
+			klog.Warningf("WARNING: %q built-in cloud provider is now disabled. %s", providerName, detail)
+			break
+		}
+	}
+}
+
+// DeprecationWarningForProvider logs information about deprecated cloud provider state
+func DeprecationWarningForProvider(providerName string) {
+	for _, provider := range deprecatedCloudProviders {
+		if provider.name != providerName {
+			continue
+		}
+
+		detail := provider.detail
+		if provider.external {
+			detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", providerName, provider.detail)
+		}
+
+		klog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", providerName, detail)
+		break
+	}
+}
+
 // InitCloudProvider creates an instance of the named cloud provider.
 func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	var cloud Interface
 	var err error
 
 	if name == "" {
-		klog.Info("No cloud provider specified.")
 		return nil, nil
 	}
 
 	if IsExternal(name) {
 		klog.Info("External cloud provider specified")
 		return nil, nil
-	}
-
-	for _, provider := range deprecatedCloudProviders {
-		if provider.name == name {
-			detail := provider.detail
-			if provider.external {
-				detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", name, provider.detail)
-			}
-			klog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", name, detail)
-
-			break
-		}
 	}
 
 	if configFilePath != "" {

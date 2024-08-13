@@ -27,7 +27,7 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
-func TestGetPodQOS(t *testing.T) {
+func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
 		pod      *v1.Pod
 		expected v1.PodQOSClass
@@ -128,15 +128,15 @@ func TestGetPodQOS(t *testing.T) {
 		},
 	}
 	for id, testCase := range testCases {
-		if actual := GetPodQOS(testCase.pod); testCase.expected != actual {
+		if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 
-		// Convert v1.Pod to core.Pod, and then check against `core.helper.GetPodQOS`.
+		// Convert v1.Pod to core.Pod, and then check against `core.helper.ComputePodQOS`.
 		pod := core.Pod{}
 		corev1.Convert_v1_Pod_To_core_Pod(testCase.pod, &pod, nil)
 
-		if actual := qos.GetPodQOS(&pod); core.PodQOSClass(testCase.expected) != actual {
+		if actual := qos.ComputePodQOS(&pod); core.PodQOSClass(testCase.expected) != actual {
 			t.Errorf("[%d]: conversion invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 	}

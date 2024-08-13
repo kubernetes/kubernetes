@@ -19,8 +19,8 @@ package validation
 import (
 	"strings"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var supportedFormats = sets.NewString(

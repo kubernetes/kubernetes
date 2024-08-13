@@ -118,7 +118,7 @@ func (t Tag) Parent() Tag {
 	return Tag{language: lang, locale: lang}
 }
 
-// returns token t and the rest of the string.
+// nextToken returns token t and the rest of the string.
 func nextToken(s string) (t, tail string) {
 	p := strings.Index(s[1:], "-")
 	if p == -1 {

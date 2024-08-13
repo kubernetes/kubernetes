@@ -18,6 +18,7 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func NewFakeInternalContainerLifecycle() *fakeInternalContainerLifecycle {
@@ -26,11 +27,11 @@ func NewFakeInternalContainerLifecycle() *fakeInternalContainerLifecycle {
 
 type fakeInternalContainerLifecycle struct{}
 
-func (f *fakeInternalContainerLifecycle) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (f *fakeInternalContainerLifecycle) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PreStopContainer(containerID string) error {
+func (f *fakeInternalContainerLifecycle) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
 	return nil
 }
 

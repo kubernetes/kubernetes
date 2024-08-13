@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -45,7 +46,6 @@ type SetSelectorOptions struct {
 	PrintFlags           *genericclioptions.PrintFlags
 	RecordFlags          *genericclioptions.RecordFlags
 	dryRunStrategy       cmdutil.DryRunStrategy
-	dryRunVerifier       *resource.DryRunVerifier
 	fieldManager         string
 
 	// set by args
@@ -60,25 +60,25 @@ type SetSelectorOptions struct {
 	ResourceFinder genericclioptions.ResourceFinder
 
 	// set at initialization
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
-	selectorLong = templates.LongDesc(`
+	selectorLong = templates.LongDesc(i18n.T(`
 		Set the selector on a resource. Note that the new selector will overwrite the old selector if the resource had one prior to the invocation
 		of 'set selector'.
 
 		A selector must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
-        Note: currently selectors can only be set on Service objects.`)
+        Note: currently selectors can only be set on Service objects.`))
 	selectorExample = templates.Examples(`
-        # set the labels and selector before creating a deployment/service pair.
+        # Set the labels and selector before creating a deployment/service pair
         kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run=client | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
         kubectl create deployment my-dep -o yaml --dry-run=client | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
 // NewSelectorOptions returns an initialized SelectorOptions instance
-func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
+func NewSelectorOptions(streams genericiooptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithScheme(scheme.Scheme).
@@ -95,7 +95,7 @@ func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions
 }
 
 // NewCmdSelector is the "set selector" command.
-func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdSelector(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{
@@ -136,15 +136,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
@@ -219,11 +210,6 @@ func (o *SetSelectorOptions) RunSelector() error {
 		}
 		if !o.WriteToServer {
 			return o.PrintObj(info.Object, o.Out)
-		}
-		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
 		}
 
 		actual, err := resource.

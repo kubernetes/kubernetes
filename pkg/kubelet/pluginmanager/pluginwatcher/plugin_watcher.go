@@ -19,9 +19,7 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
@@ -36,7 +34,6 @@ type Watcher struct {
 	path                string
 	fs                  utilfs.Filesystem
 	fsWatcher           *fsnotify.Watcher
-	stopped             chan struct{}
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
@@ -51,9 +48,7 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *
 
 // Start watches for the creation and deletion of plugin sockets at the path
 func (w *Watcher) Start(stopCh <-chan struct{}) error {
-	klog.V(2).Infof("Plugin Watcher Start at %s", w.path)
-
-	w.stopped = make(chan struct{})
+	klog.V(2).InfoS("Plugin Watcher Start", "path", w.path)
 
 	// Creating the directory to be watched if it doesn't exist yet,
 	// and walks through the directory to discover the existing plugins.
@@ -69,38 +64,29 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 
 	// Traverse plugin dir and add filesystem watchers before starting the plugin processing goroutine.
 	if err := w.traversePluginDir(w.path); err != nil {
-		klog.Errorf("failed to traverse plugin socket path %q, err: %v", w.path, err)
+		klog.ErrorS(err, "Failed to traverse plugin socket path", "path", w.path)
 	}
 
 	go func(fsWatcher *fsnotify.Watcher) {
-		defer close(w.stopped)
 		for {
 			select {
 			case event := <-fsWatcher.Events:
 				//TODO: Handle errors by taking corrective measures
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Has(fsnotify.Create) {
 					err := w.handleCreateEvent(event)
 					if err != nil {
-						klog.Errorf("error %v when handling create event: %s", err, event)
+						klog.ErrorS(err, "Error when handling create event", "event", event)
 					}
-				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				} else if event.Has(fsnotify.Remove) {
 					w.handleDeleteEvent(event)
 				}
 				continue
 			case err := <-fsWatcher.Errors:
 				if err != nil {
-					klog.Errorf("fsWatcher received error: %v", err)
+					klog.ErrorS(err, "FsWatcher received error")
 				}
 				continue
 			case <-stopCh:
-				// In case of plugin watcher being stopped by plugin manager, stop
-				// probing the creation/deletion of plugin sockets.
-				// Also give all pending go routines a chance to complete
-				select {
-				case <-w.stopped:
-				case <-time.After(11 * time.Second):
-					klog.Errorf("timeout on stopping watcher")
-				}
 				w.fsWatcher.Close()
 				return
 			}
@@ -111,7 +97,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 }
 
 func (w *Watcher) init() error {
-	klog.V(4).Infof("Ensuring Plugin directory at %s ", w.path)
+	klog.V(4).InfoS("Ensuring Plugin directory", "path", w.path)
 
 	if err := w.fs.MkdirAll(w.path, 0755); err != nil {
 		return fmt.Errorf("error (re-)creating root %s: %v", w.path, err)
@@ -123,32 +109,43 @@ func (w *Watcher) init() error {
 // Walks through the plugin directory discover any existing plugin sockets.
 // Ignore all errors except root dir not being walkable
 func (w *Watcher) traversePluginDir(dir string) error {
+	// watch the new dir
+	err := w.fsWatcher.Add(dir)
+	if err != nil {
+		return fmt.Errorf("failed to watch %s, err: %v", w.path, err)
+	}
+	// traverse existing children in the dir
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if path == dir {
 				return fmt.Errorf("error accessing path: %s error: %v", path, err)
 			}
 
-			klog.Errorf("error accessing path: %s error: %v", path, err)
+			klog.ErrorS(err, "Error accessing path", "path", path)
 			return nil
 		}
 
-		switch mode := info.Mode(); {
-		case mode.IsDir():
+		// do not call fsWatcher.Add twice on the root dir to avoid potential problems.
+		if path == dir {
+			return nil
+		}
+
+		mode := info.Mode()
+		if mode.IsDir() {
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
-		case mode&os.ModeSocket != 0:
+		} else if isSocket, _ := util.IsUnixDomainSocket(path); isSocket {
 			event := fsnotify.Event{
 				Name: path,
 				Op:   fsnotify.Create,
 			}
 			//TODO: Handle errors by taking corrective measures
 			if err := w.handleCreateEvent(event); err != nil {
-				klog.Errorf("error %v when handling create event: %s", err, event)
+				klog.ErrorS(err, "Error when handling create", "event", event)
 			}
-		default:
-			klog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
+		} else {
+			klog.V(5).InfoS("Ignoring file", "path", path, "mode", mode)
 		}
 
 		return nil
@@ -159,15 +156,15 @@ func (w *Watcher) traversePluginDir(dir string) error {
 // Files names:
 // - MUST NOT start with a '.'
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
-	klog.V(6).Infof("Handling create event: %v", event)
+	klog.V(6).InfoS("Handling create event", "event", event)
 
-	fi, err := os.Stat(event.Name)
+	fi, err := getStat(event)
 	if err != nil {
 		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
 	}
 
 	if strings.HasPrefix(fi.Name(), ".") {
-		klog.V(5).Infof("Ignoring file (starts with '.'): %s", fi.Name())
+		klog.V(5).InfoS("Ignoring file (starts with '.')", "path", fi.Name())
 		return nil
 	}
 
@@ -177,7 +174,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 			return fmt.Errorf("failed to determine if file: %s is a unix domain socket: %v", event.Name, err)
 		}
 		if !isSocket {
-			klog.V(5).Infof("Ignoring non socket file %s", fi.Name())
+			klog.V(5).InfoS("Ignoring non socket file", "path", fi.Name())
 			return nil
 		}
 
@@ -188,15 +185,13 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 }
 
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
-	if runtime.GOOS == "windows" {
-		socketPath = util.NormalizePath(socketPath)
-	}
+	socketPath = getSocketPath(socketPath)
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still
 	// a possibility that it has been deleted and recreated again before it is
 	// removed from the desired world cache, so we still need to call AddOrUpdatePlugin
 	// in this case to update the timestamp
-	klog.V(2).Infof("Adding socket path or updating timestamp %s to desired state cache", socketPath)
+	klog.V(2).InfoS("Adding socket path or updating timestamp to desired state cache", "path", socketPath)
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(socketPath)
 	if err != nil {
 		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)
@@ -205,9 +200,9 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 }
 
 func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {
-	klog.V(6).Infof("Handling delete event: %v", event)
+	klog.V(6).InfoS("Handling delete event", "event", event)
 
 	socketPath := event.Name
-	klog.V(2).Infof("Removing socket path %s from desired state cache", socketPath)
+	klog.V(2).InfoS("Removing socket path from desired state cache", "path", socketPath)
 	w.desiredStateOfWorld.RemovePlugin(socketPath)
 }

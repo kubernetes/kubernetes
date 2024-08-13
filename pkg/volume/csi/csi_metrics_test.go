@@ -18,12 +18,14 @@ package csi
 
 import (
 	"io"
+	"reflect"
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestGetMetrics(t *testing.T) {
@@ -45,7 +47,7 @@ func TestGetMetrics(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.google.gcepd",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
@@ -114,7 +116,7 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.simple.SimpleDriver",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(false /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
@@ -132,6 +134,36 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 
 		if metrics != nil {
 			t.Fatalf("for %s, expected nil metrics, but got: %v", tc.name, metrics)
+		}
+	}
+
+}
+
+// test GetMetrics with a volume that does not support stats
+func TestGetMetricsDriverNotFound(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	tests := []struct {
+		name       string
+		volumeID   string
+		targetPath string
+		exitError  error
+	}{
+		{
+			name:       "volume with no driver",
+			volumeID:   "foobar",
+			targetPath: "/mnt/foo",
+			exitError:  transientError,
+		},
+	}
+
+	for _, tc := range tests {
+		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
+		metricsGetter.driverName = "unknown-driver"
+		_, err := metricsGetter.GetMetrics()
+		if err == nil {
+			t.Errorf("test should fail, but no error occurred")
+		} else if reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+			t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
 		}
 	}
 

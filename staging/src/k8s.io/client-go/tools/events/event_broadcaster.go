@@ -17,26 +17,32 @@ limitations under the License.
 package events
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	restclient "k8s.io/client-go/rest"
-
-	"k8s.io/api/events/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	typedv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
+	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -50,9 +56,11 @@ var defaultSleepDuration = 10 * time.Second
 
 // TODO: validate impact of copying and investigate hashing
 type eventKey struct {
+	eventType           string
 	action              string
 	reason              string
 	reportingController string
+	reportingInstance   string
 	regarding           corev1.ObjectReference
 	related             corev1.ObjectReference
 }
@@ -60,40 +68,49 @@ type eventKey struct {
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 	mu            sync.Mutex
-	eventCache    map[eventKey]*v1beta1.Event
+	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
 	sink          EventSink
 }
 
-// EventSinkImpl wraps EventInterface to implement EventSink.
+// EventSinkImpl wraps EventsV1Interface to implement EventSink.
 // TODO: this makes it easier for testing purpose and masks the logic of performing API calls.
 // Note that rollbacking to raw clientset should also be transparent.
 type EventSinkImpl struct {
-	Interface typedv1beta1.EventInterface
+	Interface typedeventsv1.EventsV1Interface
 }
 
-// Create is the same as CreateWithEventNamespace of the EventExpansion
-func (e *EventSinkImpl) Create(event *v1beta1.Event) (*v1beta1.Event, error) {
-	return e.Interface.CreateWithEventNamespace(event)
+// Create takes the representation of a event and creates it. Returns the server's representation of the event, and an error, if there is any.
+func (e *EventSinkImpl) Create(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
+	if event.Namespace == "" {
+		return nil, fmt.Errorf("can't create an event with empty namespace")
+	}
+	return e.Interface.Events(event.Namespace).Create(ctx, event, metav1.CreateOptions{})
 }
 
-// Update is the same as UpdateithEventNamespace of the EventExpansion
-func (e *EventSinkImpl) Update(event *v1beta1.Event) (*v1beta1.Event, error) {
-	return e.Interface.UpdateWithEventNamespace(event)
+// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
+func (e *EventSinkImpl) Update(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
+	if event.Namespace == "" {
+		return nil, fmt.Errorf("can't update an event with empty namespace")
+	}
+	return e.Interface.Events(event.Namespace).Update(ctx, event, metav1.UpdateOptions{})
 }
 
-// Patch is the same as PatchWithEventNamespace of the EventExpansion
-func (e *EventSinkImpl) Patch(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
-	return e.Interface.PatchWithEventNamespace(event, data)
+// Patch applies the patch and returns the patched event, and an error, if there is any.
+func (e *EventSinkImpl) Patch(ctx context.Context, event *eventsv1.Event, data []byte) (*eventsv1.Event, error) {
+	if event.Namespace == "" {
+		return nil, fmt.Errorf("can't patch an event with empty namespace")
+	}
+	return e.Interface.Events(event.Namespace).Patch(ctx, event.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 }
 
 // NewBroadcaster Creates a new event broadcaster.
 func NewBroadcaster(sink EventSink) EventBroadcaster {
-	return newBroadcaster(sink, defaultSleepDuration, map[eventKey]*v1beta1.Event{})
+	return newBroadcaster(sink, defaultSleepDuration, map[eventKey]*eventsv1.Event{})
 }
 
 // NewBroadcasterForTest Creates a new event broadcaster for test purposes.
-func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[eventKey]*v1beta1.Event) EventBroadcaster {
+func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[eventKey]*eventsv1.Event) EventBroadcaster {
 	return &eventBroadcasterImpl{
 		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		eventCache:    eventCache,
@@ -107,13 +124,13 @@ func (e *eventBroadcasterImpl) Shutdown() {
 }
 
 // refreshExistingEventSeries refresh events TTL
-func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
+func (e *eventBroadcasterImpl) refreshExistingEventSeries(ctx context.Context) {
 	// TODO: Investigate whether lock contention won't be a problem
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
-			if recordedEvent, retry := recordEvent(e.sink, event); !retry {
+			if recordedEvent, retry := recordEvent(ctx, e.sink, event); !retry {
 				if recordedEvent != nil {
 					e.eventCache[isomorphicKey] = recordedEvent
 				}
@@ -125,7 +142,7 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 // finishSeries checks if a series has ended and either:
 // - write final count to the apiserver
 // - delete a singleton event (i.e. series field is nil) from the cache
-func (e *eventBroadcasterImpl) finishSeries() {
+func (e *eventBroadcasterImpl) finishSeries(ctx context.Context) {
 	// TODO: Investigate whether lock contention won't be a problem
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -133,7 +150,7 @@ func (e *eventBroadcasterImpl) finishSeries() {
 		eventSerie := event.Series
 		if eventSerie != nil {
 			if eventSerie.LastObservedTime.Time.Before(time.Now().Add(-finishTime)) {
-				if _, retry := recordEvent(e.sink, event); !retry {
+				if _, retry := recordEvent(ctx, e.sink, event); !retry {
 					delete(e.eventCache, isomorphicKey)
 				}
 			}
@@ -144,17 +161,17 @@ func (e *eventBroadcasterImpl) finishSeries() {
 }
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
-func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingController string) EventRecorder {
+func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingController string) EventRecorderLogger {
 	hostname, _ := os.Hostname()
 	reportingInstance := reportingController + "-" + hostname
-	return &recorderImpl{scheme, reportingController, reportingInstance, e.Broadcaster, clock.RealClock{}}
+	return &recorderImplLogger{recorderImpl: &recorderImpl{scheme, reportingController, reportingInstance, e.Broadcaster, clock.RealClock{}}, logger: klog.Background()}
 }
 
-func (e *eventBroadcasterImpl) recordToSink(event *v1beta1.Event, clock clock.Clock) {
+func (e *eventBroadcasterImpl) recordToSink(ctx context.Context, event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
 	go func() {
-		evToRecord := func() *v1beta1.Event {
+		evToRecord := func() *eventsv1.Event {
 			e.mu.Lock()
 			defer e.mu.Unlock()
 			eventKey := getKey(eventCopy)
@@ -165,61 +182,68 @@ func (e *eventBroadcasterImpl) recordToSink(event *v1beta1.Event, clock clock.Cl
 					isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
 					return nil
 				}
-				isomorphicEvent.Series = &v1beta1.EventSeries{
-					Count:            1,
+				isomorphicEvent.Series = &eventsv1.EventSeries{
+					Count:            2,
 					LastObservedTime: metav1.MicroTime{Time: clock.Now()},
 				}
-				return isomorphicEvent
+				// Make a copy of the Event to make sure that recording it
+				// doesn't mess with the object stored in cache.
+				return isomorphicEvent.DeepCopy()
 			}
 			e.eventCache[eventKey] = eventCopy
-			return eventCopy
+			// Make a copy of the Event to make sure that recording it doesn't
+			// mess with the object stored in cache.
+			return eventCopy.DeepCopy()
 		}()
 		if evToRecord != nil {
-			recordedEvent := e.attemptRecording(evToRecord)
-			if recordedEvent != nil {
-				recordedEventKey := getKey(recordedEvent)
-				e.mu.Lock()
-				defer e.mu.Unlock()
-				e.eventCache[recordedEventKey] = recordedEvent
-			}
+			// TODO: Add a metric counting the number of recording attempts
+			e.attemptRecording(ctx, evToRecord)
+			// We don't want the new recorded Event to be reflected in the
+			// client's cache because server-side mutations could mess with the
+			// aggregation mechanism used by the client.
 		}
 	}()
 }
 
-func (e *eventBroadcasterImpl) attemptRecording(event *v1beta1.Event) *v1beta1.Event {
+func (e *eventBroadcasterImpl) attemptRecording(ctx context.Context, event *eventsv1.Event) {
 	tries := 0
 	for {
-		if recordedEvent, retry := recordEvent(e.sink, event); !retry {
-			return recordedEvent
+		if _, retry := recordEvent(ctx, e.sink, event); !retry {
+			return
 		}
 		tries++
 		if tries >= maxTriesPerEvent {
-			klog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
-			return nil
+			klog.FromContext(ctx).Error(nil, "Unable to write event (retry limit exceeded!)", "event", event)
+			return
 		}
 		// Randomize sleep so that various clients won't all be
-		// synced up if the master goes down.
-		time.Sleep(wait.Jitter(e.sleepDuration, 0.25))
+		// synced up if the master goes down. Give up when
+		// the context is canceled.
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait.Jitter(e.sleepDuration, 0.25)):
+		}
 	}
 }
 
-func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
-	var newEvent *v1beta1.Event
+func recordEvent(ctx context.Context, sink EventSink, event *eventsv1.Event) (*eventsv1.Event, bool) {
+	var newEvent *eventsv1.Event
 	var err error
 	isEventSeries := event.Series != nil
 	if isEventSeries {
 		patch, patchBytesErr := createPatchBytesForSeries(event)
 		if patchBytesErr != nil {
-			klog.Errorf("Unable to calculate diff, no merge is possible: %v", patchBytesErr)
+			klog.FromContext(ctx).Error(patchBytesErr, "Unable to calculate diff, no merge is possible")
 			return nil, false
 		}
-		newEvent, err = sink.Patch(event, patch)
+		newEvent, err = sink.Patch(ctx, event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
 	if !isEventSeries || (isEventSeries && util.IsKeyNotFoundError(err)) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
-		newEvent, err = sink.Create(event)
+		newEvent, err = sink.Create(ctx, event)
 	}
 	if err == nil {
 		return newEvent, false
@@ -229,13 +253,21 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 	switch err.(type) {
 	case *restclient.RequestConstructionError:
 		// We will construct the request the same next time, so don't keep trying.
-		klog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
+		klog.FromContext(ctx).Error(err, "Unable to construct event (will not retry!)", "event", event)
 		return nil, false
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
-			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			// If we tried to create an Event from an EventSerie, it means that
+			// the original Patch request failed because the Event we were
+			// trying to patch didn't exist. If the creation failed because the
+			// Event now exists, it is safe to retry.  This occurs when a new
+			// Event is emitted twice in a very short period of time.
+			if isEventSeries {
+				return nil, true
+			}
+			klog.FromContext(ctx).V(5).Info("Server rejected event (will not retry!)", "event", event, "err", err)
 		} else {
-			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.FromContext(ctx).Error(err, "Server rejected event (will not retry!)", "event", event)
 		}
 		return nil, false
 	case *errors.UnexpectedObjectError:
@@ -244,11 +276,11 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
 	}
-	klog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	klog.FromContext(ctx).Error(err, "Unable to write event (may retry after sleeping)")
 	return nil, true
 }
 
-func createPatchBytesForSeries(event *v1beta1.Event) ([]byte, error) {
+func createPatchBytesForSeries(event *eventsv1.Event) ([]byte, error) {
 	oldEvent := event.DeepCopy()
 	oldEvent.Series = nil
 	oldData, err := json.Marshal(oldEvent)
@@ -259,14 +291,16 @@ func createPatchBytesForSeries(event *v1beta1.Event) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1beta1.Event{})
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, eventsv1.Event{})
 }
 
-func getKey(event *v1beta1.Event) eventKey {
+func getKey(event *eventsv1.Event) eventKey {
 	key := eventKey{
+		eventType:           event.Type,
 		action:              event.Action,
 		reason:              event.Reason,
 		reportingController: event.ReportingController,
+		reportingInstance:   event.ReportingInstance,
 		regarding:           event.Regarding,
 	}
 	if event.Related != nil {
@@ -275,10 +309,43 @@ func getKey(event *v1beta1.Event) eventKey {
 	return key
 }
 
+// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured logging function.
+// The return value can be ignored or used to stop recording, if desired.
+// TODO: this function should also return an error.
+//
+// Deprecated: use StartLogging instead.
+func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func() {
+	logger := klog.Background().V(int(verbosity))
+	stopWatcher, err := e.StartLogging(logger)
+	if err != nil {
+		logger.Error(err, "Failed to start event watcher")
+		return func() {}
+	}
+	return stopWatcher
+}
+
+// StartLogging starts sending events received from this EventBroadcaster to the structured logger.
+// To adjust verbosity, use the logger's V method (i.e. pass `logger.V(3)` instead of `logger`).
+// The returned function can be ignored or used to stop recording, if desired.
+func (e *eventBroadcasterImpl) StartLogging(logger klog.Logger) (func(), error) {
+	return e.StartEventWatcher(
+		func(obj runtime.Object) {
+			event, ok := obj.(*eventsv1.Event)
+			if !ok {
+				logger.Error(nil, "unexpected type, expected eventsv1.Event")
+				return
+			}
+			logger.Info("Event occurred", "object", klog.KRef(event.Regarding.Namespace, event.Regarding.Name), "kind", event.Regarding.Kind, "apiVersion", event.Regarding.APIVersion, "type", event.Type, "reason", event.Reason, "action", event.Action, "note", event.Note)
+		})
+}
+
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
-func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) func() {
-	watcher := e.Watch()
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) (func(), error) {
+	watcher, err := e.Watch()
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		defer utilruntime.HandleCrash()
 		for {
@@ -289,28 +356,102 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime
 			eventHandler(watchEvent.Object)
 		}
 	}()
-	return watcher.Stop
+	return watcher.Stop, nil
+}
+
+func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
+	eventHandler := func(obj runtime.Object) {
+		event, ok := obj.(*eventsv1.Event)
+		if !ok {
+			klog.FromContext(ctx).Error(nil, "unexpected type, expected eventsv1.Event")
+			return
+		}
+		e.recordToSink(ctx, event, clock.RealClock{})
+	}
+	stopWatcher, err := e.StartEventWatcher(eventHandler)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		stopWatcher()
+	}()
+	return nil
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
+// Deprecated: use StartRecordingToSinkWithContext instead.
 func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
-	go wait.Until(func() {
-		e.refreshExistingEventSeries()
-	}, refreshTime, stopCh)
-	go wait.Until(func() {
-		e.finishSeries()
-	}, finishTime, stopCh)
-	eventHandler := func(obj runtime.Object) {
-		event, ok := obj.(*v1beta1.Event)
-		if !ok {
-			klog.Errorf("unexpected type, expected v1beta1.Event")
-			return
-		}
-		e.recordToSink(event, clock.RealClock{})
+	err := e.StartRecordingToSinkWithContext(wait.ContextForChannel(stopCh))
+	if err != nil {
+		klog.Background().Error(err, "Failed to start recording to sink")
 	}
-	stopWatcher := e.StartEventWatcher(eventHandler)
-	go func() {
-		<-stopCh
-		stopWatcher()
-	}()
+}
+
+// StartRecordingToSinkWithContext starts sending events received from the specified eventBroadcaster to the given sink.
+func (e *eventBroadcasterImpl) StartRecordingToSinkWithContext(ctx context.Context) error {
+	go wait.UntilWithContext(ctx, e.refreshExistingEventSeries, refreshTime)
+	go wait.UntilWithContext(ctx, e.finishSeries, finishTime)
+	return e.startRecordingEvents(ctx)
+}
+
+type eventBroadcasterAdapterImpl struct {
+	coreClient          typedv1core.EventsGetter
+	coreBroadcaster     record.EventBroadcaster
+	eventsv1Client      typedeventsv1.EventsV1Interface
+	eventsv1Broadcaster EventBroadcaster
+}
+
+// NewEventBroadcasterAdapter creates a wrapper around new and legacy broadcasters to simplify
+// migration of individual components to the new Event API.
+//
+//logcheck:context // NewEventBroadcasterAdapterWithContext should be used instead because record.NewBroadcaster is called and works better when a context is supplied (contextual logging, cancellation).
+func NewEventBroadcasterAdapter(client clientset.Interface) EventBroadcasterAdapter {
+	return NewEventBroadcasterAdapterWithContext(context.Background(), client)
+}
+
+// NewEventBroadcasterAdapterWithContext creates a wrapper around new and legacy broadcasters to simplify
+// migration of individual components to the new Event API.
+func NewEventBroadcasterAdapterWithContext(ctx context.Context, client clientset.Interface) EventBroadcasterAdapter {
+	eventClient := &eventBroadcasterAdapterImpl{}
+	if _, err := client.Discovery().ServerResourcesForGroupVersion(eventsv1.SchemeGroupVersion.String()); err == nil {
+		eventClient.eventsv1Client = client.EventsV1()
+		eventClient.eventsv1Broadcaster = NewBroadcaster(&EventSinkImpl{Interface: eventClient.eventsv1Client})
+	}
+	// Even though there can soon exist cases when coreBroadcaster won't really be needed,
+	// we create it unconditionally because its overhead is minor and will simplify using usage
+	// patterns of this library in all components.
+	eventClient.coreClient = client.CoreV1()
+	eventClient.coreBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	return eventClient
+}
+
+// StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
+func (e *eventBroadcasterAdapterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
+	if e.eventsv1Broadcaster != nil && e.eventsv1Client != nil {
+		e.eventsv1Broadcaster.StartRecordingToSink(stopCh)
+	}
+	if e.coreBroadcaster != nil && e.coreClient != nil {
+		e.coreBroadcaster.StartRecordingToSink(&typedv1core.EventSinkImpl{Interface: e.coreClient.Events("")})
+	}
+}
+
+func (e *eventBroadcasterAdapterImpl) NewRecorder(name string) EventRecorderLogger {
+	if e.eventsv1Broadcaster != nil && e.eventsv1Client != nil {
+		return e.eventsv1Broadcaster.NewRecorder(scheme.Scheme, name)
+	}
+	return record.NewEventRecorderAdapter(e.DeprecatedNewLegacyRecorder(name))
+}
+
+func (e *eventBroadcasterAdapterImpl) DeprecatedNewLegacyRecorder(name string) record.EventRecorderLogger {
+	return e.coreBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: name})
+}
+
+func (e *eventBroadcasterAdapterImpl) Shutdown() {
+	if e.coreBroadcaster != nil {
+		e.coreBroadcaster.Shutdown()
+	}
+	if e.eventsv1Broadcaster != nil {
+		e.eventsv1Broadcaster.Shutdown()
+	}
 }

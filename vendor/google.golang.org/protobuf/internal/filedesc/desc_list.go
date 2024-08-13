@@ -10,36 +10,37 @@ import (
 	"sort"
 	"sync"
 
+	"google.golang.org/protobuf/internal/genid"
+
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/descfmt"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type FileImports []pref.FileImport
+type FileImports []protoreflect.FileImport
 
 func (p *FileImports) Len() int                            { return len(*p) }
-func (p *FileImports) Get(i int) pref.FileImport           { return (*p)[i] }
+func (p *FileImports) Get(i int) protoreflect.FileImport   { return (*p)[i] }
 func (p *FileImports) Format(s fmt.State, r rune)          { descfmt.FormatList(s, r, p) }
 func (p *FileImports) ProtoInternal(pragma.DoNotImplement) {}
 
 type Names struct {
-	List []pref.Name
+	List []protoreflect.Name
 	once sync.Once
-	has  map[pref.Name]int // protected by once
+	has  map[protoreflect.Name]int // protected by once
 }
 
 func (p *Names) Len() int                            { return len(p.List) }
-func (p *Names) Get(i int) pref.Name                 { return p.List[i] }
-func (p *Names) Has(s pref.Name) bool                { return p.lazyInit().has[s] > 0 }
+func (p *Names) Get(i int) protoreflect.Name         { return p.List[i] }
+func (p *Names) Has(s protoreflect.Name) bool        { return p.lazyInit().has[s] > 0 }
 func (p *Names) Format(s fmt.State, r rune)          { descfmt.FormatList(s, r, p) }
 func (p *Names) ProtoInternal(pragma.DoNotImplement) {}
 func (p *Names) lazyInit() *Names {
 	p.once.Do(func() {
 		if len(p.List) > 0 {
-			p.has = make(map[pref.Name]int, len(p.List))
+			p.has = make(map[protoreflect.Name]int, len(p.List))
 			for _, s := range p.List {
 				p.has[s] = p.has[s] + 1
 			}
@@ -65,14 +66,14 @@ func (p *Names) CheckValid() error {
 }
 
 type EnumRanges struct {
-	List   [][2]pref.EnumNumber // start inclusive; end inclusive
+	List   [][2]protoreflect.EnumNumber // start inclusive; end inclusive
 	once   sync.Once
-	sorted [][2]pref.EnumNumber // protected by once
+	sorted [][2]protoreflect.EnumNumber // protected by once
 }
 
-func (p *EnumRanges) Len() int                     { return len(p.List) }
-func (p *EnumRanges) Get(i int) [2]pref.EnumNumber { return p.List[i] }
-func (p *EnumRanges) Has(n pref.EnumNumber) bool {
+func (p *EnumRanges) Len() int                             { return len(p.List) }
+func (p *EnumRanges) Get(i int) [2]protoreflect.EnumNumber { return p.List[i] }
+func (p *EnumRanges) Has(n protoreflect.EnumNumber) bool {
 	for ls := p.lazyInit().sorted; len(ls) > 0; {
 		i := len(ls) / 2
 		switch r := enumRange(ls[i]); {
@@ -127,14 +128,14 @@ func (r enumRange) String() string {
 }
 
 type FieldRanges struct {
-	List   [][2]pref.FieldNumber // start inclusive; end exclusive
+	List   [][2]protoreflect.FieldNumber // start inclusive; end exclusive
 	once   sync.Once
-	sorted [][2]pref.FieldNumber // protected by once
+	sorted [][2]protoreflect.FieldNumber // protected by once
 }
 
-func (p *FieldRanges) Len() int                      { return len(p.List) }
-func (p *FieldRanges) Get(i int) [2]pref.FieldNumber { return p.List[i] }
-func (p *FieldRanges) Has(n pref.FieldNumber) bool {
+func (p *FieldRanges) Len() int                              { return len(p.List) }
+func (p *FieldRanges) Get(i int) [2]protoreflect.FieldNumber { return p.List[i] }
+func (p *FieldRanges) Has(n protoreflect.FieldNumber) bool {
 	for ls := p.lazyInit().sorted; len(ls) > 0; {
 		i := len(ls) / 2
 		switch r := fieldRange(ls[i]); {
@@ -185,10 +186,7 @@ func (p *FieldRanges) CheckValid(isMessageSet bool) error {
 // Unlike the FieldNumber.IsValid method, it allows ranges that cover the
 // reserved number range.
 func isValidFieldNumber(n protoreflect.FieldNumber, isMessageSet bool) bool {
-	if isMessageSet {
-		return protowire.MinValidNumber <= n && n <= math.MaxInt32
-	}
-	return protowire.MinValidNumber <= n && n <= protowire.MaxValidNumber
+	return protowire.MinValidNumber <= n && (n <= protowire.MaxValidNumber || isMessageSet)
 }
 
 // CheckOverlap reports an error if p and q overlap.
@@ -222,17 +220,17 @@ func (r fieldRange) String() string {
 }
 
 type FieldNumbers struct {
-	List []pref.FieldNumber
+	List []protoreflect.FieldNumber
 	once sync.Once
-	has  map[pref.FieldNumber]struct{} // protected by once
+	has  map[protoreflect.FieldNumber]struct{} // protected by once
 }
 
-func (p *FieldNumbers) Len() int                   { return len(p.List) }
-func (p *FieldNumbers) Get(i int) pref.FieldNumber { return p.List[i] }
-func (p *FieldNumbers) Has(n pref.FieldNumber) bool {
+func (p *FieldNumbers) Len() int                           { return len(p.List) }
+func (p *FieldNumbers) Get(i int) protoreflect.FieldNumber { return p.List[i] }
+func (p *FieldNumbers) Has(n protoreflect.FieldNumber) bool {
 	p.once.Do(func() {
 		if len(p.List) > 0 {
-			p.has = make(map[pref.FieldNumber]struct{}, len(p.List))
+			p.has = make(map[protoreflect.FieldNumber]struct{}, len(p.List))
 			for _, n := range p.List {
 				p.has[n] = struct{}{}
 			}
@@ -245,31 +243,43 @@ func (p *FieldNumbers) Format(s fmt.State, r rune)          { descfmt.FormatList
 func (p *FieldNumbers) ProtoInternal(pragma.DoNotImplement) {}
 
 type OneofFields struct {
-	List   []pref.FieldDescriptor
+	List   []protoreflect.FieldDescriptor
 	once   sync.Once
-	byName map[pref.Name]pref.FieldDescriptor        // protected by once
-	byJSON map[string]pref.FieldDescriptor           // protected by once
-	byNum  map[pref.FieldNumber]pref.FieldDescriptor // protected by once
+	byName map[protoreflect.Name]protoreflect.FieldDescriptor        // protected by once
+	byJSON map[string]protoreflect.FieldDescriptor                   // protected by once
+	byText map[string]protoreflect.FieldDescriptor                   // protected by once
+	byNum  map[protoreflect.FieldNumber]protoreflect.FieldDescriptor // protected by once
 }
 
-func (p *OneofFields) Len() int                                         { return len(p.List) }
-func (p *OneofFields) Get(i int) pref.FieldDescriptor                   { return p.List[i] }
-func (p *OneofFields) ByName(s pref.Name) pref.FieldDescriptor          { return p.lazyInit().byName[s] }
-func (p *OneofFields) ByJSONName(s string) pref.FieldDescriptor         { return p.lazyInit().byJSON[s] }
-func (p *OneofFields) ByNumber(n pref.FieldNumber) pref.FieldDescriptor { return p.lazyInit().byNum[n] }
-func (p *OneofFields) Format(s fmt.State, r rune)                       { descfmt.FormatList(s, r, p) }
-func (p *OneofFields) ProtoInternal(pragma.DoNotImplement)              {}
+func (p *OneofFields) Len() int                               { return len(p.List) }
+func (p *OneofFields) Get(i int) protoreflect.FieldDescriptor { return p.List[i] }
+func (p *OneofFields) ByName(s protoreflect.Name) protoreflect.FieldDescriptor {
+	return p.lazyInit().byName[s]
+}
+func (p *OneofFields) ByJSONName(s string) protoreflect.FieldDescriptor {
+	return p.lazyInit().byJSON[s]
+}
+func (p *OneofFields) ByTextName(s string) protoreflect.FieldDescriptor {
+	return p.lazyInit().byText[s]
+}
+func (p *OneofFields) ByNumber(n protoreflect.FieldNumber) protoreflect.FieldDescriptor {
+	return p.lazyInit().byNum[n]
+}
+func (p *OneofFields) Format(s fmt.State, r rune)          { descfmt.FormatList(s, r, p) }
+func (p *OneofFields) ProtoInternal(pragma.DoNotImplement) {}
 
 func (p *OneofFields) lazyInit() *OneofFields {
 	p.once.Do(func() {
 		if len(p.List) > 0 {
-			p.byName = make(map[pref.Name]pref.FieldDescriptor, len(p.List))
-			p.byJSON = make(map[string]pref.FieldDescriptor, len(p.List))
-			p.byNum = make(map[pref.FieldNumber]pref.FieldDescriptor, len(p.List))
+			p.byName = make(map[protoreflect.Name]protoreflect.FieldDescriptor, len(p.List))
+			p.byJSON = make(map[string]protoreflect.FieldDescriptor, len(p.List))
+			p.byText = make(map[string]protoreflect.FieldDescriptor, len(p.List))
+			p.byNum = make(map[protoreflect.FieldNumber]protoreflect.FieldDescriptor, len(p.List))
 			for _, f := range p.List {
 				// Field names and numbers are guaranteed to be unique.
 				p.byName[f.Name()] = f
 				p.byJSON[f.JSONName()] = f
+				p.byText[f.TextName()] = f
 				p.byNum[f.Number()] = f
 			}
 		}
@@ -278,9 +288,170 @@ func (p *OneofFields) lazyInit() *OneofFields {
 }
 
 type SourceLocations struct {
-	List []pref.SourceLocation
+	// List is a list of SourceLocations.
+	// The SourceLocation.Next field does not need to be populated
+	// as it will be lazily populated upon first need.
+	List []protoreflect.SourceLocation
+
+	// File is the parent file descriptor that these locations are relative to.
+	// If non-nil, ByDescriptor verifies that the provided descriptor
+	// is a child of this file descriptor.
+	File protoreflect.FileDescriptor
+
+	once   sync.Once
+	byPath map[pathKey]int
 }
 
-func (p *SourceLocations) Len() int                            { return len(p.List) }
-func (p *SourceLocations) Get(i int) pref.SourceLocation       { return p.List[i] }
+func (p *SourceLocations) Len() int                              { return len(p.List) }
+func (p *SourceLocations) Get(i int) protoreflect.SourceLocation { return p.lazyInit().List[i] }
+func (p *SourceLocations) byKey(k pathKey) protoreflect.SourceLocation {
+	if i, ok := p.lazyInit().byPath[k]; ok {
+		return p.List[i]
+	}
+	return protoreflect.SourceLocation{}
+}
+func (p *SourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.SourceLocation {
+	return p.byKey(newPathKey(path))
+}
+func (p *SourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflect.SourceLocation {
+	if p.File != nil && desc != nil && p.File != desc.ParentFile() {
+		return protoreflect.SourceLocation{} // mismatching parent files
+	}
+	var pathArr [16]int32
+	path := pathArr[:0]
+	for {
+		switch desc.(type) {
+		case protoreflect.FileDescriptor:
+			// Reverse the path since it was constructed in reverse.
+			for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+				path[i], path[j] = path[j], path[i]
+			}
+			return p.byKey(newPathKey(path))
+		case protoreflect.MessageDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, int32(genid.FileDescriptorProto_MessageType_field_number))
+			case protoreflect.MessageDescriptor:
+				path = append(path, int32(genid.DescriptorProto_NestedType_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		case protoreflect.FieldDescriptor:
+			isExtension := desc.(protoreflect.FieldDescriptor).IsExtension()
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			if isExtension {
+				switch desc.(type) {
+				case protoreflect.FileDescriptor:
+					path = append(path, int32(genid.FileDescriptorProto_Extension_field_number))
+				case protoreflect.MessageDescriptor:
+					path = append(path, int32(genid.DescriptorProto_Extension_field_number))
+				default:
+					return protoreflect.SourceLocation{}
+				}
+			} else {
+				switch desc.(type) {
+				case protoreflect.MessageDescriptor:
+					path = append(path, int32(genid.DescriptorProto_Field_field_number))
+				default:
+					return protoreflect.SourceLocation{}
+				}
+			}
+		case protoreflect.OneofDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.MessageDescriptor:
+				path = append(path, int32(genid.DescriptorProto_OneofDecl_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		case protoreflect.EnumDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, int32(genid.FileDescriptorProto_EnumType_field_number))
+			case protoreflect.MessageDescriptor:
+				path = append(path, int32(genid.DescriptorProto_EnumType_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		case protoreflect.EnumValueDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.EnumDescriptor:
+				path = append(path, int32(genid.EnumDescriptorProto_Value_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		case protoreflect.ServiceDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, int32(genid.FileDescriptorProto_Service_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		case protoreflect.MethodDescriptor:
+			path = append(path, int32(desc.Index()))
+			desc = desc.Parent()
+			switch desc.(type) {
+			case protoreflect.ServiceDescriptor:
+				path = append(path, int32(genid.ServiceDescriptorProto_Method_field_number))
+			default:
+				return protoreflect.SourceLocation{}
+			}
+		default:
+			return protoreflect.SourceLocation{}
+		}
+	}
+}
+func (p *SourceLocations) lazyInit() *SourceLocations {
+	p.once.Do(func() {
+		if len(p.List) > 0 {
+			// Collect all the indexes for a given path.
+			pathIdxs := make(map[pathKey][]int, len(p.List))
+			for i, l := range p.List {
+				k := newPathKey(l.Path)
+				pathIdxs[k] = append(pathIdxs[k], i)
+			}
+
+			// Update the next index for all locations.
+			p.byPath = make(map[pathKey]int, len(p.List))
+			for k, idxs := range pathIdxs {
+				for i := 0; i < len(idxs)-1; i++ {
+					p.List[idxs[i]].Next = idxs[i+1]
+				}
+				p.List[idxs[len(idxs)-1]].Next = 0
+				p.byPath[k] = idxs[0] // record the first location for this path
+			}
+		}
+	})
+	return p
+}
 func (p *SourceLocations) ProtoInternal(pragma.DoNotImplement) {}
+
+// pathKey is a comparable representation of protoreflect.SourcePath.
+type pathKey struct {
+	arr [16]uint8 // first n-1 path segments; last element is the length
+	str string    // used if the path does not fit in arr
+}
+
+func newPathKey(p protoreflect.SourcePath) (k pathKey) {
+	if len(p) < len(k.arr) {
+		for i, ps := range p {
+			if ps < 0 || math.MaxUint8 <= ps {
+				return pathKey{str: p.String()}
+			}
+			k.arr[i] = uint8(ps)
+		}
+		k.arr[len(k.arr)-1] = uint8(len(p))
+		return k
+	}
+	return pathKey{str: p.String()}
+}

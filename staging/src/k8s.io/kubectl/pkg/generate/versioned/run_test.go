@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -254,6 +254,59 @@ func TestGeneratePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test10: privileged mode",
+			params: map[string]interface{}{
+				"name":       "foo",
+				"image":      "someimage",
+				"replicas":   "1",
+				"privileged": "true",
+			},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							SecurityContext: securityContextWithPrivilege(true),
+						},
+					},
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "test11: check annotations",
+			params: map[string]interface{}{
+				"name":        "foo",
+				"image":       "someimage",
+				"replicas":    "1",
+				"labels":      "foo=bar,baz=blah",
+				"annotations": []string{"foo=bar1", "baz=blah1"},
+			},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "foo",
+					Labels:      map[string]string{"foo": "bar", "baz": "blah"},
+					Annotations: map[string]string{"foo": "bar1", "baz": "blah1"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+		},
 	}
 	generator := BasicPod{}
 	for _, tt := range tests {
@@ -356,5 +409,11 @@ func TestParseEnv(t *testing.T) {
 				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", tt.expected, envs, tt.test)
 			}
 		})
+	}
+}
+
+func securityContextWithPrivilege(privileged bool) *v1.SecurityContext {
+	return &v1.SecurityContext{
+		Privileged: &privileged,
 	}
 }

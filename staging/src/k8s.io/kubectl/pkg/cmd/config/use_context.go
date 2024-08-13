@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -48,10 +49,11 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	cmd := &cobra.Command{
 		Use:                   "use-context CONTEXT_NAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Sets the current-context in a kubeconfig file"),
+		Short:                 i18n.T("Set the current-context in a kubeconfig file"),
 		Aliases:               []string{"use"},
-		Long:                  `Sets the current-context in a kubeconfig file`,
+		Long:                  `Set the current-context in a kubeconfig file.`,
 		Example:               useContextExample,
+		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

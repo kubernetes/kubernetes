@@ -18,6 +18,7 @@ package phases
 
 import (
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -27,7 +28,7 @@ import (
 var (
 	markControlPlaneExample = cmdutil.Examples(`
 		# Applies control-plane label and taint to the current node, functionally equivalent to what executed by kubeadm init.
-		kubeadm init phase mark-control-plane --config config.yml
+		kubeadm init phase mark-control-plane --config config.yaml
 
 		# Applies control-plane label and taint to a specific node
 		kubeadm init phase mark-control-plane --node-name myNode
@@ -43,6 +44,7 @@ func NewMarkControlPlanePhase() workflow.Phase {
 		InheritFlags: []string{
 			options.NodeName,
 			options.CfgPath,
+			options.DryRun,
 		},
 		Run: runMarkControlPlane,
 	}

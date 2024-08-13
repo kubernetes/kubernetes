@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
@@ -32,7 +31,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
+func DeleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
 	switch kind {
 	case api.Kind("Pod"):
 		return c.CoreV1().Pods(namespace).Delete(context.TODO(), name, options)
@@ -53,20 +52,6 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	case api.Kind("Service"):
 		return c.CoreV1().Services(namespace).Delete(context.TODO(), name, options)
 	default:
-		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
+		return fmt.Errorf("unsupported kind when deleting: %v", kind)
 	}
-}
-
-func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
-	deleteFunc := func() (bool, error) {
-		err := deleteResource(c, kind, namespace, name, options)
-		if err == nil || apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("Failed to delete object with non-retriable error: %v", err)
-	}
-	return RetryWithExponentialBackOff(deleteFunc)
 }

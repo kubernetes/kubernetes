@@ -32,8 +32,6 @@ type Interface interface {
 	Ingresses() IngressInformer
 	// NetworkPolicies returns a NetworkPolicyInformer.
 	NetworkPolicies() NetworkPolicyInformer
-	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-	PodSecurityPolicies() PodSecurityPolicyInformer
 	// ReplicaSets returns a ReplicaSetInformer.
 	ReplicaSets() ReplicaSetInformer
 }
@@ -67,11 +65,6 @@ func (v *version) Ingresses() IngressInformer {
 // NetworkPolicies returns a NetworkPolicyInformer.
 func (v *version) NetworkPolicies() NetworkPolicyInformer {
 	return &networkPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
-	return &podSecurityPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ReplicaSets returns a ReplicaSetInformer.

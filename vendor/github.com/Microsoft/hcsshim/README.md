@@ -1,8 +1,8 @@
 # hcsshim
 
-[![Build status](https://ci.appveyor.com/api/projects/status/nbcw28mnkqml0loa/branch/master?svg=true)](https://ci.appveyor.com/project/WindowsVirtualization/hcsshim/branch/master)
+[![Build status](https://github.com/microsoft/hcsshim/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/microsoft/hcsshim/actions?query=branch%3Amaster)
 
-This package contains the Golang interface for using the Windows [Host Compute Service](https://blogs.technet.microsoft.com/virtualization/2017/01/27/introducing-the-host-compute-service-hcs/) (HCS) to launch and manage [Windows Containers](https://docs.microsoft.com/en-us/virtualization/windowscontainers/about/). It also contains other helpers and functions for managing Windows Containers such as the Golang interface for the Host Network Service (HNS).
+This package contains the Golang interface for using the Windows [Host Compute Service](https://techcommunity.microsoft.com/t5/containers/introducing-the-host-compute-service-hcs/ba-p/382332) (HCS) to launch and manage [Windows Containers](https://docs.microsoft.com/en-us/virtualization/windowscontainers/about/). It also contains other helpers and functions for managing Windows Containers such as the Golang interface for the Host Network Service (HNS).
 
 It is primarily used in the [Moby Project](https://github.com/moby/moby), but it can be freely used by other projects as well.
 
@@ -15,6 +15,11 @@ the rights to use your contribution. For details, visit https://cla.microsoft.co
 When you submit a pull request, a CLA-bot will automatically determine whether you need to provide
 a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the instructions
 provided by the bot. You will only need to do this once across all repos using our CLA.
+
+We also ask that contributors [sign their commits](https://git-scm.com/docs/git-commit) using `git commit -s` or `git commit --signoff` to certify they either authored the work themselves or otherwise have permission to use it in this project. 
+
+
+## Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or

@@ -15,10 +15,10 @@
 # Build the etcd-version-monitor image
 #
 # Usage:
-# 	[GOLANG_VERSION=1.8.3] [REGISTRY=staging-k8s.gcr.io] [TAG=test] make (build|push)
+# 	[GOLANG_VERSION=1.19.9] [REGISTRY=staging-k8s.gcr.io] [TAG=test] make (build|push)
 # TODO(shyamjvs): Support architectures other than amd64 if needed.
 ARCH:=amd64
-GOLANG_VERSION?=1.8.3
+GOLANG_VERSION?=1.19.9
 REGISTRY?=staging-k8s.gcr.io
 TAG?=0.1.3
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
@@ -30,7 +30,7 @@ build:
 	cp etcd-version-monitor.go Dockerfile $(TEMP_DIR)
 
 	# Compile etcd-version-monitor.
-	docker run -it \
+	docker run --rm -it \
 	    -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes \
 	    -v $(TEMP_DIR):/build \
 	    -e GOARCH=$(ARCH) \

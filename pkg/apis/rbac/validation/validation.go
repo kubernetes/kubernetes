@@ -27,8 +27,8 @@ import (
 
 // ValidateRBACName is exported to allow types outside of the RBAC API group to reuse this validation logic
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
-// * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
-// * https://github.com/openshift/origin/blob/388478/pkg/api/helpers.go
+// * https://github.com/kubernetes/kubernetes/blob/60db507b279ce45bd16ea3db49bf181f2aeb3c3d/pkg/api/validation/name.go
+// * https://github.com/openshift/origin/blob/388478c40e751c4295dcb9a44dd69e5ac65d0e3b/pkg/api/helpers.go
 func ValidateRBACName(name string, prefix bool) []string {
 	return path.IsValidPathSegmentName(name)
 }
@@ -55,7 +55,11 @@ func ValidateRoleUpdate(role *rbac.Role, oldRole *rbac.Role) field.ErrorList {
 	return allErrs
 }
 
-func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
+type ClusterRoleValidationOptions struct {
+	AllowInvalidLabelValueInSelector bool
+}
+
+func ValidateClusterRole(role *rbac.ClusterRole, opts ClusterRoleValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
 
@@ -65,13 +69,15 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 		}
 	}
 
+	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
+
 	if role.AggregationRule != nil {
 		if len(role.AggregationRule.ClusterRoleSelectors) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("aggregationRule", "clusterRoleSelectors"), "at least one clusterRoleSelector required if aggregationRule is non-nil"))
 		}
 		for i, selector := range role.AggregationRule.ClusterRoleSelectors {
 			fieldPath := field.NewPath("aggregationRule", "clusterRoleSelectors").Index(i)
-			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, fieldPath)...)
+			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, labelSelectorValidationOptions, fieldPath)...)
 
 			selector, err := metav1.LabelSelectorAsSelector(&selector)
 			if err != nil {
@@ -86,8 +92,8 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	return nil
 }
 
-func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole) field.ErrorList {
-	allErrs := ValidateClusterRole(role)
+func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole, opts ClusterRoleValidationOptions) field.ErrorList {
+	allErrs := ValidateClusterRole(role, opts)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&role.ObjectMeta, &oldRole.ObjectMeta, field.NewPath("metadata"))...)
 
 	return allErrs

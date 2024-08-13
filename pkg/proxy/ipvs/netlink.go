@@ -32,7 +32,17 @@ type NetLinkHandle interface {
 	DeleteDummyDevice(devName string) error
 	// ListBindAddress will list all IP addresses which are bound in a given interface
 	ListBindAddress(devName string) ([]string, error)
-	// GetLocalAddresses returns all unique local type IP addresses based on specified device and filter device
-	// If device is not specified, it will list all unique local type addresses except filter device addresses
-	GetLocalAddresses(dev, filterDev string) (sets.String, error)
+	// GetAllLocalAddresses return all local addresses on the node.
+	// Only the addresses of the current family are returned.
+	// IPv6 link-local and loopback addresses are excluded.
+	GetAllLocalAddresses() (sets.Set[string], error)
+	// GetLocalAddresses return all local addresses for an interface.
+	// Only the addresses of the current family are returned.
+	// IPv6 link-local and loopback addresses are excluded.
+	GetLocalAddresses(dev string) (sets.Set[string], error)
+	// GetAllLocalAddressesExcept return all local addresses on the node, except from the passed dev.
+	// This is not the same as to take the diff between GetAllLocalAddresses and GetLocalAddresses
+	// since an address can be assigned to many interfaces. This problem raised
+	// https://github.com/kubernetes/kubernetes/issues/114815
+	GetAllLocalAddressesExcept(dev string) (sets.Set[string], error)
 }

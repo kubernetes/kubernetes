@@ -22,9 +22,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
@@ -86,6 +87,27 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
+		"loadbalancer_2_ports": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				corev1.ResourceServices:              resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
 		"clusterip": {
 			service: &api.Service{
 				Spec: api.ServiceSpec{
@@ -138,15 +160,109 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
+		"nodeports-disabled": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("0"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
+		"nodeports-default-enabled": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port:     27443,
+							NodePort: 32001,
+						},
+						{
+							Port:     27444,
+							NodePort: 32002,
+						},
+					},
+					AllocateLoadBalancerNodePorts: nil,
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
+		"nodeports-explicitly-enabled": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
+		"nodeports-disabled-but-specified": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port:     27443,
+							NodePort: 32001,
+						},
+						{
+							Port:     27444,
+							NodePort: 32002,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
 	}
 	for testName, testCase := range testCases {
-		actual, err := evaluator.Usage(testCase.service)
-		if err != nil {
-			t.Errorf("%s unexpected error: %v", testName, err)
-		}
-		if !quota.Equals(testCase.usage, actual) {
-			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
-		}
+		t.Run(testName, func(t *testing.T) {
+			actual, err := evaluator.Usage(testCase.service)
+			if err != nil {
+				t.Errorf("%s unexpected error: %v", testName, err)
+			}
+			if !quota.Equals(testCase.usage, actual) {
+				t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
+			}
+		})
 	}
 }
 

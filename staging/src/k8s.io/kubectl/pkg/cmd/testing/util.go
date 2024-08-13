@@ -20,10 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -55,15 +56,15 @@ func DefaultClientConfig() *restclient.Config {
 }
 
 func ObjBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+	return io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
 
 func BytesBody(bodyBytes []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
+	return io.NopCloser(bytes.NewReader(bodyBytes))
 }
 
 func StringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+	return io.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func TestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
@@ -150,6 +151,22 @@ func EmptyTestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationC
 	return pods, svc, rc
 }
 
+func SubresourceTestData() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		Spec: corev1.PodSpec{
+			RestartPolicy:                 corev1.RestartPolicyAlways,
+			DNSPolicy:                     corev1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			SecurityContext:               &corev1.PodSecurityContext{},
+			EnableServiceLinks:            &enableServiceLinks,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+		},
+	}
+}
+
 func GenResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, error) {
 	jsonBytes, err := json.Marshal(bodyStruct)
 	if err != nil {
@@ -162,4 +179,34 @@ func InitTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		t.Errorf("Error running command (exit code %d): %s", code, str)
 	})
+}
+
+// WithAlphaEnvs calls func f with the given env-var-based feature gates enabled,
+// and then restores the original values of those variables.
+func WithAlphaEnvs(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+	for _, feature := range features {
+		key := string(feature)
+		if key != "" {
+			oldValue := os.Getenv(key)
+			err := os.Setenv(key, "true")
+			require.NoError(t, err, "unexpected error setting alpha env")
+			defer os.Setenv(key, oldValue)
+		}
+	}
+	f(t)
+}
+
+// WithAlphaEnvs calls func f with the given env-var-based feature gates disabled,
+// and then restores the original values of those variables.
+func WithAlphaEnvsDisabled(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+	for _, feature := range features {
+		key := string(feature)
+		if key != "" {
+			oldValue := os.Getenv(key)
+			err := os.Setenv(key, "false")
+			require.NoError(t, err, "unexpected error setting alpha env")
+			defer os.Setenv(key, oldValue)
+		}
+	}
+	f(t)
 }

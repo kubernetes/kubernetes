@@ -1,4 +1,5 @@
-// +build linux aix
+// +build linux aix zos
+// +build !js
 
 package logrus
 
@@ -10,4 +11,3 @@ func isTerminal(fd int) bool {
 	_, err := unix.IoctlGetTermios(fd, ioctlReadTermios)
 	return err == nil
 }
-

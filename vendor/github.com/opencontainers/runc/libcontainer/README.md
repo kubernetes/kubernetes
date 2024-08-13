@@ -1,6 +1,6 @@
 # libcontainer
 
-[![GoDoc](https://godoc.org/github.com/opencontainers/runc/libcontainer?status.svg)](https://godoc.org/github.com/opencontainers/runc/libcontainer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/opencontainers/runc/libcontainer.svg)](https://pkg.go.dev/github.com/opencontainers/runc/libcontainer)
 
 Libcontainer provides a native Go implementation for creating containers
 with namespaces, cgroups, capabilities, and filesystem access controls.
@@ -57,90 +57,78 @@ struct describing how the container is to be created. A sample would look simila
 
 ```go
 defaultMountFlags := unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
+var devices []*configs.DeviceRule
+for _, device := range specconv.AllowedDevices {
+	devices = append(devices, &device.Rule)
+}
 config := &configs.Config{
 	Rootfs: "/your/path/to/rootfs",
 	Capabilities: &configs.Capabilities{
-                Bounding: []string{
-                        "CAP_CHOWN",
-                        "CAP_DAC_OVERRIDE",
-                        "CAP_FSETID",
-                        "CAP_FOWNER",
-                        "CAP_MKNOD",
-                        "CAP_NET_RAW",
-                        "CAP_SETGID",
-                        "CAP_SETUID",
-                        "CAP_SETFCAP",
-                        "CAP_SETPCAP",
-                        "CAP_NET_BIND_SERVICE",
-                        "CAP_SYS_CHROOT",
-                        "CAP_KILL",
-                        "CAP_AUDIT_WRITE",
-                },
-                Effective: []string{
-                        "CAP_CHOWN",
-                        "CAP_DAC_OVERRIDE",
-                        "CAP_FSETID",
-                        "CAP_FOWNER",
-                        "CAP_MKNOD",
-                        "CAP_NET_RAW",
-                        "CAP_SETGID",
-                        "CAP_SETUID",
-                        "CAP_SETFCAP",
-                        "CAP_SETPCAP",
-                        "CAP_NET_BIND_SERVICE",
-                        "CAP_SYS_CHROOT",
-                        "CAP_KILL",
-                        "CAP_AUDIT_WRITE",
-                },
-                Inheritable: []string{
-                        "CAP_CHOWN",
-                        "CAP_DAC_OVERRIDE",
-                        "CAP_FSETID",
-                        "CAP_FOWNER",
-                        "CAP_MKNOD",
-                        "CAP_NET_RAW",
-                        "CAP_SETGID",
-                        "CAP_SETUID",
-                        "CAP_SETFCAP",
-                        "CAP_SETPCAP",
-                        "CAP_NET_BIND_SERVICE",
-                        "CAP_SYS_CHROOT",
-                        "CAP_KILL",
-                        "CAP_AUDIT_WRITE",
-                },
-                Permitted: []string{
-                        "CAP_CHOWN",
-                        "CAP_DAC_OVERRIDE",
-                        "CAP_FSETID",
-                        "CAP_FOWNER",
-                        "CAP_MKNOD",
-                        "CAP_NET_RAW",
-                        "CAP_SETGID",
-                        "CAP_SETUID",
-                        "CAP_SETFCAP",
-                        "CAP_SETPCAP",
-                        "CAP_NET_BIND_SERVICE",
-                        "CAP_SYS_CHROOT",
-                        "CAP_KILL",
-                        "CAP_AUDIT_WRITE",
-                },
-                Ambient: []string{
-                        "CAP_CHOWN",
-                        "CAP_DAC_OVERRIDE",
-                        "CAP_FSETID",
-                        "CAP_FOWNER",
-                        "CAP_MKNOD",
-                        "CAP_NET_RAW",
-                        "CAP_SETGID",
-                        "CAP_SETUID",
-                        "CAP_SETFCAP",
-                        "CAP_SETPCAP",
-                        "CAP_NET_BIND_SERVICE",
-                        "CAP_SYS_CHROOT",
-                        "CAP_KILL",
-                        "CAP_AUDIT_WRITE",
-                },
-        },
+		Bounding: []string{
+			"CAP_CHOWN",
+			"CAP_DAC_OVERRIDE",
+			"CAP_FSETID",
+			"CAP_FOWNER",
+			"CAP_MKNOD",
+			"CAP_NET_RAW",
+			"CAP_SETGID",
+			"CAP_SETUID",
+			"CAP_SETFCAP",
+			"CAP_SETPCAP",
+			"CAP_NET_BIND_SERVICE",
+			"CAP_SYS_CHROOT",
+			"CAP_KILL",
+			"CAP_AUDIT_WRITE",
+		},
+		Effective: []string{
+			"CAP_CHOWN",
+			"CAP_DAC_OVERRIDE",
+			"CAP_FSETID",
+			"CAP_FOWNER",
+			"CAP_MKNOD",
+			"CAP_NET_RAW",
+			"CAP_SETGID",
+			"CAP_SETUID",
+			"CAP_SETFCAP",
+			"CAP_SETPCAP",
+			"CAP_NET_BIND_SERVICE",
+			"CAP_SYS_CHROOT",
+			"CAP_KILL",
+			"CAP_AUDIT_WRITE",
+		},
+		Permitted: []string{
+			"CAP_CHOWN",
+			"CAP_DAC_OVERRIDE",
+			"CAP_FSETID",
+			"CAP_FOWNER",
+			"CAP_MKNOD",
+			"CAP_NET_RAW",
+			"CAP_SETGID",
+			"CAP_SETUID",
+			"CAP_SETFCAP",
+			"CAP_SETPCAP",
+			"CAP_NET_BIND_SERVICE",
+			"CAP_SYS_CHROOT",
+			"CAP_KILL",
+			"CAP_AUDIT_WRITE",
+		},
+		Ambient: []string{
+			"CAP_CHOWN",
+			"CAP_DAC_OVERRIDE",
+			"CAP_FSETID",
+			"CAP_FOWNER",
+			"CAP_MKNOD",
+			"CAP_NET_RAW",
+			"CAP_SETGID",
+			"CAP_SETUID",
+			"CAP_SETFCAP",
+			"CAP_SETPCAP",
+			"CAP_NET_BIND_SERVICE",
+			"CAP_SYS_CHROOT",
+			"CAP_KILL",
+			"CAP_AUDIT_WRITE",
+		},
+	},
 	Namespaces: configs.Namespaces([]configs.Namespace{
 		{Type: configs.NEWNS},
 		{Type: configs.NEWUTS},
@@ -155,8 +143,7 @@ config := &configs.Config{
 		Parent: "system",
 		Resources: &configs.Resources{
 			MemorySwappiness: nil,
-			AllowAllDevices:  nil,
-			AllowedDevices:   configs.DefaultAllowedDevices,
+			Devices:          devices,
 		},
 	},
 	MaskPaths: []string{
@@ -166,7 +153,7 @@ config := &configs.Config{
 	ReadonlyPaths: []string{
 		"/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus",
 	},
-	Devices:  configs.DefaultAutoCreatedDevices,
+	Devices:  specconv.AllowedDevices,
 	Hostname: "testing",
 	Mounts: []*configs.Mount{
 		{
@@ -314,7 +301,7 @@ state, err := container.State()
 #### Checkpoint & Restore
 
 libcontainer now integrates [CRIU](http://criu.org/) for checkpointing and restoring containers.
-This let's you save the state of a process running inside a container to disk, and then restore
+This lets you save the state of a process running inside a container to disk, and then restore
 that state into a new process, on the same machine or on another machine.
 
 `criu` version 1.5.2 or higher is required to use checkpoint and restore.

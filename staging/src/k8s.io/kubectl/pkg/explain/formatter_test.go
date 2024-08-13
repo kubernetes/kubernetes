@@ -19,6 +19,8 @@ package explain
 import (
 	"bytes"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestFormatterWrite(t *testing.T) {
@@ -54,6 +56,30 @@ func TestFormatterWrappedWrite(t *testing.T) {
 	f.Indent(10).WriteWrapped("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi at turpis faucibus, gravida dolor ut, fringilla velit.")
 	// Test long words (especially urls) on their own line.
 	f.Indent(20).WriteWrapped("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ThisIsAVeryLongWordThatDoesn'tFitOnALineOnItsOwn. Morbi at turpis faucibus, gravida dolor ut, fringilla velit.")
+	// Test content that includes newlines, bullet points, and blockquotes/code blocks
+	f.Indent(4).WriteWrapped(`
+This is an
+introductory paragraph
+that should end
+up on a continuous line.
+
+Example:
+Example text on its own line
+
+List:
+1.  Item with
+ wrapping text
+11.  Another
+ item with wrapping text
+* Bullet item
+ with wrapping text
+- Dash item
+ with wrapping text
+
+base64(
+    code goes here
+    and here
+)`)
 
 	want := `Lorem ipsum dolor sit amet, consectetur adipiscing
 elit. Morbi at turpis faucibus, gravida dolor ut,
@@ -68,10 +94,26 @@ fringilla velit.
                     Morbi at turpis faucibus,
                     gravida dolor ut, fringilla
                     velit.
+    This is an introductory paragraph that should
+    end up on a continuous line.
+
+    Example:
+    Example text on its own line
+
+    List:
+    1. Item with wrapping text
+    11. Another item with wrapping text
+    * Bullet item with wrapping text
+    - Dash item with wrapping text
+
+    base64(
+        code goes here
+        and here
+    )
 `
 
 	if buf.String() != want {
-		t.Errorf("Got:\n%v\nWant:\n%v\n", buf.String(), want)
+		t.Errorf("Diff:\n%s", cmp.Diff(buf.String(), want))
 	}
 }
 

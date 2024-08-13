@@ -27,3 +27,4 @@ Code changes are made in that location, merged into `k8s.io/kubernetes` and late
  1. Add API types to this repo. This is for the machinery, not for the types.
  2. Directly modify any files under `pkg` in this repo. Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/apimachinery`.
  3. Expect compatibility. This repo is direct support of Kubernetes and the API isn't yet stable enough for API guarantees.
+

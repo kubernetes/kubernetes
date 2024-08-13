@@ -36,29 +36,6 @@ GO_VERSION        ?= $(shell $(GO) version)
 GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
-GOVENDOR :=
-GO111MODULE :=
-ifeq (, $(PRE_GO_111))
-	ifneq (,$(wildcard go.mod))
-		# Enforce Go modules support just in case the directory is inside GOPATH (and for Travis CI).
-		GO111MODULE := on
-
-		ifneq (,$(wildcard vendor))
-			# Always use the local vendor/ directory to satisfy the dependencies.
-			GOOPTS := $(GOOPTS) -mod=vendor
-		endif
-	endif
-else
-	ifneq (,$(wildcard go.mod))
-		ifneq (,$(wildcard vendor))
-$(warning This repository requires Go >= 1.11 because of Go modules)
-$(warning Some recipes may not work as expected as the current Go runtime is '$(GO_VERSION_NUMBER)')
-		endif
-	else
-		# This repository isn't using Go modules (yet).
-		GOVENDOR := $(FIRST_GOPATH)/bin/govendor
-	endif
-endif
 PROMU        := $(FIRST_GOPATH)/bin/promu
 pkgs          = ./...
 
@@ -72,23 +49,32 @@ endif
 GOTEST := $(GO) test
 GOTEST_DIR :=
 ifneq ($(CIRCLE_JOB),)
-ifneq ($(shell which gotestsum),)
+ifneq ($(shell command -v gotestsum 2> /dev/null),)
 	GOTEST_DIR := test-results
 	GOTEST := gotestsum --junitfile $(GOTEST_DIR)/unit-tests.xml --
 endif
 endif
 
-PROMU_VERSION ?= 0.5.0
+PROMU_VERSION ?= 0.17.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
+SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.18.0
-# golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
+GOLANGCI_LINT_VERSION ?= v1.59.0
+# golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
-	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386))
-		GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
+	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386 arm64))
+		# If we're in CI and there is an Actions file, that means the linter
+		# is being run in Actions, so we don't need to run it here.
+		ifneq (,$(SKIP_GOLANGCI_LINT))
+			GOLANGCI_LINT :=
+		else ifeq (,$(CIRCLE_JOB))
+			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
+		else ifeq (,$(wildcard .github/workflows/golangci-lint.yml))
+			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
+		endif
 	endif
 endif
 
@@ -105,6 +91,8 @@ BUILD_DOCKER_ARCHS = $(addprefix common-docker-,$(DOCKER_ARCHS))
 PUBLISH_DOCKER_ARCHS = $(addprefix common-docker-publish-,$(DOCKER_ARCHS))
 TAG_DOCKER_ARCHS = $(addprefix common-docker-tag-latest-,$(DOCKER_ARCHS))
 
+SANITIZED_DOCKER_IMAGE_TAG := $(subst +,-,$(DOCKER_IMAGE_TAG))
+
 ifeq ($(GOHOSTARCH),amd64)
         ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux freebsd darwin windows))
                 # Only supported on amd64
@@ -118,7 +106,7 @@ endif
 %: common-% ;
 
 .PHONY: common-all
-common-all: precheck style check_license lint unused build test
+common-all: precheck style check_license lint yamllint unused build test
 
 .PHONY: common-style
 common-style:
@@ -144,21 +132,25 @@ common-check_license:
 .PHONY: common-deps
 common-deps:
 	@echo ">> getting dependencies"
-ifdef GO111MODULE
-	GO111MODULE=$(GO111MODULE) $(GO) mod download
-else
-	$(GO) get $(GOOPTS) -t ./...
-endif
+	$(GO) mod download
+
+.PHONY: update-go-deps
+update-go-deps:
+	@echo ">> updating Go dependencies"
+	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		$(GO) get -d $$m; \
+	done
+	$(GO) mod tidy
 
 .PHONY: common-test-short
 common-test-short: $(GOTEST_DIR)
 	@echo ">> running short tests"
-	GO111MODULE=$(GO111MODULE) $(GOTEST) -short $(GOOPTS) $(pkgs)
+	$(GOTEST) -short $(GOOPTS) $(pkgs)
 
 .PHONY: common-test
 common-test: $(GOTEST_DIR)
 	@echo ">> running all tests"
-	GO111MODULE=$(GO111MODULE) $(GOTEST) $(test-flags) $(GOOPTS) $(pkgs)
+	$(GOTEST) $(test-flags) $(GOOPTS) $(pkgs)
 
 $(GOTEST_DIR):
 	@mkdir -p $@
@@ -166,25 +158,34 @@ $(GOTEST_DIR):
 .PHONY: common-format
 common-format:
 	@echo ">> formatting code"
-	GO111MODULE=$(GO111MODULE) $(GO) fmt $(pkgs)
+	$(GO) fmt $(pkgs)
 
 .PHONY: common-vet
 common-vet:
 	@echo ">> vetting code"
-	GO111MODULE=$(GO111MODULE) $(GO) vet $(GOOPTS) $(pkgs)
+	$(GO) vet $(GOOPTS) $(pkgs)
 
 .PHONY: common-lint
 common-lint: $(GOLANGCI_LINT)
 ifdef GOLANGCI_LINT
 	@echo ">> running golangci-lint"
-ifdef GO111MODULE
-# 'go list' needs to be executed before staticcheck to prepopulate the modules cache.
-# Otherwise staticcheck might fail randomly for some reason not yet explained.
-	GO111MODULE=$(GO111MODULE) $(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
-	GO111MODULE=$(GO111MODULE) $(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
-else
-	$(GOLANGCI_LINT) run $(pkgs)
+	$(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
 endif
+
+.PHONY: common-lint-fix
+common-lint-fix: $(GOLANGCI_LINT)
+ifdef GOLANGCI_LINT
+	@echo ">> running golangci-lint fix"
+	$(GOLANGCI_LINT) run --fix $(GOLANGCI_LINT_OPTS) $(pkgs)
+endif
+
+.PHONY: common-yamllint
+common-yamllint:
+	@echo ">> running yamllint on all YAML files in the repository"
+ifeq (, $(shell command -v yamllint 2> /dev/null))
+	@echo "yamllint not installed so skipping"
+else
+	yamllint .
 endif
 
 # For backward-compatibility.
@@ -192,38 +193,29 @@ endif
 common-staticcheck: lint
 
 .PHONY: common-unused
-common-unused: $(GOVENDOR)
-ifdef GOVENDOR
-	@echo ">> running check for unused packages"
-	@$(GOVENDOR) list +unused | grep . && exit 1 || echo 'No unused packages'
-else
-ifdef GO111MODULE
+common-unused:
 	@echo ">> running check for unused/missing packages in go.mod"
-	GO111MODULE=$(GO111MODULE) $(GO) mod tidy
-ifeq (,$(wildcard vendor))
+	$(GO) mod tidy
 	@git diff --exit-code -- go.sum go.mod
-else
-	@echo ">> running check for unused packages in vendor/"
-	GO111MODULE=$(GO111MODULE) $(GO) mod vendor
-	@git diff --exit-code -- go.sum go.mod vendor/
-endif
-endif
-endif
 
 .PHONY: common-build
 common-build: promu
 	@echo ">> building binaries"
-	GO111MODULE=$(GO111MODULE) $(PROMU) build --prefix $(PREFIX) $(PROMU_BINARIES)
+	$(PROMU) build --prefix $(PREFIX) $(PROMU_BINARIES)
 
 .PHONY: common-tarball
 common-tarball: promu
 	@echo ">> building release tarball"
 	$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
 
+.PHONY: common-docker-repo-name
+common-docker-repo-name:
+	@echo "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)"
+
 .PHONY: common-docker $(BUILD_DOCKER_ARCHS)
 common-docker: $(BUILD_DOCKER_ARCHS)
 $(BUILD_DOCKER_ARCHS): common-docker-%:
-	docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" \
+	docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" \
 		-f $(DOCKERFILE_PATH) \
 		--build-arg ARCH="$*" \
 		--build-arg OS="linux" \
@@ -232,17 +224,19 @@ $(BUILD_DOCKER_ARCHS): common-docker-%:
 .PHONY: common-docker-publish $(PUBLISH_DOCKER_ARCHS)
 common-docker-publish: $(PUBLISH_DOCKER_ARCHS)
 $(PUBLISH_DOCKER_ARCHS): common-docker-publish-%:
-	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)"
+	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)"
 
+DOCKER_MAJOR_VERSION_TAG = $(firstword $(subst ., ,$(shell cat VERSION)))
 .PHONY: common-docker-tag-latest $(TAG_DOCKER_ARCHS)
 common-docker-tag-latest: $(TAG_DOCKER_ARCHS)
 $(TAG_DOCKER_ARCHS): common-docker-tag-latest-%:
-	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"
+	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"
+	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)"
 
 .PHONY: common-docker-manifest
 common-docker-manifest:
-	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$(ARCH):$(DOCKER_IMAGE_TAG))
-	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)"
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$(ARCH):$(SANITIZED_DOCKER_IMAGE_TAG))
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)"
 
 .PHONY: promu
 promu: $(PROMU)
@@ -265,12 +259,6 @@ $(GOLANGCI_LINT):
 	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh \
 		| sed -e '/install -d/d' \
 		| sh -s -- -b $(FIRST_GOPATH)/bin $(GOLANGCI_LINT_VERSION)
-endif
-
-ifdef GOVENDOR
-.PHONY: $(GOVENDOR)
-$(GOVENDOR):
-	GOOS= GOARCH= $(GO) get -u github.com/kardianos/govendor
 endif
 
 .PHONY: precheck

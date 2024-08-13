@@ -19,7 +19,6 @@ package gci
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,7 +55,7 @@ func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests [
 		manifestFuncName: funcName,
 	}
 
-	d, err := ioutil.TempDir("", "configure-helper-test")
+	d, err := os.MkdirTemp("", "configure-helper-test")
 	if err != nil {
 		c.t.Fatalf("Failed to create temp directory: %v", err)
 	}
@@ -143,7 +142,7 @@ func (c *ManifestTestCase) mustCreateEnv(env interface{}, target string, templat
 }
 
 func (c *ManifestTestCase) mustLoadPodFromManifest() {
-	json, err := ioutil.ReadFile(c.manifestDestination)
+	json, err := os.ReadFile(c.manifestDestination)
 	if err != nil {
 		c.t.Fatalf("Failed to read manifest: %s, %v", c.manifestDestination, err)
 	}
@@ -171,7 +170,7 @@ func copyFile(src, dst string) (err error) {
 	}
 	defer func() {
 		cerr := out.Close()
-		if cerr == nil {
+		if err == nil {
 			err = cerr
 		}
 	}()

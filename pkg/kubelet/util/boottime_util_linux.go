@@ -1,4 +1,5 @@
-// +build freebsd linux
+//go:build linux
+// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.

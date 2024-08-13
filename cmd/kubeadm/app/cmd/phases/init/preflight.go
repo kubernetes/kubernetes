@@ -20,17 +20,19 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
+	utilsexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
 	preflightExample = cmdutil.Examples(`
 		# Run pre-flight checks for kubeadm init using a config file.
-		kubeadm init phase preflight --config kubeadm-config.yml
+		kubeadm init phase preflight --config kubeadm-config.yaml
 		`)
 )
 
@@ -44,7 +46,10 @@ func NewPreflightPhase() workflow.Phase {
 		Run:     runPreflight,
 		InheritFlags: []string{
 			options.CfgPath,
+			options.ImageRepository,
+			options.NodeCRISocket,
 			options.IgnorePreflightErrors,
+			options.DryRun,
 		},
 	}
 }
@@ -61,16 +66,13 @@ func runPreflight(c workflow.RunData) error {
 		return err
 	}
 
-	if !data.DryRun() {
-		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
-			return err
-		}
-	} else {
+	if data.DryRun() {
 		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+		return nil
 	}
 
-	return nil
+	fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
+	fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
+	fmt.Println("[preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
+	return preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors())
 }

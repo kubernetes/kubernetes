@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -33,7 +33,7 @@ import (
 )
 
 func TestV1beta2StatefulSetSpecConversion(t *testing.T) {
-	replicas := utilpointer.Int32Ptr(2)
+	replicas := utilpointer.Int32(2)
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 	v1beta2Template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -104,7 +104,7 @@ func TestV1beta2StatefulSetSpecConversion(t *testing.T) {
 }
 
 func TestV1beta2StatefulSetUpdateStrategyConversion(t *testing.T) {
-	partition := utilpointer.Int32Ptr(2)
+	partition := utilpointer.Int32(2)
 	v1beta2rollingUpdate := new(v1beta2.RollingUpdateStatefulSetStrategy)
 	v1beta2rollingUpdate.Partition = partition
 	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
@@ -152,14 +152,15 @@ func TestV1beta2StatefulSetUpdateStrategyConversion(t *testing.T) {
 }
 
 func TestV1beta2RollingUpdateDaemonSetConversion(t *testing.T) {
-	intorstr := intstr.FromInt(1)
+	intorstr := intstr.FromInt32(1)
+	maxSurge := intstr.FromInt32(0)
 	testcases := map[string]struct {
 		rollingUpdateDs1 *apps.RollingUpdateDaemonSet
 		rollingUpdateDs2 *v1beta2.RollingUpdateDaemonSet
 	}{
 		"RollingUpdateDaemonSet Conversion 2": {
-			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr},
-			rollingUpdateDs2: &v1beta2.RollingUpdateDaemonSet{MaxUnavailable: &intorstr},
+			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr, MaxSurge: maxSurge},
+			rollingUpdateDs2: &v1beta2.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 		},
 	}
 
@@ -260,7 +261,7 @@ func TestV1beta2StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentConversion(t *testing.T) {
-	replica := utilpointer.Int32Ptr(2)
+	replica := utilpointer.Int32(2)
 	rollbackTo := new(apps.RollbackConfig)
 	rollbackTo.Revision = int64(2)
 	testcases := map[string]struct {
@@ -390,9 +391,9 @@ func TestV1beta2ScaleStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentSpecConversion(t *testing.T) {
-	replica := utilpointer.Int32Ptr(2)
-	revisionHistoryLimit := utilpointer.Int32Ptr(2)
-	progressDeadlineSeconds := utilpointer.Int32Ptr(2)
+	replica := utilpointer.Int32(2)
+	revisionHistoryLimit := utilpointer.Int32(2)
+	progressDeadlineSeconds := utilpointer.Int32(2)
 
 	testcases := map[string]struct {
 		deploymentSpec1 *apps.DeploymentSpec
@@ -488,8 +489,8 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
-	maxUnavailable := intstr.FromInt(2)
-	maxSurge := intstr.FromInt(2)
+	maxUnavailable := intstr.FromInt32(2)
+	maxSurge := intstr.FromInt32(2)
 	extensionsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
 	v1beta2RollingUpdate := v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	testcases := map[string]struct {
@@ -529,8 +530,8 @@ func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
 
 func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
 	nilIntStr := intstr.IntOrString{}
-	maxUnavailable := intstr.FromInt(2)
-	maxSurge := intstr.FromInt(2)
+	maxUnavailable := intstr.FromInt32(2)
+	maxSurge := intstr.FromInt32(2)
 	testcases := map[string]struct {
 		rollingUpdateDeployment1 *apps.RollingUpdateDeployment
 		rollingUpdateDeployment2 *v1beta2.RollingUpdateDeployment

@@ -22,6 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	remote "k8s.io/cri-client/pkg"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -106,24 +110,31 @@ func TestExec(t *testing.T) {
 	elevenKilobyte := strings.Repeat("logs-123", 8*128*11) // 8*128*11=11264 = 11KB of text.
 
 	tests := []struct {
-		expectedStatus probe.Result
-		expectError    bool
-		input          string
-		output         string
-		err            error
+		expectedStatus   probe.Result
+		expectError      bool
+		execProbeTimeout bool
+		input            string
+		output           string
+		err              error
 	}{
 		// Ok
-		{probe.Success, false, "OK", "OK", nil},
+		{probe.Success, false, true, "OK", "OK", nil},
 		// Ok
-		{probe.Success, false, "OK", "OK", &fakeExitError{true, 0}},
+		{probe.Success, false, true, "OK", "OK", &fakeExitError{true, 0}},
 		// Ok - truncated output
-		{probe.Success, false, elevenKilobyte, tenKilobyte, nil},
+		{probe.Success, false, true, elevenKilobyte, tenKilobyte, nil},
 		// Run returns error
-		{probe.Unknown, true, "", "", fmt.Errorf("test error")},
+		{probe.Unknown, true, true, "", "", fmt.Errorf("test error")},
 		// Unhealthy
-		{probe.Failure, false, "Fail", "", &fakeExitError{true, 1}},
+		{probe.Failure, false, true, "Fail", "", &fakeExitError{true, 1}},
+		// Timeout
+		{probe.Failure, false, true, "", remote.ErrCommandTimedOut.Error() + ": command testcmd timed out", fmt.Errorf("%w: command testcmd timed out", remote.ErrCommandTimedOut)},
+		// ExecProbeTimeout
+		{probe.Unknown, true, false, "", "", fmt.Errorf("%w: command testcmd timed out", remote.ErrCommandTimedOut)},
 	}
+
 	for i, test := range tests {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)
 		fake := FakeCmd{
 			out: []byte(test.output),
 			err: test.err,
@@ -132,10 +143,10 @@ func TestExec(t *testing.T) {
 		if status != test.expectedStatus {
 			t.Errorf("[%d] expected %v, got %v", i, test.expectedStatus, status)
 		}
-		if err != nil && test.expectError == false {
+		if err != nil && !test.expectError {
 			t.Errorf("[%d] unexpected error: %v", i, err)
 		}
-		if err == nil && test.expectError == true {
+		if err == nil && test.expectError {
 			t.Errorf("[%d] unexpected non-error", i)
 		}
 		if test.output != output {

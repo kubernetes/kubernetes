@@ -1,0 +1,44 @@
+# One inline resource claim, one pod, two containers.
+# One container uses resource, one does not.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-inline-claim-parameters
+  namespace: default
+data:
+  a: b
+---
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourceClaimTemplate
+metadata:
+  name: test-inline-claim-template
+  namespace: default
+spec:
+  metadata:
+    labels:
+      app: inline-resource
+  spec:
+    resourceClassName: example
+    parametersRef:
+      kind: ConfigMap
+      name: test-inline-claim-parameters
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-inline-claim
+spec:
+  restartPolicy: Never
+  containers:
+  - name: with-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    resources:
+      claims:
+      - name: resource
+  - name: without-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+  resourceClaims:
+  - name: resource
+    resourceClaimTemplateName: test-inline-claim-template

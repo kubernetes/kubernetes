@@ -17,11 +17,12 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 func TestNoMetricsCollected(t *testing.T) {
@@ -29,7 +30,7 @@ func TestNoMetricsCollected(t *testing.T) {
 	descLogSize = descLogSize.GetRawDesc()
 
 	collector := &logMetricsCollector{
-		podStats: func() ([]statsapi.PodStats, error) {
+		podStats: func(_ context.Context) ([]statsapi.PodStats, error) {
 			return []statsapi.PodStats{}, nil
 		},
 	}
@@ -45,7 +46,7 @@ func TestMetricsCollected(t *testing.T) {
 
 	size := uint64(18)
 	collector := &logMetricsCollector{
-		podStats: func() ([]statsapi.PodStats, error) {
+		podStats: func(_ context.Context) ([]statsapi.PodStats, error) {
 			return []statsapi.PodStats{
 				{
 					PodRef: statsapi.PodReference{

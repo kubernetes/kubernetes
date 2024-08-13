@@ -55,15 +55,15 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -91,7 +91,14 @@ type Event struct {
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,7,opt,name=impersonatedUser"`
 	// Source IPs, from where the request originated and intermediate proxies.
+	// The source IPs are listed from (in order):
+	// 1. X-Forwarded-For request header IPs
+	// 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+	// 3. The remote address for the connection, if it doesn't match the last
+	//    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+	// Note: All but the last IP can be arbitrarily set by the client.
 	// +optional
+	// +listType=atomic
 	SourceIPs []string `json:"sourceIPs,omitempty" protobuf:"bytes,8,rep,name=sourceIPs"`
 	// UserAgent records the user agent string reported by the client.
 	// Note that the UserAgent is provided by the client, and must not be trusted.
@@ -160,12 +167,23 @@ type Policy struct {
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
+	// +listType=atomic
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 
 	// OmitStages is a list of stages for which no events are created. Note that this can also
 	// be specified per rule in which case the union of both are omitted.
 	// +optional
+	// +listType=atomic
 	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,3,rep,name=omitStages"`
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// This is used as a global default - a value of 'true' will omit the managed fileds,
+	// otherwise the managed fields will be included in the API audit log.
+	// Note that this can also be specified per rule in which case the value specified
+	// in a rule will override the global default.
+	// +optional
+	OmitManagedFields bool `json:"omitManagedFields,omitempty" protobuf:"varint,4,opt,name=omitManagedFields"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -188,16 +206,19 @@ type PolicyRule struct {
 	// The users (by authenticated user name) this rule applies to.
 	// An empty list implies every user.
 	// +optional
+	// +listType=atomic
 	Users []string `json:"users,omitempty" protobuf:"bytes,2,rep,name=users"`
 	// The user groups this rule applies to. A user is considered matching
 	// if it is a member of any of the UserGroups.
 	// An empty list implies every user group.
 	// +optional
+	// +listType=atomic
 	UserGroups []string `json:"userGroups,omitempty" protobuf:"bytes,3,rep,name=userGroups"`
 
 	// The verbs that match this rule.
 	// An empty list implies every verb.
 	// +optional
+	// +listType=atomic
 	Verbs []string `json:"verbs,omitempty" protobuf:"bytes,4,rep,name=verbs"`
 
 	// Rules can apply to API resources (such as "pods" or "secrets"),
@@ -206,26 +227,41 @@ type PolicyRule struct {
 
 	// Resources that this rule matches. An empty list implies all kinds in all API groups.
 	// +optional
+	// +listType=atomic
 	Resources []GroupResources `json:"resources,omitempty" protobuf:"bytes,5,rep,name=resources"`
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
 	// An empty list implies every namespace.
 	// +optional
+	// +listType=atomic
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,6,rep,name=namespaces"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
-	// *s are allowed, but only as the full, final step in the path.
+	// `*`s are allowed, but only as the full, final step in the path.
 	// Examples:
-	//  "/metrics" - Log requests for apiserver metrics
-	//  "/healthz*" - Log all health checks
+	// - `/metrics` - Log requests for apiserver metrics
+	// - `/healthz*` - Log all health checks
 	// +optional
+	// +listType=atomic
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 
 	// OmitStages is a list of stages for which no events are created. Note that this can also
 	// be specified policy wide in which case the union of both are omitted.
 	// An empty list means no restrictions will apply.
 	// +optional
+	// +listType=atomic
 	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// - a value of 'true' will drop the managed fields from the API audit log
+	// - a value of 'false' indicates that the managed fileds should be included
+	//   in the API audit log
+	// Note that the value, if specified, in this rule will override the global default
+	// If a value is not specified then the global default specified in
+	// Policy.OmitManagedFields will stand.
+	// +optional
+	OmitManagedFields *bool `json:"omitManagedFields,omitempty" protobuf:"varint,9,opt,name=omitManagedFields"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -237,22 +273,24 @@ type GroupResources struct {
 	// Resources is a list of resources this rule applies to.
 	//
 	// For example:
-	// 'pods' matches pods.
-	// 'pods/log' matches the log subresource of pods.
-	// '*' matches all resources and their subresources.
-	// 'pods/*' matches all subresources of pods.
-	// '*/scale' matches all scale subresources.
+	// - `pods` matches pods.
+	// - `pods/log` matches the log subresource of pods.
+	// - `*` matches all resources and their subresources.
+	// - `pods/*` matches all subresources of pods.
+	// - `*/scale` matches all scale subresources.
 	//
 	// If wildcard is present, the validation rule will ensure resources do not
 	// overlap with each other.
 	//
 	// An empty list implies all resources and subresources in this API groups apply.
 	// +optional
+	// +listType=atomic
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.
 	// Using this field requires Resources to be specified.
 	// An empty list implies that every instance of the resource is matched.
 	// +optional
+	// +listType=atomic
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,3,rep,name=resourceNames"`
 }
 

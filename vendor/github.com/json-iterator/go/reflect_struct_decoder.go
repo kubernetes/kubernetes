@@ -507,7 +507,7 @@ func (decoder *generalStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) 
 	for c = ','; c == ','; c = iter.nextToken() {
 		decoder.decodeOneField(ptr, iter)
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	if c != '}' {
@@ -588,7 +588,7 @@ func (decoder *oneFieldStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator)
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -622,7 +622,7 @@ func (decoder *twoFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -660,7 +660,7 @@ func (decoder *threeFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -702,7 +702,7 @@ func (decoder *fourFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -748,7 +748,7 @@ func (decoder *fiveFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -798,7 +798,7 @@ func (decoder *sixFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -852,7 +852,7 @@ func (decoder *sevenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -910,7 +910,7 @@ func (decoder *eightFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -972,7 +972,7 @@ func (decoder *nineFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -1038,7 +1038,7 @@ func (decoder *tenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 			break
 		}
 	}
-	if iter.Error != nil && iter.Error != io.EOF {
+	if iter.Error != nil && iter.Error != io.EOF && len(decoder.typ.Type1().Name()) != 0 {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
 	iter.decrementDepth()
@@ -1075,6 +1075,11 @@ type stringModeNumberDecoder struct {
 }
 
 func (decoder *stringModeNumberDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
+	if iter.WhatIsNext() == NilValue {
+		decoder.elemDecoder.Decode(ptr, iter)
+		return
+	}
+
 	c := iter.nextToken()
 	if c != '"' {
 		iter.ReportError("stringModeNumberDecoder", `expect ", but found `+string([]byte{c}))

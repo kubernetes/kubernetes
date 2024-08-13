@@ -22,15 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 const testingCheckpoint = "cpumanager_checkpoint_test"
-
-var testingDir = os.TempDir()
 
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
@@ -61,7 +60,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{
-				defaultCPUSet: cpuset.NewCPUSet(4, 5, 6),
+				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
 		},
 		{
@@ -83,11 +82,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.NewCPUSet(4, 5, 6),
-						"container2": cpuset.NewCPUSet(1, 2, 3),
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
 					},
 				},
-				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
 		},
 		{
@@ -166,7 +165,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{
-				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
 		},
 		{
@@ -191,20 +190,22 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.NewCPUSet(4, 5, 6),
-						"container2": cpuset.NewCPUSet(1, 2, 3),
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
 					},
 				},
-				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
 		},
 	}
 
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(testingDir)
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	if err != nil {
-		t.Fatalf("could not create testing checkpoint manager: %v", err)
-	}
+	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -214,21 +215,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 			// prepare checkpoint for testing
 			if strings.TrimSpace(tc.checkpointContent) != "" {
 				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				if err := cpm.CreateCheckpoint(testingCheckpoint, checkpoint); err != nil {
-					t.Fatalf("could not create testing checkpoint: %v", err)
-				}
+				err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
+				require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
 			}
 
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
-			if err != nil {
-				if strings.TrimSpace(tc.expectedError) != "" {
-					tc.expectedError = "could not restore state from checkpoint: " + tc.expectedError
-					if strings.HasPrefix(err.Error(), tc.expectedError) {
-						t.Logf("got expected error: %v", err)
-						return
-					}
-				}
-				t.Fatalf("unexpected error while creatng checkpointState: %v", err)
+			if strings.TrimSpace(tc.expectedError) == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "could not restore state from checkpoint")
+				require.Contains(t, err.Error(), tc.expectedError)
+				return
 			}
 
 			// compare state after restoration with the one expected
@@ -244,19 +242,26 @@ func TestCheckpointStateStore(t *testing.T) {
 	}{
 		{
 			"Store default cpu set",
-			&stateMemory{defaultCPUSet: cpuset.NewCPUSet(1, 2, 3)},
+			&stateMemory{defaultCPUSet: cpuset.New(1, 2, 3)},
 		},
 		{
 			"Store assignments",
 			&stateMemory{
 				assignments: map[string]map[string]cpuset.CPUSet{
 					"pod": {
-						"container1": cpuset.NewCPUSet(1, 5, 8),
+						"container1": cpuset.New(1, 5, 8),
 					},
 				},
 			},
 		},
 	}
+
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -296,33 +301,40 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	}{
 		{
 			description:   "One container",
-			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			defaultCPUset: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
 			assignments: map[string]map[string]cpuset.CPUSet{
 				"pod": {
-					"c1": cpuset.NewCPUSet(0, 1),
+					"c1": cpuset.New(0, 1),
 				},
 			},
 		},
 		{
 			description:   "Two containers",
-			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			defaultCPUset: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
 			assignments: map[string]map[string]cpuset.CPUSet{
 				"pod": {
-					"c1": cpuset.NewCPUSet(0, 1),
-					"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+					"c1": cpuset.New(0, 1),
+					"c2": cpuset.New(2, 3, 4, 5),
 				},
 			},
 		},
 		{
 			description:   "Container without assigned cpus",
-			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			defaultCPUset: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
 			assignments: map[string]map[string]cpuset.CPUSet{
 				"pod": {
-					"c1": cpuset.NewCPUSet(),
+					"c1": cpuset.New(),
 				},
 			},
 		},
 	}
+
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -365,10 +377,10 @@ func TestCheckpointStateClear(t *testing.T) {
 	}{
 		{
 			"Valid state",
-			cpuset.NewCPUSet(1, 5, 10),
+			cpuset.New(1, 5, 10),
 			map[string]map[string]cpuset.CPUSet{
 				"pod": {
-					"container1": cpuset.NewCPUSet(1, 4),
+					"container1": cpuset.New(1, 4),
 				},
 			},
 		},
@@ -376,6 +388,13 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			// create temp dir
+			testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(testingDir)
+
 			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
@@ -385,7 +404,7 @@ func TestCheckpointStateClear(t *testing.T) {
 			state.SetCPUAssignments(tc.assignments)
 
 			state.ClearState()
-			if !cpuset.NewCPUSet().Equals(state.GetDefaultCPUSet()) {
+			if !cpuset.New().Equals(state.GetDefaultCPUSet()) {
 				t.Fatal("cleared state with non-empty default cpu set")
 			}
 			for pod := range tc.assignments {

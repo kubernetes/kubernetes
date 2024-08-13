@@ -21,16 +21,20 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
-	"time"
 
-	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
+
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 var noRestraintQSF = fqtesting.NewNoRestraintFactory()
@@ -38,24 +42,25 @@ var noRestraintQSF = fqtesting.NewNoRestraintFactory()
 // genPL creates a valid PriorityLevelConfiguration with the given
 // name and randomly generated spec.  The given name must not be one
 // of the mandatory ones.
-func genPL(rng *rand.Rand, name string) *fcv1a1.PriorityLevelConfiguration {
-	plc := &fcv1a1.PriorityLevelConfiguration{
+func genPL(rng *rand.Rand, name string) *flowcontrol.PriorityLevelConfiguration {
+	plc := &flowcontrol.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: fcv1a1.PriorityLevelConfigurationSpec{
-			Type: fcv1a1.PriorityLevelEnablementLimited,
-			Limited: &fcv1a1.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: rng.Int31n(100) + 1,
-				LimitResponse: fcv1a1.LimitResponse{
-					Type: fcv1a1.LimitResponseTypeReject}}}}
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(int32(rng.Int31n(100) + 1)),
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject}}}}
 	if rng.Float32() < 0.95 {
-		plc.Spec.Limited.LimitResponse.Type = fcv1a1.LimitResponseTypeQueue
+		plc.Spec.Limited.LimitResponse.Type = flowcontrol.LimitResponseTypeQueue
 		hs := rng.Int31n(5) + 1
-		plc.Spec.Limited.LimitResponse.Queuing = &fcv1a1.QueuingConfiguration{
+		plc.Spec.Limited.LimitResponse.Queuing = &flowcontrol.QueuingConfiguration{
 			Queues:           hs + rng.Int31n(20),
 			HandSize:         hs,
 			QueueLengthLimit: 5}
 	}
-	_, err := qscOfPL(noRestraintQSF, nil, plc, time.Minute)
+	labelVals := []string{"test"}
+	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, metrics.RatioedGaugeVecPhasedElementPair(metrics.PriorityLevelConcurrencyGaugeVec, 1, 1, labelVals), metrics.PriorityLevelExecutionSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelVals), fq.NewNamedIntegrator(clock.RealClock{}, name))
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +69,7 @@ func genPL(rng *rand.Rand, name string) *fcv1a1.PriorityLevelConfiguration {
 
 // A FlowSchema together with characteristics relevant to testing
 type fsTestingRecord struct {
-	fs *fcv1a1.FlowSchema
+	fs *flowcontrol.FlowSchema
 	// Does this reference an existing priority level?
 	wellFormed                    bool
 	matchesAllResourceRequests    bool
@@ -84,8 +89,8 @@ func (ftr *fsTestingRecord) addDigests(digests []RequestDigest, matches bool) {
 }
 
 var flowDistinguisherMethodTypes = sets.NewString(
-	string(fcv1a1.FlowDistinguisherMethodByUserType),
-	string(fcv1a1.FlowDistinguisherMethodByNamespaceType),
+	string(flowcontrol.FlowDistinguisherMethodByUserType),
+	string(flowcontrol.FlowDistinguisherMethodByNamespaceType),
 )
 
 var mandFTRExempt = &fsTestingRecord{
@@ -188,9 +193,9 @@ var mandFTRCatchAll = &fsTestingRecord{
 // formed spec references a priority level drawn from badPLNames.
 // goodPLNames may be empty, but badPLNames may not.
 func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) *fsTestingRecord {
-	fs := &fcv1a1.FlowSchema{
+	fs := &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       fcv1a1.FlowSchemaSpec{}}
+		Spec:       flowcontrol.FlowSchemaSpec{}}
 	// 5% chance of zero rules, otherwise draw from 1--6 biased low
 	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2)) * ((19 + rng.Intn(20)) / 20)
 	ftr := &fsTestingRecord{fs: fs,
@@ -201,23 +206,23 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 			false: {false: {}, true: {}},
 			true:  {false: {}, true: {}}},
 	}
-	dangleStatus := fcv1a1.ConditionFalse
+	dangleStatus := flowcontrol.ConditionFalse
 	if rng.Float32() < 0.9 && len(goodPLNames) > 0 {
-		fs.Spec.PriorityLevelConfiguration = fcv1a1.PriorityLevelConfigurationReference{pickSetString(rng, goodPLNames)}
+		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{Name: pickSetString(rng, goodPLNames)}
 	} else {
-		fs.Spec.PriorityLevelConfiguration = fcv1a1.PriorityLevelConfigurationReference{pickSetString(rng, badPLNames)}
+		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{Name: pickSetString(rng, badPLNames)}
 		ftr.wellFormed = false
-		dangleStatus = fcv1a1.ConditionTrue
+		dangleStatus = flowcontrol.ConditionTrue
 	}
-	fs.Status.Conditions = []fcv1a1.FlowSchemaCondition{{
-		Type:   fcv1a1.FlowSchemaConditionDangling,
+	fs.Status.Conditions = []flowcontrol.FlowSchemaCondition{{
+		Type:   flowcontrol.FlowSchemaConditionDangling,
 		Status: dangleStatus}}
 	fs.Spec.MatchingPrecedence = rng.Int31n(9997) + 2
 	if rng.Float32() < 0.8 {
-		fdmt := fcv1a1.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))
-		fs.Spec.DistinguisherMethod = &fcv1a1.FlowDistinguisherMethod{fdmt}
+		fdmt := flowcontrol.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))
+		fs.Spec.DistinguisherMethod = &flowcontrol.FlowDistinguisherMethod{Type: fdmt}
 	}
-	fs.Spec.Rules = []fcv1a1.PolicyRulesWithSubjects{}
+	fs.Spec.Rules = []flowcontrol.PolicyRulesWithSubjects{}
 	everyResourceMatcher := -1
 	if ftr.matchesAllResourceRequests {
 		if mayMatchClusterScope {
@@ -250,7 +255,9 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 		ftr.addDigests(skippingRDigests, false)
 		ftr.addDigests(skippingNDigests, false)
 	}
-	t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, ftr.wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	if testDebugLogs {
+		t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, ftr.wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	}
 	return ftr
 }
 
@@ -274,12 +281,12 @@ var noextra = make(map[string][]string)
 // cluster-scoped request.  Thus, these are normally excluded.  When
 // mayMatchClusterScope==true the generated rule may be cluster-scoped
 // and there is no promise of cross-rule exclusion.
-func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests bool) (fcv1a1.PolicyRulesWithSubjects, []RequestDigest, []RequestDigest, []RequestDigest, []RequestDigest) {
-	subjects := []fcv1a1.Subject{}
+func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests bool) (flowcontrol.PolicyRulesWithSubjects, []RequestDigest, []RequestDigest, []RequestDigest, []RequestDigest) {
+	subjects := []flowcontrol.Subject{}
 	matchingUIs := []user.Info{}
 	skippingUIs := []user.Info{}
-	resourceRules := []fcv1a1.ResourcePolicyRule{}
-	nonResourceRules := []fcv1a1.NonResourcePolicyRule{}
+	resourceRules := []flowcontrol.ResourcePolicyRule{}
+	nonResourceRules := []flowcontrol.NonResourcePolicyRule{}
 	matchingRRIs := []*request.RequestInfo{}
 	skippingRRIs := []*request.RequestInfo{}
 	matchingNRIs := []*request.RequestInfo{}
@@ -340,8 +347,10 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatc
 	if nRR == 0 {
 		_, _, skippingNRIs = genNonResourceRule(rng, pfx+"-o", false, someMatchesAllNonResourceRequests)
 	}
-	rule := fcv1a1.PolicyRulesWithSubjects{subjects, resourceRules, nonResourceRules}
-	t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%s, mu=%s, su=%s, mrr=%s, mnr=%s, srr=%s, snr=%s", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
+	rule := flowcontrol.PolicyRulesWithSubjects{Subjects: subjects, ResourceRules: resourceRules, NonResourceRules: nonResourceRules}
+	if testDebugLogs {
+		t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%s, mu=%s, su=%s, mrr=%s, mnr=%s, srr=%s, snr=%s", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
+	}
 	matchingRDigests := cross(matchingUIs, matchingRRIs)
 	skippingRDigests := append(append(cross(matchingUIs, skippingRRIs),
 		cross(skippingUIs, matchingRRIs)...),
@@ -367,7 +376,7 @@ func cross(uis []user.Info, ris []*request.RequestInfo) []RequestDigest {
 	return ans
 }
 
-func shuffleAndTakeDigests(t *testing.T, rng *rand.Rand, rule *fcv1a1.PolicyRulesWithSubjects, toMatch bool, digests []RequestDigest, n int) []RequestDigest {
+func shuffleAndTakeDigests(t *testing.T, rng *rand.Rand, rule *flowcontrol.PolicyRulesWithSubjects, toMatch bool, digests []RequestDigest, n int) []RequestDigest {
 	ans := make([]RequestDigest, 0, n)
 	for len(ans) < n && len(digests) > 0 {
 		i := rng.Intn(len(digests))
@@ -378,12 +387,16 @@ func shuffleAndTakeDigests(t *testing.T, rng *rand.Rand, rule *fcv1a1.PolicyRule
 		if rule != nil {
 			thisMatches := matchesPolicyRule(digest, rule)
 			if toMatch {
-				t.Logf("Added matching digest %#+v", digest)
+				if testDebugLogs {
+					t.Logf("Added matching digest %#+v", digest)
+				}
 				if !thisMatches {
 					t.Errorf("Fail in check: rule %s does not match digest %#+v", fcfmt.Fmt(rule), digest)
 				}
 			} else {
-				t.Logf("Added skipping digest %#+v", digest)
+				if testDebugLogs {
+					t.Logf("Added skipping digest %#+v", digest)
+				}
 				if thisMatches {
 					t.Errorf("Fail in check: rule %s matches digest %#+v", fcfmt.Fmt(rule), digest)
 				}
@@ -408,25 +421,25 @@ func uniqify(in RequestDigest) RequestDigest {
 // names that begin with the given prefix.  The second returned list
 // contains members that mismatch the generated Subject and involve
 // names that begin with the given prefix.
-func genSubject(rng *rand.Rand, pfx string) (fcv1a1.Subject, []user.Info, []user.Info) {
-	subject := fcv1a1.Subject{}
+func genSubject(rng *rand.Rand, pfx string) (flowcontrol.Subject, []user.Info, []user.Info) {
+	subject := flowcontrol.Subject{}
 	var matchingUIs, skippingUIs []user.Info
 	x := rng.Float32()
 	switch {
 	case x < 0.33:
-		subject.Kind = fcv1a1.SubjectKindUser
+		subject.Kind = flowcontrol.SubjectKindUser
 		subject.User, matchingUIs, skippingUIs = genUser(rng, pfx)
 	case x < 0.67:
-		subject.Kind = fcv1a1.SubjectKindGroup
+		subject.Kind = flowcontrol.SubjectKindGroup
 		subject.Group, matchingUIs, skippingUIs = genGroup(rng, pfx)
 	default:
-		subject.Kind = fcv1a1.SubjectKindServiceAccount
+		subject.Kind = flowcontrol.SubjectKindServiceAccount
 		subject.ServiceAccount, matchingUIs, skippingUIs = genServiceAccount(rng, pfx)
 	}
 	return subject, matchingUIs, skippingUIs
 }
 
-func genUser(rng *rand.Rand, pfx string) (*fcv1a1.UserSubject, []user.Info, []user.Info) {
+func genUser(rng *rand.Rand, pfx string) (*flowcontrol.UserSubject, []user.Info, []user.Info) {
 	mui := &user.DefaultInfo{
 		Name:   pfx + "-u",
 		UID:    "good-id",
@@ -437,7 +450,7 @@ func genUser(rng *rand.Rand, pfx string) (*fcv1a1.UserSubject, []user.Info, []us
 		UID:    mui.UID,
 		Groups: mui.Groups,
 		Extra:  mui.Extra}}
-	return &fcv1a1.UserSubject{mui.Name}, []user.Info{mui}, skips
+	return &flowcontrol.UserSubject{Name: mui.Name}, []user.Info{mui}, skips
 }
 
 var groupCover = []string{"system:authenticated", "system:unauthenticated"}
@@ -446,21 +459,21 @@ func mg(rng *rand.Rand) string {
 	return groupCover[rng.Intn(len(groupCover))]
 }
 
-func mkUserSubject(username string) fcv1a1.Subject {
-	return fcv1a1.Subject{
-		Kind: fcv1a1.SubjectKindUser,
-		User: &fcv1a1.UserSubject{username},
+func mkUserSubject(username string) flowcontrol.Subject {
+	return flowcontrol.Subject{
+		Kind: flowcontrol.SubjectKindUser,
+		User: &flowcontrol.UserSubject{Name: username},
 	}
 }
 
-func mkGroupSubject(group string) fcv1a1.Subject {
-	return fcv1a1.Subject{
-		Kind:  fcv1a1.SubjectKindGroup,
-		Group: &fcv1a1.GroupSubject{group},
+func mkGroupSubject(group string) flowcontrol.Subject {
+	return flowcontrol.Subject{
+		Kind:  flowcontrol.SubjectKindGroup,
+		Group: &flowcontrol.GroupSubject{Name: group},
 	}
 }
 
-func genGroup(rng *rand.Rand, pfx string) (*fcv1a1.GroupSubject, []user.Info, []user.Info) {
+func genGroup(rng *rand.Rand, pfx string) (*flowcontrol.GroupSubject, []user.Info, []user.Info) {
 	name := pfx + "-g"
 	ui := &user.DefaultInfo{
 		Name:   pfx + "-u",
@@ -486,10 +499,10 @@ func genGroup(rng *rand.Rand, pfx string) (*fcv1a1.GroupSubject, []user.Info, []
 	if rng.Intn(2) == 0 {
 		skipper.Groups = append(skipper.Groups, pfx+"-k")
 	}
-	return &fcv1a1.GroupSubject{name}, []user.Info{ui}, []user.Info{skipper}
+	return &flowcontrol.GroupSubject{Name: name}, []user.Info{ui}, []user.Info{skipper}
 }
 
-func genServiceAccount(rng *rand.Rand, pfx string) (*fcv1a1.ServiceAccountSubject, []user.Info, []user.Info) {
+func genServiceAccount(rng *rand.Rand, pfx string) (*flowcontrol.ServiceAccountSubject, []user.Info, []user.Info) {
 	ns := pfx + "-ns"
 	name := pfx + "-n"
 	mname := name
@@ -515,19 +528,19 @@ func genServiceAccount(rng *rand.Rand, pfx string) (*fcv1a1.ServiceAccountSubjec
 			Groups: mui.Groups,
 			Extra:  mui.Extra}}
 	}
-	return &fcv1a1.ServiceAccountSubject{Namespace: ns, Name: mname}, []user.Info{mui}, skips
+	return &flowcontrol.ServiceAccountSubject{Namespace: ns, Name: mname}, []user.Info{mui}, skips
 }
 
 // genResourceRule randomly generates a valid ResourcePolicyRule and lists
 // of matching and non-matching `*request.RequestInfo`.
-func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllResources, someMatchesAllResources bool) (fcv1a1.ResourcePolicyRule, []*request.RequestInfo, []*request.RequestInfo) {
+func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllResources, someMatchesAllResources bool) (flowcontrol.ResourcePolicyRule, []*request.RequestInfo, []*request.RequestInfo) {
 	namespaces := []string{pfx + "-n1", pfx + "-n2", pfx + "-n3"}
 	rnamespaces := namespaces
 	if mayMatchClusterScope && rng.Float32() < 0.1 {
 		namespaces[0] = ""
 		rnamespaces = namespaces[1:]
 	}
-	rr := fcv1a1.ResourcePolicyRule{
+	rr := flowcontrol.ResourcePolicyRule{
 		Verbs:        []string{pfx + "-v1", pfx + "-v2", pfx + "-v3"},
 		APIGroups:    []string{pfx + ".g1", pfx + ".g2", pfx + ".g3"},
 		Resources:    []string{pfx + "-r1s", pfx + "-r2s", pfx + "-r3s"},
@@ -549,17 +562,17 @@ func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllR
 	// choose a proper subset of fields to wildcard; only matters if not matching all
 	starMask := rng.Intn(15)
 	if matchAllResources || starMask&1 == 1 && rng.Float32() < 0.1 {
-		rr.Verbs = []string{fcv1a1.VerbAll}
+		rr.Verbs = []string{flowcontrol.VerbAll}
 	}
 	if matchAllResources || starMask&2 == 2 && rng.Float32() < 0.1 {
-		rr.APIGroups = []string{fcv1a1.APIGroupAll}
+		rr.APIGroups = []string{flowcontrol.APIGroupAll}
 	}
 	if matchAllResources || starMask&4 == 4 && rng.Float32() < 0.1 {
-		rr.Resources = []string{fcv1a1.ResourceAll}
+		rr.Resources = []string{flowcontrol.ResourceAll}
 	}
 	if matchAllResources || starMask&8 == 8 && rng.Float32() < 0.1 {
 		rr.ClusterScope = true
-		rr.Namespaces = []string{fcv1a1.NamespaceEvery}
+		rr.Namespaces = []string{flowcontrol.NamespaceEvery}
 	}
 	return rr, matchingRIs, skippingRIs
 }
@@ -615,8 +628,8 @@ func chooseInts(rng *rand.Rand, n, m int) []int {
 // genNonResourceRule returns a randomly generated valid
 // NonResourcePolicyRule and lists of matching and non-matching
 // `*request.RequestInfo`.
-func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMatchesAllNonResources bool) (fcv1a1.NonResourcePolicyRule, []*request.RequestInfo, []*request.RequestInfo) {
-	nrr := fcv1a1.NonResourcePolicyRule{
+func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMatchesAllNonResources bool) (flowcontrol.NonResourcePolicyRule, []*request.RequestInfo, []*request.RequestInfo) {
+	nrr := flowcontrol.NonResourcePolicyRule{
 		Verbs:           []string{pfx + "-v1", pfx + "-v2", pfx + "-v3"},
 		NonResourceURLs: []string{"/" + pfx + "/g/p1", "/" + pfx + "/g/p2", "/" + pfx + "/g/p3"},
 	}
@@ -630,7 +643,7 @@ func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMa
 	// choose a proper subset of fields to consider wildcarding; only matters if not matching all
 	starMask := rng.Intn(3)
 	if matchAllNonResources || starMask&1 == 1 && rng.Float32() < 0.1 {
-		nrr.Verbs = []string{fcv1a1.VerbAll}
+		nrr.Verbs = []string{flowcontrol.VerbAll}
 	}
 	if matchAllNonResources || starMask&2 == 2 && rng.Float32() < 0.1 {
 		nrr.NonResourceURLs = []string{"*"}

@@ -8,22 +8,26 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 5. If the PR is unfinished, see how to mark it: https://git.k8s.io/community/contributors/guide/pull-requests.md#marking-unfinished-pull-requests
 -->
 
-**What type of PR is this?**
-> Uncomment only one ` /kind <>` line, hit enter to put that in a new line, and remove leading whitespace from that line:
->
-> /kind api-change
-> /kind bug
-> /kind cleanup
-> /kind deprecation
-> /kind design
-> /kind documentation
-> /kind failing-test
-> /kind feature
-> /kind flake
+#### What type of PR is this?
 
-**What this PR does / why we need it**:
+<!--
+Add one of the following kinds:
+/kind bug
+/kind cleanup
+/kind documentation
+/kind feature
 
-**Which issue(s) this PR fixes**:
+Optionally add one or more of the following kinds if applicable:
+/kind api-change
+/kind deprecation
+/kind failing-test
+/kind flake
+/kind regression
+-->
+
+#### What this PR does / why we need it:
+
+#### Which issue(s) this PR fixes:
 <!--
 *Automatically closes linked issue when PR is merged.
 Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
@@ -31,9 +35,9 @@ _If PR is about `failing-tests or flakes`, please post the related issues/tests 
 -->
 Fixes #
 
-**Special notes for your reviewer**:
+#### Special notes for your reviewer:
 
-**Does this PR introduce a user-facing change?**:
+#### Does this PR introduce a user-facing change?
 <!--
 If no, just write "NONE" in the release-note block below.
 If yes, a release note is required:
@@ -45,7 +49,7 @@ For more information on release notes see: https://git.k8s.io/community/contribu
 
 ```
 
-**Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
+#### Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.:
 
 <!--
 This section can be blank if this pull request does not require a release note.

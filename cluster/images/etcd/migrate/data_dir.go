@@ -19,9 +19,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -88,7 +86,7 @@ func (d *DataDirectory) Backup() error {
 	if err != nil {
 		return err
 	}
-	err = exec.Command("cp", "-r", d.path, backupDir).Run()
+	err = copyDirectory(d.path, backupDir)
 	if err != nil {
 		return err
 	}
@@ -122,6 +120,10 @@ type VersionFile struct {
 	path string
 }
 
+func (v *VersionFile) nextPath() string {
+	return fmt.Sprintf("%s-next", v.path)
+}
+
 // Exists returns true if a version.txt file exists on the file system.
 func (v *VersionFile) Exists() (bool, error) {
 	return exists(v.path)
@@ -129,7 +131,7 @@ func (v *VersionFile) Exists() (bool, error) {
 
 // Read parses the version.txt file and returns it's contents.
 func (v *VersionFile) Read() (*EtcdVersionPair, error) {
-	data, err := ioutil.ReadFile(v.path)
+	data, err := os.ReadFile(v.path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version file %s: %v", v.path, err)
 	}
@@ -141,10 +143,40 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 	return vp, nil
 }
 
+// equals returns true iff VersionFile exists and contains given EtcdVersionPair.
+func (v *VersionFile) equals(vp *EtcdVersionPair) (bool, error) {
+	exists, err := v.Exists()
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	cvp, err := v.Read()
+	if err != nil {
+		return false, err
+	}
+	return vp.Equals(cvp), nil
+}
+
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
-	data := []byte(fmt.Sprintf("%s/%s", vp.version, vp.storageVersion))
-	return ioutil.WriteFile(v.path, data, 0666)
+	// We do write only if file content differs from given EtcdVersionPair.
+	isUpToDate, err := v.equals(vp)
+	if err != nil {
+		return fmt.Errorf("failed to to check if version file %s should be changed: %v", v.path, err)
+	}
+	if isUpToDate {
+		return nil
+	}
+	// We do write + rename instead of just write to protect from version.txt
+	// corruption under full disk condition.
+	// See https://github.com/kubernetes/kubernetes/issues/98989.
+	err = os.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
+	if err != nil {
+		return fmt.Errorf("failed to write new version file %s: %v", v.nextPath(), err)
+	}
+	return os.Rename(v.nextPath(), v.path)
 }
 
 func exists(path string) (bool, error) {

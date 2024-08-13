@@ -99,8 +99,8 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 		old:         old,
 		new: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        "empty",
-				ClusterName: "somethingelse", // immutable
+				Name:      "empty",
+				Namespace: "somethingelse", // immutable
 			},
 			Handler: "bar",
 		},
@@ -134,17 +134,15 @@ func TestValidateOverhead(t *testing.T) {
 	successCase := []struct {
 		Name     string
 		overhead *node.Overhead
-	}{
-		{
-			Name: "Overhead with valid cpu and memory resources",
-			overhead: &node.Overhead{
-				PodFixed: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
+	}{{
+		Name: "Overhead with valid cpu and memory resources",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+				core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
-	}
+	}}
 
 	for _, tc := range successCase {
 		rc := &node.RuntimeClass{
@@ -160,16 +158,14 @@ func TestValidateOverhead(t *testing.T) {
 	errorCase := []struct {
 		Name     string
 		overhead *node.Overhead
-	}{
-		{
-			Name: "Invalid Resources",
-			overhead: &node.Overhead{
-				PodFixed: core.ResourceList{
-					core.ResourceName("my.org"): resource.MustParse("10m"),
-				},
+	}{{
+		Name: "Invalid Resources",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName("my.org"): resource.MustParse("10m"),
 			},
 		},
-	}
+	}}
 	for _, tc := range errorCase {
 		rc := &node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -227,12 +223,12 @@ func TestValidateScheduling(t *testing.T) {
 				Key:               "valid",
 				Operator:          core.TolerationOpExists,
 				Effect:            core.TaintEffectNoExecute,
-				TolerationSeconds: utilpointer.Int64Ptr(5),
+				TolerationSeconds: utilpointer.Int64(5),
 			}, {
 				Key:               "valid",
 				Operator:          core.TolerationOpExists,
 				Effect:            core.TaintEffectNoExecute,
-				TolerationSeconds: utilpointer.Int64Ptr(10),
+				TolerationSeconds: utilpointer.Int64(10),
 			}},
 		},
 		expectErrs: 1,

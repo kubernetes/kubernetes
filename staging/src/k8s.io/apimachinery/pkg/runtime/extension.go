@@ -18,16 +18,77 @@ package runtime
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
+	"fmt"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	"k8s.io/apimachinery/pkg/util/json"
 )
+
+// RawExtension intentionally avoids implementing value.UnstructuredConverter for now because the
+// signature of ToUnstructured does not allow returning an error value in cases where the conversion
+// is not possible (content type is unrecognized or bytes don't match content type).
+func rawToUnstructured(raw []byte, contentType string) (interface{}, error) {
+	switch contentType {
+	case ContentTypeJSON:
+		var u interface{}
+		if err := json.Unmarshal(raw, &u); err != nil {
+			return nil, fmt.Errorf("failed to parse RawExtension bytes as JSON: %w", err)
+		}
+		return u, nil
+	case ContentTypeCBOR:
+		var u interface{}
+		if err := cbor.Unmarshal(raw, &u); err != nil {
+			return nil, fmt.Errorf("failed to parse RawExtension bytes as CBOR: %w", err)
+		}
+		return u, nil
+	default:
+		return nil, fmt.Errorf("cannot convert RawExtension with unrecognized content type to unstructured")
+	}
+}
+
+func (re RawExtension) guessContentType() string {
+	switch {
+	case bytes.HasPrefix(re.Raw, cborSelfDescribed):
+		return ContentTypeCBOR
+	case len(re.Raw) > 0:
+		switch re.Raw[0] {
+		case '\t', '\r', '\n', ' ', '{', '[', 'n', 't', 'f', '"', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			// Prefixes for the four whitespace characters, objects, arrays, strings, numbers, true, false, and null.
+			return ContentTypeJSON
+		}
+	}
+	return ""
+}
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	if re == nil {
 		return errors.New("runtime.RawExtension: UnmarshalJSON on nil pointer")
 	}
-	if !bytes.Equal(in, []byte("null")) {
-		re.Raw = append(re.Raw[0:0], in...)
+	if bytes.Equal(in, []byte("null")) {
+		return nil
+	}
+	re.Raw = append(re.Raw[0:0], in...)
+	return nil
+}
+
+var (
+	cborNull          = []byte{0xf6}
+	cborSelfDescribed = []byte{0xd9, 0xd9, 0xf7}
+)
+
+func (re *RawExtension) UnmarshalCBOR(in []byte) error {
+	if re == nil {
+		return errors.New("runtime.RawExtension: UnmarshalCBOR on nil pointer")
+	}
+	if !bytes.Equal(in, cborNull) {
+		if !bytes.HasPrefix(in, cborSelfDescribed) {
+			// The self-described CBOR tag doesn't change the interpretation of the data
+			// item it encloses, but it is useful as a magic number. Its encoding is
+			// also what is used to implement the CBOR RecognizingDecoder.
+			re.Raw = append(re.Raw[:0], cborSelfDescribed...)
+		}
+		re.Raw = append(re.Raw, in...)
 	}
 	return nil
 }
@@ -46,6 +107,35 @@ func (re RawExtension) MarshalJSON() ([]byte, error) {
 		}
 		return []byte("null"), nil
 	}
-	// TODO: Check whether ContentType is actually JSON before returning it.
-	return re.Raw, nil
+
+	contentType := re.guessContentType()
+	if contentType == ContentTypeJSON {
+		return re.Raw, nil
+	}
+
+	u, err := rawToUnstructured(re.Raw, contentType)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(u)
+}
+
+func (re RawExtension) MarshalCBOR() ([]byte, error) {
+	if re.Raw == nil {
+		if re.Object != nil {
+			return cbor.Marshal(re.Object)
+		}
+		return cbor.Marshal(nil)
+	}
+
+	contentType := re.guessContentType()
+	if contentType == ContentTypeCBOR {
+		return re.Raw, nil
+	}
+
+	u, err := rawToUnstructured(re.Raw, contentType)
+	if err != nil {
+		return nil, err
+	}
+	return cbor.Marshal(u)
 }

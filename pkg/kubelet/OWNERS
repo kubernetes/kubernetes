@@ -1,14 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- Random-Liu
-- dchen1107
-- derekwaynecarr
-- tallclair
-- vishh
-- yujuhong
+  - sig-node-approvers # https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dapprovers
+emeritus_approvers:
+  - dashpole
+  - vishh
 reviewers:
-- sig-node-reviewers
+  - sig-node-reviewers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dreviewers
+  - tallclair
 labels:
-- area/kubelet
-- sig/node
+  - area/kubelet
+  - sig/node

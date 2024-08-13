@@ -21,11 +21,12 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/generate"
 )
 
@@ -85,6 +86,27 @@ func getArgs(genericParams map[string]interface{}) ([]string, error) {
 		delete(genericParams, "args")
 	}
 	return args, nil
+}
+
+// getAnnotations returns map of annotations.
+func getAnnotations(genericParams map[string]interface{}) (map[string]string, error) {
+	annotationStrings, ok := genericParams["annotations"]
+	if !ok {
+		return nil, nil
+	}
+
+	annotationStringArray, ok := annotationStrings.([]string)
+	if !ok {
+		return nil, fmt.Errorf("expected []string, found: %v", annotationStrings)
+	}
+
+	annotations, _, err := cmdutil.ParsePairs(annotationStringArray, "annotations", false)
+	if err != nil {
+		return nil, err
+	}
+
+	delete(genericParams, "annotations")
+	return annotations, nil
 }
 
 // getEnvs returns environment variables.
@@ -213,6 +235,7 @@ type BasicPod struct{}
 func (BasicPod) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
 		{Name: "labels", Required: false},
+		{Name: "annotations", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
 		{Name: "image", Required: true},
@@ -229,6 +252,7 @@ func (BasicPod) ParamNames() []generate.GeneratorParam {
 		{Name: "requests", Required: false},
 		{Name: "limits", Required: false},
 		{Name: "serviceaccount", Required: false},
+		{Name: "privileged", Required: false},
 	}
 }
 
@@ -239,6 +263,11 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	}
 
 	envs, err := getEnvs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	annotations, err := getAnnotations(genericParams)
 	if err != nil {
 		return nil, err
 	}
@@ -281,21 +310,35 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if len(restartPolicy) == 0 {
 		restartPolicy = v1.RestartPolicyAlways
 	}
+
+	privileged, err := generate.GetBool(params, "privileged", false)
+	if err != nil {
+		return nil, err
+	}
+	var securityContext *v1.SecurityContext
+	if privileged {
+		securityContext = &v1.SecurityContext{
+			Privileged: &privileged,
+		}
+	}
+
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: v1.PodSpec{
 			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
-					Name:      name,
-					Image:     params["image"],
-					Stdin:     stdin,
-					StdinOnce: !leaveStdinOpen && stdin,
-					TTY:       tty,
-					Resources: resourceRequirements,
+					Name:            name,
+					Image:           params["image"],
+					Stdin:           stdin,
+					StdinOnce:       !leaveStdinOpen && stdin,
+					TTY:             tty,
+					Resources:       resourceRequirements,
+					SecurityContext: securityContext,
 				},
 			},
 			DNSPolicy:     v1.DNSClusterFirst,

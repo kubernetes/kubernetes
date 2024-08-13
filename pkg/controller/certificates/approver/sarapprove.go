@@ -23,12 +23,13 @@ import (
 	"fmt"
 
 	authorization "k8s.io/api/authorization/v1"
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
-
-	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
 
@@ -44,12 +45,13 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
+func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
 	}
 	return certificates.NewCertificateController(
+		ctx,
 		"csrapproving",
 		client,
 		csrInformer,
@@ -61,19 +63,19 @@ func recognizers() []csrRecognizer {
 	recognizers := []csrRecognizer{
 		{
 			recognize:      isSelfNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: "*"},
 			successMessage: "Auto approving self kubelet client certificate after SubjectAccessReview.",
 		},
 		{
 			recognize:      isNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
 	}
 	return recognizers
 }
 
-func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
+func (a *sarApprover) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	if len(csr.Status.Certificate) != 0 {
 		return nil
 	}
@@ -94,13 +96,13 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 
 		tried = append(tried, r.permission.Subresource)
 
-		approved, err := a.authorize(csr, r.permission)
+		approved, err := a.authorize(ctx, csr, r.permission)
 		if err != nil {
 			return err
 		}
 		if approved {
 			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.Background(), csr, metav1.UpdateOptions{})
+			_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("error updating approval for csr: %v", err)
 			}
@@ -115,7 +117,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	return nil
 }
 
-func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs authorization.ResourceAttributes) (bool, error) {
+func (a *sarApprover) authorize(ctx context.Context, csr *capi.CertificateSigningRequest, rattrs authorization.ResourceAttributes) (bool, error) {
 	extra := make(map[string]authorization.ExtraValue)
 	for k, v := range csr.Spec.Extra {
 		extra[k] = authorization.ExtraValue(v)
@@ -130,7 +132,7 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 			ResourceAttributes: &rattrs,
 		},
 	}
-	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
+	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -140,25 +142,30 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 func appendApprovalCondition(csr *capi.CertificateSigningRequest, message string) {
 	csr.Status.Conditions = append(csr.Status.Conditions, capi.CertificateSigningRequestCondition{
 		Type:    capi.CertificateApproved,
+		Status:  corev1.ConditionTrue,
 		Reason:  "AutoApproved",
 		Message: message,
 	})
 }
 
 func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
-	isClientCSR := capihelper.IsKubeletClientCSR(x509cr, csr.Spec.Usages)
-	if !isClientCSR {
+	if csr.Spec.SignerName != capi.KubeAPIServerClientKubeletSignerName {
 		return false
 	}
-	return *csr.Spec.SignerName == capi.KubeAPIServerClientKubeletSignerName
+	return capihelper.IsKubeletClientCSR(x509cr, usagesToSet(csr.Spec.Usages))
 }
 
 func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
-	if !isNodeClientCert(csr, x509cr) {
-		return false
-	}
 	if csr.Spec.Username != x509cr.Subject.CommonName {
 		return false
 	}
-	return true
+	return isNodeClientCert(csr, x509cr)
+}
+
+func usagesToSet(usages []capi.KeyUsage) sets.String {
+	result := sets.NewString()
+	for _, usage := range usages {
+		result.Insert(string(usage))
+	}
+	return result
 }

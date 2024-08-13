@@ -19,39 +19,65 @@ package topologymanager
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type fakeManager struct{}
+type fakeManager struct {
+	hint   *TopologyHint
+	policy Policy
+}
 
-//NewFakeManager returns an instance of FakeManager
+// NewFakeManager returns an instance of FakeManager
 func NewFakeManager() Manager {
-	klog.Infof("[fake topologymanager] NewFakeManager")
+	klog.InfoS("NewFakeManager")
 	return &fakeManager{}
 }
 
+// NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
+func NewFakeManagerWithHint(hint *TopologyHint) Manager {
+	klog.InfoS("NewFakeManagerWithHint")
+	return &fakeManager{
+		hint:   hint,
+		policy: NewNonePolicy(),
+	}
+}
+
+// NewFakeManagerWithPolicy returns an instance of fake topology manager with specified policy
+func NewFakeManagerWithPolicy(policy Policy) Manager {
+	klog.InfoS("NewFakeManagerWithPolicy")
+	return &fakeManager{
+		policy: policy,
+	}
+}
+
 func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyHint {
-	klog.Infof("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
-	return TopologyHint{}
+	klog.InfoS("GetAffinity", "podUID", podUID, "containerName", containerName)
+	if m.hint == nil {
+		return TopologyHint{}
+	}
+
+	return *m.hint
+}
+
+func (m *fakeManager) GetPolicy() Policy {
+	return m.policy
 }
 
 func (m *fakeManager) AddHintProvider(h HintProvider) {
-	klog.Infof("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
+	klog.InfoS("AddHintProvider", "hintProvider", h)
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, containerID string) error {
-	klog.Infof("[fake topologymanager] AddContainer  pod: %v container id:  %v", pod, containerID)
-	return nil
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	klog.InfoS("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.Infof("[fake topologymanager] RemoveContainer container id:  %v", containerID)
+	klog.InfoS("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Infof("[fake topologymanager] Topology Admit Handler")
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	klog.InfoS("Topology Admit Handler")
+	return admission.GetPodAdmitResult(nil)
 }

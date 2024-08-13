@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -239,7 +239,10 @@ func validateScalingPolicy(policy autoscaling.HPAScalingPolicy, fldPath *field.P
 	return allErrs
 }
 
-var validMetricSourceTypes = sets.NewString(string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType), string(autoscaling.ResourceMetricSourceType), string(autoscaling.ExternalMetricSourceType))
+var validMetricSourceTypes = sets.NewString(
+	string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType),
+	string(autoscaling.ResourceMetricSourceType), string(autoscaling.ExternalMetricSourceType),
+	string(autoscaling.ContainerResourceMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
 func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
@@ -282,10 +285,43 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		}
 	}
 
-	expectedField := strings.ToLower(string(spec.Type))
+	if spec.ContainerResource != nil {
+		typesPresent.Insert("containerResource")
+		if typesPresent.Len() == 1 {
+			allErrs = append(allErrs, validateContainerResourceSource(spec.ContainerResource, fldPath.Child("containerResource"))...)
+		}
+	}
 
-	if !typesPresent.Has(expectedField) {
-		allErrs = append(allErrs, field.Required(fldPath.Child(expectedField), "must populate information for the given metric source"))
+	var expectedField string
+	switch spec.Type {
+
+	case autoscaling.ObjectMetricSourceType:
+		if spec.Object == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("object"), "must populate information for the given metric source"))
+		}
+		expectedField = "object"
+	case autoscaling.PodsMetricSourceType:
+		if spec.Pods == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("pods"), "must populate information for the given metric source"))
+		}
+		expectedField = "pods"
+	case autoscaling.ResourceMetricSourceType:
+		if spec.Resource == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "must populate information for the given metric source"))
+		}
+		expectedField = "resource"
+	case autoscaling.ExternalMetricSourceType:
+		if spec.External == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("external"), "must populate information for the given metric source"))
+		}
+		expectedField = "external"
+	case autoscaling.ContainerResourceMetricSourceType:
+		if spec.ContainerResource == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
+		}
+		expectedField = "containerResource"
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, validMetricSourceTypesList))
 	}
 
 	if typesPresent.Len() != 1 {
@@ -337,6 +373,34 @@ func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) 
 
 	if src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
+	}
+
+	return allErrs
+}
+
+func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(src.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
+	} else {
+		allErrs = append(allErrs, corevalidation.ValidateContainerResourceName(src.Name, fldPath.Child("name"))...)
+	}
+
+	if len(src.Container) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("container"), "must specify a container"))
+	} else {
+		allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(src.Container, fldPath.Child("container"))...)
+	}
+
+	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
+
+	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
+	}
+
+	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
 	}
 
 	return allErrs

@@ -29,37 +29,37 @@ import (
 )
 
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
-func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
-	err := wait.Poll(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+func WaitForReadyReplicaSet(ctx context.Context, c clientset.Interface, ns, name string) error {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return *(rs.Spec.Replicas) == rs.Status.Replicas && *(rs.Spec.Replicas) == rs.Status.ReadyReplicas, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never became ready", name)
 	}
 	return err
 }
 
 // WaitForReplicaSetTargetAvailableReplicas waits for .status.availableReplicas of a RS to equal targetReplicaNum
-func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
-	return WaitForReplicaSetTargetAvailableReplicasWithTimeout(c, replicaSet, targetReplicaNum, framework.PollShortTimeout)
+func WaitForReplicaSetTargetAvailableReplicas(ctx context.Context, c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
+	return WaitForReplicaSetTargetAvailableReplicasWithTimeout(ctx, c, replicaSet, targetReplicaNum, framework.PodStartTimeout)
 }
 
 // WaitForReplicaSetTargetAvailableReplicasWithTimeout waits for .status.availableReplicas of a RS to equal targetReplicaNum
 // with given timeout.
-func WaitForReplicaSetTargetAvailableReplicasWithTimeout(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32, timeout time.Duration) error {
+func WaitForReplicaSetTargetAvailableReplicasWithTimeout(ctx context.Context, c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32, timeout time.Duration) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.AvailableReplicas == targetReplicaNum, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of .status.availableReplicas", replicaSet.Name)
 	}
 	return err

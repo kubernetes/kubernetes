@@ -21,7 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -38,7 +38,7 @@ import (
 
 // StartConversionWebhookServer starts an http server with the provided handler and returns the WebhookClientConfig
 // needed to configure a CRD to use this conversion webhook as its converter.
-func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv1beta1.WebhookClientConfig, error) {
+func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv1.WebhookClientConfig, error) {
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		return nil, nil, fmt.Errorf("failed to append Cert from PEM")
@@ -57,7 +57,7 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 	}
 	webhookServer.StartTLS()
 	endpoint := webhookServer.URL + "/convert"
-	webhookConfig := &apiextensionsv1beta1.WebhookClientConfig{
+	webhookConfig := &apiextensionsv1.WebhookClientConfig{
 		CABundle: localhostCert,
 		URL:      &endpoint,
 	}
@@ -84,7 +84,7 @@ type V1ReviewConverterFunc func(review *apiextensionsv1.ConversionReview) (*apie
 func NewReviewWebhookHandler(t *testing.T, v1beta1ConverterFunc V1Beta1ReviewConverterFunc, v1ConverterFunc V1ReviewConverterFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Error(err)
 			return
@@ -209,7 +209,8 @@ func NewObjectConverterWebhookHandler(t *testing.T, converterFunc ObjectConverte
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//
+//	go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIDGDCCAgCgAwIBAgIQTKCKn99d5HhQVCLln2Q+eTANBgkqhkiG9w0BAQsFADAS
 MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw

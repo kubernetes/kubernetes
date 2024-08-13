@@ -1,3 +1,4 @@
+//go:build linux || darwin
 // +build linux darwin
 
 /*
@@ -19,20 +20,26 @@ limitations under the License.
 package fs
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
-	"strings"
+	"os"
+	"path/filepath"
+	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
-	"k8s.io/apimachinery/pkg/api/resource"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
-// FsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+type UsageInfo struct {
+	Bytes  int64
+	Inodes int64
+}
+
+// Info linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
@@ -55,63 +62,87 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
-// DiskUsage gets disk usage of specified path.
-func DiskUsage(path string) (*resource.Quantity, error) {
-	// First check whether the quota system knows about this directory
-	// A nil quantity with no error means that the path does not support quotas
-	// and we should use other mechanisms.
-	data, err := fsquota.GetConsumption(path)
-	if data != nil {
-		return data, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("unable to retrieve disk consumption via quota for %s: %v", path, err)
-	}
-	// Uses the same niceness level as cadvisor.fs does when running du
-	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", path).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -B 1) on path %s with error %v", path, err)
-	}
-	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
-	}
-	used.Format = resource.BinarySI
-	return &used, nil
-}
+// DiskUsage calculates the number of inodes and disk usage for a given directory
+func DiskUsage(path string) (UsageInfo, error) {
+	var usage UsageInfo
 
-// Find uses the equivalent of the command `find <path> -dev -printf '.' | wc -c` to count files and directories.
-// While this is not an exact measure of inodes used, it is a very good approximation.
-func Find(path string) (int64, error) {
 	if path == "" {
-		return 0, fmt.Errorf("invalid directory")
+		return usage, fmt.Errorf("invalid directory")
 	}
+
 	// First check whether the quota system knows about this directory
-	// A nil quantity with no error means that the path does not support quotas
-	// and we should use other mechanisms.
-	inodes, err := fsquota.GetInodes(path)
+	// A nil quantity or error means that the path does not support quotas
+	// or xfs_quota tool is missing and we should use other mechanisms.
+	startTime := time.Now()
+	consumption, _ := fsquota.GetConsumption(path)
+	if consumption != nil {
+		usage.Bytes = consumption.Value()
+		defer servermetrics.CollectVolumeStatCalDuration("fsquota", startTime)
+	} else {
+		defer servermetrics.CollectVolumeStatCalDuration("du", startTime)
+	}
+
+	inodes, _ := fsquota.GetInodes(path)
 	if inodes != nil {
-		return inodes.Value(), nil
-	} else if err != nil {
-		return 0, fmt.Errorf("unable to retrieve inode consumption via quota for %s: %v", path, err)
+		usage.Inodes = inodes.Value()
 	}
-	var counter byteCounter
-	var stderr bytes.Buffer
-	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
-	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
-	if err := findCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
-	}
-	if err := findCmd.Wait(); err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
-	}
-	return counter.bytesWritten, nil
-}
 
-// Simple io.Writer implementation that counts how many bytes were written.
-type byteCounter struct{ bytesWritten int64 }
+	if inodes != nil && consumption != nil {
+		return usage, nil
+	}
 
-func (b *byteCounter) Write(p []byte) (int, error) {
-	b.bytesWritten += int64(len(p))
-	return len(p), nil
+	topLevelStat := &unix.Stat_t{}
+	err := unix.Stat(path, topLevelStat)
+	if err != nil {
+		return usage, err
+	}
+
+	// dedupedInode stores inodes that could be duplicates (nlink > 1)
+	dedupedInodes := make(map[uint64]struct{})
+
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		// ignore files that have been deleted after directory was read
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("unable to count inodes for %s: %s", path, err)
+		}
+
+		// according to the docs, Sys can be nil
+		if info.Sys() == nil {
+			return fmt.Errorf("fileinfo Sys is nil")
+		}
+
+		s, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("unsupported fileinfo; could not convert to stat_t")
+		}
+
+		if s.Dev != topLevelStat.Dev {
+			// don't descend into directories on other devices
+			return filepath.SkipDir
+		}
+
+		// Dedupe hardlinks
+		if s.Nlink > 1 {
+			if _, ok := dedupedInodes[s.Ino]; !ok {
+				dedupedInodes[s.Ino] = struct{}{}
+			} else {
+				return nil
+			}
+		}
+
+		if consumption == nil {
+			usage.Bytes += int64(s.Blocks) * int64(512) // blocksize in bytes
+		}
+
+		if inodes == nil {
+			usage.Inodes++
+		}
+
+		return nil
+	})
+
+	return usage, err
 }

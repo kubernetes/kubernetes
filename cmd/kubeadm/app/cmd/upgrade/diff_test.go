@@ -17,20 +17,26 @@ limitations under the License.
 package upgrade
 
 import (
-	"io/ioutil"
+	"fmt"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/pkg/errors"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	clientset "k8s.io/client-go/kubernetes"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 func createTestRunDiffFile(contents []byte) (string, error) {
-	file, err := ioutil.TempFile("", "kubeadm-upgrade-diff-config-*.yaml")
+	file, err := os.CreateTemp("", "kubeadm-upgrade-diff-config-*.yaml")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create temporary test file")
 	}
-	if _, err := file.Write([]byte(contents)); err != nil {
+	if _, err := file.Write(contents); err != nil {
 		return "", errors.Wrap(err, "failed to write to temporary test file")
 	}
 	if err := file.Close(); err != nil {
@@ -39,19 +45,27 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	return file.Name(), nil
 }
 
-func TestRunDiff(t *testing.T) {
-	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
+func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+	return &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.0.1",
+		},
+	}, nil
+}
 
+func TestRunDiff(t *testing.T) {
 	// create a temporary file with valid ClusterConfiguration
-	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta2\n" +
-		"kind: ClusterConfiguration\n" +
-		"kubernetesVersion: " + currentVersion)
+	testUpgradeDiffConfigContents := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: UpgradeConfiguration
+diff:
+  contextLines: 4`, kubeadmapiv1.SchemeGroupVersion.String()))
+
 	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(testUpgradeDiffConfig)
-
 	// create a temporary manifest file with dummy contents
 	testUpgradeDiffManifestContents := []byte("some-contents")
 	testUpgradeDiffManifest, err := createTestRunDiffFile(testUpgradeDiffManifestContents)
@@ -60,12 +74,18 @@ func TestRunDiff(t *testing.T) {
 	}
 	defer os.Remove(testUpgradeDiffManifest)
 
+	kubeConfigPath, err := createTestRunDiffFile([]byte(testConfigToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	//nolint:errcheck
+	defer os.Remove(kubeConfigPath)
+
 	flags := &diffFlags{
 		cfgPath: "",
-		out:     ioutil.Discard,
+		out:     io.Discard,
 	}
 
-	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster
 	testCases := []struct {
 		name            string
 		args            []string
@@ -74,6 +94,13 @@ func TestRunDiff(t *testing.T) {
 		cfgPath         string
 		expectedError   bool
 	}{
+		{
+			name:            "valid: run diff with empty config path on valid manifest path",
+			cfgPath:         "",
+			setManifestPath: true,
+			manifestPath:    testUpgradeDiffManifest,
+			expectedError:   false,
+		},
 		{
 			name:            "valid: run diff on valid manifest path",
 			cfgPath:         testUpgradeDiffConfig,
@@ -111,14 +138,73 @@ func TestRunDiff(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			flags.cfgPath = tc.cfgPath
+			flags.kubeConfigPath = kubeConfigPath
+			cmd := newCmdDiff(os.Stdout)
 			if tc.setManifestPath {
 				flags.apiServerManifestPath = tc.manifestPath
 				flags.controllerManagerManifestPath = tc.manifestPath
 				flags.schedulerManifestPath = tc.manifestPath
 			}
-			if err := runDiff(flags, tc.args); (err != nil) != tc.expectedError {
+			if err := runDiff(cmd.Flags(), flags, tc.args, fakeFetchInitConfig); (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
 			}
 		})
 	}
+}
+
+func TestValidateManifests(t *testing.T) {
+	// Create valid manifest paths
+	apiServerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(apiServerManifest)
+	controllerManagerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(controllerManagerManifest)
+	schedulerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(schedulerManifest)
+	// Create a file path that does not exist
+	notExistFilePath := "./foobar123456"
+
+	testCases := []struct {
+		name          string
+		args          []string
+		expectedError bool
+	}{
+		{
+			name:          "valid: valid manifest path",
+			args:          []string{apiServerManifest, controllerManagerManifest, schedulerManifest},
+			expectedError: false,
+		},
+		{
+			name:          "invalid: one is empty path",
+			args:          []string{apiServerManifest, controllerManagerManifest, ""},
+			expectedError: true,
+		},
+		{
+			name:          "invalid: manifest path is directory",
+			args:          []string{"./"},
+			expectedError: true,
+		},
+		{
+			name:          "invalid: manifest path does not exist",
+			args:          []string{notExistFilePath},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateManifestsPath(tc.args...); (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+		})
+	}
+
 }

@@ -19,22 +19,24 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	g "github.com/onsi/ginkgo"
+	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var _ = SIGDescribe("client-go should negotiate", func() {
 	f := framework.NewDefaultFramework("protocol")
-	f.SkipNamespaceCreation = true
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	for _, s := range []string{
 		"application/json",
@@ -44,17 +46,28 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 	} {
 		accept := s
 		g.It(fmt.Sprintf("watch and report errors with accept %q", accept), func() {
+			g.By("creating an object for which we will watch")
+			ns := f.Namespace.Name
+			client := f.ClientSet.CoreV1().ConfigMaps(ns)
+			configMapName := "e2e-client-go-test-negotiation"
+			testConfigMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: configMapName}}
+			before, err := client.List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			_, err = client.Create(context.TODO(), testConfigMap, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			opts := metav1.ListOptions{
+				ResourceVersion: before.ResourceVersion,
+				FieldSelector:   fields.SelectorFromSet(fields.Set{"metadata.name": configMapName}).String(),
+			}
+
+			g.By("watching for changes on the object")
 			cfg, err := framework.LoadConfig()
 			framework.ExpectNoError(err)
 
 			cfg.AcceptContentTypes = accept
 
 			c := kubernetes.NewForConfigOrDie(cfg)
-			svcs, err := c.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			rv, err := strconv.Atoi(svcs.ResourceVersion)
-			framework.ExpectNoError(err)
-			w, err := c.CoreV1().Services("default").Watch(context.TODO(), metav1.ListOptions{ResourceVersion: strconv.Itoa(rv - 1)})
+			w, err := c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), opts)
 			framework.ExpectNoError(err)
 			defer w.Stop()
 

@@ -19,30 +19,36 @@ package generic
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
 )
 
-// RESTOptions is set of configuration options to generic registries.
+// RESTOptions is set of resource-specific configuration options to generic registries.
 type RESTOptions struct {
-	StorageConfig *storagebackend.Config
+	StorageConfig *storagebackend.ConfigForResource
 	Decorator     StorageDecorator
 
-	EnableGarbageCollection bool
-	DeleteCollectionWorkers int
-	ResourcePrefix          string
-	CountMetricPollPeriod   time.Duration
+	EnableGarbageCollection   bool
+	DeleteCollectionWorkers   int
+	ResourcePrefix            string
+	CountMetricPollPeriod     time.Duration
+	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 }
 
 // Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)
-func (opts RESTOptions) GetRESTOptions(schema.GroupResource) (RESTOptions, error) {
+func (opts RESTOptions) GetRESTOptions(schema.GroupResource, runtime.Object) (RESTOptions, error) {
 	return opts, nil
 }
 
 type RESTOptionsGetter interface {
-	GetRESTOptions(resource schema.GroupResource) (RESTOptions, error)
+	// GetRESTOptions returns the RESTOptions for the given resource and example object.
+	// The example object is used to determine the storage version for the resource.
+	// If the example object is nil, the storage version will be determined by the resource's default storage version.
+	GetRESTOptions(resource schema.GroupResource, example runtime.Object) (RESTOptions, error)
 }
 
 // StoreOptions is set of configuration options used to complete generic registries.

@@ -1,24 +1,25 @@
 // Package require implements the same assertions as the `assert` package but
 // stops test execution when a test fails.
 //
-// Example Usage
+// # Example Usage
 //
 // The following is a complete example using require in a standard test function:
-//    import (
-//      "testing"
-//      "github.com/stretchr/testify/require"
-//    )
 //
-//    func TestSomething(t *testing.T) {
+//	import (
+//	  "testing"
+//	  "github.com/stretchr/testify/require"
+//	)
 //
-//      var a string = "Hello"
-//      var b string = "Hello"
+//	func TestSomething(t *testing.T) {
 //
-//      require.Equal(t, a, b, "The two words should be the same.")
+//	  var a string = "Hello"
+//	  var b string = "Hello"
 //
-//    }
+//	  require.Equal(t, a, b, "The two words should be the same.")
 //
-// Assertions
+//	}
+//
+// # Assertions
 //
 // The `require` package have same global functions as in the `assert` package,
 // but instead of returning a boolean result they call `t.FailNow()`.

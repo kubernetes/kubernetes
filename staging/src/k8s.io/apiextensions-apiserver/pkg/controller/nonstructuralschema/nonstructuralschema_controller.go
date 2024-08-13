@@ -50,7 +50,7 @@ type ConditionController struct {
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// last generation this controller updated the condition per CRD name (to avoid two
 	// different version of the apiextensions-apiservers in HA to fight for the right message)
@@ -64,10 +64,13 @@ func NewConditionController(
 	crdClient client.CustomResourceDefinitionsGetter,
 ) *ConditionController {
 	c := &ConditionController{
-		crdClient:          crdClient,
-		crdLister:          crdInformer.Lister(),
-		crdSynced:          crdInformer.Informer().HasSynced,
-		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "non_structural_schema_condition_controller"),
+		crdClient: crdClient,
+		crdLister: crdInformer.Lister(),
+		crdSynced: crdInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "non_structural_schema_condition_controller"},
+		),
 		lastSeenGeneration: map[string]int64{},
 	}
 
@@ -89,6 +92,12 @@ func calculateCondition(in *apiextensionsv1.CustomResourceDefinition) *apiextens
 	}
 
 	allErrs := field.ErrorList{}
+
+	if in.Spec.PreserveUnknownFields {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "preserveUnknownFields"),
+			in.Spec.PreserveUnknownFields,
+			fmt.Sprint("must be false")))
+	}
 
 	for i, v := range in.Spec.Versions {
 		if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
@@ -179,7 +188,7 @@ func (c *ConditionController) sync(key string) error {
 }
 
 // Run starts the controller.
-func (c *ConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *ConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -190,7 +199,7 @@ func (c *ConditionController) Run(threadiness int, stopCh <-chan struct{}) {
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -210,7 +219,7 @@ func (c *ConditionController) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

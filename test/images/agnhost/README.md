@@ -16,14 +16,6 @@ The image was created for testing purposes, reducing the need for having differe
 cases for the same tested behaviour.
 
 
-## Developer notes
-
-We've introduced versioning into the `agnhost` binary for debugging purposes (e.g.: if the
-image and binary versions do not match, see [here](https://github.com/kubernetes/kubernetes/pull/79667#discussion_r304198370)).
-
-Whenever the image `VERSION` is bumped, the `Version` in `agnhost.go` will also have to be bumped.
-
-
 ## Usage
 
 The `agnhost` binary has several subcommands which are can be used to test different
@@ -40,7 +32,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14
+        image: registry.k8s.io/e2e-test-images/agnhost:2.40
         name: agnhost
       dnsConfig:
         nameservers:
@@ -88,7 +80,7 @@ Usage:
 
 ### connect
 
-Tries to open a TCP connection to the given host and port. On error it
+Tries to open a TCP or SCTP connection to the given host and port. On error it
 prints an error message prefixed with a specific fixed string that
 test cases can check for:
 
@@ -105,9 +97,11 @@ output than to check the exit code.)
 Usage:
 
 ```console
-    kubectl exec test-agnost -- /agnost connect [--timeout=<duration>] <host>:<port>
+    kubectl exec test-agnhost -- /agnhost connect [--timeout=<duration>] [--protocol=<protocol>] <host>:<port>
 ```
 
+The optional `--protocol` parameter can be set to `sctp` to test SCTP
+connections. The default value is `tcp`.
 
 ### crd-conversion-webhook
 
@@ -194,30 +188,30 @@ Usage:
 Starts a HTTP server on the given `--http-port` (default: 80), serving various endpoints representing a
 guestbook app. The endpoints and their purpose are:
 
-- `/register`: A guestbook slave will subscribe to a master, to its given `--slaveof` endpoint. The master
-  will then push any updates it receives to its registered slaves through the `--backend-port` (default: 6379).
+- `/register`: A guestbook replica will subscribe to a primary, to its given `--replicaof` endpoint. The primary
+  will then push any updates it receives to its registered replicas through the `--backend-port` (default: 6379).
 - `/get`: Returns `{"data": value}`, where the `value` is the stored value for the given `key` if non-empty,
   or the entire store.
-- `/set`: Will set the given key-value pair in its own store and propagate it to its slaves, if any.
+- `/set`: Will set the given key-value pair in its own store and propagate it to its replicas, if any.
   Will return `{"data": "Updated"}` to the caller on success.
-- `/guestbook`: Will proxy the request to `agnhost-master` if the given `cmd` is `set`, or `agnhost-slave`
+- `/guestbook`: Will proxy the request to `agnhost-primary` if the given `cmd` is `set`, or `agnhost-replica`
   if the given `cmd` is `get`.
 
 Usage:
 
 ```console
 guestbook="test/e2e/testing-manifests/guestbook"
-sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14|"
+sed_expr="s|{{.AgnhostImage}}|registry.k8s.io/e2e-test-images/agnhost:2.40|"
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
-kubectl create -f ${guestbook}/agnhost-master-service.yaml
-kubectl create -f ${guestbook}/agnhost-slave-service.yaml
+kubectl create -f ${guestbook}/agnhost-primary-service.yaml
+kubectl create -f ${guestbook}/agnhost-replica-service.yaml
 
 # create the deployments.
 cat ${guestbook}/frontend-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
-cat ${guestbook}/agnhost-master-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
-cat ${guestbook}/agnhost-slave-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-primary-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-replica-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
 ```
 
 
@@ -260,6 +254,30 @@ Usage:
     kubectl exec test-agnhost -- /agnhost liveness
 ```
 
+### grpc-health-checking
+
+Started the gRPC health checking server. The health checking response can be
+controlled with the time delay or via http control server.
+
+- `--delay-unhealthy-sec` - the delay to change status to NOT_SERVING.
+  Endpoint reporting SERVING for `delay-unhealthy-sec` (`-1` by default)
+  seconds and then NOT_SERVING. Negative value indicates always SERVING. Use `0` to
+  start endpoint as NOT_SERVING.
+- `--port` (default: `5000`) can be used to override the gRPC port number.
+- `--http-port` (default: `8080`) can be used to override the http control server port number.
+- `--service` (default: ``) can be used used to specify which service this endpoint will respond to.
+- `--tls-cert-file` File containing an x509 certificate for gRPC TLS. (CA cert, if any, concatenated after server cert).
+- `--tls-private-key-file` File containing an x509 private key matching `--tls-cert-file`.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost grpc-health-checking \
+      [--delay-unhealthy-sec 5] [--service ""] \
+      [--port 5000] [--http-port 8080]
+
+    kubectl exec test-agnhost -- curl http://localhost:8080/make-not-serving
+```
 
 ### logs-generator
 
@@ -290,20 +308,17 @@ Examples:
 
 ```console
 docker run -i \
-  us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+  registry.k8s.io/e2e-test-images/agnhost:2.40 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+  --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
-
 
 ### mounttest
 
@@ -371,8 +386,6 @@ HTTP server:
         -d '{"LocalAddr":"127.0.0.1:9999"}'
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/net/README.md?pixel)]()
-
 ### netexec
 
 Starts a HTTP(S) server on given port with the following endpoints:
@@ -391,7 +404,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
   - `protocol`: The protocol which will be used when making the request. Default value: `http`.
     Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
-- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`)
+- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`), with the optional status `code`.
 - `/exit`: Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:
 	- `code`: The exit code for the process. Default value: 0. Allows an integer [0-127].
@@ -405,6 +418,8 @@ Starts a HTTP(S) server on given port with the following endpoints:
   it exited.
 - `/hostname`: Returns the server's hostname.
 - `/hostName`: Returns the server's hostname.
+- `/redirect`: Returns a redirect response to the given `location`, with the optional status `code`
+  (`/redirect?location=/echo%3Fmsg=foobar&code=307`).
 - `/shell`: Executes the given `shellCommand` or `cmd` (`/shell?cmd=some-command`) and
   returns a JSON containing the fields `output` (command's output) and `error` (command's
   error message). Returns `200 OK` if the command succeeded, `417 Expectation Failed` if not.
@@ -417,11 +432,16 @@ If `--tls-cert-file` is added (ideally in conjunction with `--tls-private-key-fi
 will be upgraded to HTTPS. The image has default, `localhost`-based cert/privkey files at
 `/localhost.crt` and `/localhost.key` (see: [`porter` subcommand](#porter))
 
+If `--http-override` is set, the HTTP(S) server will always serve the override path & options,
+ignoring the request URL.
+
 It will also start a UDP server on the indicated UDP port that responds to the following commands:
 
 - `hostname`: Returns the server's hostname
 - `echo <msg>`: Returns the given `<msg>`
 - `clientip`: Returns the request's IP address
+
+The UDP server can be disabled by setting `--udp-port -1`.
 
 Additionally, if (and only if) `--sctp-port` is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
@@ -474,7 +494,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -529,7 +549,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -543,10 +563,10 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in ENV variables. For example, if the environment
-variable `SERVE_PORT_9001` is set, then the subcommand will start serving on the port 9001.
-Additionally, if the environment variable `SERVE_TLS_PORT_9002` is set, then the subcommand
-will start a TLS server on that port.
+Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]`. eg:
+    - `SERVE_PORT_9001` - serve TCP connections on port 9001
+    - `SERVE_TLS_PORT_9002` - serve TLS-encrypted TCP connections on port 9002
+    - `SERVE_SCTP_PORT_9003` - serve SCTP connections on port 9003
 
 The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
 expiring in January 2084, generated from `src/crypto/tls`:
@@ -563,9 +583,6 @@ Usage:
 ```console
     kubectl exec test-agnhost -- /agnhost porter
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/porter/README.md?pixel)]()
-
 
 ### resource-consumer-controller
 
@@ -606,10 +623,28 @@ Usage:
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
+### tcp-reset
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
+Starts a simple TCP servers that reads only one byte of the connection and then closes it,
+having the effect of sending a TCP RST to the client.
 
+The subcommand can accept the following flags:
+
+- `port` (default: `8080`): The port number to listen to.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost tcp-reset [--port <port>]
+```
+
+Important: This behavior only works if the client send more than 1 byte and is OS
+dependant, it is guaranteed to work on Linux.
+
+```console
+echo -n 1 | nc 192.168.1.4:8080  # FIN
+echo -n 12 | nc 192.168.1.4:8080 # RST
+```
 
 ### test-webserver
 
@@ -657,6 +692,6 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 
 ## Image
 
-The image can be found at `us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14` for both Linux and
-Windows containers (based on `mcr.microsoft.com/windows/servercore:ltsc2019`,
-`mcr.microsoft.com/windows/servercore:1903`, and `mcr.microsoft.com/windows/servercore:1909`).
+The image can be found at `registry.k8s.io/e2e-test-images/agnhost:2.40` for both Linux and
+Windows containers (based on `mcr.microsoft.com/windows/nanoserver:1809` and
+`mcr.microsoft.com/windows/nanoserver:ltsc2022`).

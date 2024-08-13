@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -20,13 +21,16 @@ package hostutil
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/kubernetes/pkg/util/filesystem"
+	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -67,7 +71,7 @@ func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir s
 		}
 	}
 
-	return path.Base(mountPath), nil
+	return filepath.Base(mountPath), nil
 }
 
 // DeviceOpened determines if the device is in use elsewhere
@@ -86,9 +90,28 @@ func (hu *HostUtil) MakeRShared(path string) error {
 	return nil
 }
 
+func isSystemCannotAccessErr(err error) bool {
+	if fserr, ok := err.(*fs.PathError); ok {
+		errno, ok := fserr.Err.(syscall.Errno)
+		return ok && errno == windows.ERROR_CANT_ACCESS_FILE
+	}
+
+	return false
+}
+
 // GetFileType checks for sockets/block/character devices
 func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
-	return getFileType(pathname)
+	filetype, err := getFileType(pathname)
+
+	// os.Stat will return a 1920 error (windows.ERROR_CANT_ACCESS_FILE) if we use it on a Unix Socket
+	// on Windows. In this case, we need to use a different method to check if it's a Unix Socket.
+	if err == errUnknownFileType || isSystemCannotAccessErr(err) {
+		if isSocket, errSocket := filesystem.IsUnixDomainSocket(pathname); errSocket == nil && isSocket {
+			return FileTypeSocket, nil
+		}
+	}
+
+	return filetype, err
 }
 
 // PathExists checks whether the path exists
@@ -121,4 +144,10 @@ func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 		return 0, err
 	}
 	return info.Mode(), nil
+}
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *HostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return "", nil
 }

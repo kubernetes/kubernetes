@@ -7,26 +7,26 @@ package guid
 
 import (
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // not used for secure application
 	"encoding"
 	"encoding/binary"
 	"fmt"
 	"strconv"
-
-	"golang.org/x/sys/windows"
 )
+
+//go:generate go run golang.org/x/tools/cmd/stringer -type=Variant -trimprefix=Variant -linecomment
 
 // Variant specifies which GUID variant (or "type") of the GUID. It determines
 // how the entirety of the rest of the GUID is interpreted.
 type Variant uint8
 
-// The variants specified by RFC 4122.
+// The variants specified by RFC 4122 section 4.1.1.
 const (
 	// VariantUnknown specifies a GUID variant which does not conform to one of
 	// the variant encodings specified in RFC 4122.
 	VariantUnknown Variant = iota
 	VariantNCS
-	VariantRFC4122
+	VariantRFC4122 // RFC 4122
 	VariantMicrosoft
 	VariantFuture
 )
@@ -36,15 +36,12 @@ const (
 // hash of an input string.
 type Version uint8
 
+func (v Version) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 var _ = (encoding.TextMarshaler)(GUID{})
 var _ = (encoding.TextUnmarshaler)(&GUID{})
-
-// GUID represents a GUID/UUID. It has the same structure as
-// golang.org/x/sys/windows.GUID so that it can be used with functions expecting
-// that type. It is defined as its own type so that stringification and
-// marshaling can be supported. The representation matches that used by native
-// Windows code.
-type GUID windows.GUID
 
 // NewV4 returns a new version 4 (pseudorandom) GUID, as defined by RFC 4122.
 func NewV4() (GUID, error) {
@@ -68,7 +65,7 @@ func NewV4() (GUID, error) {
 // big-endian UTF16 stream of bytes. If that is desired, the string can be
 // encoded as such before being passed to this function.
 func NewV5(namespace GUID, name []byte) (GUID, error) {
-	b := sha1.New()
+	b := sha1.New() //nolint:gosec // not used for secure application
 	namespaceBytes := namespace.ToArray()
 	b.Write(namespaceBytes[:])
 	b.Write(name)

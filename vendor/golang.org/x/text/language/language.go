@@ -344,7 +344,7 @@ func (t Tag) Parent() Tag {
 	return Tag(compact.Tag(t).Parent())
 }
 
-// returns token t and the rest of the string.
+// nextToken returns token t and the rest of the string.
 func nextToken(s string) (t, tail string) {
 	p := strings.Index(s[1:], "-")
 	if p == -1 {
@@ -412,6 +412,10 @@ func (t Tag) Extensions() []Extension {
 // are of the allowed values defined for the Unicode locale extension ('u') in
 // https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // TypeForKey will traverse the inheritance chain to get the correct value.
+//
+// If there are multiple types associated with a key, only the first will be
+// returned. If there is no type associated with a key, it returns the empty
+// string.
 func (t Tag) TypeForKey(key string) string {
 	if !compact.Tag(t).MayHaveExtensions() {
 		if key != "rg" && key != "va" {

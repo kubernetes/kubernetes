@@ -22,7 +22,12 @@ import (
 	"testing"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func generation1() map[string]interface{} {
@@ -253,5 +258,66 @@ func TestStrategyPrepareForUpdate(t *testing.T) {
 		if !reflect.DeepEqual(tc.obj, tc.expected) {
 			t.Errorf("test %q failed: expected: %v, got %v", tc.name, tc.expected, tc.obj)
 		}
+	}
+}
+
+func TestSelectableFields(t *testing.T) {
+	tcs := []struct {
+		name             string
+		selectableFields []v1.SelectableField
+		obj              *unstructured.Unstructured
+		expectFields     fields.Set
+	}{
+		{
+			name: "valid path",
+			selectableFields: []v1.SelectableField{
+				{JSONPath: ".spec.foo"},
+			},
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":       "example",
+						"generation": int64(1),
+						"other":      "new",
+					},
+					"spec": map[string]interface{}{
+						"foo": "x",
+					},
+				},
+			},
+			expectFields: map[string]string{"spec.foo": "x", "metadata.name": "example"},
+		},
+		{
+			name: "missing value",
+			selectableFields: []v1.SelectableField{
+				{JSONPath: ".spec.foo"},
+			},
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":       "example",
+						"generation": int64(1),
+						"other":      "new",
+					},
+					"spec": map[string]interface{}{},
+				},
+			},
+			expectFields: map[string]string{"spec.foo": "", "metadata.name": "example"},
+		},
+	}
+
+	for _, tc := range tcs {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
+		t.Run(tc.name, func(t *testing.T) {
+			strategy := customResourceStrategy{selectableFieldSet: prepareSelectableFields(tc.selectableFields)}
+
+			_, fields, err := strategy.GetAttrs(tc.obj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tc.expectFields, fields) {
+				t.Errorf("Expected fields '%+#v' but got '%+#v'", tc.expectFields, fields)
+			}
+		})
 	}
 }

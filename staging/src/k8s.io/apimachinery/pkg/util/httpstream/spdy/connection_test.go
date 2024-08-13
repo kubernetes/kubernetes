@@ -17,13 +17,16 @@ limitations under the License.
 package spdy
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/moby/spdystream"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
@@ -177,4 +180,154 @@ func TestConnectionCloseIsImmediateThroughAProxy(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestConnectionPings(t *testing.T) {
+	const pingPeriod = 10 * time.Millisecond
+	timeout := time.After(10 * time.Second)
+
+	// Set up server connection.
+	listener, err := net.Listen("tcp4", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	srvErr := make(chan error, 1)
+	go func() {
+		defer close(srvErr)
+
+		srvConn, err := listener.Accept()
+		if err != nil {
+			srvErr <- fmt.Errorf("server: error accepting connection: %v", err)
+			return
+		}
+		defer srvConn.Close()
+
+		spdyConn, err := spdystream.NewConnection(srvConn, true)
+		if err != nil {
+			srvErr <- fmt.Errorf("server: error creating spdy connection: %v", err)
+			return
+		}
+
+		var pingsSent int64
+		srvSPDYConn := newConnection(
+			spdyConn,
+			func(stream httpstream.Stream, replySent <-chan struct{}) error {
+				// Echo all the incoming data.
+				go io.Copy(stream, stream)
+				return nil
+			},
+			pingPeriod,
+			func() (time.Duration, error) {
+				atomic.AddInt64(&pingsSent, 1)
+				return 0, nil
+			})
+		defer srvSPDYConn.Close()
+
+		// Wait for the connection to close, to prevent defers from running
+		// early.
+		select {
+		case <-timeout:
+			srvErr <- fmt.Errorf("server: timeout waiting for connection to close")
+			return
+		case <-srvSPDYConn.CloseChan():
+		}
+
+		// Count pings sent by the server.
+		gotPings := atomic.LoadInt64(&pingsSent)
+		if gotPings < 1 {
+			t.Errorf("server: failed to send any pings (check logs)")
+		}
+	}()
+
+	// Set up client connection.
+	clConn, err := net.Dial("tcp4", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("client: error connecting to proxy: %v", err)
+	}
+	defer clConn.Close()
+	clSPDYConn, err := NewClientConnection(clConn)
+	if err != nil {
+		t.Fatalf("client: error creating spdy connection: %v", err)
+	}
+	defer clSPDYConn.Close()
+	start := time.Now()
+	clSPDYStream, err := clSPDYConn.CreateStream(http.Header{})
+	if err != nil {
+		t.Fatalf("client: error creating stream: %v", err)
+	}
+	defer clSPDYStream.Close()
+
+	// Send some data both ways, to make sure pings don't interfere with
+	// regular messages.
+	in := "foo"
+	if _, err := fmt.Fprintln(clSPDYStream, in); err != nil {
+		t.Fatalf("client: error writing data to stream: %v", err)
+	}
+	var out string
+	if _, err := fmt.Fscanln(clSPDYStream, &out); err != nil {
+		t.Fatalf("client: error reading data from stream: %v", err)
+	}
+	if in != out {
+		t.Errorf("client: received data doesn't match sent data: got %q, want %q", out, in)
+	}
+
+	// Wait for at least 2 pings to get sent each way before closing the
+	// connection.
+	elapsed := time.Since(start)
+	if elapsed < 3*pingPeriod {
+		time.Sleep(3*pingPeriod - elapsed)
+	}
+	clSPDYConn.Close()
+
+	select {
+	case err, ok := <-srvErr:
+		if ok && err != nil {
+			t.Error(err)
+		}
+	case <-timeout:
+		t.Errorf("timed out waiting for server to exit")
+	}
+}
+
+type fakeStream struct{ id uint32 }
+
+func (*fakeStream) Read(p []byte) (int, error)  { return 0, nil }
+func (*fakeStream) Write(p []byte) (int, error) { return 0, nil }
+func (*fakeStream) Close() error                { return nil }
+func (*fakeStream) Reset() error                { return nil }
+func (*fakeStream) Headers() http.Header        { return nil }
+func (f *fakeStream) Identifier() uint32        { return f.id }
+
+func TestConnectionRemoveStreams(t *testing.T) {
+	c := &connection{streams: make(map[uint32]httpstream.Stream)}
+	stream0 := &fakeStream{id: 0}
+	stream1 := &fakeStream{id: 1}
+	stream2 := &fakeStream{id: 2}
+
+	c.registerStream(stream0)
+	c.registerStream(stream1)
+
+	if len(c.streams) != 2 {
+		t.Fatalf("should have two streams, has %d", len(c.streams))
+	}
+
+	// not exists
+	c.RemoveStreams(stream2)
+
+	if len(c.streams) != 2 {
+		t.Fatalf("should have two streams, has %d", len(c.streams))
+	}
+
+	// remove all existing
+	c.RemoveStreams(stream0, stream1)
+
+	// remove nil stream should not crash
+	c.RemoveStreams(nil)
+
+	if len(c.streams) != 0 {
+		t.Fatalf("should not have any streams, has %d", len(c.streams))
+	}
+
 }

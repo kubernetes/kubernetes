@@ -24,16 +24,19 @@ import (
 	encodingjson "encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,6 +91,7 @@ type F struct {
 	G []int             `json:"fg"`
 	H []bool            `json:"fh"`
 	I []float32         `json:"fi"`
+	J []byte            `json:"fj"`
 }
 
 type G struct {
@@ -95,6 +99,56 @@ type G struct {
 	CustomValue2   *CustomValue   `json:"customValue2"`
 	CustomPointer1 CustomPointer  `json:"customPointer1"`
 	CustomPointer2 *CustomPointer `json:"customPointer2"`
+}
+
+type H struct {
+	A A `json:"ha"`
+	C `json:",inline"`
+}
+
+type I struct {
+	A A `json:"ia"`
+	H `json:",inline"`
+
+	UL1 UnknownLevel1 `json:"ul1"`
+}
+
+type UnknownLevel1 struct {
+	A          int64 `json:"a"`
+	InlinedAA  `json:",inline"`
+	InlinedAAA `json:",inline"`
+}
+type InlinedAA struct {
+	AA int64 `json:"aa"`
+}
+type InlinedAAA struct {
+	AAA   int64         `json:"aaa"`
+	Child UnknownLevel2 `json:"child"`
+}
+
+type UnknownLevel2 struct {
+	B          int64 `json:"b"`
+	InlinedBB  `json:",inline"`
+	InlinedBBB `json:",inline"`
+}
+type InlinedBB struct {
+	BB int64 `json:"bb"`
+}
+type InlinedBBB struct {
+	BBB   int64         `json:"bbb"`
+	Child UnknownLevel3 `json:"child"`
+}
+
+type UnknownLevel3 struct {
+	C          int64 `json:"c"`
+	InlinedCC  `json:",inline"`
+	InlinedCCC `json:",inline"`
+}
+type InlinedCC struct {
+	CC int64 `json:"cc"`
+}
+type InlinedCCC struct {
+	CCC int64 `json:"ccc"`
 }
 
 type CustomValue struct {
@@ -141,7 +195,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 	if !reflect.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
+		t.Errorf("Object changed during JSON operations, diff: %v", cmp.Diff(item, unmarshalledObj))
 		return
 	}
 
@@ -160,7 +214,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 	}
 
 	if !reflect.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(item, newObj))
 	}
 }
 
@@ -274,7 +328,7 @@ func TestRoundTrip(t *testing.T) {
 		{
 			// Test slice of interface{} with different values.
 			obj: &D{
-				A: []interface{}{3.0, "3.0", nil},
+				A: []interface{}{float64(3.5), int64(4), "3.0", nil},
 			},
 		},
 	}
@@ -282,6 +336,329 @@ func TestRoundTrip(t *testing.T) {
 	for i := range testCases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			doRoundTrip(t, testCases[i].obj)
+		})
+	}
+}
+
+// TestUnknownFields checks for the collection of unknown
+// field errors from the various possible locations of
+// unknown fields (e.g. fields on struct, inlined struct, slice, etc)
+func TestUnknownFields(t *testing.T) {
+	// simples checks that basic unknown fields are found
+	// in fields, subfields and slices.
+	var simplesData = `{
+"ca": [
+	{
+		"aa": 1,
+		"ab": "ab",
+		"ac": true,
+		"unknown1": 24
+	}
+],
+"cc": "ccstring",
+"unknown2": "foo"
+}`
+
+	var simplesErrs = []string{
+		`unknown field "ca[0].unknown1"`,
+		`unknown field "unknown2"`,
+	}
+
+	// same-name, different-levels checks that
+	// fields at a higher level in the json
+	// are not persisted to unrecognized fields
+	// at lower levels and vice-versa.
+	//
+	// In this case, the field "cc" exists at the root level
+	// but not in the nested field ul1. If we are
+	// improperly retaining matched keys, this not
+	// see an issue with "cc" existing inside "ul1"
+	//
+	// The opposite for "aaa", which exists at the
+	// nested level but not at the root.
+	var sameNameDiffLevelData = `
+	{
+		"cc": "foo",
+		"aaa": 1,
+		"ul1": {
+			"aa": 1,
+			"aaa": 1,
+			"cc": 1
+
+		}
+}`
+	var sameNameDiffLevelErrs = []string{
+		`unknown field "aaa"`,
+		`unknown field "ul1.cc"`,
+	}
+
+	// inlined-inlined confirms that we see
+	// fields that are doubly nested and don't recognize
+	// those that aren't
+	var inlinedInlinedData = `{
+		"bb": "foo",
+		"bc": {
+			"foo": "bar"
+		},
+		"bd": ["d1", "d2"],
+		"aa": 1
+}`
+
+	var inlinedInlinedErrs = []string{
+		`unknown field "aa"`,
+	}
+
+	// combined tests everything together
+	var combinedData = `
+	{
+		"ia": {
+			"aa": 1,
+			"ab": "ab",
+			"unknownI": "foo"
+		},
+		"ha": {
+			"aa": 2,
+			"ab": "ab2",
+			"unknownH": "foo"
+		},
+		"ca":[
+			{
+				"aa":1,
+				"ab":"11",
+				"ac":true
+			},
+			{
+				"aa":2,
+				"ab":"22",
+				"unknown1": "foo"
+			},
+			{
+				"aa":3,
+				"ab":"33",
+				"unknown2": "foo"
+			}
+		],
+		"ba":{
+			"aa":3,
+			"ab":"33",
+			"ac": true,
+			"unknown3": 26,
+			"unknown4": "foo"
+		},
+		"unknown5": "foo",
+		"bb":"bbb",
+		"bc":{
+			"k1":"v1",
+			"k2":"v2"
+		},
+		"bd":[
+			"s1",
+			"s2"
+		],
+		"cc":"ccc",
+		"cd":42,
+		"ce":{
+			"k1":1,
+			"k2":2
+		},
+		"cf":[
+			true,
+			false,
+			false
+		],
+		"cg":
+		[
+			1,
+			2,
+			5
+		],
+		"ch":3.3,
+		"ci":[
+			null,
+			null,
+			null
+		],
+		"ul1": {
+			"a": 1,
+			"aa": 1,
+			"aaa": 1,
+			"b": 1,
+			"bb": 1,
+			"bbb": 1,
+			"c": 1,
+			"cc": 1,
+			"ccc": 1,
+			"child": {
+				"a": 1,
+				"aa": 1,
+				"aaa": 1,
+				"b": 1,
+				"bb": 1,
+				"bbb": 1,
+				"c": 1,
+				"cc": 1,
+				"ccc": 1,
+				"child": {
+					"a": 1,
+					"aa": 1,
+					"aaa": 1,
+					"b": 1,
+					"bb": 1,
+					"bbb": 1,
+					"c": 1,
+					"cc": 1,
+					"ccc": 1
+				}
+			}
+		}
+}`
+
+	var combinedErrs = []string{
+		`unknown field "ca[1].unknown1"`,
+		`unknown field "ca[2].unknown2"`,
+		`unknown field "ba.unknown3"`,
+		`unknown field "ba.unknown4"`,
+		`unknown field "unknown5"`,
+		`unknown field "ha.unknownH"`,
+		`unknown field "ia.unknownI"`,
+
+		`unknown field "ul1.b"`,
+		`unknown field "ul1.bb"`,
+		`unknown field "ul1.bbb"`,
+		`unknown field "ul1.c"`,
+		`unknown field "ul1.cc"`,
+		`unknown field "ul1.ccc"`,
+
+		`unknown field "ul1.child.a"`,
+		`unknown field "ul1.child.aa"`,
+		`unknown field "ul1.child.aaa"`,
+		`unknown field "ul1.child.c"`,
+		`unknown field "ul1.child.cc"`,
+		`unknown field "ul1.child.ccc"`,
+
+		`unknown field "ul1.child.child.a"`,
+		`unknown field "ul1.child.child.aa"`,
+		`unknown field "ul1.child.child.aaa"`,
+		`unknown field "ul1.child.child.b"`,
+		`unknown field "ul1.child.child.bb"`,
+		`unknown field "ul1.child.child.bbb"`,
+	}
+
+	testCases := []struct {
+		jsonData            string
+		obj                 interface{}
+		returnUnknownFields bool
+		expectedErrs        []string
+	}{
+		{
+			jsonData:            simplesData,
+			obj:                 &C{},
+			returnUnknownFields: true,
+			expectedErrs:        simplesErrs,
+		},
+		{
+			jsonData:            simplesData,
+			obj:                 &C{},
+			returnUnknownFields: false,
+		},
+		{
+			jsonData:            sameNameDiffLevelData,
+			obj:                 &I{},
+			returnUnknownFields: true,
+			expectedErrs:        sameNameDiffLevelErrs,
+		},
+		{
+			jsonData:            sameNameDiffLevelData,
+			obj:                 &I{},
+			returnUnknownFields: false,
+		},
+		{
+			jsonData:            inlinedInlinedData,
+			obj:                 &I{},
+			returnUnknownFields: true,
+			expectedErrs:        inlinedInlinedErrs,
+		},
+		{
+			jsonData:            inlinedInlinedData,
+			obj:                 &I{},
+			returnUnknownFields: false,
+		},
+		{
+			jsonData:            combinedData,
+			obj:                 &I{},
+			returnUnknownFields: true,
+			expectedErrs:        combinedErrs,
+		},
+		{
+			jsonData:            combinedData,
+			obj:                 &I{},
+			returnUnknownFields: false,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			unstr := make(map[string]interface{})
+			err := json.Unmarshal([]byte(tc.jsonData), &unstr)
+			if err != nil {
+				t.Errorf("Error when unmarshaling to unstructured: %v", err)
+				return
+			}
+			err = runtime.NewTestUnstructuredConverterWithValidation(simpleEquality).FromUnstructuredWithValidation(unstr, tc.obj, tc.returnUnknownFields)
+			if len(tc.expectedErrs) == 0 && err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			var errString string
+			if err != nil {
+				errString = err.Error()
+			}
+			missedErrs := []string{}
+			failed := false
+			for _, expected := range tc.expectedErrs {
+				if !strings.Contains(errString, expected) {
+					failed = true
+					missedErrs = append(missedErrs, expected)
+				} else {
+					errString = strings.Replace(errString, expected, "", 1)
+				}
+			}
+			if failed {
+				for _, e := range missedErrs {
+					t.Errorf("missing err: %v\n", e)
+				}
+			}
+			leftoverErrors := strings.TrimSpace(strings.TrimPrefix(strings.ReplaceAll(errString, ",", ""), "strict decoding error:"))
+			if leftoverErrors != "" {
+				t.Errorf("found unexpected errors: %s", leftoverErrors)
+			}
+		})
+	}
+}
+
+// BenchmarkFromUnstructuredWithValidation benchmarks
+// the time and memory required to perform FromUnstructured
+// with the various validation directives (Ignore, Warn, Strict)
+func BenchmarkFromUnstructuredWithValidation(b *testing.B) {
+	re := regexp.MustCompile("^I$")
+	f := fuzz.NewWithSeed(1).NilChance(0.1).SkipFieldsWithPattern(re)
+	iObj := &I{}
+	f.Fuzz(&iObj)
+
+	unstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(iObj)
+	if err != nil {
+		b.Fatalf("ToUnstructured failed: %v", err)
+		return
+	}
+	for _, shouldReturn := range []bool{false, true} {
+		b.Run(fmt.Sprintf("shouldReturn=%t", shouldReturn), func(b *testing.B) {
+			newObj := reflect.New(reflect.TypeOf(iObj).Elem()).Interface()
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if err = runtime.NewTestUnstructuredConverterWithValidation(simpleEquality).FromUnstructuredWithValidation(unstr, newObj, shouldReturn); err != nil {
+					b.Fatalf("FromUnstructured failed: %v", err)
+					return
+				}
+			}
 		})
 	}
 }
@@ -311,7 +688,7 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 	}
 
 	if expectedErr == nil && !reflect.DeepEqual(unmarshalledObj, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(unmarshalledObj, newObj))
 	}
 }
 
@@ -322,11 +699,11 @@ func TestUnrecognized(t *testing.T) {
 		err  error
 	}{
 		{
-			data: "{\"da\":[3.0,\"3.0\",null]}",
+			data: "{\"da\":[3.5,4,\"3.0\",null]}",
 			obj:  &D{},
 		},
 		{
-			data: "{\"ea\":[3.0,\"3.0\",null]}",
+			data: "{\"ea\":[3.5,4,\"3.0\",null]}",
 			obj:  &E{},
 		},
 		{
@@ -373,6 +750,10 @@ func TestUnrecognized(t *testing.T) {
 		},
 		{
 			data: "{\"ff\":[\"abc\"],\"fg\":[123],\"fh\":[true,false]}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fj\":\"\"}",
 			obj:  &F{},
 		},
 		{
@@ -540,7 +921,29 @@ func TestFloatIntConversion(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(obj, unmarshalled) {
-		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+		t.Errorf("Incorrect conversion, diff: %v", cmp.Diff(obj, unmarshalled))
+	}
+}
+
+func TestIntFloatConversion(t *testing.T) {
+	unstr := map[string]interface{}{"ch": int64(3)}
+
+	var obj C
+	if err := runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, &obj); err != nil {
+		t.Errorf("Unexpected error in FromUnstructured: %v", err)
+	}
+
+	data, err := json.Marshal(unstr)
+	if err != nil {
+		t.Fatalf("Error when marshaling unstructured: %v", err)
+	}
+	var unmarshalled C
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		t.Fatalf("Error when unmarshaling to object: %v", err)
+	}
+
+	if !reflect.DeepEqual(obj, unmarshalled) {
+		t.Errorf("Incorrect conversion, diff: %v", cmp.Diff(obj, unmarshalled))
 	}
 }
 

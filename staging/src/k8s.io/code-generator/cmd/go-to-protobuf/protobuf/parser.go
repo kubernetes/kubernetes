@@ -25,7 +25,6 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -35,7 +34,7 @@ import (
 
 func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast.File) error) error {
 	fset := token.NewFileSet()
-	src, err := ioutil.ReadFile(name)
+	src, err := os.ReadFile(name)
 	if err != nil {
 		return err
 	}
@@ -110,10 +109,9 @@ func RewriteGeneratedGogoProtobufFile(name string, extractFn ExtractFunc, option
 // as being "optional" (they may be nil on the wire). This allows protobuf to serialize a map or slice and
 // properly discriminate between empty and nil (which is not possible in protobuf).
 // TODO: move into upstream gogo-protobuf once https://github.com/gogo/protobuf/issues/181
-//   has agreement
+// has agreement
 func rewriteOptionalMethods(decl ast.Decl, isOptional OptionalFunc) {
-	switch t := decl.(type) {
-	case *ast.FuncDecl:
+	if t, ok := decl.(*ast.FuncDecl); ok {
 		ident, ptr, ok := receiver(t)
 		if !ok {
 			return
@@ -151,8 +149,7 @@ type optionalAssignmentVisitor struct {
 // Visit walks the provided node, transforming field initializations of the form
 // m.Field = &OptionalType{} -> m.Field = OptionalType{}
 func (v optionalAssignmentVisitor) Visit(n ast.Node) ast.Visitor {
-	switch t := n.(type) {
-	case *ast.AssignStmt:
+	if t, ok := n.(*ast.AssignStmt); ok {
 		if len(t.Lhs) == 1 && len(t.Rhs) == 1 {
 			if !isFieldSelector(t.Lhs[0], "m", "") {
 				return nil
@@ -196,13 +193,11 @@ func (v *optionalItemsVisitor) Visit(n ast.Node) ast.Visitor {
 					t.Lhs[0] = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
 				}
 			}
-			switch rhs := t.Rhs[0].(type) {
-			case *ast.CallExpr:
+			if rhs, ok := t.Rhs[0].(*ast.CallExpr); ok {
 				if ident, ok := rhs.Fun.(*ast.Ident); ok && ident.Name == "append" {
 					ast.Walk(v, rhs)
 					if len(rhs.Args) > 0 {
-						switch arg := rhs.Args[0].(type) {
-						case *ast.Ident:
+						if arg, ok := rhs.Args[0].(*ast.Ident); ok {
 							if arg.Name == "m" {
 								rhs.Args[0] = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
 							}
@@ -213,8 +208,7 @@ func (v *optionalItemsVisitor) Visit(n ast.Node) ast.Visitor {
 			}
 		}
 	case *ast.IfStmt:
-		switch cond := t.Cond.(type) {
-		case *ast.BinaryExpr:
+		if cond, ok := t.Cond.(*ast.BinaryExpr); ok {
 			if cond.Op == token.EQL {
 				if isFieldSelector(cond.X, "m", "Items") && isIdent(cond.Y, "nil") {
 					cond.X = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
@@ -226,8 +220,7 @@ func (v *optionalItemsVisitor) Visit(n ast.Node) ast.Visitor {
 			// if err := m[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 			// 	return err
 			// }
-			switch s := t.Init.(type) {
-			case *ast.AssignStmt:
+			if s, ok := t.Init.(*ast.AssignStmt); ok {
 				if call, ok := s.Rhs[0].(*ast.CallExpr); ok {
 					if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 						if x, ok := sel.X.(*ast.IndexExpr); ok {
@@ -303,15 +296,13 @@ func receiver(f *ast.FuncDecl) (ident *ast.Ident, pointer bool, ok bool) {
 // dropExistingTypeDeclarations removes any type declaration for which extractFn returns true. The function
 // returns true if the entire declaration should be dropped.
 func dropExistingTypeDeclarations(decl ast.Decl, extractFn ExtractFunc) bool {
-	switch t := decl.(type) {
-	case *ast.GenDecl:
+	if t, ok := decl.(*ast.GenDecl); ok {
 		if t.Tok != token.TYPE {
 			return false
 		}
 		specs := []ast.Spec{}
 		for _, s := range t.Specs {
-			switch spec := s.(type) {
-			case *ast.TypeSpec:
+			if spec, ok := s.(*ast.TypeSpec); ok {
 				if extractFn(spec) {
 					continue
 				}
@@ -330,15 +321,13 @@ func dropExistingTypeDeclarations(decl ast.Decl, extractFn ExtractFunc) bool {
 // to prevent generation from being able to define side-effects.  The function returns true
 // if the entire declaration should be dropped.
 func dropEmptyImportDeclarations(decl ast.Decl) bool {
-	switch t := decl.(type) {
-	case *ast.GenDecl:
+	if t, ok := decl.(*ast.GenDecl); ok {
 		if t.Tok != token.IMPORT {
 			return false
 		}
 		specs := []ast.Spec{}
 		for _, s := range t.Specs {
-			switch spec := s.(type) {
-			case *ast.ImportSpec:
+			if spec, ok := s.(*ast.ImportSpec); ok {
 				if spec.Name != nil && spec.Name.Name == "_" {
 					continue
 				}
@@ -375,6 +364,21 @@ func RewriteTypesWithProtobufStructTags(name string, structTags map[string]map[s
 	})
 }
 
+func getFieldName(expr ast.Expr, structname string) (name string, err error) {
+	for {
+		switch t := expr.(type) {
+		case *ast.Ident:
+			return t.Name, nil
+		case *ast.SelectorExpr:
+			return t.Sel.Name, nil
+		case *ast.StarExpr:
+			expr = t.X
+		default:
+			return "", fmt.Errorf("unable to get name for tag from struct %q, field %#v", structname, t)
+		}
+	}
+}
+
 func updateStructTags(decl ast.Decl, structTags map[string]map[string]string, toCopy []string) []error {
 	var errs []error
 	t, ok := decl.(*ast.GenDecl)
@@ -403,14 +407,11 @@ func updateStructTags(decl ast.Decl, structTags map[string]map[string]string, to
 		for i := range st.Fields.List {
 			f := st.Fields.List[i]
 			var name string
+			var err error
 			if len(f.Names) == 0 {
-				switch t := f.Type.(type) {
-				case *ast.Ident:
-					name = t.Name
-				case *ast.SelectorExpr:
-					name = t.Sel.Name
-				default:
-					errs = append(errs, fmt.Errorf("unable to get name for tag from struct %q, field %#v", spec.Name.Name, t))
+				name, err = getFieldName(f.Type, spec.Name.Name)
+				if err != nil {
+					errs = append(errs, err)
 					continue
 				}
 			} else {

@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -27,12 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration"
 )
 
-// REST implements a RESTStorage for pod disruption budgets against etcd
+// REST implements a RESTStorage for validatingWebhookConfiguration against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against pod disruption budgets.
+// NewREST returns a RESTStorage object that will work against validatingWebhookConfiguration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingWebhookConfiguration{} },
@@ -40,7 +41,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ValidatingWebhookConfiguration).Name, nil
 		},
-		DefaultQualifiedResource: admissionregistration.Resource("validatingwebhookconfigurations"),
+		DefaultQualifiedResource:  admissionregistration.Resource("validatingwebhookconfigurations"),
+		SingularQualifiedResource: admissionregistration.Resource("validatingwebhookconfiguration"),
 
 		CreateStrategy: validatingwebhookconfiguration.Strategy,
 		UpdateStrategy: validatingwebhookconfiguration.Strategy,
@@ -53,4 +55,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		return nil, err
 	}
 	return &REST{store}, nil
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"api-extensions"}
 }

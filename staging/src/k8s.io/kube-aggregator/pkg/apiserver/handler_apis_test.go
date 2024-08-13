@@ -17,16 +17,16 @@ limitations under the License.
 package apiserver
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
@@ -315,7 +315,7 @@ func TestAPIs(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
@@ -327,7 +327,7 @@ func TestAPIs(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
+			t.Errorf("%s: %v", tc.name, cmp.Diff(tc.expected, actual))
 			continue
 		}
 	}
@@ -502,7 +502,7 @@ func TestAPIGroup(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, string(response))
 			continue
 		}
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
@@ -514,7 +514,7 @@ func TestAPIGroup(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
+			t.Errorf("%s: %v", tc.name, cmp.Diff(tc.expected, actual))
 			continue
 		}
 	}

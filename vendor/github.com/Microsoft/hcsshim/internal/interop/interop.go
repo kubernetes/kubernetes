@@ -15,10 +15,6 @@ func ConvertAndFreeCoTaskMemString(buffer *uint16) string {
 	return str
 }
 
-func ConvertAndFreeCoTaskMemBytes(buffer *uint16) []byte {
-	return []byte(ConvertAndFreeCoTaskMemString(buffer))
-}
-
 func Win32FromHresult(hr uintptr) syscall.Errno {
 	if hr&0x1fff0000 == 0x00070000 {
 		return syscall.Errno(hr & 0xffff)

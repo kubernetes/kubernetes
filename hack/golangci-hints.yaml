@@ -1,0 +1,184 @@
+# golangci-lint is used in Kubernetes with different configurations that
+# enable an increasing amount of checks:
+# - golangci.yaml is the most permissive configuration. All existing code
+#   passed.
+# - golangci-strict.yaml adds checks that all new code in pull requests
+#   must pass.
+# - golangci-hints.yaml adds checks for code patterns where developer
+#   and reviewer may decide whether findings should get addressed before
+#   merging. Beware that the golangci-lint output includes also the
+#   issues that must be fixed and doesn't indicate how severe each issue
+#   is (https://gophers.slack.com/archives/CS0TBRKPC/p1685721815275349).
+#
+# All three flavors are generated from golangci.yaml.in with
+# hack/update-golangci-lint-config.sh.
+
+run:
+  timeout: 30m
+  skip-files:
+    - "^zz_generated.*"
+
+output:
+  sort-results: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # The default excludes disable the "should have comment or be unexported" check from revive.
+  # We want that to be enabled, therefore we have to disable all default excludes and
+  # add those back one-by-one that we want. See https://github.com/golangci/golangci-lint/issues/456#issuecomment-617470264
+  exclude-use-default: false
+  exclude:
+    # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+    - ineffective break statement. Did you mean to break out of the outer loop
+
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # exclude ineffassign linter for generated files for conversion
+    - path: conversion\.go
+      linters:
+        - ineffassign
+
+    # SSA Extract calls are allowed in tests.
+    - linters:
+        - forbidigo
+      text: should not be used because managedFields was removed
+      path: _test.go$
+
+    # The Kubernetes naming convention for conversion functions uses underscores
+    # and intentionally deviates from normal Go conventions to make those function
+    # names more readable. Same for SetDefaults_*.
+    #
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
+    - linters:
+        - stylecheck
+        - revive
+      text: "(ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+
+    # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
+    - linters:
+       - ginkgolinter
+      text: use a function call in (Eventually|Consistently)
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
+    - linters:
+        - gocritic
+      text: "ifElseChain: rewrite if-else to switch statement"
+
+    # Only packages listed here opt into the strict "exported symbols must be documented".
+    #
+    # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
+    - linters:
+        - golint
+        - revive
+        - stylecheck
+      text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
+      path-except: cmd/kubeadm
+
+linters:
+  disable-all: false
+  enable: # please keep this alphabetized
+    - forbidigo
+    - ginkgolinter
+    - gocritic
+    - govet
+    - errorlint
+    - ineffassign
+    - logcheck
+    - revive
+    - staticcheck
+    - stylecheck
+    - testifylint
+    - unused
+
+linters-settings: # please keep this alphabetized
+  custom:
+    logcheck:
+      # Installed there by hack/verify-golangci-lint.sh.
+      path: ../_output/local/bin/logcheck.so
+      description: structured logging checker
+      original-url: k8s.io/logtools/logcheck
+      settings:
+        config: |
+          # hack/logcheck.conf contains regular expressions that are matched against <pkg>/<file>,
+          # for example k8s.io/cmd/kube-scheduler/app/config/config.go.
+          #
+          # By default, structured logging call parameters are checked, but usage of
+          # those calls is not required. That is changed on a per-file basis.
+          #
+          # Remember to clean the golangci-lint cache when changing the configuration and
+          # running the verify-golangci-lint.sh script multiple times, otherwise
+          # golangci-lint will report stale results:
+          #    _output/local/bin/golangci-lint cache clean
+          
+          # At this point we don't enforce the usage structured logging calls except in
+          # those packages that were migrated. This disables the check for other files.
+          -structured .*
+          
+          # Now enable it again for migrated packages.
+          structured k8s.io/kubernetes/cmd/kubelet/.*
+          structured k8s.io/kubernetes/pkg/kubelet/.*
+          structured k8s.io/kubernetes/pkg/proxy/.*
+          structured k8s.io/kms/.*
+          structured k8s.io/apiserver/pkg/storage/value/.*
+          structured k8s.io/apiserver/pkg/server/options/encryptionconfig/.*
+          
+          # The following packages have been migrated to contextual logging.
+          # Packages matched here do not have to be listed above because
+          # "contextual" implies "structured".
+          contextual k8s.io/api/.*
+          contextual k8s.io/apimachinery/pkg/util/runtime/.*
+          contextual k8s.io/client-go/metadata/.*
+          contextual k8s.io/client-go/tools/events/.*
+          contextual k8s.io/client-go/tools/record/.*
+          contextual k8s.io/component-helpers/.*
+          contextual k8s.io/cri-api/.*
+          contextual k8s.io/cri-client/.*
+          contextual k8s.io/dynamic-resource-allocation/.*
+          contextual k8s.io/endpointslice/.*
+          contextual k8s.io/kms/.*
+          contextual k8s.io/kube-controller-manager/.*
+          contextual k8s.io/kube-proxy/.*
+          contextual k8s.io/kube-scheduler/.*
+          contextual k8s.io/sample-apiserver/.*
+          contextual k8s.io/sample-cli-plugin/.*
+          contextual k8s.io/sample-controller/.*
+          contextual k8s.io/kubernetes/cmd/kube-proxy/.*
+          contextual k8s.io/kubernetes/cmd/kube-scheduler/.*
+          contextual k8s.io/kubernetes/pkg/controller/.*
+          contextual k8s.io/kubernetes/pkg/scheduler/.*
+          contextual k8s.io/kubernetes/test/e2e/dra/.*
+          
+          # As long as contextual logging is alpha or beta, all WithName, WithValues,
+          # NewContext calls have to go through klog. Once it is GA, we can lift
+          # this restriction. Whether we then do a global search/replace remains
+          # to be decided.
+          with-helpers .*
+  forbidigo:
+    analyze-types: true
+    forbid:
+    - p: ^managedfields\.ExtractInto$
+      pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
+      msg: should not be used because managedFields was removed
+    - p: \.Extract
+      pkg: ^k8s\.io/client-go/applyconfigurations/
+      msg: should not be used because managedFields was removed
+    - p: ^gomega\.BeTrue$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    - p: ^gomega\.BeFalse$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+  revive:
+    # Only these rules are enabled.
+    rules:
+      - name: exported
+        arguments:
+        - disableStutteringCheck
+  staticcheck:
+    checks:
+      - "all"
+  testifylint:
+    enable-all: true

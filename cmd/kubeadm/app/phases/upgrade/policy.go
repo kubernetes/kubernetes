@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -34,7 +35,7 @@ const (
 	MaximumAllowedMinorVersionDowngradeSkew = 1
 
 	// MaximumAllowedMinorVersionKubeletSkew describes how many minor versions the control plane version and the kubelet can skew in a kubeadm cluster
-	MaximumAllowedMinorVersionKubeletSkew = 1
+	MaximumAllowedMinorVersionKubeletSkew = 3
 )
 
 // VersionSkewPolicyErrors describes version skew errors that might be seen during the validation process in EnforceVersionPolicies
@@ -167,8 +168,8 @@ func detectUnstableVersionError(newK8sVersion *version.Version, newK8sVersionStr
 }
 
 // detectTooOldKubelets errors out if the kubelet versions are so old that an unsupported skew would happen if the cluster was upgraded
-func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[string]uint16) error {
-	tooOldKubeletVersions := []string{}
+func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[string][]string) error {
+	var tooOldKubeletVersions []string
 	for versionStr := range kubeletVersions {
 
 		kubeletVersion, err := version.ParseSemantic(versionStr)

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 /*
@@ -27,7 +28,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -37,12 +37,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 var (
-	testSupportedVersions = MustParseSupportedVersions("3.0.17, 3.1.12")
+	testSupportedVersions = mustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
 	testVersionPrevious   = &EtcdVersion{semver.MustParse("3.0.17")}
 	testVersionLatest     = &EtcdVersion{semver.MustParse("3.1.12")}
 )
@@ -56,31 +57,33 @@ func init() {
 
 func TestMigrate(t *testing.T) {
 	migrations := []struct {
-		title        string
-		memberCount  int
-		startVersion string
-		endVersion   string
-		protocol     string
+		title            string
+		memberCount      int
+		startVersion     string
+		endVersion       string
+		protocol         string
+		clientListenUrls string
 	}{
 		// upgrades
-		{"v3-v3-up", 1, "3.0.17/etcd3", "3.1.12/etcd3", "https"},
-		{"oldest-newest-up", 1, "3.0.17/etcd3", "3.1.12/etcd3", "https"},
+		{"v3-v3-up", 1, "3.0.17/etcd3", "3.1.12/etcd3", "https", ""},
+		{"oldest-newest-up", 1, "3.0.17/etcd3", "3.1.12/etcd3", "https", ""},
+		{"v3-v3-up-with-additional-client-url", 1, "3.0.17/etcd3", "3.1.12/etcd3", "https", "http://127.0.0.1:2379,http://10.128.0.1:2379"},
 
 		// warning: v2->v3 ha upgrades not currently supported.
-		{"ha-v3-v3-up", 3, "3.0.17/etcd3", "3.1.12/etcd3", "https"},
+		{"ha-v3-v3-up", 3, "3.0.17/etcd3", "3.1.12/etcd3", "https", ""},
 
 		// downgrades
-		{"v3-v3-down", 1, "3.1.12/etcd3", "3.0.17/etcd3", "https"},
+		{"v3-v3-down", 1, "3.1.12/etcd3", "3.0.17/etcd3", "https", ""},
 
 		// warning: ha downgrades not yet supported.
 	}
 
 	for _, m := range migrations {
 		t.Run(m.title, func(t *testing.T) {
-			start := MustParseEtcdVersionPair(m.startVersion)
-			end := MustParseEtcdVersionPair(m.endVersion)
+			start := mustParseEtcdVersionPair(m.startVersion)
+			end := mustParseEtcdVersionPair(m.endVersion)
 
-			testCfgs := clusterConfig(t, m.title, m.memberCount, m.protocol)
+			testCfgs := clusterConfig(t, m.title, m.memberCount, m.protocol, m.clientListenUrls)
 
 			servers := []*EtcdMigrateServer{}
 			for _, cfg := range testCfgs {
@@ -217,7 +220,7 @@ func checkPermissions(t *testing.T, path string, expected os.FileMode) {
 	}
 }
 
-func clusterConfig(t *testing.T, name string, memberCount int, protocol string) []*EtcdMigrateCfg {
+func clusterConfig(t *testing.T, name string, memberCount int, protocol string, clientListenUrls string) []*EtcdMigrateCfg {
 	peers := []string{}
 	for i := 0; i < memberCount; i++ {
 		memberName := fmt.Sprintf("%s-%d", name, i)
@@ -243,6 +246,7 @@ func clusterConfig(t *testing.T, name string, memberCount int, protocol string) 
 			port:              uint64(2379 + i*10000),
 			peerListenUrls:    peerURL,
 			peerAdvertiseUrls: peerURL,
+			clientListenUrls:  clientListenUrls,
 			etcdDataPrefix:    "/registry",
 			ttlKeysDirectory:  "/registry/events",
 			supportedVersions: testSupportedVersions,
@@ -287,13 +291,13 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 	}
 
 	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0777))
+	err = os.WriteFile(certFileName, certPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}
 
 	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0777))
+	err = os.WriteFile(keyFileName, keyPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}
@@ -304,7 +308,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 func parseIPList(ips []string) []net.IP {
 	var netIPs []net.IP
 	for _, ip := range ips {
-		netIPs = append(netIPs, net.ParseIP(ip))
+		netIPs = append(netIPs, netutils.ParseIPSloppy(ip))
 	}
 	return netIPs
 }
@@ -332,7 +336,7 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		IsCA:                  true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)
@@ -359,4 +363,23 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+// mustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
+// or panics if the parse fails.
+func mustParseEtcdVersionPair(s string) *EtcdVersionPair {
+	pair, err := ParseEtcdVersionPair(s)
+	if err != nil {
+		panic(err)
+	}
+	return pair
+}
+
+// mustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
+func mustParseSupportedVersions(list []string) SupportedVersions {
+	versions, err := ParseSupportedVersions(list)
+	if err != nil {
+		panic(err)
+	}
+	return versions
 }

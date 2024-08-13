@@ -69,6 +69,9 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
 
 ---
 
@@ -137,8 +140,8 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents/status"]
     verbs: ["update", "patch"]
-
 ---
+
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -150,9 +153,38 @@ roleRef:
   kind: ClusterRole
   name: csi-gce-pd-snapshotter-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
-# priviledged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-leaderelection-role
+  namespace: gce-pd-csi-driver
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-controller-leaderelection-binding
+  namespace: gce-pd-csi-driver
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+subjects:
+- kind: ServiceAccount
+  name: csi-gce-pd-controller-sa
+roleRef:
+  kind: Role
+  name: csi-gce-pd-leaderelection-role
+  apiGroup: rbac.authorization.k8s.io
+---
+
+# privileged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

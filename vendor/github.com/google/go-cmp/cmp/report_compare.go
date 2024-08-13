@@ -1,23 +1,13 @@
 // Copyright 2019, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/google/go-cmp/cmp/internal/value"
 )
-
-// TODO: Enforce limits?
-//	* Enforce maximum number of records to print per node?
-//	* Enforce maximum size in bytes allowed?
-//	* As a heuristic, use less verbosity for equal nodes than unequal nodes.
-// TODO: Enforce unique outputs?
-//	* Avoid Stringer methods if it results in same output?
-//	* Print pointer address if outputs still equal?
 
 // numContextRecords is the number of surrounding equal records to print.
 const numContextRecords = 2
@@ -71,24 +61,69 @@ func (opts formatOptions) WithTypeMode(t typeMode) formatOptions {
 	opts.TypeMode = t
 	return opts
 }
+func (opts formatOptions) WithVerbosity(level int) formatOptions {
+	opts.VerbosityLevel = level
+	opts.LimitVerbosity = true
+	return opts
+}
+func (opts formatOptions) verbosity() uint {
+	switch {
+	case opts.VerbosityLevel < 0:
+		return 0
+	case opts.VerbosityLevel > 16:
+		return 16 // some reasonable maximum to avoid shift overflow
+	default:
+		return uint(opts.VerbosityLevel)
+	}
+}
+
+const maxVerbosityPreset = 6
+
+// verbosityPreset modifies the verbosity settings given an index
+// between 0 and maxVerbosityPreset, inclusive.
+func verbosityPreset(opts formatOptions, i int) formatOptions {
+	opts.VerbosityLevel = int(opts.verbosity()) + 2*i
+	if i > 0 {
+		opts.AvoidStringer = true
+	}
+	if i >= maxVerbosityPreset {
+		opts.PrintAddresses = true
+		opts.QualifiedNames = true
+	}
+	return opts
+}
 
 // FormatDiff converts a valueNode tree into a textNode tree, where the later
 // is a textual representation of the differences detected in the former.
-func (opts formatOptions) FormatDiff(v *valueNode) textNode {
+func (opts formatOptions) FormatDiff(v *valueNode, ptrs *pointerReferences) (out textNode) {
+	if opts.DiffMode == diffIdentical {
+		opts = opts.WithVerbosity(1)
+	} else if opts.verbosity() < 3 {
+		opts = opts.WithVerbosity(3)
+	}
+
 	// Check whether we have specialized formatting for this node.
 	// This is not necessary, but helpful for producing more readable outputs.
 	if opts.CanFormatDiffSlice(v) {
 		return opts.FormatDiffSlice(v)
 	}
 
+	var parentKind reflect.Kind
+	if v.parent != nil && v.parent.TransformerName == "" {
+		parentKind = v.parent.Type.Kind()
+	}
+
 	// For leaf nodes, format the value based on the reflect.Values alone.
-	if v.MaxDepth == 0 {
+	// As a special case, treat equal []byte as a leaf nodes.
+	isBytes := v.Type.Kind() == reflect.Slice && v.Type.Elem() == byteType
+	isEqualBytes := isBytes && v.NumDiff+v.NumIgnored+v.NumTransformed == 0
+	if v.MaxDepth == 0 || isEqualBytes {
 		switch opts.DiffMode {
 		case diffUnknown, diffIdentical:
 			// Format Equal.
 			if v.NumDiff == 0 {
-				outx := opts.FormatValue(v.ValueX, visitedPointers{})
-				outy := opts.FormatValue(v.ValueY, visitedPointers{})
+				outx := opts.FormatValue(v.ValueX, parentKind, ptrs)
+				outy := opts.FormatValue(v.ValueY, parentKind, ptrs)
 				if v.NumIgnored > 0 && v.NumSame == 0 {
 					return textEllipsis
 				} else if outx.Len() < outy.Len() {
@@ -101,8 +136,13 @@ func (opts formatOptions) FormatDiff(v *valueNode) textNode {
 			// Format unequal.
 			assert(opts.DiffMode == diffUnknown)
 			var list textList
-			outx := opts.WithTypeMode(elideType).FormatValue(v.ValueX, visitedPointers{})
-			outy := opts.WithTypeMode(elideType).FormatValue(v.ValueY, visitedPointers{})
+			outx := opts.WithTypeMode(elideType).FormatValue(v.ValueX, parentKind, ptrs)
+			outy := opts.WithTypeMode(elideType).FormatValue(v.ValueY, parentKind, ptrs)
+			for i := 0; i <= maxVerbosityPreset && outx != nil && outy != nil && outx.Equal(outy); i++ {
+				opts2 := verbosityPreset(opts, i).WithTypeMode(elideType)
+				outx = opts2.FormatValue(v.ValueX, parentKind, ptrs)
+				outy = opts2.FormatValue(v.ValueY, parentKind, ptrs)
+			}
 			if outx != nil {
 				list = append(list, textRecord{Diff: '-', Value: outx})
 			}
@@ -111,34 +151,57 @@ func (opts formatOptions) FormatDiff(v *valueNode) textNode {
 			}
 			return opts.WithTypeMode(emitType).FormatType(v.Type, list)
 		case diffRemoved:
-			return opts.FormatValue(v.ValueX, visitedPointers{})
+			return opts.FormatValue(v.ValueX, parentKind, ptrs)
 		case diffInserted:
-			return opts.FormatValue(v.ValueY, visitedPointers{})
+			return opts.FormatValue(v.ValueY, parentKind, ptrs)
 		default:
 			panic("invalid diff mode")
 		}
 	}
 
+	// Register slice element to support cycle detection.
+	if parentKind == reflect.Slice {
+		ptrRefs := ptrs.PushPair(v.ValueX, v.ValueY, opts.DiffMode, true)
+		defer ptrs.Pop()
+		defer func() { out = wrapTrunkReferences(ptrRefs, out) }()
+	}
+
 	// Descend into the child value node.
 	if v.TransformerName != "" {
-		out := opts.WithTypeMode(emitType).FormatDiff(v.Value)
-		out = textWrap{"Inverse(" + v.TransformerName + ", ", out, ")"}
+		out := opts.WithTypeMode(emitType).FormatDiff(v.Value, ptrs)
+		out = &textWrap{Prefix: "Inverse(" + v.TransformerName + ", ", Value: out, Suffix: ")"}
 		return opts.FormatType(v.Type, out)
 	} else {
 		switch k := v.Type.Kind(); k {
-		case reflect.Struct, reflect.Array, reflect.Slice, reflect.Map:
-			return opts.FormatType(v.Type, opts.formatDiffList(v.Records, k))
+		case reflect.Struct, reflect.Array, reflect.Slice:
+			out = opts.formatDiffList(v.Records, k, ptrs)
+			out = opts.FormatType(v.Type, out)
+		case reflect.Map:
+			// Register map to support cycle detection.
+			ptrRefs := ptrs.PushPair(v.ValueX, v.ValueY, opts.DiffMode, false)
+			defer ptrs.Pop()
+
+			out = opts.formatDiffList(v.Records, k, ptrs)
+			out = wrapTrunkReferences(ptrRefs, out)
+			out = opts.FormatType(v.Type, out)
 		case reflect.Ptr:
-			return textWrap{"&", opts.FormatDiff(v.Value), ""}
+			// Register pointer to support cycle detection.
+			ptrRefs := ptrs.PushPair(v.ValueX, v.ValueY, opts.DiffMode, false)
+			defer ptrs.Pop()
+
+			out = opts.FormatDiff(v.Value, ptrs)
+			out = wrapTrunkReferences(ptrRefs, out)
+			out = &textWrap{Prefix: "&", Value: out}
 		case reflect.Interface:
-			return opts.WithTypeMode(emitType).FormatDiff(v.Value)
+			out = opts.WithTypeMode(emitType).FormatDiff(v.Value, ptrs)
 		default:
 			panic(fmt.Sprintf("%v cannot have children", k))
 		}
+		return out
 	}
 }
 
-func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) textNode {
+func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind, ptrs *pointerReferences) textNode {
 	// Derive record name based on the data structure kind.
 	var name string
 	var formatKey func(reflect.Value) string
@@ -154,7 +217,17 @@ func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) te
 	case reflect.Map:
 		name = "entry"
 		opts = opts.WithTypeMode(elideType)
-		formatKey = formatMapKey
+		formatKey = func(v reflect.Value) string { return formatMapKey(v, false, ptrs) }
+	}
+
+	maxLen := -1
+	if opts.LimitVerbosity {
+		if opts.DiffMode == diffIdentical {
+			maxLen = ((1 << opts.verbosity()) >> 1) << 2 // 0, 4, 8, 16, 32, etc...
+		} else {
+			maxLen = (1 << opts.verbosity()) << 1 // 2, 4, 8, 16, 32, 64, etc...
+		}
+		opts.VerbosityLevel--
 	}
 
 	// Handle unification.
@@ -163,16 +236,21 @@ func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) te
 		var list textList
 		var deferredEllipsis bool // Add final "..." to indicate records were dropped
 		for _, r := range recs {
+			if len(list) == maxLen {
+				deferredEllipsis = true
+				break
+			}
+
 			// Elide struct fields that are zero value.
 			if k == reflect.Struct {
 				var isZero bool
 				switch opts.DiffMode {
 				case diffIdentical:
-					isZero = value.IsZero(r.Value.ValueX) || value.IsZero(r.Value.ValueY)
+					isZero = r.Value.ValueX.IsZero() || r.Value.ValueY.IsZero()
 				case diffRemoved:
-					isZero = value.IsZero(r.Value.ValueX)
+					isZero = r.Value.ValueX.IsZero()
 				case diffInserted:
-					isZero = value.IsZero(r.Value.ValueY)
+					isZero = r.Value.ValueY.IsZero()
 				}
 				if isZero {
 					continue
@@ -186,23 +264,31 @@ func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) te
 				}
 				continue
 			}
-			if out := opts.FormatDiff(r.Value); out != nil {
+			if out := opts.FormatDiff(r.Value, ptrs); out != nil {
 				list = append(list, textRecord{Key: formatKey(r.Key), Value: out})
 			}
 		}
 		if deferredEllipsis {
 			list.AppendEllipsis(diffStats{})
 		}
-		return textWrap{"{", list, "}"}
+		return &textWrap{Prefix: "{", Value: list, Suffix: "}"}
 	case diffUnknown:
 	default:
 		panic("invalid diff mode")
 	}
 
 	// Handle differencing.
+	var numDiffs int
 	var list textList
+	var keys []reflect.Value // invariant: len(list) == len(keys)
 	groups := coalesceAdjacentRecords(name, recs)
+	maxGroup := diffStats{Name: name}
 	for i, ds := range groups {
+		if maxLen >= 0 && numDiffs >= maxLen {
+			maxGroup = maxGroup.Append(ds)
+			continue
+		}
+
 		// Handle equal records.
 		if ds.NumDiff() == 0 {
 			// Compute the number of leading and trailing records to print.
@@ -226,16 +312,21 @@ func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) te
 
 			// Format the equal values.
 			for _, r := range recs[:numLo] {
-				out := opts.WithDiffMode(diffIdentical).FormatDiff(r.Value)
+				out := opts.WithDiffMode(diffIdentical).FormatDiff(r.Value, ptrs)
 				list = append(list, textRecord{Key: formatKey(r.Key), Value: out})
+				keys = append(keys, r.Key)
 			}
 			if numEqual > numLo+numHi {
 				ds.NumIdentical -= numLo + numHi
 				list.AppendEllipsis(ds)
+				for len(keys) < len(list) {
+					keys = append(keys, reflect.Value{})
+				}
 			}
 			for _, r := range recs[numEqual-numHi : numEqual] {
-				out := opts.WithDiffMode(diffIdentical).FormatDiff(r.Value)
+				out := opts.WithDiffMode(diffIdentical).FormatDiff(r.Value, ptrs)
 				list = append(list, textRecord{Key: formatKey(r.Key), Value: out})
+				keys = append(keys, r.Key)
 			}
 			recs = recs[numEqual:]
 			continue
@@ -247,24 +338,70 @@ func (opts formatOptions) formatDiffList(recs []reportRecord, k reflect.Kind) te
 			case opts.CanFormatDiffSlice(r.Value):
 				out := opts.FormatDiffSlice(r.Value)
 				list = append(list, textRecord{Key: formatKey(r.Key), Value: out})
+				keys = append(keys, r.Key)
 			case r.Value.NumChildren == r.Value.MaxDepth:
-				outx := opts.WithDiffMode(diffRemoved).FormatDiff(r.Value)
-				outy := opts.WithDiffMode(diffInserted).FormatDiff(r.Value)
+				outx := opts.WithDiffMode(diffRemoved).FormatDiff(r.Value, ptrs)
+				outy := opts.WithDiffMode(diffInserted).FormatDiff(r.Value, ptrs)
+				for i := 0; i <= maxVerbosityPreset && outx != nil && outy != nil && outx.Equal(outy); i++ {
+					opts2 := verbosityPreset(opts, i)
+					outx = opts2.WithDiffMode(diffRemoved).FormatDiff(r.Value, ptrs)
+					outy = opts2.WithDiffMode(diffInserted).FormatDiff(r.Value, ptrs)
+				}
 				if outx != nil {
 					list = append(list, textRecord{Diff: diffRemoved, Key: formatKey(r.Key), Value: outx})
+					keys = append(keys, r.Key)
 				}
 				if outy != nil {
 					list = append(list, textRecord{Diff: diffInserted, Key: formatKey(r.Key), Value: outy})
+					keys = append(keys, r.Key)
 				}
 			default:
-				out := opts.FormatDiff(r.Value)
+				out := opts.FormatDiff(r.Value, ptrs)
 				list = append(list, textRecord{Key: formatKey(r.Key), Value: out})
+				keys = append(keys, r.Key)
 			}
 		}
 		recs = recs[ds.NumDiff():]
+		numDiffs += ds.NumDiff()
 	}
-	assert(len(recs) == 0)
-	return textWrap{"{", list, "}"}
+	if maxGroup.IsZero() {
+		assert(len(recs) == 0)
+	} else {
+		list.AppendEllipsis(maxGroup)
+		for len(keys) < len(list) {
+			keys = append(keys, reflect.Value{})
+		}
+	}
+	assert(len(list) == len(keys))
+
+	// For maps, the default formatting logic uses fmt.Stringer which may
+	// produce ambiguous output. Avoid calling String to disambiguate.
+	if k == reflect.Map {
+		var ambiguous bool
+		seenKeys := map[string]reflect.Value{}
+		for i, currKey := range keys {
+			if currKey.IsValid() {
+				strKey := list[i].Key
+				prevKey, seen := seenKeys[strKey]
+				if seen && prevKey.CanInterface() && currKey.CanInterface() {
+					ambiguous = prevKey.Interface() != currKey.Interface()
+					if ambiguous {
+						break
+					}
+				}
+				seenKeys[strKey] = currKey
+			}
+		}
+		if ambiguous {
+			for i, k := range keys {
+				if k.IsValid() {
+					list[i].Key = formatMapKey(k, true, ptrs)
+				}
+			}
+		}
+	}
+
+	return &textWrap{Prefix: "{", Value: list, Suffix: "}"}
 }
 
 // coalesceAdjacentRecords coalesces the list of records into groups of

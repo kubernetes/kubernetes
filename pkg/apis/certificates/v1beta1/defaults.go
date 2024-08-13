@@ -18,12 +18,12 @@ package v1beta1
 
 import (
 	"crypto/x509"
-	"reflect"
-	"strings"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -38,6 +38,12 @@ func SetDefaults_CertificateSigningRequestSpec(obj *certificatesv1beta1.Certific
 	if obj.SignerName == nil {
 		signerName := DefaultSignerNameFromSpec(obj)
 		obj.SignerName = &signerName
+	}
+}
+
+func SetDefaults_CertificateSigningRequestCondition(obj *certificatesv1beta1.CertificateSigningRequestCondition) {
+	if len(obj.Status) == 0 {
+		obj.Status = v1.ConditionTrue
 	}
 }
 
@@ -60,70 +66,17 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 }
 
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return false
-	}
-
-	// at least one of dnsNames or ipAddresses must be specified
-	if len(req.DNSNames) == 0 && len(req.IPAddresses) == 0 {
-		return false
-	}
-
-	if len(req.EmailAddresses) > 0 || len(req.URIs) > 0 {
-		return false
-	}
-
-	requiredUsages := []certificatesv1beta1.KeyUsage{
-		certificatesv1beta1.UsageDigitalSignature,
-		certificatesv1beta1.UsageKeyEncipherment,
-		certificatesv1beta1.UsageServerAuth,
-	}
-	if !equalUnsorted(requiredUsages, usages) {
-		return false
-	}
-
-	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return false
-	}
-
-	return true
+	return certificates.IsKubeletServingCSR(req, usagesToSet(usages))
 }
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return false
-	}
-
-	if len(req.DNSNames) > 0 || len(req.EmailAddresses) > 0 || len(req.IPAddresses) > 0 || len(req.URIs) > 0 {
-		return false
-	}
-
-	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return false
-	}
-
-	requiredUsages := []certificatesv1beta1.KeyUsage{
-		certificatesv1beta1.UsageDigitalSignature,
-		certificatesv1beta1.UsageKeyEncipherment,
-		certificatesv1beta1.UsageClientAuth,
-	}
-	if !equalUnsorted(requiredUsages, usages) {
-		return false
-	}
-
-	return true
+	return certificates.IsKubeletClientCSR(req, usagesToSet(usages))
 }
 
-// equalUnsorted compares two []string for equality of contents regardless of
-// the order of the elements
-func equalUnsorted(left, right []certificatesv1beta1.KeyUsage) bool {
-	l := sets.NewString()
-	for _, s := range left {
-		l.Insert(string(s))
+func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.String {
+	result := sets.NewString()
+	for _, usage := range usages {
+		result.Insert(string(usage))
 	}
-	r := sets.NewString()
-	for _, s := range right {
-		r.Insert(string(s))
-	}
-	return l.Equal(r)
+	return result
 }

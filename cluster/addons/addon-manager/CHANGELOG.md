@@ -1,4 +1,27 @@
-## Version 9.1.0 (Wed May 13 2020 Antoni Zawodny <zawodny@google.com>)
+### Version 9.1.7 (Thu May 15 2023 Paco Xu <paco.xu@daocloud.io>)
+- Update kubectl to v1.27.1.
+- Use `--prune-allowlist` instead of deprecated `--prune-whitelist`.
+
+### Version 9.1.6 (Thu February 24 2022 Shihang Zhang <zshihang@google.com>)
+ - Clean up the wait check for service account (https://github.com/kubernetes/kubernetes/pull/108313)
+
+### Version 9.1.5 (Mon April 19 2021 Spencer Peterson <spencerjp@google.com>)
+ - Update baseimage to debian-base:v1.0.1.
+
+### Version 9.1.4 (Wed February 10 2021 Jordan Liggitt <liggitt@google.com>)
+ - Update kubectl to v1.20.2.
+ - Fix a bug in leader election (https://github.com/kubernetes/kubernetes/issues/98966)
+
+### Version 9.1.3 (Mon November 30 2020 Spencer Peterson <spencerjp@google.com>)
+ - Update kubectl to v1.19.3.
+
+### Version 9.1.2 (Thu August 6 2020 Spencer Peterson <spencerjp@google.com>)
+ - Fix `start_addon` overwriting resources with `addonmanager.kubernetes.io/mode=EnsureExists`.
+
+### Version 9.1.1 (Wed May 19 2020 Antoni Zawodny <zawodny@google.com>)
+ - Fix kube-addons.sh and kubectl permissions
+
+### Version 9.1.0 (Wed May 13 2020 Antoni Zawodny <zawodny@google.com>)
  - Enable overriding the default list of whitelisted resources
 
 ### Version 9.0.2  (Thu August 1 2019 Maciej Borsz <maciejborsz@google.com>
@@ -80,6 +103,3 @@
 
 ### Version 1 (Thu May 5 2016 Mike Danese @mikedanese)
  - Run kube-addon-manager in a pod
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/addon-manager/CHANGELOG.md?pixel)]()

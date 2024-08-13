@@ -27,6 +27,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// AllPodLogsForObjectFunc is a function type that can tell you how to get logs for a runtime.object
+type AllPodLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[v1.ObjectReference]rest.ResponseWrapper, error)
+
+// AllPodLogsForObjectFn gives a way to easily override the function for unit testing if needed.
+var AllPodLogsForObjectFn AllPodLogsForObjectFunc = allPodLogsForObject
+
 // LogsForObjectFunc is a function type that can tell you how to get logs for a runtime.object
 type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[v1.ObjectReference]rest.ResponseWrapper, error)
 
@@ -67,10 +73,20 @@ var MapBasedSelectorForObjectFn MapBasedSelectorForObjectFunc = mapBasedSelector
 
 // ProtocolsForObjectFunc will call the provided function on the protocols for the object,
 // return nil-map if no protocols for the object, or return an error.
+// Deprecated: use PortsProtocolsForObjectFunc instead.
+// When the same port has different protocols, data will be lost
 type ProtocolsForObjectFunc func(object runtime.Object) (map[string]string, error)
 
 // ProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+// Deprecated: use MultiProtocolsForObjectFn instead.
 var ProtocolsForObjectFn ProtocolsForObjectFunc = protocolsForObject
+
+// MultiProtocolsWithForObjectFunc will call the provided function on the protocols for the object,
+// return nil-map if no protocols for the object, or return an error.
+type MultiProtocolsWithForObjectFunc func(object runtime.Object) (map[string][]string, error)
+
+// MultiProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+var MultiProtocolsForObjectFn MultiProtocolsWithForObjectFunc = multiProtocolsForObject
 
 // PortsForObjectFunc returns the ports associated with the provided object
 type PortsForObjectFunc func(object runtime.Object) ([]string, error)

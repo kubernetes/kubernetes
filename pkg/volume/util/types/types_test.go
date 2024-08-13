@@ -20,31 +20,58 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
-func TestIsFilesystemMismatchError(t *testing.T) {
+func TestErrorTypes(t *testing.T) {
 	tests := []struct {
-		mountError  error
-		expectError bool
+		name           string
+		realError      error
+		errorCheckFunc func(error) bool
+		expectError    bool
 	}{
 		{
+			"when mount error has File system mismatch errors",
 			mount.NewMountError(mount.FilesystemMismatch, "filesystem mismatch"),
+			IsFilesystemMismatchError,
 			true,
 		},
 		{
+			"when mount error has other error",
 			mount.NewMountError(mount.FormatFailed, "filesystem mismatch"),
+			IsFilesystemMismatchError,
 			false,
 		},
 		{
+			"when mount error wraps filesystem mismatch error",
 			fmt.Errorf("mount failed %w", mount.NewMountError(mount.FilesystemMismatch, "filesystem mismatch")),
+			IsFilesystemMismatchError,
+			true,
+		},
+		{
+			"when error has no failedPrecondition error",
+			fmt.Errorf("some other error"),
+			IsFailedPreconditionError,
+			false,
+		},
+		{
+			"when error has failedPrecondition error",
+			NewFailedPreconditionError("volume-in-use"),
+			IsFailedPreconditionError,
+			true,
+		},
+		{
+			"when error wraps failedPrecondition error",
+			fmt.Errorf("volume readonly %w", NewFailedPreconditionError("volume-in-use-error")),
+			IsFailedPreconditionError,
 			true,
 		},
 	}
+
 	for _, test := range tests {
-		ok := IsFilesystemMismatchError(test.mountError)
+		ok := test.errorCheckFunc(test.realError)
 		if ok != test.expectError {
-			t.Errorf("expected filesystem mismatch to be %v but got %v", test.expectError, ok)
+			t.Errorf("for %s: expected error to be %v but got %v", test.name, test.expectError, ok)
 		}
 	}
 }

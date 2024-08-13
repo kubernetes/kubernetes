@@ -44,15 +44,20 @@ type Node struct {
 	HugePages []HugePagesInfo `json:"hugepages"`
 	Cores     []Core          `json:"cores"`
 	Caches    []Cache         `json:"caches"`
+	Distances []uint64        `json:"distances"`
 }
 
 type Core struct {
-	Id      int     `json:"core_id"`
-	Threads []int   `json:"thread_ids"`
-	Caches  []Cache `json:"caches"`
+	Id           int     `json:"core_id"`
+	Threads      []int   `json:"thread_ids"`
+	Caches       []Cache `json:"caches"`
+	UncoreCaches []Cache `json:"uncore_caches"`
+	SocketID     int     `json:"socket_id"`
 }
 
 type Cache struct {
+	// Id of memory cache
+	Id int `json:"id"`
 	// Size of memory cache in bytes.
 	Size uint64 `json:"size"`
 	// Type of memory cache: data, instruction, or unified.
@@ -65,6 +70,19 @@ func (n *Node) FindCore(id int) (bool, int) {
 	for i, n := range n.Cores {
 		if n.Id == id {
 			return true, i
+		}
+	}
+	return false, -1
+}
+
+// FindCoreByThread returns bool if found Core with same thread as provided and it's index in Node Core array.
+// If it's not found, returns false and -1.
+func (n *Node) FindCoreByThread(thread int) (bool, int) {
+	for i, n := range n.Cores {
+		for _, t := range n.Threads {
+			if t == thread {
+				return true, i
+			}
 		}
 	}
 	return false, -1
@@ -161,6 +179,9 @@ type MachineInfo struct {
 	// The time of this information point.
 	Timestamp time.Time `json:"timestamp"`
 
+	// Vendor id of CPU.
+	CPUVendorID string `json:"vendor_id"`
+
 	// The number of cores in this machine.
 	NumCores int `json:"num_cores"`
 
@@ -175,6 +196,9 @@ type MachineInfo struct {
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
+
+	// The amount of swap (in bytes) in this machine
+	SwapCapacity uint64 `json:"swap_capacity"`
 
 	// Memory capacity and number of DIMMs by memory type
 	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
@@ -232,12 +256,14 @@ func (m *MachineInfo) Clone() *MachineInfo {
 		}
 	}
 	copy := MachineInfo{
+		CPUVendorID:      m.CPUVendorID,
 		Timestamp:        m.Timestamp,
 		NumCores:         m.NumCores,
 		NumPhysicalCores: m.NumPhysicalCores,
 		NumSockets:       m.NumSockets,
 		CpuFrequency:     m.CpuFrequency,
 		MemoryCapacity:   m.MemoryCapacity,
+		SwapCapacity:     m.SwapCapacity,
 		MemoryByType:     memoryByType,
 		NVMInfo:          m.NVMInfo,
 		HugePages:        m.HugePages,

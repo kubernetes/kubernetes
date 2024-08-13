@@ -13,6 +13,26 @@
 # limitations under the License.
 
 ARG BASEIMAGE
+ARG REGISTRY
+ARG OS_VERSION
+
+# We're using a Linux image to unpack the archives, then we're copying them over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
+ADD https://iperf.fr/download/windows/iperf-2.0.9-win64.zip /iperf.zip
+ADD https://download.savannah.nongnu.org/releases/coreutils/windows-64bit-unsupported/coreutils-8.31-28-windows-64bit.zip /coreutils.zip
+
+# we're also creating an empty /uploads folder, which we're copying over to Windows  because
+# we can't RUN commands on a Windows image.
+RUN tar -xzvf /coredns.tgz &&\
+    unzip iperf.zip &&\
+    mv iperf-2.0.9-win64 iperf &&\
+    unzip coreutils.zip &&\
+    mv coreutils-8.31-28-windows-64bit wincoreutils &&\
+    mkdir /uploads
+
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
 FROM $BASEIMAGE
 
 # from dnsutils image
@@ -24,21 +44,13 @@ FROM $BASEIMAGE
 # - curl, nc: used by a lot of e2e tests (inherited from BASEIMAGE)
 # from iperf image
 # install necessary packages: iperf
-ENV chocolateyUseWindowsCompression false
-RUN powershell -Command "\
-    iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')); \
-    choco feature disable --name showDownloadProgress; \
-    choco install bind-toolsonly --version 9.10.3 -y
-RUN powershell -Command "\
-    wget -uri 'https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz' -OutFile C:\coredns.tgz;\
-    tar -xzvf C:\coredns.tgz;\
-    Remove-Item C:\coredns.tgz"
+COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
+COPY --from=prep /coredns.exe /coredns.exe
+COPY --from=prep /iperf /iperf
+COPY --from=prep /wincoreutils/sync.exe /bin/sync.exe
 
-RUN powershell -Command "\
-    wget -uri 'https://iperf.fr/download/windows/iperf-2.0.9-win64.zip' -OutFile C:\iperf.zip;\
-    Expand-Archive -Path C:\iperf.zip -DestinationPath C:\ -Force;\
-    Rename-Item C:\iperf-2.0.9-win64 C:\iperf;\
-    Remove-Item C:\iperf.zip"
+# NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
+ENV PATH="C:\dig\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
 
 # PORT 80 needed by: test-webserver
 # PORT 8080 needed by: netexec, nettest
@@ -47,18 +59,21 @@ RUN powershell -Command "\
 EXPOSE 80 8080 8081 9376
 
 # from netexec
-RUN mkdir C:\uploads
+COPY --from=prep /uploads /uploads
 
 # from porter
 ADD porter/localhost.crt localhost.crt
 ADD porter/localhost.key localhost.key
 
-ADD agnhost agnhost
+# from mounttest
+ADD mounttest/filePermissions.ps1 filePermissions.ps1
+
+ADD agnhost /agnhost
 
 # needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
 # overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct
 # entrypoint is used by the containers.
-RUN mklink agnhost-2 agnhost
+ADD agnhost /agnhost-2
 
 ENTRYPOINT ["/agnhost"]
 CMD ["pause"]

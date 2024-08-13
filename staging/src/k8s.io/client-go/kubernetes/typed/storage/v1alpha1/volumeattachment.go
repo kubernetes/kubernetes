@@ -20,14 +20,14 @@ package v1alpha1
 
 import (
 	"context"
-	"time"
 
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // VolumeAttachmentsGetter has a method to return a VolumeAttachmentInterface.
@@ -40,6 +40,7 @@ type VolumeAttachmentsGetter interface {
 type VolumeAttachmentInterface interface {
 	Create(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.CreateOptions) (*v1alpha1.VolumeAttachment, error)
 	Update(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.UpdateOptions) (*v1alpha1.VolumeAttachment, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.UpdateOptions) (*v1alpha1.VolumeAttachment, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
@@ -47,138 +48,26 @@ type VolumeAttachmentInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.VolumeAttachmentList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.VolumeAttachment, err error)
+	Apply(ctx context.Context, volumeAttachment *storagev1alpha1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.VolumeAttachment, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, volumeAttachment *storagev1alpha1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.VolumeAttachment, err error)
 	VolumeAttachmentExpansion
 }
 
 // volumeAttachments implements VolumeAttachmentInterface
 type volumeAttachments struct {
-	client rest.Interface
+	*gentype.ClientWithListAndApply[*v1alpha1.VolumeAttachment, *v1alpha1.VolumeAttachmentList, *storagev1alpha1.VolumeAttachmentApplyConfiguration]
 }
 
 // newVolumeAttachments returns a VolumeAttachments
 func newVolumeAttachments(c *StorageV1alpha1Client) *volumeAttachments {
 	return &volumeAttachments{
-		client: c.RESTClient(),
+		gentype.NewClientWithListAndApply[*v1alpha1.VolumeAttachment, *v1alpha1.VolumeAttachmentList, *storagev1alpha1.VolumeAttachmentApplyConfiguration](
+			"volumeattachments",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1alpha1.VolumeAttachment { return &v1alpha1.VolumeAttachment{} },
+			func() *v1alpha1.VolumeAttachmentList { return &v1alpha1.VolumeAttachmentList{} }),
 	}
-}
-
-// Get takes name of the volumeAttachment, and returns the corresponding volumeAttachment object, and an error if there is any.
-func (c *volumeAttachments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.VolumeAttachment, err error) {
-	result = &v1alpha1.VolumeAttachment{}
-	err = c.client.Get().
-		Resource("volumeattachments").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of VolumeAttachments that match those selectors.
-func (c *volumeAttachments) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.VolumeAttachmentList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.VolumeAttachmentList{}
-	err = c.client.Get().
-		Resource("volumeattachments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested volumeAttachments.
-func (c *volumeAttachments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("volumeattachments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a volumeAttachment and creates it.  Returns the server's representation of the volumeAttachment, and an error, if there is any.
-func (c *volumeAttachments) Create(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.CreateOptions) (result *v1alpha1.VolumeAttachment, err error) {
-	result = &v1alpha1.VolumeAttachment{}
-	err = c.client.Post().
-		Resource("volumeattachments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(volumeAttachment).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a volumeAttachment and updates it. Returns the server's representation of the volumeAttachment, and an error, if there is any.
-func (c *volumeAttachments) Update(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.UpdateOptions) (result *v1alpha1.VolumeAttachment, err error) {
-	result = &v1alpha1.VolumeAttachment{}
-	err = c.client.Put().
-		Resource("volumeattachments").
-		Name(volumeAttachment.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(volumeAttachment).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *volumeAttachments) UpdateStatus(ctx context.Context, volumeAttachment *v1alpha1.VolumeAttachment, opts v1.UpdateOptions) (result *v1alpha1.VolumeAttachment, err error) {
-	result = &v1alpha1.VolumeAttachment{}
-	err = c.client.Put().
-		Resource("volumeattachments").
-		Name(volumeAttachment.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(volumeAttachment).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the volumeAttachment and deletes it. Returns an error if one occurs.
-func (c *volumeAttachments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("volumeattachments").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *volumeAttachments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("volumeattachments").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched volumeAttachment.
-func (c *volumeAttachments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.VolumeAttachment, err error) {
-	result = &v1alpha1.VolumeAttachment{}
-	err = c.client.Patch(pt).
-		Resource("volumeattachments").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

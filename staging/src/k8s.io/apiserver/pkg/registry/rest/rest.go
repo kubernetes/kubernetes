@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -51,10 +52,25 @@ import (
 // Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
 // that objects may implement any of the below interfaces.
+//
+// Consider using StorageWithReadiness whenever possible.
 type Storage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
+
+	// Destroy cleans up its resources on shutdown.
+	// Destroy has to be implemented in thread-safe way and be prepared
+	// for being called more than once.
+	Destroy()
+}
+
+// StorageWithReadiness extends Storage interface with the readiness check.
+type StorageWithReadiness interface {
+	Storage
+
+	// ReadinessCheck allows for checking storage readiness.
+	ReadinessCheck() error
 }
 
 // Scoper indicates what scope the resource is at. It must be specified.
@@ -83,12 +99,25 @@ type CategoriesProvider interface {
 	Categories() []string
 }
 
+// SingularNameProvider returns singular name of resources. This is used by kubectl discovery to have singular
+// name representation of resources. In case of shortcut conflicts(with CRD shortcuts) singular name should always map to this resource.
+type SingularNameProvider interface {
+	GetSingularName() string
+}
+
 // GroupVersionKindProvider is used to specify a particular GroupVersionKind to discovery.  This is used for polymorphic endpoints
 // which generally point to foreign versions.  Scale refers to Scale.v1beta1.extensions for instance.
 // This trumps KindProvider since it is capable of providing the information required.
 // TODO KindProvider (only used by federation) should be removed and replaced with this, but that presents greater risk late in 1.8.
 type GroupVersionKindProvider interface {
 	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
+}
+
+// GroupVersionAcceptor is used to determine if a particular GroupVersion is acceptable to send to an endpoint.
+// This is used for endpoints which accept multiple versions (which is extremely rare).
+// The only known instance is pods/evictions which accepts policy/v1, but also policy/v1beta1 for backwards compatibility.
+type GroupVersionAcceptor interface {
+	AcceptsGroupVersion(gv schema.GroupVersion) bool
 }
 
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
@@ -100,16 +129,6 @@ type Lister interface {
 	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 	// TableConvertor ensures all list implementers also implement table conversion
 	TableConvertor
-}
-
-// Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
-// if export is generally supported for that type. Errors can still be returned during the actual Export when certain
-// instances of the type are not exportable.
-type Exporter interface {
-	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
-	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
-	// retained, otherwise they are stripped also.
-	Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -200,6 +219,13 @@ type NamedCreater interface {
 	Create(ctx context.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 
+// SubresourceObjectMetaPreserver adds configuration options to a Creater for subresources.
+type SubresourceObjectMetaPreserver interface {
+	// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that a
+	// handler should preserve fields of ObjectMeta that are managed by the system.
+	PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool
+}
+
 // UpdatedObjectInfo provides information about an updated object to an Updater.
 // It requires access to the old object in order to return the newly updated object.
 type UpdatedObjectInfo interface {
@@ -214,7 +240,7 @@ type UpdatedObjectInfo interface {
 }
 
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+// if the hook cannot be completed. A ValidateObjectFunc may NOT transform the provided
 // object.
 type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
@@ -280,6 +306,11 @@ type StandardStorage interface {
 	GracefulDeleter
 	CollectionDeleter
 	Watcher
+
+	// Destroy cleans up its resources on shutdown.
+	// Destroy has to be implemented in thread-safe way and be prepared
+	// for being called more than once.
+	Destroy()
 }
 
 // Redirector know how to return a remote resource's location.
@@ -348,4 +379,24 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+// ResetFieldsStrategy is an optional interface that a storage object can
+// implement if it wishes to provide the fields reset by its strategies.
+type ResetFieldsStrategy interface {
+	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
+}
+
+// CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy
+// and ResetFieldsStrategy.
+type CreateUpdateResetFieldsStrategy interface {
+	RESTCreateUpdateStrategy
+	ResetFieldsStrategy
+}
+
+// UpdateResetFieldsStrategy is a union of RESTUpdateStrategy
+// and ResetFieldsStrategy.
+type UpdateResetFieldsStrategy interface {
+	RESTUpdateStrategy
+	ResetFieldsStrategy
 }

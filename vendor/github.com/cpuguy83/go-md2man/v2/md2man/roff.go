@@ -1,6 +1,8 @@
 package md2man
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -15,38 +17,40 @@ type roffRenderer struct {
 	extensions   blackfriday.Extensions
 	listCounters []int
 	firstHeader  bool
-	defineTerm   bool
+	firstDD      bool
 	listDepth    int
 }
 
 const (
-	titleHeader      = ".TH "
-	topLevelHeader   = "\n\n.SH "
-	secondLevelHdr   = "\n.SH "
-	otherHeader      = "\n.SS "
-	crTag            = "\n"
-	emphTag          = "\\fI"
-	emphCloseTag     = "\\fP"
-	strongTag        = "\\fB"
-	strongCloseTag   = "\\fP"
-	breakTag         = "\n.br\n"
-	paraTag          = "\n.PP\n"
-	hruleTag         = "\n.ti 0\n\\l'\\n(.lu'\n"
-	linkTag          = "\n\\[la]"
-	linkCloseTag     = "\\[ra]"
-	codespanTag      = "\\fB\\fC"
-	codespanCloseTag = "\\fR"
-	codeTag          = "\n.PP\n.RS\n\n.nf\n"
-	codeCloseTag     = "\n.fi\n.RE\n"
-	quoteTag         = "\n.PP\n.RS\n"
-	quoteCloseTag    = "\n.RE\n"
-	listTag          = "\n.RS\n"
-	listCloseTag     = "\n.RE\n"
-	arglistTag       = "\n.TP\n"
-	tableStart       = "\n.TS\nallbox;\n"
-	tableEnd         = ".TE\n"
-	tableCellStart   = "T{\n"
-	tableCellEnd     = "\nT}\n"
+	titleHeader       = ".TH "
+	topLevelHeader    = "\n\n.SH "
+	secondLevelHdr    = "\n.SH "
+	otherHeader       = "\n.SS "
+	crTag             = "\n"
+	emphTag           = "\\fI"
+	emphCloseTag      = "\\fP"
+	strongTag         = "\\fB"
+	strongCloseTag    = "\\fP"
+	breakTag          = "\n.br\n"
+	paraTag           = "\n.PP\n"
+	hruleTag          = "\n.ti 0\n\\l'\\n(.lu'\n"
+	linkTag           = "\n\\[la]"
+	linkCloseTag      = "\\[ra]"
+	codespanTag       = "\\fB"
+	codespanCloseTag  = "\\fR"
+	codeTag           = "\n.EX\n"
+	codeCloseTag      = ".EE\n" // Do not prepend a newline character since code blocks, by definition, include a newline already (or at least as how blackfriday gives us on).
+	quoteTag          = "\n.PP\n.RS\n"
+	quoteCloseTag     = "\n.RE\n"
+	listTag           = "\n.RS\n"
+	listCloseTag      = "\n.RE\n"
+	dtTag             = "\n.TP\n"
+	dd2Tag            = "\n"
+	tableStart        = "\n.TS\nallbox;\n"
+	tableEnd          = ".TE\n"
+	tableCellStart    = "T{\n"
+	tableCellEnd      = "\nT}\n"
+	tablePreprocessor = `'\" t`
 )
 
 // NewRoffRenderer creates a new blackfriday Renderer for generating roff documents
@@ -73,6 +77,16 @@ func (r *roffRenderer) GetExtensions() blackfriday.Extensions {
 
 // RenderHeader handles outputting the header at document start
 func (r *roffRenderer) RenderHeader(w io.Writer, ast *blackfriday.Node) {
+	// We need to walk the tree to check if there are any tables.
+	// If there are, we need to enable the roff table preprocessor.
+	ast.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
+		if node.Type == blackfriday.Table {
+			out(w, tablePreprocessor+"\n")
+			return blackfriday.Terminate
+		}
+		return blackfriday.GoToNext
+	})
+
 	// disable hyphenation
 	out(w, ".nh\n")
 }
@@ -85,12 +99,11 @@ func (r *roffRenderer) RenderFooter(w io.Writer, ast *blackfriday.Node) {
 // RenderNode is called for each node in a markdown document; based on the node
 // type the equivalent roff output is sent to the writer
 func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-
-	var walkAction = blackfriday.GoToNext
+	walkAction := blackfriday.GoToNext
 
 	switch node.Type {
 	case blackfriday.Text:
-		r.handleText(w, node, entering)
+		escapeSpecialChars(w, node.Literal)
 	case blackfriday.Softbreak:
 		out(w, crTag)
 	case blackfriday.Hardbreak:
@@ -108,9 +121,16 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 			out(w, strongCloseTag)
 		}
 	case blackfriday.Link:
-		if !entering {
-			out(w, linkTag+string(node.LinkData.Destination)+linkCloseTag)
+		// Don't render the link text for automatic links, because this
+		// will only duplicate the URL in the roff output.
+		// See https://daringfireball.net/projects/markdown/syntax#autolink
+		if !bytes.Equal(node.LinkData.Destination, node.FirstChild.Literal) {
+			out(w, string(node.FirstChild.Literal))
 		}
+		// Hyphens in a link must be escaped to avoid word-wrap in the rendered man page.
+		escapedLink := strings.ReplaceAll(string(node.LinkData.Destination), "-", "\\-")
+		out(w, linkTag+escapedLink+linkCloseTag)
+		walkAction = blackfriday.SkipChildren
 	case blackfriday.Image:
 		// ignore images
 		walkAction = blackfriday.SkipChildren
@@ -150,38 +170,24 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 		out(w, codeCloseTag)
 	case blackfriday.Table:
 		r.handleTable(w, node, entering)
-	case blackfriday.TableCell:
-		r.handleTableCell(w, node, entering)
 	case blackfriday.TableHead:
 	case blackfriday.TableBody:
 	case blackfriday.TableRow:
 		// no action as cell entries do all the nroff formatting
 		return blackfriday.GoToNext
+	case blackfriday.TableCell:
+		r.handleTableCell(w, node, entering)
+	case blackfriday.HTMLSpan:
+		// ignore other HTML tags
+	case blackfriday.HTMLBlock:
+		if bytes.HasPrefix(node.Literal, []byte("<!--")) {
+			break // ignore comments, no warning
+		}
+		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
 	default:
 		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
 	}
 	return walkAction
-}
-
-func (r *roffRenderer) handleText(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
-	// handle special roff table cell text encapsulation
-	if node.Parent.Type == blackfriday.TableCell {
-		if len(node.Literal) > 30 {
-			start = tableCellStart
-			end = tableCellEnd
-		} else {
-			// end rows that aren't terminated by "tableCellEnd" with a cr if end of row
-			if node.Parent.Next == nil && !node.Parent.IsHeader {
-				end = crTag
-			}
-		}
-	}
-	out(w, start)
-	escapeSpecialChars(w, node.Literal)
-	out(w, end)
 }
 
 func (r *roffRenderer) handleHeading(w io.Writer, node *blackfriday.Node, entering bool) {
@@ -230,15 +236,20 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 		if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
 			out(w, fmt.Sprintf(".IP \"%3d.\" 5\n", r.listCounters[len(r.listCounters)-1]))
 			r.listCounters[len(r.listCounters)-1]++
+		} else if node.ListFlags&blackfriday.ListTypeTerm != 0 {
+			// DT (definition term): line just before DD (see below).
+			out(w, dtTag)
+			r.firstDD = true
 		} else if node.ListFlags&blackfriday.ListTypeDefinition != 0 {
-			// state machine for handling terms and following definitions
-			// since blackfriday does not distinguish them properly, nor
-			// does it seperate them into separate lists as it should
-			if !r.defineTerm {
-				out(w, arglistTag)
-				r.defineTerm = true
+			// DD (definition description): line that starts with ": ".
+			//
+			// We have to distinguish between the first DD and the
+			// subsequent ones, as there should be no vertical
+			// whitespace between the DT and the first DD.
+			if r.firstDD {
+				r.firstDD = false
 			} else {
-				r.defineTerm = false
+				out(w, dd2Tag)
 			}
 		} else {
 			out(w, ".IP \\(bu 2\n")
@@ -251,7 +262,7 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering bool) {
 	if entering {
 		out(w, tableStart)
-		//call walker to count cells (and rows?) so format section can be produced
+		// call walker to count cells (and rows?) so format section can be produced
 		columns := countColumns(node)
 		out(w, strings.Repeat("l ", columns)+"\n")
 		out(w, strings.Repeat("l ", columns)+".\n")
@@ -261,26 +272,39 @@ func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering
 }
 
 func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
-	if node.IsHeader {
-		start = codespanTag
-		end = codespanCloseTag
-	}
 	if entering {
+		var start string
 		if node.Prev != nil && node.Prev.Type == blackfriday.TableCell {
-			out(w, "\t"+start)
-		} else {
-			out(w, start)
+			start = "\t"
 		}
+		if node.IsHeader {
+			start += strongTag
+		} else if nodeLiteralSize(node) > 30 {
+			start += tableCellStart
+		}
+		out(w, start)
 	} else {
-		// need to carriage return if we are at the end of the header row
-		if node.IsHeader && node.Next == nil {
-			end = end + crTag
+		var end string
+		if node.IsHeader {
+			end = strongCloseTag
+		} else if nodeLiteralSize(node) > 30 {
+			end = tableCellEnd
+		}
+		if node.Next == nil && end != tableCellEnd {
+			// Last cell: need to carriage return if we are at the end of the
+			// header row and content isn't wrapped in a "tablecell"
+			end += crTag
 		}
 		out(w, end)
 	}
+}
+
+func nodeLiteralSize(node *blackfriday.Node) int {
+	total := 0
+	for n := node.FirstChild; n != nil; n = n.FirstChild {
+		total += len(n.Literal)
+	}
+	return total
 }
 
 // because roff format requires knowing the column count before outputting any table
@@ -309,16 +333,29 @@ func out(w io.Writer, output string) {
 	io.WriteString(w, output) // nolint: errcheck
 }
 
-func needsBackslash(c byte) bool {
-	for _, r := range []byte("-_&\\~") {
-		if c == r {
-			return true
+func escapeSpecialChars(w io.Writer, text []byte) {
+	scanner := bufio.NewScanner(bytes.NewReader(text))
+
+	// count the number of lines in the text
+	// we need to know this to avoid adding a newline after the last line
+	n := bytes.Count(text, []byte{'\n'})
+	idx := 0
+
+	for scanner.Scan() {
+		dt := scanner.Bytes()
+		if idx < n {
+			idx++
+			dt = append(dt, '\n')
 		}
+		escapeSpecialCharsLine(w, dt)
 	}
-	return false
+
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
 }
 
-func escapeSpecialChars(w io.Writer, text []byte) {
+func escapeSpecialCharsLine(w io.Writer, text []byte) {
 	for i := 0; i < len(text); i++ {
 		// escape initial apostrophe or period
 		if len(text) >= 1 && (text[0] == '\'' || text[0] == '.') {
@@ -328,7 +365,7 @@ func escapeSpecialChars(w io.Writer, text []byte) {
 		// directly copy normal characters
 		org := i
 
-		for i < len(text) && !needsBackslash(text[i]) {
+		for i < len(text) && text[i] != '\\' {
 			i++
 		}
 		if i > org {

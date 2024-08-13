@@ -17,9 +17,11 @@ limitations under the License.
 package value
 
 import (
+	"errors"
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/metrics"
@@ -33,7 +35,7 @@ const (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -47,11 +49,11 @@ var (
 			Name:      "transformation_duration_seconds",
 			Help:      "Latencies in seconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
-			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
+			// external KMS is involved latencies may climb into hundreds of milliseconds.
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 25),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"transformation_type"},
+		[]string{"transformation_type", "transformer_prefix"},
 	)
 
 	transformerOperationsTotal = metrics.NewCounterVec(
@@ -59,7 +61,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "transformation_operations_total",
-			Help:           "Total number of transformations.",
+			Help:           "Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type", "transformer_prefix", "status"},
@@ -111,12 +113,11 @@ func RegisterMetrics() {
 
 // RecordTransformation records latencies and count of TransformFromStorage and TransformToStorage operations.
 // Note that transformation_failures_total metric is deprecated, use transformation_operations_total instead.
-func RecordTransformation(transformationType, transformerPrefix string, start time.Time, err error) {
-	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, status.Code(err).String()).Inc()
+func RecordTransformation(transformationType, transformerPrefix string, elapsed time.Duration, err error) {
+	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, getErrorCode(err)).Inc()
 
-	switch {
-	case err == nil:
-		transformerLatencies.WithLabelValues(transformationType).Observe(sinceInSeconds(start))
+	if err == nil {
+		transformerLatencies.WithLabelValues(transformationType, transformerPrefix).Observe(elapsed.Seconds())
 	}
 }
 
@@ -138,4 +139,24 @@ func RecordDataKeyGeneration(start time.Time, err error) {
 // sinceInSeconds gets the time since the specified start in seconds.
 func sinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+type gRPCError interface {
+	GRPCStatus() *status.Status
+}
+
+func getErrorCode(err error) string {
+	if err == nil {
+		return codes.OK.String()
+	}
+
+	// handle errors wrapped with fmt.Errorf and similar
+	var s gRPCError
+	if errors.As(err, &s) {
+		return s.GRPCStatus().Code().String()
+	}
+
+	// This is not gRPC error. The operation must have failed before gRPC
+	// method was called, otherwise we would get gRPC error.
+	return "unknown-non-grpc"
 }

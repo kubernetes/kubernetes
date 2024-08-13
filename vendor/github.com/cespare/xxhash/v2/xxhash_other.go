@@ -1,8 +1,9 @@
-// +build !amd64 appengine !gc purego
+//go:build (!amd64 && !arm64) || appengine || !gc || purego
+// +build !amd64,!arm64 appengine !gc purego
 
 package xxhash
 
-// Sum64 computes the 64-bit xxHash digest of b.
+// Sum64 computes the 64-bit xxHash digest of b with a zero seed.
 func Sum64(b []byte) uint64 {
 	// A simpler version would be
 	//   d := New()
@@ -14,10 +15,10 @@ func Sum64(b []byte) uint64 {
 	var h uint64
 
 	if n >= 32 {
-		v1 := prime1v + prime2
+		v1 := primes[0] + prime2
 		v2 := prime2
 		v3 := uint64(0)
-		v4 := -prime1v
+		v4 := -primes[0]
 		for len(b) >= 32 {
 			v1 = round(v1, u64(b[0:8:len(b)]))
 			v2 = round(v2, u64(b[8:16:len(b)]))
@@ -36,19 +37,18 @@ func Sum64(b []byte) uint64 {
 
 	h += uint64(n)
 
-	i, end := 0, len(b)
-	for ; i+8 <= end; i += 8 {
-		k1 := round(0, u64(b[i:i+8:len(b)]))
+	for ; len(b) >= 8; b = b[8:] {
+		k1 := round(0, u64(b[:8]))
 		h ^= k1
 		h = rol27(h)*prime1 + prime4
 	}
-	if i+4 <= end {
-		h ^= uint64(u32(b[i:i+4:len(b)])) * prime1
+	if len(b) >= 4 {
+		h ^= uint64(u32(b[:4])) * prime1
 		h = rol23(h)*prime2 + prime3
-		i += 4
+		b = b[4:]
 	}
-	for ; i < end; i++ {
-		h ^= uint64(b[i]) * prime5
+	for ; len(b) > 0; b = b[1:] {
+		h ^= uint64(b[0]) * prime5
 		h = rol11(h) * prime1
 	}
 

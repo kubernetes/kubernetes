@@ -1,6 +1,6 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 // Package diff implements an algorithm for producing edit-scripts.
 // The edit-script is a sequence of operations needed to transform one list
@@ -11,6 +11,13 @@
 // This package prioritizes performance over accuracy. That is, the run time
 // is more important than obtaining a minimal Levenshtein distance.
 package diff
+
+import (
+	"math/rand"
+	"time"
+
+	"github.com/google/go-cmp/cmp/internal/flags"
+)
 
 // EditType represents a single operation within an edit-script.
 type EditType uint8
@@ -112,15 +119,17 @@ func (r Result) Similar() bool {
 	return r.NumSame+1 >= r.NumDiff
 }
 
+var randBool = rand.New(rand.NewSource(time.Now().Unix())).Intn(2) == 0
+
 // Difference reports whether two lists of lengths nx and ny are equal
 // given the definition of equality provided as f.
 //
 // This function returns an edit-script, which is a sequence of operations
 // needed to convert one list into the other. The following invariants for
 // the edit-script are maintained:
-//	• eq == (es.Dist()==0)
-//	• nx == es.LenX()
-//	• ny == es.LenY()
+//   - eq == (es.Dist()==0)
+//   - nx == es.LenX()
+//   - ny == es.LenY()
 //
 // This algorithm is not guaranteed to be an optimal solution (i.e., one that
 // produces an edit-script with a minimal Levenshtein distance). This algorithm
@@ -160,12 +169,13 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// A diagonal edge is equivalent to a matching symbol between both X and Y.
 
 	// Invariants:
-	//	• 0 ≤ fwdPath.X ≤ (fwdFrontier.X, revFrontier.X) ≤ revPath.X ≤ nx
-	//	• 0 ≤ fwdPath.Y ≤ (fwdFrontier.Y, revFrontier.Y) ≤ revPath.Y ≤ ny
+	//   - 0 ≤ fwdPath.X ≤ (fwdFrontier.X, revFrontier.X) ≤ revPath.X ≤ nx
+	//   - 0 ≤ fwdPath.Y ≤ (fwdFrontier.Y, revFrontier.Y) ≤ revPath.Y ≤ ny
 	//
 	// In general:
-	//	• fwdFrontier.X < revFrontier.X
-	//	• fwdFrontier.Y < revFrontier.Y
+	//   - fwdFrontier.X < revFrontier.X
+	//   - fwdFrontier.Y < revFrontier.Y
+	//
 	// Unless, it is time for the algorithm to terminate.
 	fwdPath := path{+1, point{0, 0}, make(EditScript, 0, (nx+ny)/2)}
 	revPath := path{-1, point{nx, ny}, make(EditScript, 0)}
@@ -177,37 +187,50 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// approximately the square-root of the search budget.
 	searchBudget := 4 * (nx + ny) // O(n)
 
+	// Running the tests with the "cmp_debug" build tag prints a visualization
+	// of the algorithm running in real-time. This is educational for
+	// understanding how the algorithm works. See debug_enable.go.
+	f = debug.Begin(nx, ny, f, &fwdPath.es, &revPath.es)
+
 	// The algorithm below is a greedy, meet-in-the-middle algorithm for
 	// computing sub-optimal edit-scripts between two lists.
 	//
 	// The algorithm is approximately as follows:
-	//	• Searching for differences switches back-and-forth between
-	//	a search that starts at the beginning (the top-left corner), and
-	//	a search that starts at the end (the bottom-right corner). The goal of
-	//	the search is connect with the search from the opposite corner.
-	//	• As we search, we build a path in a greedy manner, where the first
-	//	match seen is added to the path (this is sub-optimal, but provides a
-	//	decent result in practice). When matches are found, we try the next pair
-	//	of symbols in the lists and follow all matches as far as possible.
-	//	• When searching for matches, we search along a diagonal going through
-	//	through the "frontier" point. If no matches are found, we advance the
-	//	frontier towards the opposite corner.
-	//	• This algorithm terminates when either the X coordinates or the
-	//	Y coordinates of the forward and reverse frontier points ever intersect.
-	//
+	//   - Searching for differences switches back-and-forth between
+	//     a search that starts at the beginning (the top-left corner), and
+	//     a search that starts at the end (the bottom-right corner).
+	//     The goal of the search is connect with the search
+	//     from the opposite corner.
+	//   - As we search, we build a path in a greedy manner,
+	//     where the first match seen is added to the path (this is sub-optimal,
+	//     but provides a decent result in practice). When matches are found,
+	//     we try the next pair of symbols in the lists and follow all matches
+	//     as far as possible.
+	//   - When searching for matches, we search along a diagonal going through
+	//     through the "frontier" point. If no matches are found,
+	//     we advance the frontier towards the opposite corner.
+	//   - This algorithm terminates when either the X coordinates or the
+	//     Y coordinates of the forward and reverse frontier points ever intersect.
+
 	// This algorithm is correct even if searching only in the forward direction
 	// or in the reverse direction. We do both because it is commonly observed
 	// that two lists commonly differ because elements were added to the front
 	// or end of the other list.
 	//
-	// Running the tests with the "cmp_debug" build tag prints a visualization
-	// of the algorithm running in real-time. This is educational for
-	// understanding how the algorithm works. See debug_enable.go.
-	f = debug.Begin(nx, ny, f, &fwdPath.es, &revPath.es)
-	for {
+	// Non-deterministically start with either the forward or reverse direction
+	// to introduce some deliberate instability so that we have the flexibility
+	// to change this algorithm in the future.
+	if flags.Deterministic || randBool {
+		goto forwardSearch
+	} else {
+		goto reverseSearch
+	}
+
+forwardSearch:
+	{
 		// Forward search from the beginning.
 		if fwdFrontier.X >= revFrontier.X || fwdFrontier.Y >= revFrontier.Y || searchBudget == 0 {
-			break
+			goto finishSearch
 		}
 		for stop1, stop2, i := false, false, 0; !(stop1 && stop2) && searchBudget > 0; i++ {
 			// Search in a diagonal pattern for a match.
@@ -242,10 +265,14 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 		} else {
 			fwdFrontier.Y++
 		}
+		goto reverseSearch
+	}
 
+reverseSearch:
+	{
 		// Reverse search from the end.
 		if fwdFrontier.X >= revFrontier.X || fwdFrontier.Y >= revFrontier.Y || searchBudget == 0 {
-			break
+			goto finishSearch
 		}
 		for stop1, stop2, i := false, false, 0; !(stop1 && stop2) && searchBudget > 0; i++ {
 			// Search in a diagonal pattern for a match.
@@ -280,8 +307,10 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 		} else {
 			revFrontier.Y--
 		}
+		goto forwardSearch
 	}
 
+finishSearch:
 	// Join the forward and reverse paths and then append the reverse path.
 	fwdPath.connect(revPath.point, f)
 	for i := len(revPath.es) - 1; i >= 0; i-- {
@@ -363,6 +392,7 @@ type point struct{ X, Y int }
 func (p *point) add(dx, dy int) { p.X += dx; p.Y += dy }
 
 // zigzag maps a consecutive sequence of integers to a zig-zag sequence.
+//
 //	[0 1 2 3 4 5 ...] => [0 -1 +1 -2 +2 ...]
 func zigzag(x int) int {
 	if x&1 != 0 {

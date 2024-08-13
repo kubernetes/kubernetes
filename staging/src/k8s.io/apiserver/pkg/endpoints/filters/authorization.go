@@ -20,6 +20,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
 
@@ -41,15 +47,21 @@ const (
 	reasonError    = "internal error"
 )
 
-// WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+type recordAuthorizationMetricsFunc func(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time)
+
+// WithAuthorization passes all authorized requests on to handler, and returns a forbidden error otherwise.
+func WithAuthorization(hhandler http.Handler, auth authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics)
+}
+
+func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer, metrics recordAuthorizationMetricsFunc) http.Handler {
 	if a == nil {
-		klog.Warningf("Authorization is disabled")
+		klog.Warning("Authorization is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		ae := request.AuditEventFrom(ctx)
+		authorizationStart := time.Now()
 
 		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
@@ -57,22 +69,30 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 			return
 		}
 		authorized, reason, err := a.Authorize(ctx, attributes)
+
+		authorizationFinish := time.Now()
+		defer func() {
+			metrics(ctx, authorized, err, authorizationStart, authorizationFinish)
+		}()
+
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorized == authorizer.DecisionAllow {
-			audit.LogAnnotation(ae, decisionAnnotationKey, decisionAllow)
-			audit.LogAnnotation(ae, reasonAnnotationKey, reason)
+			audit.AddAuditAnnotations(ctx,
+				decisionAnnotationKey, decisionAllow,
+				reasonAnnotationKey, reason)
 			handler.ServeHTTP(w, req)
 			return
 		}
 		if err != nil {
-			audit.LogAnnotation(ae, reasonAnnotationKey, reasonError)
+			audit.AddAuditAnnotation(ctx, reasonAnnotationKey, reasonError)
 			responsewriters.InternalError(w, req, err)
 			return
 		}
 
-		klog.V(4).Infof("Forbidden: %#v, Reason: %q", req.RequestURI, reason)
-		audit.LogAnnotation(ae, decisionAnnotationKey, decisionForbid)
-		audit.LogAnnotation(ae, reasonAnnotationKey, reason)
+		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason)
+		audit.AddAuditAnnotations(ctx,
+			decisionAnnotationKey, decisionForbid,
+			reasonAnnotationKey, reason)
 		responsewriters.Forbidden(ctx, attributes, w, req, reason, s)
 	})
 }
@@ -101,6 +121,32 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 	attribs.Subresource = requestInfo.Subresource
 	attribs.Namespace = requestInfo.Namespace
 	attribs.Name = requestInfo.Name
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		// parsing here makes it easy to keep the AttributesRecord type value-only and avoids any mutex copies when
+		// doing shallow copies in other steps.
+		if len(requestInfo.FieldSelector) > 0 {
+			fieldSelector, err := fields.ParseSelector(requestInfo.FieldSelector)
+			if err != nil {
+				attribs.FieldSelectorRequirements, attribs.FieldSelectorParsingErr = nil, err
+			} else {
+				if requirements := fieldSelector.Requirements(); len(requirements) > 0 {
+					attribs.FieldSelectorRequirements, attribs.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
+				}
+			}
+		}
+
+		if len(requestInfo.LabelSelector) > 0 {
+			labelSelector, err := labels.Parse(requestInfo.LabelSelector)
+			if err != nil {
+				attribs.LabelSelectorRequirements, attribs.LabelSelectorParsingErr = nil, err
+			} else {
+				if requirements, _ /*selectable*/ := labelSelector.Requirements(); len(requirements) > 0 {
+					attribs.LabelSelectorRequirements, attribs.LabelSelectorParsingErr = requirements, nil
+				}
+			}
+		}
+	}
 
 	return &attribs, nil
 }

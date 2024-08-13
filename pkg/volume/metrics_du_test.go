@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -19,26 +17,14 @@ limitations under the License.
 package volume_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"golang.org/x/sys/unix"
 	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
-
-func getExpectedBlockSize(path string) int64 {
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(path, statfs)
-	if err != nil {
-		return 0
-	}
-
-	return int64(statfs.Bsize)
-}
 
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
@@ -73,7 +59,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	}
 
 	// Write a file and expect Used to increase
-	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
+	os.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
 	actual, err = metrics.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
@@ -81,6 +67,21 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	if e, a := (expectedEmptyDirUsage.Value() + getExpectedBlockSize(filepath.Join(tmpDir, "f1"))), actual.Used.Value(); e != a {
 		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
 	}
+
+	// create a hardlink and expect inodes count to stay the same
+	previousInodes := actual.InodesUsed.Value()
+	err = os.Link(filepath.Join(tmpDir, "f1"), filepath.Join(tmpDir, "f2"))
+	if err != nil {
+		t.Errorf("Unexpected error when creating hard link %v", err)
+	}
+	actual, err = metrics.GetMetrics()
+	if err != nil {
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
+	}
+	if e, a := previousInodes, actual.InodesUsed.Value(); e != a {
+		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
+	}
+
 }
 
 // TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetMetrics

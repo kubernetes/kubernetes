@@ -76,7 +76,7 @@ var plugins = map[string]map[string]plugin{
 			namedOptions: map[string]option{
 				"resyncperiod": {},
 				"endpoint": { // new deprecation
-					status: deprecated,
+					status: SevDeprecated,
 					action: useFirstArgumentOnly,
 				},
 				"tls":                {},
@@ -97,7 +97,7 @@ var plugins = map[string]map[string]plugin{
 			namedOptions: map[string]option{
 				"resyncperiod": {},
 				"endpoint": {
-					status: ignored,
+					status: SevIgnored,
 					action: useFirstArgumentOnly,
 				},
 				"tls":                {},
@@ -107,7 +107,7 @@ var plugins = map[string]map[string]plugin{
 				"pods":               {},
 				"endpoint_pod_names": {},
 				"upstream": { // new deprecation
-					status: deprecated,
+					status: SevDeprecated,
 					action: removeOption,
 				},
 				"ttl":         {},
@@ -120,11 +120,11 @@ var plugins = map[string]map[string]plugin{
 		"v5": plugin{
 			namedOptions: map[string]option{
 				"resyncperiod": { // new deprecation
-					status: deprecated,
+					status: SevDeprecated,
 					action: removeOption,
 				},
 				"endpoint": {
-					status: ignored,
+					status: SevIgnored,
 					action: useFirstArgumentOnly,
 				},
 				"tls":                {},
@@ -134,7 +134,7 @@ var plugins = map[string]map[string]plugin{
 				"pods":               {},
 				"endpoint_pod_names": {},
 				"upstream": {
-					status: ignored,
+					status: SevIgnored,
 					action: removeOption,
 				},
 				"ttl":         {},
@@ -146,12 +146,12 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v6": plugin{
 			namedOptions: map[string]option{
-				"resyncperiod": { // new removal
-					status: removed,
+				"resyncperiod": { // now ignored
+					status: SevIgnored,
 					action: removeOption,
 				},
 				"endpoint": {
-					status: ignored,
+					status: SevIgnored,
 					action: useFirstArgumentOnly,
 				},
 				"tls":                {},
@@ -161,7 +161,7 @@ var plugins = map[string]map[string]plugin{
 				"pods":               {},
 				"endpoint_pod_names": {},
 				"upstream": {
-					status: ignored,
+					status: SevIgnored,
 					action: removeOption,
 				},
 				"ttl":         {},
@@ -173,9 +173,12 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v7": plugin{
 			namedOptions: map[string]option{
-				// resyncperiod removed
+				"resyncperiod": { // new removal
+					status: SevRemoved,
+					action: removeOption,
+				},
 				"endpoint": {
-					status: ignored,
+					status: SevIgnored,
 					action: useFirstArgumentOnly,
 				},
 				"tls":                {},
@@ -184,8 +187,8 @@ var plugins = map[string]map[string]plugin{
 				"labels":             {},
 				"pods":               {},
 				"endpoint_pod_names": {},
-				"upstream": {
-					status: ignored,
+				"upstream": { // new removal
+					status: SevRemoved,
 					action: removeOption,
 				},
 				"ttl":         {},
@@ -195,6 +198,46 @@ var plugins = map[string]map[string]plugin{
 				"ignore":      {},
 			},
 		},
+		"v8 remove transfer option": plugin{
+			namedOptions: map[string]option{
+				"endpoint": {
+					status: SevIgnored,
+					action: useFirstArgumentOnly,
+				},
+				"tls":                {},
+				"kubeconfig":         {},
+				"namespaces":         {},
+				"labels":             {},
+				"pods":               {},
+				"endpoint_pod_names": {},
+				"ttl":                {},
+				"noendpoints":        {},
+				"transfer": {
+					status: SevRemoved,
+					action: removeOption,
+				},
+				"fallthrough": {},
+				"ignore":      {},
+			},
+		},
+		"v8": plugin{
+			namedOptions: map[string]option{
+				"endpoint": {
+					status: SevIgnored,
+					action: useFirstArgumentOnly,
+				},
+				"tls":                {},
+				"kubeconfig":         {},
+				"namespaces":         {},
+				"labels":             {},
+				"pods":               {},
+				"endpoint_pod_names": {},
+				"ttl":                {},
+				"noendpoints":        {},
+				"fallthrough":        {},
+				"ignore":             {},
+			},
+		},
 	},
 
 	"errors": {
@@ -202,6 +245,12 @@ var plugins = map[string]map[string]plugin{
 		"v2": plugin{
 			namedOptions: map[string]option{
 				"consolidate": {},
+			},
+		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"consolidate": {},
+				"stacktrace":  {},
 			},
 		},
 	},
@@ -215,7 +264,7 @@ var plugins = map[string]map[string]plugin{
 		"v1 add lameduck": plugin{
 			namedOptions: map[string]option{
 				"lameduck": {
-					status: newdefault,
+					status: SevNewDefault,
 					add: func(c *corefile.Plugin) (*corefile.Plugin, error) {
 						return addOptionToPlugin(c, &corefile.Option{Name: "lameduck 5s"})
 					},
@@ -260,6 +309,17 @@ var plugins = map[string]map[string]plugin{
 				"ttl":         {}, // new option
 			},
 		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"type":        {},
+				"class":       {},
+				"name":        {},
+				"answer name": {},
+				"edns0":       {},
+				"ttl":         {}, 
+				"cname_target": {}, // new option
+			},
+		},
 	},
 
 	"log": {
@@ -284,6 +344,15 @@ var plugins = map[string]map[string]plugin{
 				"denial":      {},
 				"prefetch":    {},
 				"serve_stale": {}, // new option
+			},
+		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"success":     {},
+				"denial":      {},
+				"prefetch":    {},
+				"serve_stale": {}, 
+				"keepttl":     {}, // new option
 			},
 		},
 	},
@@ -314,6 +383,40 @@ var plugins = map[string]map[string]plugin{
 				"health_check":   {},
 			},
 		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"except":         {},
+				"force_tcp":      {},
+				"prefer_udp":     {},
+				"expire":         {},
+				"max_fails":      {},
+				"tls":            {},
+				"tls_servername": {},
+				"policy":         {},
+				"health_check":   {},
+				"max_concurrent": {},
+			},
+		},
+		"v3 add max_concurrent": plugin{
+			namedOptions: map[string]option{
+				"except":         {},
+				"force_tcp":      {},
+				"prefer_udp":     {},
+				"expire":         {},
+				"max_fails":      {},
+				"tls":            {},
+				"tls_servername": {},
+				"policy":         {},
+				"health_check":   {},
+				"max_concurrent": { // new option
+					status: SevNewDefault,
+					add: func(c *corefile.Plugin) (*corefile.Plugin, error) {
+						return addOptionToPlugin(c, &corefile.Option{Name: "max_concurrent 1000"})
+					},
+					downAction: removeOption,
+				},
+			},
+		},
 	},
 
 	"k8s_external": {
@@ -321,6 +424,13 @@ var plugins = map[string]map[string]plugin{
 			namedOptions: map[string]option{
 				"apex": {},
 				"ttl":  {},
+			},
+		},
+		"v2": plugin{
+			namedOptions: map[string]option{
+				"apex": {},
+				"ttl":  {},
+				"fallthrough": {}, // new option
 			},
 		},
 	},
@@ -335,7 +445,7 @@ var plugins = map[string]map[string]plugin{
 				"except":       {},
 				"spray":        {},
 				"protocol": { // https_google option ignored
-					status: ignored,
+					status: SevIgnored,
 					action: proxyRemoveHttpsGoogleProtocol,
 				},
 			},
@@ -349,22 +459,30 @@ var plugins = map[string]map[string]plugin{
 				"except":       {},
 				"spray":        {},
 				"protocol": { // https_google option removed
-					status: removed,
+					status: SevRemoved,
 					action: proxyRemoveHttpsGoogleProtocol,
 				},
 			},
 		},
 		"deprecation": plugin{ // proxy -> forward deprecation migration
-			status:       deprecated,
+			status:       SevDeprecated,
 			replacedBy:   "forward",
 			action:       proxyToForwardPluginAction,
 			namedOptions: proxyToForwardOptionsMigrations,
 		},
 		"removal": plugin{ // proxy -> forward forced migration
-			status:       removed,
+			status:       SevRemoved,
 			replacedBy:   "forward",
 			action:       proxyToForwardPluginAction,
 			namedOptions: proxyToForwardOptionsMigrations,
+		},
+	},
+
+	"transfer": {
+		"v1": plugin{
+			namedOptions: map[string]option{
+				"to": {},
+			},
 		},
 	},
 }
@@ -393,6 +511,36 @@ func addToServerBlockWithPlugins(sb *corefile.Server, newPlugin *corefile.Plugin
 		}
 	}
 	return sb, nil
+}
+
+func copyKubernetesTransferOptToPlugin(cf *corefile.Corefile) (*corefile.Corefile, error) {
+	for _, s := range cf.Servers {
+		var (
+			to   []string
+			zone string
+		)
+		for _, p := range s.Plugins {
+			if p.Name != "kubernetes" {
+				continue
+			}
+			zone = p.Args[0]
+			for _, o := range p.Options {
+				if o.Name != "transfer" {
+					continue
+				}
+				to = o.Args
+			}
+		}
+		if len(to) < 2 {
+			continue
+		}
+		s.Plugins = append(s.Plugins, &corefile.Plugin{
+			Name:    "transfer",
+			Args:    []string{zone},
+			Options: []*corefile.Option{{Name: "to", Args: to[1:]}},
+		})
+	}
+	return cf, nil
 }
 
 func addToKubernetesServerBlocks(sb *corefile.Server, newPlugin *corefile.Plugin) (*corefile.Server, error) {

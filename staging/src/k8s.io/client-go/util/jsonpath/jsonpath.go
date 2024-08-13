@@ -103,13 +103,23 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 		if j.beginRange > 0 {
 			j.beginRange--
 			j.inRange++
-			for _, value := range results {
+			if len(results) > 0 {
+				for _, value := range results {
+					j.parser.Root.Nodes = nodes[i+1:]
+					nextResults, err := j.FindResults(value.Interface())
+					if err != nil {
+						return nil, err
+					}
+					fullResult = append(fullResult, nextResults...)
+				}
+			} else {
+				// If the range has no results, we still need to process the nodes within the range
+				// so the position will advance to the end node
 				j.parser.Root.Nodes = nodes[i+1:]
-				nextResults, err := j.FindResults(value.Interface())
+				_, err := j.FindResults(nil)
 				if err != nil {
 					return nil, err
 				}
-				fullResult = append(fullResult, nextResults...)
 			}
 			j.inRange--
 
@@ -562,6 +572,9 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 	iface, ok := template.PrintableValue(v)
 	if !ok {
 		return nil, fmt.Errorf("can't print type %s", v.Type())
+	}
+	if iface == nil {
+		return []byte("null"), nil
 	}
 	var buffer bytes.Buffer
 	fmt.Fprint(&buffer, iface)

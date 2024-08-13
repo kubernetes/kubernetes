@@ -32,7 +32,7 @@ func NewLengthDelimitedFrameWriter(w io.Writer) io.Writer {
 	return &lengthDelimitedFrameWriter{w: w}
 }
 
-// Write writes a single frame to the nested writer, prepending it with the length in
+// Write writes a single frame to the nested writer, prepending it with the length
 // in bytes of data (as a 4 byte, bigendian uint32).
 func (w *lengthDelimitedFrameWriter) Write(data []byte) (int, error) {
 	binary.BigEndian.PutUint32(w.h[:], uint32(len(data)))
@@ -56,10 +56,10 @@ type lengthDelimitedFrameReader struct {
 //
 // The protocol is:
 //
-//   stream: message ...
-//   message: prefix body
-//   prefix: 4 byte uint32 in BigEndian order, denotes length of body
-//   body: bytes (0..prefix)
+//	stream: message ...
+//	message: prefix body
+//	prefix: 4 byte uint32 in BigEndian order, denotes length of body
+//	body: bytes (0..prefix)
 //
 // If the buffer passed to Read is not long enough to contain an entire frame, io.ErrShortRead
 // will be returned along with the number of bytes read.
@@ -132,12 +132,14 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// Return whatever remaining data exists from an in progress frame
 	if n := len(r.remaining); n > 0 {
 		if n <= len(data) {
+			//nolint:staticcheck // SA4006,SA4010 underlying array of data is modified here.
 			data = append(data[0:0], r.remaining...)
 			r.remaining = nil
 			return n, nil
 		}
 
 		n = len(data)
+		//nolint:staticcheck // SA4006,SA4010 underlying array of data is modified here.
 		data = append(data[0:0], r.remaining[:n]...)
 		r.remaining = r.remaining[n:]
 		return n, io.ErrShortBuffer
@@ -145,7 +147,6 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 
 	// RawMessage#Unmarshal appends to data - we reset the slice down to 0 and will either see
 	// data written to data, or be larger than data and a different array.
-	n := len(data)
 	m := json.RawMessage(data[:0])
 	if err := r.decoder.Decode(&m); err != nil {
 		return 0, err
@@ -154,11 +155,19 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// If capacity of data is less than length of the message, decoder will allocate a new slice
 	// and set m to it, which means we need to copy the partial result back into data and preserve
 	// the remaining result for subsequent reads.
-	if len(m) > n {
-		data = append(data[0:0], m[:n]...)
-		r.remaining = m[n:]
-		return n, io.ErrShortBuffer
+	if len(m) > cap(data) {
+		copy(data, m)
+		r.remaining = m[len(data):]
+		return len(data), io.ErrShortBuffer
 	}
+
+	if len(m) > len(data) {
+		// The bytes beyond len(data) were stored in data's underlying array, which we do
+		// not own after this function returns.
+		r.remaining = append([]byte(nil), m[len(data):]...)
+		return len(data), io.ErrShortBuffer
+	}
+
 	return len(m), nil
 }
 

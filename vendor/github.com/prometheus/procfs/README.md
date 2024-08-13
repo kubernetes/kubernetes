@@ -6,8 +6,8 @@ metrics from the pseudo-filesystems /proc and /sys.
 *WARNING*: This package is a work in progress. Its API may still break in
 backwards-incompatible ways without warnings. Use it at your own risk.
 
-[![GoDoc](https://godoc.org/github.com/prometheus/procfs?status.png)](https://godoc.org/github.com/prometheus/procfs)
-[![Build Status](https://travis-ci.org/prometheus/procfs.svg?branch=master)](https://travis-ci.org/prometheus/procfs)
+[![Go Reference](https://pkg.go.dev/badge/github.com/prometheus/procfs.svg)](https://pkg.go.dev/github.com/prometheus/procfs)
+[![CircleCI](https://circleci.com/gh/prometheus/procfs/tree/master.svg?style=svg)](https://circleci.com/gh/prometheus/procfs/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/prometheus/procfs)](https://goreportcard.com/report/github.com/prometheus/procfs)
 
 ## Usage
@@ -51,11 +51,11 @@ ensure the `fixtures` directory is up to date by removing the existing directory
 extracting the ttar file using `make fixtures/.unpacked` or just `make test`.
 
 ```bash
-rm -rf fixtures
+rm -rf testdata/fixtures
 make test
 ```
 
 Next, make the required changes to the extracted files in the `fixtures` directory.  When
 the changes are complete, run `make update_fixtures` to create a new `fixtures.ttar` file
 based on the updated `fixtures` directory.  And finally, verify the changes using
-`git diff fixtures.ttar`.
+`git diff testdata/fixtures.ttar`.

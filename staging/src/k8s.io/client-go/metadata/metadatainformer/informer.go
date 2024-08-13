@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +31,17 @@ import (
 	"k8s.io/client-go/metadata/metadatalister"
 	"k8s.io/client-go/tools/cache"
 )
+
+// SharedInformerOption defines the functional option type for metadataSharedInformerFactory.
+type SharedInformerOption func(*metadataSharedInformerFactory) *metadataSharedInformerFactory
+
+// WithTransform sets a transform on all informers.
+func WithTransform(transform cache.TransformFunc) SharedInformerOption {
+	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
+		factory.transform = transform
+		return factory
+	}
+}
 
 // NewSharedInformerFactory constructs a new instance of metadataSharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactory {
@@ -49,10 +61,29 @@ func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync t
 	}
 }
 
+// NewSharedInformerFactoryWithOptions constructs a new instance of metadataSharedInformerFactory with additional options.
+func NewSharedInformerFactoryWithOptions(client metadata.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
+	factory := &metadataSharedInformerFactory{
+		client:           client,
+		namespace:        v1.NamespaceAll,
+		defaultResync:    defaultResync,
+		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
+		startedInformers: make(map[schema.GroupVersionResource]bool),
+	}
+
+	// Apply all options
+	for _, opt := range options {
+		factory = opt(factory)
+	}
+
+	return factory
+}
+
 type metadataSharedInformerFactory struct {
 	client        metadata.Interface
 	defaultResync time.Duration
 	namespace     string
+	transform     cache.TransformFunc
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -60,6 +91,11 @@ type metadataSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
+	// wg tracks how many goroutines were started.
+	wg sync.WaitGroup
+	// shuttingDown is true when Shutdown has been called. It may still be running
+	// because it needs to wait for goroutines.
+	shuttingDown bool
 }
 
 var _ SharedInformerFactory = &metadataSharedInformerFactory{}
@@ -75,6 +111,7 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 	}
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer.Informer().SetTransform(f.transform)
 	f.informers[key] = informer
 
 	return informer
@@ -85,9 +122,21 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.shuttingDown {
+		return
+	}
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Informer().Run(stopCh)
+			f.wg.Add(1)
+			// We need a new variable in each loop iteration,
+			// otherwise the goroutine would use the loop variable
+			// and that keeps changing.
+			informer := informer.Informer()
+			go func() {
+				defer f.wg.Done()
+				informer.Run(stopCh)
+			}()
 			f.startedInformers[informerType] = true
 		}
 	}
@@ -113,6 +162,15 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
 	}
 	return res
+}
+
+func (f *metadataSharedInformerFactory) Shutdown() {
+	// Will return immediately if there is nothing to wait for.
+	defer f.wg.Wait()
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.shuttingDown = true
 }
 
 // NewFilteredMetadataInformer constructs a new informer for a metadata type.

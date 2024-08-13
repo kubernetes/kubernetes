@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +34,7 @@ type Lease struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the Lease.
+	// spec contains the specification of the Lease.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec LeaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -42,11 +43,13 @@ type Lease struct {
 // LeaseSpec is a specification of a Lease.
 type LeaseSpec struct {
 	// holderIdentity contains the identity of the holder of a current lease.
+	// If Coordinated Leader Election is used, the holder identity must be
+	// equal to the elected LeaseCandidate.metadata.name field.
 	// +optional
 	HolderIdentity *string `json:"holderIdentity,omitempty" protobuf:"bytes,1,opt,name=holderIdentity"`
 	// leaseDurationSeconds is a duration that candidates for a lease need
 	// to wait to force acquire it. This is measure against time of last
-	// observed RenewTime.
+	// observed renewTime.
 	// +optional
 	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty" protobuf:"varint,2,opt,name=leaseDurationSeconds"`
 	// acquireTime is a time when the current lease was acquired.
@@ -60,6 +63,16 @@ type LeaseSpec struct {
 	// holders.
 	// +optional
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
+	// Strategy indicates the strategy for picking the leader for coordinated leader election
+	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
+	// +featureGate=CoordinatedLeaderElection
+	// +optional
+	Strategy *v1.CoordinatedLeaseStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
+	// PreferredHolder signals to a lease holder that the lease has a
+	// more optimal holder and should be given up.
+	// +featureGate=CoordinatedLeaderElection
+	// +optional
+	PreferredHolder *string `json:"preferredHolder,omitempty" protobuf:"bytes,7,opt,name=preferredHolder"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -75,6 +88,6 @@ type LeaseList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []Lease `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

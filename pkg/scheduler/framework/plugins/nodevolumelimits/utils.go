@@ -19,14 +19,14 @@ package nodevolumelimits
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
@@ -38,27 +38,19 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 
 	// In-tree storage to CSI driver migration feature should be enabled,
 	// along with the plugin-specific one
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		return false
-	}
-
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS) {
+		return true
+	case csilibplugins.PortworxVolumePluginName:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx) {
 			return false
 		}
 	case csilibplugins.GCEPDInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE) {
-			return false
-		}
+		return true
 	case csilibplugins.AzureDiskInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk) {
-			return false
-		}
+		return true
 	case csilibplugins.CinderInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack) {
-			return false
-		}
+		return true
 	default:
 		return false
 	}
@@ -70,13 +62,13 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 		return false
 	}
 
-	var mpaSet sets.String
+	var mpaSet sets.Set[string]
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
-		mpaSet = sets.NewString()
+		mpaSet = sets.New[string]()
 	} else {
 		tok := strings.Split(mpa, ",")
-		mpaSet = sets.NewString(tok...)
+		mpaSet = sets.New(tok...)
 	}
 
 	return mpaSet.Has(pluginName)

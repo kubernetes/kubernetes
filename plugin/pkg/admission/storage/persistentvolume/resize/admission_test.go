@@ -88,7 +88,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume1",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 					StorageClassName: &goldClassName,
@@ -101,7 +101,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			newObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume1",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("2Gi"),
 					},
 					StorageClassName: &goldClassName,
@@ -119,7 +119,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume3",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 				},
@@ -131,7 +131,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			newObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume3",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("2Gi"),
 					},
 				},
@@ -148,7 +148,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume4",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 					StorageClassName: &silverClassName,
@@ -161,7 +161,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			newObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume4",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("2Gi"),
 					},
 					StorageClassName: &silverClassName,
@@ -178,7 +178,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 					StorageClassName: &silverClassName,
@@ -191,7 +191,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			newObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "volume4",
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 					StorageClassName: &silverClassName,
@@ -208,7 +208,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("1Gi"),
 					},
 					StorageClassName: &silverClassName,
@@ -220,7 +220,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			},
 			newObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					Resources: api.ResourceRequirements{
+					Resources: api.VolumeResourceRequirements{
 						Requests: getResourceList("2Gi"),
 					},
 					StorageClassName: &silverClassName,

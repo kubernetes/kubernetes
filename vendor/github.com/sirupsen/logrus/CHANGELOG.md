@@ -1,9 +1,68 @@
+# 1.8.1
+Code quality:
+  * move magefile in its own subdir/submodule to remove magefile dependency on logrus consumer
+  * improve timestamp format documentation
+
+Fixes:
+  * fix race condition on logger hooks
+
+
+# 1.8.0
+
+Correct versioning number replacing v1.7.1.
+
+# 1.7.1
+
+Beware this release has introduced a new public API and its semver is therefore incorrect.
+
+Code quality:
+  * use go 1.15 in travis
+  * use magefile as task runner
+
+Fixes:
+  * small fixes about new go 1.13 error formatting system
+  * Fix for long time race condiction with mutating data hooks
+
+Features:
+  * build support for zos
+
+# 1.7.0
+Fixes:
+  * the dependency toward a windows terminal library has been removed
+
+Features:
+  * a new buffer pool management API has been added
+  * a set of `<LogLevel>Fn()` functions have been added
+
+# 1.6.0
+Fixes:
+  * end of line cleanup
+  * revert the entry concurrency bug fix whic leads to deadlock under some circumstances
+  * update dependency on go-windows-terminal-sequences to fix a crash with go 1.14
+
+Features:
+  * add an option to the `TextFormatter` to completely disable fields quoting
+
+# 1.5.0
+Code quality:
+  * add golangci linter run on travis
+
+Fixes:
+  * add mutex for hooks concurrent access on `Entry` data
+  * caller function field for go1.14
+  * fix build issue for gopherjs target
+
+Feature:
+  * add an hooks/writer sub-package whose goal is to split output on different stream depending on the trace level
+  * add a `DisableHTMLEscape` option in the `JSONFormatter`
+  * add `ForceQuote` and `PadLevelText` options in the `TextFormatter`
+
 # 1.4.2
   * Fixes build break for plan9, nacl, solaris
 # 1.4.1
 This new release introduces:
   * Enhance TextFormatter to not print caller information when they are empty (#944)
-  * Remove dependency on golang.org/x/crypto (#932, #943) 
+  * Remove dependency on golang.org/x/crypto (#932, #943)
 
 Fixes:
   * Fix Entry.WithContext method to return a copy of the initial entry (#941)
@@ -11,7 +70,7 @@ Fixes:
 # 1.4.0
 This new release introduces:
   * Add `DeferExitHandler`, similar to `RegisterExitHandler` but prepending the handler to the list of handlers (semantically like `defer`) (#848).
-  * Add `CallerPrettyfier` to `JSONFormatter` and `TextFormatter (#909, #911)
+  * Add `CallerPrettyfier` to `JSONFormatter` and `TextFormatter` (#909, #911)
   * Add `Entry.WithContext()` and `Entry.Context`, to set a context on entries to be used e.g. in hooks (#919).
 
 Fixes:

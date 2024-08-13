@@ -23,7 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/kubernetes/pkg/volume"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -31,14 +34,21 @@ const (
 	pvControllerSubsystem = "pv_collector"
 
 	// Metric names.
+	totalPVKey    = "total_pv_count"
 	boundPVKey    = "bound_pv_count"
 	unboundPVKey  = "unbound_pv_count"
 	boundPVCKey   = "bound_pvc_count"
 	unboundPVCKey = "unbound_pvc_count"
 
 	// Label names.
-	namespaceLabel    = "namespace"
-	storageClassLabel = "storage_class"
+	namespaceLabel             = "namespace"
+	storageClassLabel          = "storage_class"
+	volumeAttributesClassLabel = "volume_attributes_class"
+	pluginNameLabel            = "plugin_name"
+	volumeModeLabel            = "volume_mode"
+
+	// String to use when plugin name cannot be determined
+	pluginNameNotAvailable = "N/A"
 )
 
 var registerMetrics sync.Once
@@ -54,15 +64,17 @@ type PVCLister interface {
 }
 
 // Register all metrics for pv controller.
-func Register(pvLister PVLister, pvcLister PVCLister) {
+func Register(pvLister PVLister, pvcLister PVCLister, pluginMgr *volume.VolumePluginMgr) {
 	registerMetrics.Do(func() {
-		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
+		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister, pluginMgr))
 		legacyregistry.MustRegister(volumeOperationErrorsMetric)
+		legacyregistry.MustRegister(retroactiveStorageClassMetric)
+		legacyregistry.MustRegister(retroactiveStorageClassErrorMetric)
 	})
 }
 
-func newPVAndPVCCountCollector(pvLister PVLister, pvcLister PVCLister) *pvAndPVCCountCollector {
-	return &pvAndPVCCountCollector{pvLister: pvLister, pvcLister: pvcLister}
+func newPVAndPVCCountCollector(pvLister PVLister, pvcLister PVCLister, pluginMgr *volume.VolumePluginMgr) *pvAndPVCCountCollector {
+	return &pvAndPVCCountCollector{pvLister: pvLister, pvcLister: pvcLister, pluginMgr: pluginMgr}
 }
 
 // Custom collector for current pod and container counts.
@@ -73,12 +85,32 @@ type pvAndPVCCountCollector struct {
 	pvLister PVLister
 	// Cache for accessing information about PersistentVolumeClaims.
 	pvcLister PVCLister
+	// Volume plugin manager
+	pluginMgr *volume.VolumePluginMgr
+}
+
+// Holds all dimensions for bound/unbound PVC metrics
+type pvcBindingMetricDimensions struct {
+	namespace, storageClassName, volumeAttributesClassName string
+}
+
+func getPVCMetricDimensions(pvc *v1.PersistentVolumeClaim) pvcBindingMetricDimensions {
+	return pvcBindingMetricDimensions{
+		namespace:                 pvc.Namespace,
+		storageClassName:          storagehelpers.GetPersistentVolumeClaimClass(pvc),
+		volumeAttributesClassName: ptr.Deref(pvc.Spec.VolumeAttributesClassName, ""),
+	}
 }
 
 // Check if our collector implements necessary collector interface
 var _ metrics.StableCollector = &pvAndPVCCountCollector{}
 
 var (
+	totalPVCountDesc = metrics.NewDesc(
+		metrics.BuildFQName("", pvControllerSubsystem, totalPVKey),
+		"Gauge measuring total number of persistent volumes",
+		[]string{pluginNameLabel, volumeModeLabel}, nil,
+		metrics.ALPHA, "")
 	boundPVCountDesc = metrics.NewDesc(
 		metrics.BuildFQName("", pvControllerSubsystem, boundPVKey),
 		"Gauge measuring number of persistent volume currently bound",
@@ -93,12 +125,12 @@ var (
 	boundPVCCountDesc = metrics.NewDesc(
 		metrics.BuildFQName("", pvControllerSubsystem, boundPVCKey),
 		"Gauge measuring number of persistent volume claim currently bound",
-		[]string{namespaceLabel}, nil,
+		[]string{namespaceLabel, storageClassLabel, volumeAttributesClassLabel}, nil,
 		metrics.ALPHA, "")
 	unboundPVCCountDesc = metrics.NewDesc(
 		metrics.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
 		"Gauge measuring number of persistent volume claim currently unbound",
-		[]string{namespaceLabel}, nil,
+		[]string{namespaceLabel, storageClassLabel, volumeAttributesClassLabel}, nil,
 		metrics.ALPHA, "")
 
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
@@ -108,9 +140,36 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin_name", "operation_name"})
+
+	retroactiveStorageClassMetric = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "retroactive_storageclass_total",
+			Help:           "Total number of retroactive StorageClass assignments to persistent volume claim",
+			StabilityLevel: metrics.ALPHA,
+		})
+
+	retroactiveStorageClassErrorMetric = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "retroactive_storageclass_errors_total",
+			Help:           "Total number of failed retroactive StorageClass assignments to persistent volume claim",
+			StabilityLevel: metrics.ALPHA,
+		})
 )
 
+// volumeCount counts by PluginName and VolumeMode.
+type volumeCount map[string]map[string]int
+
+func (v volumeCount) add(pluginName string, volumeMode string) {
+	count, ok := v[pluginName]
+	if !ok {
+		count = map[string]int{}
+	}
+	count[volumeMode]++
+	v[pluginName] = count
+}
+
 func (collector *pvAndPVCCountCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- totalPVCountDesc
 	ch <- boundPVCountDesc
 	ch <- unboundPVCountDesc
 	ch <- boundPVCCountDesc
@@ -122,14 +181,26 @@ func (collector *pvAndPVCCountCollector) CollectWithStability(ch chan<- metrics.
 	collector.pvcCollect(ch)
 }
 
+func (collector *pvAndPVCCountCollector) getPVPluginName(pv *v1.PersistentVolume) string {
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	fullPluginName := pluginNameNotAvailable
+	if plugin, err := collector.pluginMgr.FindPluginBySpec(spec); err == nil {
+		fullPluginName = metricutil.GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), spec)
+	}
+	return fullPluginName
+}
+
 func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 	boundNumberByStorageClass := make(map[string]int)
 	unboundNumberByStorageClass := make(map[string]int)
+	totalCount := make(volumeCount)
 	for _, pvObj := range collector.pvLister.List() {
 		pv, ok := pvObj.(*v1.PersistentVolume)
 		if !ok {
 			continue
 		}
+		pluginName := collector.getPVPluginName(pv)
+		totalCount.add(pluginName, string(*pv.Spec.VolumeMode))
 		if pv.Status.Phase == v1.VolumeBound {
 			boundNumberByStorageClass[pv.Spec.StorageClassName]++
 		} else {
@@ -150,35 +221,57 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 			float64(number),
 			storageClassName)
 	}
+	for pluginName, volumeModeCount := range totalCount {
+		for volumeMode, number := range volumeModeCount {
+			ch <- metrics.NewLazyConstMetric(
+				totalPVCountDesc,
+				metrics.GaugeValue,
+				float64(number),
+				pluginName,
+				volumeMode)
+		}
+	}
 }
 
 func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
-	boundNumberByNamespace := make(map[string]int)
-	unboundNumberByNamespace := make(map[string]int)
+	boundNumber := make(map[pvcBindingMetricDimensions]int)
+	unboundNumber := make(map[pvcBindingMetricDimensions]int)
 	for _, pvcObj := range collector.pvcLister.List() {
 		pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
 		}
 		if pvc.Status.Phase == v1.ClaimBound {
-			boundNumberByNamespace[pvc.Namespace]++
+			boundNumber[getPVCMetricDimensions(pvc)]++
 		} else {
-			unboundNumberByNamespace[pvc.Namespace]++
+			unboundNumber[getPVCMetricDimensions(pvc)]++
 		}
 	}
-	for namespace, number := range boundNumberByNamespace {
+	for pvcLabels, number := range boundNumber {
 		ch <- metrics.NewLazyConstMetric(
 			boundPVCCountDesc,
 			metrics.GaugeValue,
 			float64(number),
-			namespace)
+			pvcLabels.namespace, pvcLabels.storageClassName, pvcLabels.volumeAttributesClassName)
 	}
-	for namespace, number := range unboundNumberByNamespace {
+	for pvcLabels, number := range unboundNumber {
 		ch <- metrics.NewLazyConstMetric(
 			unboundPVCCountDesc,
 			metrics.GaugeValue,
 			float64(number),
-			namespace)
+			pvcLabels.namespace, pvcLabels.storageClassName, pvcLabels.volumeAttributesClassName)
+	}
+}
+
+// RecordRetroactiveStorageClassMetric increments only retroactive_storageclass_total
+// metric or both retroactive_storageclass_total and retroactive_storageclass_errors_total
+// if success is false.
+func RecordRetroactiveStorageClassMetric(success bool) {
+	if !success {
+		retroactiveStorageClassMetric.Inc()
+		retroactiveStorageClassErrorMetric.Inc()
+	} else {
+		retroactiveStorageClassMetric.Inc()
 	}
 }
 

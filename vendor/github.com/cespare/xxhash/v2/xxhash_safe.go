@@ -1,10 +1,11 @@
+//go:build appengine
 // +build appengine
 
 // This file contains the safe implementations of otherwise unsafe-using code.
 
 package xxhash
 
-// Sum64String computes the 64-bit xxHash digest of s.
+// Sum64String computes the 64-bit xxHash digest of s with a zero seed.
 func Sum64String(s string) uint64 {
 	return Sum64([]byte(s))
 }

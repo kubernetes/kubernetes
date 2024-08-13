@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -16,20 +17,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package runtime
 
 import (
-	winio "github.com/Microsoft/go-winio"
-)
+	"net/url"
 
-const (
-	dockerSocket     = "//./pipe/docker_engine"         // The Docker socket is not CRI compatible
-	containerdSocket = "//./pipe/containerd-containerd" // Proposed containerd named pipe for Windows
+	winio "github.com/Microsoft/go-winio"
 )
 
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
-	_, err := winio.DialPipe(path, nil)
+	u, err := url.Parse(path)
+	if err != nil {
+		// should not happen, since we are trying to access known / hardcoded sockets
+		return false
+	}
+
+	// the dial path must be without "npipe://"
+	_, err = winio.DialPipe(u.Path, nil)
 	if err != nil {
 		return false
 	}

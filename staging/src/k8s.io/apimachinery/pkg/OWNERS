@@ -1,8 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- caesarxuchao
-- deads2k
-- lavalamp
-- smarterclayton
-- liggitt
+  - caesarxuchao
+  - deads2k
+  - smarterclayton
+  - liggitt
+emeritus_approvers:
+  - lavalamp

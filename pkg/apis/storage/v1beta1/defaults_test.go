@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -85,8 +86,21 @@ func TestSetDefaultAttachRequired(t *testing.T) {
 	}
 }
 
+func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should be defaulted
+	defaultStorageCapacity := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outStorageCapacity := output.Spec.StorageCapacity
+	if outStorageCapacity == nil {
+		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: nil", defaultStorageCapacity)
+	} else if *outStorageCapacity != defaultStorageCapacity {
+		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: %+v", defaultStorageCapacity, outStorageCapacity)
+	}
+}
+
 func TestSetDefaultVolumeLifecycleModesEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	driver := &storagev1beta1.CSIDriver{}
 
 	// field should be defaulted
@@ -100,14 +114,66 @@ func TestSetDefaultVolumeLifecycleModesEnabled(t *testing.T) {
 	}
 }
 
-func TestSetDefaultVolumeLifecycleModesDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
+func TestSetDefaultCSIDriver(t *testing.T) {
+	enabled := true
+	disabled := false
+	tests := []struct {
+		desc     string
+		field    string
+		wantSpec *storagev1beta1.CSIDriverSpec
+	}{
+		{
+			desc:     "AttachRequired default to true",
+			field:    "AttachRequired",
+			wantSpec: &storagev1beta1.CSIDriverSpec{AttachRequired: &enabled},
+		},
+		{
+			desc:     "PodInfoOnMount default to false",
+			field:    "PodInfoOnMount",
+			wantSpec: &storagev1beta1.CSIDriverSpec{PodInfoOnMount: &disabled},
+		},
+		{
+			desc:     "RequiresRepublish default to false",
+			field:    "RequiresRepublish",
+			wantSpec: &storagev1beta1.CSIDriverSpec{RequiresRepublish: &disabled},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			gotSpec := roundTrip(t, runtime.Object(&storagev1beta1.CSIDriver{})).(*storagev1beta1.CSIDriver).Spec
+			got := reflect.Indirect(reflect.ValueOf(gotSpec)).FieldByName(test.field).Interface()
+			want := reflect.Indirect(reflect.ValueOf(test.wantSpec)).FieldByName(test.field).Interface()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("CSIDriver defaults diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should be defaulted
+	defaultSELinuxMount := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount == nil {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: nil", defaultSELinuxMount)
+	} else if *outSELinuxMount != defaultSELinuxMount {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: %+v", defaultSELinuxMount, outSELinuxMount)
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)
 	driver := &storagev1beta1.CSIDriver{}
 
 	// field should not be defaulted
 	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
-	outModes := output.Spec.VolumeLifecycleModes
-	if outModes != nil {
-		t.Errorf("Expected VolumeLifecycleModes to remain nil, got: %+v", outModes)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount != nil {
+		t.Errorf("Expected SELinuxMount remain nil, got: %+v", outSELinuxMount)
 	}
 }

@@ -64,43 +64,43 @@ id="anchor-versions">[1](#footnote-versions)</sup>
 
 Log a message and 10 fields:
 
-| Package | Time | Objects Allocated |
-| :--- | :---: | :---: |
-| :zap: zap | 3131 ns/op | 5 allocs/op |
-| :zap: zap (sugared) | 4173 ns/op | 21 allocs/op |
-| zerolog | 16154 ns/op | 90 allocs/op |
-| lion | 16341 ns/op | 111 allocs/op |
-| go-kit | 17049 ns/op | 126 allocs/op |
-| logrus | 23662 ns/op | 142 allocs/op |
-| log15 | 36351 ns/op | 149 allocs/op |
-| apex/log | 42530 ns/op | 126 allocs/op |
+| Package | Time | Time % to zap | Objects Allocated |
+| :------ | :--: | :-----------: | :---------------: |
+| :zap: zap | 1744 ns/op | +0% | 5 allocs/op
+| :zap: zap (sugared) | 2483 ns/op | +42% | 10 allocs/op
+| zerolog | 918 ns/op | -47% | 1 allocs/op
+| go-kit | 5590 ns/op | +221% | 57 allocs/op
+| slog | 5640 ns/op | +223% | 40 allocs/op
+| apex/log | 21184 ns/op | +1115% | 63 allocs/op
+| logrus | 24338 ns/op | +1296% | 79 allocs/op
+| log15 | 26054 ns/op | +1394% | 74 allocs/op
 
 Log a message with a logger that already has 10 fields of context:
 
-| Package | Time | Objects Allocated |
-| :--- | :---: | :---: |
-| :zap: zap | 380 ns/op | 0 allocs/op |
-| :zap: zap (sugared) | 564 ns/op | 2 allocs/op |
-| zerolog | 321 ns/op | 0 allocs/op |
-| lion | 7092 ns/op | 39 allocs/op |
-| go-kit | 20226 ns/op | 115 allocs/op |
-| logrus | 22312 ns/op | 130 allocs/op |
-| log15 | 28788 ns/op | 79 allocs/op |
-| apex/log | 42063 ns/op | 115 allocs/op |
+| Package | Time | Time % to zap | Objects Allocated |
+| :------ | :--: | :-----------: | :---------------: |
+| :zap: zap | 193 ns/op | +0% | 0 allocs/op
+| :zap: zap (sugared) | 227 ns/op | +18% | 1 allocs/op
+| zerolog | 81 ns/op | -58% | 0 allocs/op
+| slog | 322 ns/op | +67% | 0 allocs/op
+| go-kit | 5377 ns/op | +2686% | 56 allocs/op
+| apex/log | 19518 ns/op | +10013% | 53 allocs/op
+| log15 | 19812 ns/op | +10165% | 70 allocs/op
+| logrus | 21997 ns/op | +11297% | 68 allocs/op
 
 Log a static string, without any context or `printf`-style templating:
 
-| Package | Time | Objects Allocated |
-| :--- | :---: | :---: |
-| :zap: zap | 361 ns/op | 0 allocs/op |
-| :zap: zap (sugared) | 534 ns/op | 2 allocs/op |
-| zerolog | 323 ns/op | 0 allocs/op |
-| standard library | 575 ns/op | 2 allocs/op |
-| go-kit | 922 ns/op | 13 allocs/op |
-| lion | 1413 ns/op | 10 allocs/op |
-| logrus | 2291 ns/op | 27 allocs/op |
-| apex/log | 3690 ns/op | 11 allocs/op |
-| log15 | 5954 ns/op | 26 allocs/op |
+| Package | Time | Time % to zap | Objects Allocated |
+| :------ | :--: | :-----------: | :---------------: |
+| :zap: zap | 165 ns/op | +0% | 0 allocs/op
+| :zap: zap (sugared) | 212 ns/op | +28% | 1 allocs/op
+| zerolog | 95 ns/op | -42% | 0 allocs/op
+| slog | 296 ns/op | +79% | 0 allocs/op
+| go-kit | 415 ns/op | +152% | 9 allocs/op
+| standard library | 422 ns/op | +156% | 2 allocs/op
+| apex/log | 1601 ns/op | +870% | 5 allocs/op
+| logrus | 3017 ns/op | +1728% | 23 allocs/op
+| log15 | 3469 ns/op | +2002% | 20 allocs/op
 
 ## Development Status: Stable
 
@@ -124,13 +124,14 @@ Released under the [MIT License](LICENSE.txt).
 
 <sup id="footnote-versions">1</sup> In particular, keep in mind that we may be
 benchmarking against slightly older versions of other packages. Versions are
-pinned in zap's [glide.lock][] file. [↩](#anchor-versions)
+pinned in the [benchmarks/go.mod][] file. [↩](#anchor-versions)
 
-[doc-img]: https://godoc.org/go.uber.org/zap?status.svg
-[doc]: https://godoc.org/go.uber.org/zap
-[ci-img]: https://travis-ci.org/uber-go/zap.svg?branch=master
-[ci]: https://travis-ci.org/uber-go/zap
+[doc-img]: https://pkg.go.dev/badge/go.uber.org/zap
+[doc]: https://pkg.go.dev/go.uber.org/zap
+[ci-img]: https://github.com/uber-go/zap/actions/workflows/go.yml/badge.svg
+[ci]: https://github.com/uber-go/zap/actions/workflows/go.yml
 [cov-img]: https://codecov.io/gh/uber-go/zap/branch/master/graph/badge.svg
 [cov]: https://codecov.io/gh/uber-go/zap
 [benchmarking suite]: https://github.com/uber-go/zap/tree/master/benchmarks
-[glide.lock]: https://github.com/uber-go/zap/blob/master/glide.lock
+[benchmarks/go.mod]: https://github.com/uber-go/zap/blob/master/benchmarks/go.mod
+

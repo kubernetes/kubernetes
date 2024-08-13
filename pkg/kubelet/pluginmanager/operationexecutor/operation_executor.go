@@ -43,7 +43,7 @@ import (
 // errors are simply logged and the goroutine is terminated without updating
 // actualStateOfWorld.
 type OperationExecutor interface {
-	// RegisterPlugin registers the given plugin using the a handler in the plugin handler map.
+	// RegisterPlugin registers the given plugin using a handler in the plugin handler map.
 	// It then updates the actual state of the world to reflect that.
 	RegisterPlugin(socketPath string, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
 

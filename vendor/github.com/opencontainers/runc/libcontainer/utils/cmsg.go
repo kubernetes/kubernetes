@@ -1,5 +1,3 @@
-// +build linux
-
 package utils
 
 /*
@@ -88,6 +86,11 @@ func SendFd(socket *os.File, name string, fd uintptr) error {
 	if len(name) >= MaxNameLen {
 		return fmt.Errorf("sendfd: filename too long: %s", name)
 	}
-	oob := unix.UnixRights(int(fd))
-	return unix.Sendmsg(int(socket.Fd()), []byte(name), oob, nil, 0)
+	return SendFds(socket, []byte(name), int(fd))
+}
+
+// SendFds sends a list of files descriptor and msg over the given AF_UNIX socket.
+func SendFds(socket *os.File, msg []byte, fds ...int) error {
+	oob := unix.UnixRights(fds...)
+	return unix.Sendmsg(int(socket.Fd()), msg, oob, nil, 0)
 }

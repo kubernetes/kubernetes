@@ -1,12 +1,12 @@
 # kube-aggregator
-## Coming Soon!
 
-Implements https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/aggregated-api-servers.md.
+Implements the [Aggregated API Servers](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/aggregated-api-servers.md) design proposal.
 
-It provides
-* Provide an API for registering API servers.
-* Summarize discovery information from all the servers.
-* Proxy client requests to individual servers.
+It provides:
+
+* an API for registering API servers.
+* Summaries of discovery information from all the aggregated APIs
+* HTTP proxying of requests from clients on to specific API backends
 
 
 ## Purpose
@@ -25,3 +25,4 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 
 `kube-aggregator` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kube-aggregator.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
+

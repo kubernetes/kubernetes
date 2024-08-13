@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodDisruptionBudgetStrategy(t *testing.T) {
@@ -35,12 +36,13 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	}
 
 	validSelector := map[string]string{"a": "b"}
-	minAvailable := intstr.FromInt(3)
+	minAvailable := intstr.FromInt32(3)
 	pdb := &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: &minAvailable,
-			Selector:     &metav1.LabelSelector{MatchLabels: validSelector},
+			MinAvailable:               &minAvailable,
+			Selector:                   &metav1.LabelSelector{MatchLabels: validSelector},
+			UnhealthyPodEvictionPolicy: ptr.To(policy.AlwaysAllow),
 		},
 	}
 
@@ -95,6 +97,25 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Expected no error updating replacing MinAvailable with MaxUnavailable on poddisruptionbudgets.")
 	}
+
+	// Changing UnhealthyPodEvictionPolicy? OK
+	newPdb.Spec.UnhealthyPodEvictionPolicy = ptr.To(policy.IfHealthyBudget)
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) != 0 {
+		t.Errorf("Expected no error on changing UnhealthyPodEvictionPolicy on poddisruptionbudgets.")
+	}
+	if *newPdb.Spec.UnhealthyPodEvictionPolicy != policy.IfHealthyBudget {
+		t.Errorf("Unexpected UnhealthyPodEvictionPolicy: expected %v, got %v", *newPdb.Spec.UnhealthyPodEvictionPolicy, policy.IfHealthyBudget)
+	}
+
+	// Changing to invalid UnhealthyPodEvictionPolicy.
+	newPdb.Spec.UnhealthyPodEvictionPolicy = ptr.To(policy.UnhealthyPodEvictionPolicyType("invalid"))
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) == 0 {
+		t.Errorf("Expected error on changing to invalid UnhealthyPodEvictionPolicy on poddisruptionbudgets.")
+	}
 }
 
 func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
@@ -106,8 +127,8 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 		t.Errorf("PodDisruptionBudgetStatus should not allow create on update")
 	}
 
-	oldMinAvailable := intstr.FromInt(3)
-	newMinAvailable := intstr.FromInt(2)
+	oldMinAvailable := intstr.FromInt32(3)
+	newMinAvailable := intstr.FromInt32(2)
 
 	validSelector := map[string]string{"a": "b"}
 	oldPdb := &policy.PodDisruptionBudget{
@@ -146,5 +167,67 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 	errs := StatusStrategy.ValidateUpdate(ctx, newPdb, oldPdb)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
+	}
+}
+
+func TestPodDisruptionBudgetStatusValidationByApiVersion(t *testing.T) {
+	testCases := map[string]struct {
+		apiVersion string
+		validation bool
+	}{
+		"policy/v1beta1 should not do update validation": {
+			apiVersion: "v1beta1",
+			validation: false,
+		},
+		"policy/v1 should do update validation": {
+			apiVersion: "v1",
+			validation: true,
+		},
+		"policy/some-version should do update validation": {
+			apiVersion: "some-version",
+			validation: true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIGroup:   "policy",
+					APIVersion: tc.apiVersion,
+				})
+
+			oldMaxUnavailable := intstr.FromInt32(2)
+			newMaxUnavailable := intstr.FromInt32(3)
+			oldPdb := &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+					MaxUnavailable: &oldMaxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 1,
+				},
+			}
+			newPdb := &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+					MinAvailable: &newMaxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: -1, // This is not allowed, so should trigger validation error.
+				},
+			}
+
+			errs := StatusStrategy.ValidateUpdate(ctx, newPdb, oldPdb)
+			hasErrors := len(errs) > 0
+			if !tc.validation && hasErrors {
+				t.Errorf("Validation failed when no validation should happen")
+			}
+			if tc.validation && !hasErrors {
+				t.Errorf("Expected validation errors but didn't get any")
+			}
+		})
 	}
 }

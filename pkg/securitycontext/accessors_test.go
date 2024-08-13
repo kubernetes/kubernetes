@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/pointer"
 )
 
 func TestPodSecurityContextAccessor(t *testing.T) {
@@ -29,6 +30,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 	runAsUser := int64(1)
 	runAsGroup := int64(1)
 	runAsNonRoot := true
+	hostUsers := false
 
 	testcases := []*api.PodSecurityContext{
 		nil,
@@ -37,10 +39,12 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		{HostIPC: true},
 		{HostNetwork: true},
 		{HostPID: true},
+		{HostUsers: &hostUsers},
 		{RunAsNonRoot: &runAsNonRoot},
 		{RunAsUser: &runAsUser},
 		{RunAsGroup: &runAsGroup},
 		{SELinuxOptions: &api.SELinuxOptions{User: "bob"}},
+		{SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}},
 		{SupplementalGroups: []int64{1, 2, 3}},
 	}
 
@@ -64,6 +68,9 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		if v := a.HostPID(); !reflect.DeepEqual(expected.HostPID, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.HostPID, v)
 		}
+		if v := a.HostUsers(); !reflect.DeepEqual(expected.HostUsers, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.HostUsers, v)
+		}
 		if v := a.RunAsNonRoot(); !reflect.DeepEqual(expected.RunAsNonRoot, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsNonRoot, v)
 		}
@@ -72,6 +79,9 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		}
 		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
+		}
+		if v := a.SeccompProfile(); !reflect.DeepEqual(expected.SeccompProfile, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.SeccompProfile, v)
 		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
@@ -98,10 +108,12 @@ func TestPodSecurityContextMutator(t *testing.T) {
 					HostNetwork:        true,
 					HostIPC:            true,
 					HostPID:            true,
+					HostUsers:          nil,
 					SELinuxOptions:     &api.SELinuxOptions{},
 					RunAsUser:          nil,
 					RunAsGroup:         nil,
 					RunAsNonRoot:       nil,
+					SeccompProfile:     nil,
 					SupplementalGroups: nil,
 					FSGroup:            nil,
 				}
@@ -127,9 +139,11 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m.SetHostNetwork(m.HostNetwork())
 			m.SetHostIPC(m.HostIPC())
 			m.SetHostPID(m.HostPID())
+			m.SetHostUsers(m.HostUsers())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
 			m.SetRunAsGroup(m.RunAsGroup())
+			m.SetSeccompProfile(m.SeccompProfile())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			m.SetSupplementalGroups(m.SupplementalGroups())
 			if !reflect.DeepEqual(sc, originalSC) {
@@ -189,6 +203,19 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			}
 		}
 
+		// HostUsers
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewPodSecurityContextMutator(tc.newSC())
+			b := false
+			modifiedSC.HostUsers = &b
+			m.SetHostUsers(&b)
+			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
+				continue
+			}
+		}
+
 		// RunAsNonRoot
 		{
 			modifiedSC := nonNilSC(tc.newSC())
@@ -240,6 +267,18 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			}
 		}
 
+		// SeccompProfile
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewPodSecurityContextMutator(tc.newSC())
+			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")}
+			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")})
+			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
+				continue
+			}
+		}
+
 		// SupplementalGroups
 		{
 			modifiedSC := nonNilSC(tc.newSC())
@@ -257,6 +296,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 func TestContainerSecurityContextAccessor(t *testing.T) {
 	privileged := true
 	runAsUser := int64(1)
+	runAsGroup := int64(1)
 	runAsNonRoot := true
 	readOnlyRootFilesystem := true
 	allowPrivilegeEscalation := true
@@ -268,8 +308,10 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 		{Privileged: &privileged},
 		{SELinuxOptions: &api.SELinuxOptions{User: "bob"}},
 		{RunAsUser: &runAsUser},
+		{RunAsGroup: &runAsGroup},
 		{RunAsNonRoot: &runAsNonRoot},
 		{ReadOnlyRootFilesystem: &readOnlyRootFilesystem},
+		{SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}},
 		{AllowPrivilegeEscalation: &allowPrivilegeEscalation},
 	}
 
@@ -293,11 +335,17 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 		if v := a.RunAsUser(); !reflect.DeepEqual(expected.RunAsUser, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsUser, v)
 		}
+		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
+		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
 		}
 		if v := a.ReadOnlyRootFilesystem(); !reflect.DeepEqual(expected.ReadOnlyRootFilesystem, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.ReadOnlyRootFilesystem, v)
+		}
+		if v := a.SeccompProfile(); !reflect.DeepEqual(expected.SeccompProfile, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.SeccompProfile, v)
 		}
 		if v := a.AllowPrivilegeEscalation(); !reflect.DeepEqual(expected.AllowPrivilegeEscalation, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.AllowPrivilegeEscalation, v)
@@ -320,6 +368,7 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 				return &api.SecurityContext{
 					Capabilities:   &api.Capabilities{Drop: []api.Capability{"test"}},
 					SELinuxOptions: &api.SELinuxOptions{},
+					SeccompProfile: &api.SeccompProfile{},
 				}
 			},
 		},
@@ -345,6 +394,7 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 			m.SetReadOnlyRootFilesystem(m.ReadOnlyRootFilesystem())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
+			m.SetRunAsGroup(m.RunAsGroup())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			if !reflect.DeepEqual(sc, originalSC) {
 				t.Errorf("%s: unexpected mutation: %#v, %#v", k, sc, originalSC)
@@ -431,6 +481,31 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 			}
 		}
 
+		// RunAsGroup
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewContainerSecurityContextMutator(tc.newSC())
+			i := int64(1123)
+			modifiedSC.RunAsGroup = &i
+			m.SetRunAsGroup(&i)
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
+		// SeccompProfile
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewContainerSecurityContextMutator(tc.newSC())
+			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
+			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined})
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
 		// SELinuxOptions
 		{
 			modifiedSC := nonNilSC(tc.newSC())
@@ -474,12 +549,14 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 		{
 			PodSC: &api.PodSecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{User: "bob"},
+				SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined},
 				RunAsUser:      &runAsUser,
 				RunAsNonRoot:   &runAsNonRoot,
 			},
 			SC: nil,
 			Effective: &api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{User: "bob"},
+				SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined},
 				RunAsUser:      &runAsUser,
 				RunAsNonRoot:   &runAsNonRoot,
 			},
@@ -487,12 +564,14 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 		{
 			PodSC: &api.PodSecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{User: "bob"},
+				SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined},
 				RunAsUser:      &runAsUserPod,
 				RunAsNonRoot:   &runAsNonRootPod,
 			},
 			SC: &api.SecurityContext{},
 			Effective: &api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{User: "bob"},
+				SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined},
 				RunAsUser:      &runAsUserPod,
 				RunAsNonRoot:   &runAsNonRootPod,
 			},
@@ -500,6 +579,7 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 		{
 			PodSC: &api.PodSecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{User: "bob"},
+				SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined},
 				RunAsUser:      &runAsUserPod,
 				RunAsNonRoot:   &runAsNonRootPod,
 			},
@@ -511,6 +591,7 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 				RunAsUser:                &runAsUser,
 				RunAsNonRoot:             &runAsNonRoot,
 				SELinuxOptions:           &api.SELinuxOptions{User: "bob"},
+				SeccompProfile:           &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault},
 			},
 			Effective: &api.SecurityContext{
 				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
@@ -520,6 +601,7 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 				RunAsUser:                &runAsUser,
 				RunAsNonRoot:             &runAsNonRoot,
 				SELinuxOptions:           &api.SELinuxOptions{User: "bob"},
+				SeccompProfile:           &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 		{
@@ -567,6 +649,9 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 		if v := a.RunAsUser(); !reflect.DeepEqual(expected.RunAsUser, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsUser, v)
 		}
+		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
+		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
 		}
@@ -599,6 +684,7 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 			newPodSC: func() *api.PodSecurityContext {
 				return &api.PodSecurityContext{
 					SELinuxOptions: &api.SELinuxOptions{User: "poduser"},
+					SeccompProfile: &api.SeccompProfile{},
 					RunAsNonRoot:   &runAsNonRootPod,
 					RunAsUser:      &runAsUserPod,
 				}
@@ -613,6 +699,7 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 				return &api.SecurityContext{
 					Capabilities:   &api.Capabilities{Drop: []api.Capability{"test"}},
 					SELinuxOptions: &api.SELinuxOptions{},
+					SeccompProfile: &api.SeccompProfile{},
 				}
 			},
 		},
@@ -643,7 +730,9 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 			m.SetReadOnlyRootFilesystem(m.ReadOnlyRootFilesystem())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
+			m.SetRunAsGroup(m.RunAsGroup())
 			m.SetSELinuxOptions(m.SELinuxOptions())
+			m.SetSeccompProfile(m.SeccompProfile())
 			if !reflect.DeepEqual(podSC, originalPodSC) {
 				t.Errorf("%s: unexpected mutation: %#v, %#v", k, podSC, originalPodSC)
 			}
@@ -744,6 +833,34 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 			i := int64(1123)
 			modifiedSC.RunAsUser = &i
 			m.SetRunAsUser(&i)
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
+		// RunAsGroup
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewEffectiveContainerSecurityContextMutator(
+				NewPodSecurityContextAccessor(tc.newPodSC()),
+				NewContainerSecurityContextMutator(tc.newSC()),
+			)
+			i := int64(1123)
+			modifiedSC.RunAsGroup = &i
+			m.SetRunAsGroup(&i)
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
+		// SeccompProfile
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewContainerSecurityContextMutator(tc.newSC())
+			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
+			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined})
 			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
 				continue

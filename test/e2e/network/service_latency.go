@@ -33,10 +33,12 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 type durations []time.Duration
@@ -45,15 +47,16 @@ func (d durations) Len() int           { return len(d) }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
-var _ = SIGDescribe("Service endpoints latency", func() {
+var _ = common.SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Service endpoint latency, thresholds
 		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compute 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
 	*/
-	framework.ConformanceIt("should not be very high ", func() {
+	framework.ConformanceIt("should not be very high", func(ctx context.Context) {
 		const (
 			// These are very generous criteria. Ideally we will
 			// get this much lower in the future. See issue
@@ -87,7 +90,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		f.ClientSet = kubernetes.NewForConfigOrDie(cfg)
 
 		failing := sets.NewString()
-		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
+		d, err := runServiceLatencies(ctx, f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
 		}
@@ -131,7 +134,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	})
 })
 
-func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
+func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
 		Client:       f.ClientSet,
 		Image:        imageutils.GetPauseImageName(),
@@ -140,7 +143,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := e2erc.RunRC(cfg); err != nil {
+	if err := e2erc.RunRC(ctx, cfg); err != nil {
 		return nil, err
 	}
 
@@ -149,12 +152,13 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	// consumes the endpoints data, so it seems like the right thing to
 	// test.
 	endpointQueries := newQuerier()
-	startEndpointWatcher(f, endpointQueries)
+	startEndpointWatcher(ctx, f, endpointQueries)
 	defer close(endpointQueries.stop)
 
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
-	singleServiceLatency(f, cfg.Name, endpointQueries)
+	_, err = singleServiceLatency(ctx, f, cfg.Name, endpointQueries)
+	framework.ExpectNoError(err)
 
 	// These channels are never closed, and each attempt sends on exactly
 	// one of these channels, so the sum of the things sent over them will
@@ -168,7 +172,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
-			if d, err := singleServiceLatency(f, cfg.Name, endpointQueries); err != nil {
+			if d, err := singleServiceLatency(ctx, f, cfg.Name, endpointQueries); err != nil {
 				errs <- err
 			} else {
 				durations <- d
@@ -224,8 +228,8 @@ func newQuerier() *endpointQueries {
 
 // join merges the incoming streams of requests and added endpoints. It has
 // nice properties like:
-//  * remembering an endpoint if it happens to arrive before it is requested.
-//  * closing all outstanding requests (returning nil) if it is stopped.
+//   - remembering an endpoint if it happens to arrive before it is requested.
+//   - closing all outstanding requests (returning nil) if it is stopped.
 func (eq *endpointQueries) join() {
 	defer func() {
 		// Terminate all pending requests, so that no goroutine will
@@ -292,15 +296,15 @@ func (eq *endpointQueries) added(e *v1.Endpoints) {
 }
 
 // blocks until it has finished syncing.
-func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
+func startEndpointWatcher(ctx context.Context, f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(context.TODO(), options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(ctx, options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(context.TODO(), options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(ctx, options)
 			},
 		},
 		&v1.Endpoints{},
@@ -331,7 +335,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	}
 }
 
-func singleServiceLatency(f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
+func singleServiceLatency(ctx context.Context, f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
 	// Make a service that points to that pod.
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -345,7 +349,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
+	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
 	if err != nil {
 		return 0, err
 	}

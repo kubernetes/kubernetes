@@ -9,23 +9,30 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func hnsCall(method, path, request string, returnResponse interface{}) error {
+func hnsCallRawResponse(method, path, request string) (*hnsResponse, error) {
 	var responseBuffer *uint16
 	logrus.Debugf("[%s]=>[%s] Request : %s", method, path, request)
 
 	err := _hnsCall(method, path, request, &responseBuffer)
 	if err != nil {
-		return hcserror.New(err, "hnsCall ", "")
+		return nil, hcserror.New(err, "hnsCall ", "")
 	}
 	response := interop.ConvertAndFreeCoTaskMemString(responseBuffer)
 
 	hnsresponse := &hnsResponse{}
 	if err = json.Unmarshal([]byte(response), &hnsresponse); err != nil {
-		return err
+		return nil, err
 	}
+	return hnsresponse, nil
+}
 
+func hnsCall(method, path, request string, returnResponse interface{}) error {
+	hnsresponse, err := hnsCallRawResponse(method, path, request)
+	if err != nil {
+		return fmt.Errorf("failed during hnsCallRawResponse: %v", err)
+	}
 	if !hnsresponse.Success {
-		return fmt.Errorf("HNS failed with error : %s", hnsresponse.Error)
+		return fmt.Errorf("hns failed with error : %s", hnsresponse.Error)
 	}
 
 	if len(hnsresponse.Output) == 0 {

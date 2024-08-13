@@ -18,29 +18,23 @@ package roundtrip
 
 import (
 	"bytes"
+	gojson "encoding/json"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -49,7 +43,7 @@ import (
 //
 // Example use: `NewCompatibilityTestOptions(scheme).Complete(t).Run(t)`
 type CompatibilityTestOptions struct {
-	// Scheme is used to create new objects for fuzzing, decoding, and for constructing serializers.
+	// Scheme is used to create new objects for filling, decoding, and for constructing serializers.
 	// Required.
 	Scheme *runtime.Scheme
 
@@ -60,7 +54,7 @@ type CompatibilityTestOptions struct {
 	// TestDataDirCurrentVersion points to a directory containing compatibility test data for the current version.
 	// Complete() populates this with "<TestDataDir>/HEAD" if unset.
 	// Within this directory, `<group>.<version>.<kind>.[json|yaml|pb]` files are required to exist, and are:
-	// * verified to match serialized FuzzedObjects[GVK]
+	// * verified to match serialized FilledObjects[GVK]
 	// * verified to decode without error
 	// * verified to round-trip byte-for-byte when re-encoded
 	// * verified to be semantically equal when decoded into memory
@@ -78,19 +72,24 @@ type CompatibilityTestOptions struct {
 	// Complete() populates this with Scheme.AllKnownTypes() if unset.
 	Kinds []schema.GroupVersionKind
 
-	// FuzzedObjects is an optional set of fuzzed objects to use for verifying HEAD fixtures.
-	// Complete() populates this with the result of CompatibilityTestObject(Kinds[*], Scheme, FuzzFuncs) for any missing kinds.
-	// Objects must be deterministically fuzzed and identical on every invocation.
-	FuzzedObjects map[schema.GroupVersionKind]runtime.Object
+	// FilledObjects is an optional set of pre-filled objects to use for verifying HEAD fixtures.
+	// Complete() populates this with the result of CompatibilityTestObject(Kinds[*], Scheme, FillFuncs) for any missing kinds.
+	// Objects must deterministically populate every field and be identical on every invocation.
+	FilledObjects map[schema.GroupVersionKind]runtime.Object
 
-	// FuzzFuncs is an optional set of custom fuzzing functions to use to construct FuzzedObjects.
-	// They *must* not use any random source other than the passed-in fuzzer.
-	FuzzFuncs []interface{}
+	// FillFuncs is an optional map of custom functions to use to fill instances of particular types.
+	FillFuncs map[reflect.Type]FillFunc
 
 	JSON  runtime.Serializer
 	YAML  runtime.Serializer
 	Proto runtime.Serializer
 }
+
+// FillFunc is a function that populates all serializable fields in obj.
+// s and i are string and integer values relevant to the object being populated
+// (for example, the json key or protobuf tag containing the object)
+// that can be used when filling the object to make the object content identifiable
+type FillFunc func(s string, i int, obj interface{})
 
 func NewCompatibilityTestOptions(scheme *runtime.Scheme) *CompatibilityTestOptions {
 	return &CompatibilityTestOptions{Scheme: scheme}
@@ -162,19 +161,23 @@ func (c *CompatibilityTestOptions) Complete(t *testing.T) *CompatibilityTestOpti
 		return false
 	})
 
-	// Fuzz any missing objects
-	if c.FuzzedObjects == nil {
-		c.FuzzedObjects = map[schema.GroupVersionKind]runtime.Object{}
+	// Fill any missing objects
+	if c.FilledObjects == nil {
+		c.FilledObjects = map[schema.GroupVersionKind]runtime.Object{}
+	}
+	fillFuncs := defaultFillFuncs()
+	for k, v := range c.FillFuncs {
+		fillFuncs[k] = v
 	}
 	for _, gvk := range c.Kinds {
-		if _, ok := c.FuzzedObjects[gvk]; ok {
+		if _, ok := c.FilledObjects[gvk]; ok {
 			continue
 		}
-		obj, err := CompatibilityTestObject(c.Scheme, gvk, c.FuzzFuncs)
+		obj, err := CompatibilityTestObject(c.Scheme, gvk, fillFuncs)
 		if err != nil {
 			t.Fatal(err)
 		}
-		c.FuzzedObjects[gvk] = obj
+		c.FilledObjects[gvk] = obj
 	}
 
 	if c.JSON == nil {
@@ -190,105 +193,47 @@ func (c *CompatibilityTestOptions) Complete(t *testing.T) *CompatibilityTestOpti
 	return c
 }
 
-// CompatibilityTestObject returns a deterministically fuzzed object for the specified GVK
-func CompatibilityTestObject(scheme *runtime.Scheme, gvk schema.GroupVersionKind, fuzzFuncs []interface{}) (runtime.Object, error) {
-	// Construct the object
-	obj, err := scheme.New(gvk)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fuzz it
-	CompatibilityTestFuzzer(scheme, fuzzFuncs).Fuzz(obj)
-
-	// Set the kind and apiVersion
-	if typeAcc, err := apimeta.TypeAccessor(obj); err != nil {
-		return nil, err
-	} else {
-		typeAcc.SetKind(gvk.Kind)
-		typeAcc.SetAPIVersion(gvk.GroupVersion().String())
-	}
-
-	return obj, nil
-}
-
-// CompatibilityTestFuzzer returns a fuzzer for the given scheme:
-// - fixed seed (deterministic output that lets us generate the same fixtures on every run)
-// - 0 nil chance (populate all fields)
-// - 1 numelements (populate and bound all lists)
-// - 20 max depth (don't recurse infinitely)
-// - meta fuzzing functions added
-// - custom fuzzing functions to make strings and managedFields more readable in fixtures
-func CompatibilityTestFuzzer(scheme *runtime.Scheme, fuzzFuncs []interface{}) *fuzz.Fuzzer {
-	fuzzer := fuzz.NewWithSeed(0).NilChance(0).NumElements(1, 1).MaxDepth(20)
-	fuzzer = fuzzer.Funcs(genericfuzzer.Funcs(serializer.NewCodecFactory(scheme))...)
-	fuzzString := 1
-	fuzzIntOrString := 1
-	fuzzMicroTime := int64(1)
-	fuzzer.Funcs(
-		// avoid crazy strings
-		func(s *string, c fuzz.Continue) {
-			fuzzString++
-			*s = strconv.Itoa(fuzzString)
-		},
-		func(i **intstr.IntOrString, c fuzz.Continue) {
-			fuzzIntOrString++
-			tmp := intstr.FromInt(fuzzIntOrString)
-			_ = tmp
-			*i = &tmp
-		},
-		func(t **metav1.MicroTime, c fuzz.Continue) {
-			if t != nil && *t != nil {
-				// use type-defined fuzzing for non-nil objects
-				(*t).Fuzz(c)
-				return
-			}
-			fuzzMicroTime++
-			tmp := metav1.NewMicroTime(time.Unix(fuzzMicroTime, 0))
-			*t = &tmp
-		},
-		// limit managed fields to two levels
-		func(f *[]metav1.ManagedFieldsEntry, c fuzz.Continue) {
-			field := metav1.ManagedFieldsEntry{}
-			c.Fuzz(&field)
-			if field.FieldsV1 != nil {
-				field.FieldsV1.Raw = []byte("{}")
-			}
-			*f = []metav1.ManagedFieldsEntry{field}
-		},
-		func(r *runtime.RawExtension, c fuzz.Continue) {
-			// generate a raw object in normalized form
-			// TODO: test non-normalized round-tripping... YAMLToJSON normalizes and makes exact comparisons fail
-			r.Raw = []byte(`{"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}}`)
-		},
-	)
-	fuzzer.Funcs(fuzzFuncs...)
-	return fuzzer
-}
-
 func (c *CompatibilityTestOptions) Run(t *testing.T) {
+	usedHEADFixtures := sets.NewString()
+
 	for _, gvk := range c.Kinds {
 		t.Run(makeName(gvk), func(t *testing.T) {
 
 			t.Run("HEAD", func(t *testing.T) {
-				c.runCurrentVersionTest(t, gvk)
+				c.runCurrentVersionTest(t, gvk, usedHEADFixtures)
 			})
 
 			for _, previousVersionDir := range c.TestDataDirsPreviousVersions {
 				t.Run(filepath.Base(previousVersionDir), func(t *testing.T) {
-					c.runPreviousVersionTest(t, gvk, previousVersionDir)
+					c.runPreviousVersionTest(t, gvk, previousVersionDir, nil)
 				})
 			}
 
 		})
 	}
+
+	// Check for unused HEAD fixtures
+	t.Run("unused_fixtures", func(t *testing.T) {
+		files, err := os.ReadDir(c.TestDataDirCurrentVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		allFixtures := sets.NewString()
+		for _, file := range files {
+			allFixtures.Insert(file.Name())
+		}
+
+		if unused := allFixtures.Difference(usedHEADFixtures); len(unused) > 0 {
+			t.Fatalf("remove unused fixtures from %s:\n%s", c.TestDataDirCurrentVersion, strings.Join(unused.List(), "\n"))
+		}
+	})
 }
 
-func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind) {
-	expectedObject := c.FuzzedObjects[gvk]
+func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind, usedFiles sets.String) {
+	expectedObject := c.FilledObjects[gvk]
 	expectedJSON, expectedYAML, expectedProto := c.encode(t, expectedObject)
 
-	actualJSON, actualYAML, actualProto, err := read(c.TestDataDirCurrentVersion, gvk, "")
+	actualJSON, actualYAML, actualProto, err := read(c.TestDataDirCurrentVersion, gvk, "", usedFiles)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
@@ -336,8 +281,14 @@ func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schem
 		t.Fatal(err)
 	}
 	{
+		// compact before decoding since embedded RawExtension fields retain indenting
+		compacted := &bytes.Buffer{}
+		if err := gojson.Compact(compacted, actualJSON); err != nil {
+			t.Error(err)
+		}
+
 		jsonDecoded := emptyObj.DeepCopyObject()
-		jsonDecoded, _, err = c.JSON.Decode(actualJSON, &gvk, jsonDecoded)
+		jsonDecoded, _, err = c.JSON.Decode(compacted.Bytes(), &gvk, jsonDecoded)
 		if err != nil {
 			t.Error(err)
 		} else if !apiequality.Semantic.DeepEqual(expectedObject, jsonDecoded) {
@@ -380,10 +331,18 @@ func (c *CompatibilityTestOptions) encode(t *testing.T, obj runtime.Object) (jso
 	return jsonBytes.Bytes(), yamlBytes.Bytes(), protoBytes.Bytes()
 }
 
-func read(dir string, gvk schema.GroupVersionKind, suffix string) (json, yaml, proto []byte, err error) {
-	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".json"))
-	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".yaml"))
-	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".pb"))
+func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.String) (json, yaml, proto []byte, err error) {
+	jsonFilename := makeName(gvk) + suffix + ".json"
+	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, jsonFilename))
+	yamlFilename := makeName(gvk) + suffix + ".yaml"
+	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, yamlFilename))
+	protoFilename := makeName(gvk) + suffix + ".pb"
+	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, protoFilename))
+	if usedFiles != nil {
+		usedFiles.Insert(jsonFilename)
+		usedFiles.Insert(yamlFilename)
+		usedFiles.Insert(protoFilename)
+	}
 	if jsonErr != nil {
 		return actualJSON, actualYAML, actualProto, jsonErr
 	}
@@ -405,8 +364,14 @@ func writeFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, ex
 	}
 }
 
-func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string) {
-	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "")
+func deleteFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, extension string) {
+	if err := os.Remove(filepath.Join(dir, makeName(gvk)+suffix+"."+extension)); err != nil {
+		t.Fatalf("error removing %s: %v", extension, err)
+	}
+}
+
+func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string, usedFiles sets.String) {
+	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "", usedFiles)
 	if os.IsNotExist(err) || (len(jsonBeforeRoundTrip) == 0 && len(yamlBeforeRoundTrip) == 0 && len(protoBeforeRoundTrip) == 0) {
 		t.SkipNow()
 		return
@@ -420,8 +385,14 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 		t.Fatal(err)
 	}
 
+	// compact before decoding since embedded RawExtension fields retain indenting
+	compacted := &bytes.Buffer{}
+	if err := gojson.Compact(compacted, jsonBeforeRoundTrip); err != nil {
+		t.Fatal(err)
+	}
+
 	jsonDecoded := emptyObj.DeepCopyObject()
-	jsonDecoded, _, err = c.JSON.Decode(jsonBeforeRoundTrip, &gvk, jsonDecoded)
+	jsonDecoded, _, err = c.JSON.Decode(compacted.Bytes(), &gvk, jsonDecoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,15 +428,28 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 	}
 	protoAfterRoundTrip := protoBytes.Bytes()
 
-	expectedJSONAfterRoundTrip, expectedYAMLAfterRoundTrip, expectedProtoAfterRoundTrip, _ := read(previousVersionDir, gvk, ".after_roundtrip")
+	jsonNeedsRemove := false
+	yamlNeedsRemove := false
+	protoNeedsRemove := false
+
+	expectedJSONAfterRoundTrip, expectedYAMLAfterRoundTrip, expectedProtoAfterRoundTrip, _ := read(previousVersionDir, gvk, ".after_roundtrip", usedFiles)
 	if len(expectedJSONAfterRoundTrip) == 0 {
 		expectedJSONAfterRoundTrip = jsonBeforeRoundTrip
+	} else if bytes.Equal(jsonBeforeRoundTrip, expectedJSONAfterRoundTrip) {
+		t.Errorf("JSON after_roundtrip file is identical and should be removed")
+		jsonNeedsRemove = true
 	}
 	if len(expectedYAMLAfterRoundTrip) == 0 {
 		expectedYAMLAfterRoundTrip = yamlBeforeRoundTrip
+	} else if bytes.Equal(yamlBeforeRoundTrip, expectedYAMLAfterRoundTrip) {
+		t.Errorf("YAML after_roundtrip file is identical and should be removed")
+		yamlNeedsRemove = true
 	}
 	if len(expectedProtoAfterRoundTrip) == 0 {
 		expectedProtoAfterRoundTrip = protoBeforeRoundTrip
+	} else if bytes.Equal(protoBeforeRoundTrip, expectedProtoAfterRoundTrip) {
+		t.Errorf("Proto after_roundtrip file is identical and should be removed")
+		protoNeedsRemove = true
 	}
 
 	jsonNeedsUpdate := false
@@ -491,17 +475,25 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 		// t.Logf("json (for locating the offending field based on surrounding data): %s", string(expectedJSON))
 	}
 
-	if jsonNeedsUpdate || yamlNeedsUpdate || protoNeedsUpdate {
+	if jsonNeedsUpdate || yamlNeedsUpdate || protoNeedsUpdate || jsonNeedsRemove || yamlNeedsRemove || protoNeedsRemove {
 		const updateEnvVar = "UPDATE_COMPATIBILITY_FIXTURE_DATA"
 		if os.Getenv(updateEnvVar) == "true" {
 			if jsonNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "json", jsonAfterRoundTrip)
+			} else if jsonNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "json")
 			}
+
 			if yamlNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "yaml", yamlAfterRoundTrip)
+			} else if yamlNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "yaml")
 			}
+
 			if protoNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "pb", protoAfterRoundTrip)
+			} else if protoNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "pb")
 			}
 			t.Logf("wrote expected compatibility data... verify, commit, and rerun tests")
 		} else {

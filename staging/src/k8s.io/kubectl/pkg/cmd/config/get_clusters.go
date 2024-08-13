@@ -29,7 +29,7 @@ import (
 
 var (
 	getClustersExample = templates.Examples(`
-		# List the clusters kubectl knows about
+		# List the clusters that kubectl knows about
 		kubectl config get-clusters`)
 )
 
@@ -39,7 +39,7 @@ func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess)
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
 		Short:   i18n.T("Display clusters defined in the kubeconfig"),
-		Long:    "Display clusters defined in the kubeconfig.",
+		Long:    i18n.T("Display clusters defined in the kubeconfig."),
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runGetClusters(out, configAccess))

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,18 +20,13 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
-	"runtime"
-
-	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/securitycontext"
-
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -44,22 +40,27 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	return nil
 }
 
-// generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
-// Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
-	wc := &runtimeapi.WindowsContainerConfig{
-		Resources:       &runtimeapi.WindowsContainerResources{},
-		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
+// generateContainerResources generates platform specific (windows) container resources config for runtime
+func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+	return &runtimeapi.ContainerResources{
+		Windows: m.generateWindowsContainerResources(pod, container),
 	}
+}
 
-	cpuLimit := container.Resources.Limits.Cpu()
-	isolatedByHyperv := kubeletapis.ShouldIsolatedByHyperV(pod.Annotations)
+// generateWindowsContainerResources generates windows container resources config for runtime
+func (m *kubeGenericRuntimeManager) generateWindowsContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.WindowsContainerResources {
+	wcr := m.calculateWindowsResources(container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+
+	return wcr
+}
+
+// calculateWindowsResources will create the windowsContainerResources type based on the provided CPU and memory resource requests, limits
+func (m *kubeGenericRuntimeManager) calculateWindowsResources(cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.WindowsContainerResources {
+	resources := runtimeapi.WindowsContainerResources{}
+
+	memLimit := memoryLimit.Value()
+
 	if !cpuLimit.IsZero() {
-		// Note that sysinfo.NumCPU() is limited to 64 CPUs on Windows due to Processor Groups,
-		// as only 64 processors are available for execution by a given process. This causes
-		// some oddities on systems with more than 64 processors.
-		// Refer https://msdn.microsoft.com/en-us/library/windows/desktop/dd405503(v=vs.85).aspx.
-
 		// Since Kubernetes doesn't have any notion of weight in the Pod/Container API, only limits/reserves, then applying CpuMaximum only
 		// will better follow the intent of the user. At one point CpuWeights were set, but this prevented limits from having any effect.
 
@@ -80,60 +81,44 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		// Part three - CRI & ContainerD's implementation
 		//   The kubelet sets these directly on CGroups in Linux, but needs to pass them across CRI on Windows.
 		//   There is an existing cpu_maximum field, with a range of percent * 100, so 1-10000. This is different from Docker, but consistent with OCI
-		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.proto#L681-L682
+		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto#L681-L682
 		//   https://github.com/opencontainers/runtime-spec/blob/ad53dcdc39f1f7f7472b10aa0a45648fe4865496/config-windows.md#cpu
 		//   If both CpuWeight and CpuMaximum are set - ContainerD catches this invalid case and returns an error instead.
-
-		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(runtime.NumCPU()) / 1000
-
-		// TODO: This should be reviewed or removed once Hyper-V support is implemented with CRI-ContainerD
-		//       in a future release. cpuCount may or may not be required if cpuMaximum is set.
-		if isolatedByHyperv {
-			cpuCount := int64(cpuLimit.MilliValue()+999) / 1000
-			wc.Resources.CpuCount = cpuCount
-
-			if cpuCount != 0 {
-				cpuMaximum = cpuLimit.MilliValue() / cpuCount * 10000 / 1000
-			}
-		}
-		// ensure cpuMaximum is in range [1, 10000].
-		if cpuMaximum < 1 {
-			cpuMaximum = 1
-		} else if cpuMaximum > 10000 {
-			cpuMaximum = 10000
-		}
-
-		wc.Resources.CpuMaximum = cpuMaximum
+		resources.CpuMaximum = calculateCPUMaximum(cpuLimit, int64(winstats.ProcessorCount()))
 	}
 
-	if !isolatedByHyperv {
-		// The processor resource controls are mutually exclusive on
-		// Windows Server Containers, the order of precedence is
-		// CPUCount first, then CPUMaximum.
-		if wc.Resources.CpuCount > 0 {
-			if wc.Resources.CpuMaximum > 0 {
-				wc.Resources.CpuMaximum = 0
-				klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
-			}
+	// The processor resource controls are mutually exclusive on
+	// Windows Server Containers, the order of precedence is
+	// CPUCount first, then CPUMaximum.
+	if resources.CpuCount > 0 {
+		if resources.CpuMaximum > 0 {
+			resources.CpuMaximum = 0
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
-	memoryLimit := container.Resources.Limits.Memory().Value()
-	if memoryLimit != 0 {
-		wc.Resources.MemoryLimitInBytes = memoryLimit
+	if memLimit != 0 {
+		resources.MemoryLimitInBytes = memLimit
+	}
+
+	return &resources
+}
+
+// generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
+// Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
+	wc := &runtimeapi.WindowsContainerConfig{
+		Resources:       m.generateWindowsContainerResources(pod, container),
+		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
 	}
 
 	// setup security context
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
-	if effectiveSc.RunAsUser != nil {
-		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
-	}
+
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&
-		effectiveSc.WindowsOptions != nil &&
+	if effectiveSc.WindowsOptions != nil &&
 		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {
 		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec
 	}
@@ -143,5 +128,52 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
 	}
 
+	if securitycontext.HasWindowsHostProcessRequest(pod, container) {
+		wc.SecurityContext.HostProcess = true
+	}
+
 	return wc, nil
+}
+
+// calculateCPUMaximum calculates the maximum CPU given a limit and a number of cpus while ensuring it's in range [1,10000].
+func calculateCPUMaximum(cpuLimit *resource.Quantity, cpuCount int64) int64 {
+	cpuMaximum := 10 * cpuLimit.MilliValue() / cpuCount
+
+	// ensure cpuMaximum is in range [1, 10000].
+	if cpuMaximum < 1 {
+		cpuMaximum = 1
+	} else if cpuMaximum > 10000 {
+		cpuMaximum = 10000
+	}
+	return cpuMaximum
+}
+
+func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *kubecontainer.ContainerResources {
+	var cStatusResources *kubecontainer.ContainerResources
+	runtimeStatusResources := statusResources.GetWindows()
+	if runtimeStatusResources != nil {
+		var memLimit, cpuLimit *resource.Quantity
+
+		// Used the reversed formula from the calculateCPUMaximum function
+		if runtimeStatusResources.CpuMaximum > 0 {
+			cpuLimitValue := runtimeStatusResources.CpuMaximum * int64(winstats.ProcessorCount()) / 10
+			cpuLimit = resource.NewMilliQuantity(cpuLimitValue, resource.DecimalSI)
+		}
+
+		if runtimeStatusResources.MemoryLimitInBytes > 0 {
+			memLimit = resource.NewQuantity(runtimeStatusResources.MemoryLimitInBytes, resource.BinarySI)
+		}
+
+		if cpuLimit != nil || memLimit != nil {
+			cStatusResources = &kubecontainer.ContainerResources{
+				CPULimit:    cpuLimit,
+				MemoryLimit: memLimit,
+			}
+		}
+	}
+	return cStatusResources
+}
+
+func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
+	return nil
 }

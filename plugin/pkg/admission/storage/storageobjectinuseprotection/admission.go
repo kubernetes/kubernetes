@@ -21,11 +21,8 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -45,12 +42,9 @@ func Register(plugins *admission.Plugins) {
 // storageProtectionPlugin holds state for and implements the admission plugin.
 type storageProtectionPlugin struct {
 	*admission.Handler
-
-	storageObjectInUseProtection bool
 }
 
 var _ admission.Interface = &storageProtectionPlugin{}
-var _ initializer.WantsFeatures = &storageProtectionPlugin{}
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *storageProtectionPlugin {
@@ -70,10 +64,6 @@ var (
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
 func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	if !c.storageObjectInUseProtection {
-		return nil
-	}
-
 	switch a.GetResource().GroupResource() {
 	case pvResource:
 		return c.admitPV(a)
@@ -127,13 +117,5 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 
 	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
-	return nil
-}
-
-func (c *storageProtectionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	c.storageObjectInUseProtection = featureGates.Enabled(features.StorageObjectInUseProtection)
-}
-
-func (c *storageProtectionPlugin) ValidateInitialization() error {
 	return nil
 }

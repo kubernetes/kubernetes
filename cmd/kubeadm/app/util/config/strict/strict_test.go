@@ -14,18 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package strict
+package strict_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
 func TestVerifyUnmarshalStrict(t *testing.T) {
@@ -33,6 +38,7 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		pathTestData = "testdata/"
 	)
 
+	var schemes = []*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}
 	var testFiles = []struct {
 		fileName      string
 		kind          string
@@ -41,15 +47,21 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 	}{
 		// tests with file errors
 		{
+			fileName:      "invalid_casesensitive_field.yaml",
+			kind:          constants.ClusterConfigurationKind,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
+			expectedError: true,
+		},
+		{
 			fileName:      "invalid_duplicate_field_clustercfg.yaml",
 			kind:          constants.InitConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
 			fileName:      "invalid_duplicate_field_joincfg.yaml",
 			kind:          constants.JoinConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
@@ -67,19 +79,19 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		{
 			fileName:      "invalid_unknown_field_clustercfg.yaml",
 			kind:          constants.ClusterConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
 			fileName:      "invalid_unknown_field_initcfg.yaml",
 			kind:          constants.InitConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
 			fileName:      "invalid_unknown_field_joincfg.yaml",
 			kind:          constants.JoinConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
@@ -104,26 +116,26 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		{
 			fileName:      "valid_clustercfg.yaml",
 			kind:          "SomeUnknownKind",
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		// valid tests
 		{
 			fileName:      "valid_clustercfg.yaml",
 			kind:          constants.ClusterConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: false,
 		},
 		{
 			fileName:      "valid_initcfg.yaml",
 			kind:          constants.InitConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: false,
 		},
 		{
 			fileName:      "valid_joincfg.yaml",
 			kind:          constants.JoinConfigurationKind,
-			groupVersion:  kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion:  kubeadmapiv1.SchemeGroupVersion,
 			expectedError: false,
 		},
 		{
@@ -142,7 +154,7 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 
 	for _, test := range testFiles {
 		t.Run(test.fileName, func(t *testing.T) {
-			bytes, err := ioutil.ReadFile(filepath.Join(pathTestData, test.fileName))
+			bytes, err := os.ReadFile(filepath.Join(pathTestData, test.fileName))
 			if err != nil {
 				t.Fatalf("couldn't read test data: %v", err)
 			}
@@ -151,7 +163,7 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 				Version: test.groupVersion.Version,
 				Kind:    test.kind,
 			}
-			err = VerifyUnmarshalStrict(bytes, gvk)
+			err = strict.VerifyUnmarshalStrict(schemes, gvk, bytes)
 			if (err != nil) != test.expectedError {
 				t.Errorf("expected error %v, got %v, error: %v", err != nil, test.expectedError, err)
 			}

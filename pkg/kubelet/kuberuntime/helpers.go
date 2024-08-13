@@ -17,16 +17,19 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 type podsByID []*kubecontainer.Pod
@@ -48,14 +51,14 @@ func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
 
-type containerStatusByCreated []*kubecontainer.ContainerStatus
+type containerStatusByCreated []*kubecontainer.Status
 
 func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
-// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
-func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.ContainerState {
+// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
+func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
 	switch state {
 	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
@@ -81,7 +84,7 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_SCTP
 	}
 
-	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
 	return runtimeapi.Protocol_TCP
 }
 
@@ -91,14 +94,22 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
+	// Keep backwards compatibility to older runtimes, c.ImageId has been added in v1.30
+	imageID := c.ImageRef
+	if c.ImageId != "" {
+		imageID = c.ImageId
+	}
+
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:    c.GetMetadata().GetName(),
-		ImageID: c.ImageRef,
-		Image:   c.Image.Image,
-		Hash:    annotatedInfo.Hash,
-		State:   toKubeContainerState(c.State),
+		ID:                  kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:                c.GetMetadata().GetName(),
+		ImageID:             imageID,
+		ImageRef:            c.ImageRef,
+		ImageRuntimeHandler: c.Image.RuntimeHandler,
+		Image:               c.Image.Image,
+		Hash:                annotatedInfo.Hash,
+		State:               toKubeContainerState(c.State),
 	}, nil
 }
 
@@ -119,11 +130,12 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
-func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, error) {
-	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+func (m *kubeGenericRuntimeManager) getImageUser(ctx context.Context, image string) (*int64, string, error) {
+	resp, err := m.imageService.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: image}, false)
 	if err != nil {
 		return nil, "", err
 	}
+	imageStatus := resp.GetImage()
 
 	if imageStatus != nil {
 		if imageStatus.Uid != nil {
@@ -139,9 +151,16 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 	return new(int64), "", nil
 }
 
-// isInitContainerFailed returns true if container has exited and exitcode is not zero
-// or is in unknown state.
-func isInitContainerFailed(status *kubecontainer.ContainerStatus) bool {
+// isInitContainerFailed returns true under the following conditions:
+// 1. container has exited and exitcode is not zero.
+// 2. container is in unknown state.
+// 3. container gets OOMKilled.
+func isInitContainerFailed(status *kubecontainer.Status) bool {
+	// When oomkilled occurs, init container should be considered as a failure.
+	if status.Reason == "OOMKilled" {
+		return true
+	}
+
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
 		return true
 	}
@@ -170,13 +189,13 @@ func buildContainerLogsPath(containerName string, restartCount int) string {
 }
 
 // BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
-func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID, containerName string) string {
-	return filepath.Join(BuildPodLogsDirectory(podNamespace, podName, podUID), containerName)
+func BuildContainerLogsDirectory(podLogsDir, podNamespace, podName string, podUID types.UID, containerName string) string {
+	return filepath.Join(BuildPodLogsDirectory(podLogsDir, podNamespace, podName, podUID), containerName)
 }
 
 // BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
-func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
-	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
+func BuildPodLogsDirectory(podLogsDir, podNamespace, podName string, podUID types.UID) string {
+	return filepath.Join(podLogsDir, strings.Join([]string{podNamespace, podName,
 		string(podUID)}, logPathDelimiter))
 }
 
@@ -189,7 +208,7 @@ func parsePodUIDFromLogsDirectory(name string) types.UID {
 }
 
 // toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.
-func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.RuntimeStatus {
+func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeapi.RuntimeHandler, features *runtimeapi.RuntimeFeatures) *kubecontainer.RuntimeStatus {
 	conditions := []kubecontainer.RuntimeCondition{}
 	for _, c := range status.GetConditions() {
 		conditions = append(conditions, kubecontainer.RuntimeCondition{
@@ -199,69 +218,122 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 			Message: c.Message,
 		})
 	}
-	return &kubecontainer.RuntimeStatus{Conditions: conditions}
-}
-
-// getSeccompProfileFromAnnotations gets seccomp profile from annotations.
-// It gets pod's profile if containerName is empty.
-func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
-	// try the pod profile.
-	profile, profileOK := annotations[v1.SeccompPodAnnotationKey]
-	if containerName != "" {
-		// try the container profile.
-		cProfile, cProfileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]
-		if cProfileOK {
-			profile = cProfile
-			profileOK = cProfileOK
+	retHandlers := make([]kubecontainer.RuntimeHandler, len(handlers))
+	for i, h := range handlers {
+		supportsRRO := false
+		supportsUserns := false
+		if h.Features != nil {
+			supportsRRO = h.Features.RecursiveReadOnlyMounts
+			supportsUserns = h.Features.UserNamespaces
+		}
+		retHandlers[i] = kubecontainer.RuntimeHandler{
+			Name:                            h.Name,
+			SupportsRecursiveReadOnlyMounts: supportsRRO,
+			SupportsUserNamespaces:          supportsUserns,
 		}
 	}
-
-	if !profileOK {
-		return ""
-	}
-
-	if strings.HasPrefix(profile, "localhost/") {
-		name := strings.TrimPrefix(profile, "localhost/")
-		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return "localhost/" + fname
-	}
-
-	return profile
-}
-
-func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostIPC {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostNetwork {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil {
-		if pod.Spec.HostPID {
-			return runtimeapi.NamespaceMode_NODE
-		}
-		if pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
-			return runtimeapi.NamespaceMode_POD
+	var retFeatures *kubecontainer.RuntimeFeatures
+	if features != nil {
+		retFeatures = &kubecontainer.RuntimeFeatures{
+			SupplementalGroupsPolicy: features.SupplementalGroupsPolicy,
 		}
 	}
-	// Note that PID does not default to the zero value for v1.Pod
-	return runtimeapi.NamespaceMode_CONTAINER
+	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}
 }
 
-// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
-// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
-		Ipc:     ipcNamespaceForPod(pod),
-		Network: networkNamespaceForPod(pod),
-		Pid:     pidNamespaceForPod(pod),
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
+	if scmp == nil {
+		if fallbackToRuntimeDefault {
+			return &runtimeapi.SecurityProfile{
+				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+			}, nil
+		}
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}, nil
 	}
+	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}, nil
+	}
+	if scmp.Type == v1.SeccompProfileTypeLocalhost {
+		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+			return &runtimeapi.SecurityProfile{
+				ProfileType:  runtimeapi.SecurityProfile_Localhost,
+				LocalhostRef: fname,
+			}, nil
+		} else {
+			return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
+		}
+	}
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}, nil
+}
+
+func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
+	// container fields are applied first
+	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
+	}
+
+	// when container seccomp is not defined, try to apply from pod field
+	if podSecContext != nil && podSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
+	}
+
+	if fallbackToRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}, nil
+	}
+
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}, nil
+}
+
+func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, string, error) {
+	profile := apparmor.GetProfile(pod, container)
+	if profile == nil {
+		return nil, "", nil
+	}
+
+	var (
+		securityProfile   *runtimeapi.SecurityProfile
+		deprecatedProfile string // Deprecated apparmor profile format, still provided for backwards compatibility with older runtimes.
+	)
+
+	switch profile.Type {
+	case v1.AppArmorProfileTypeRuntimeDefault:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileRuntimeDefault
+
+	case v1.AppArmorProfileTypeUnconfined:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNameUnconfined
+
+	case v1.AppArmorProfileTypeLocalhost:
+		if profile.LocalhostProfile == nil {
+			return nil, "", errors.New("missing localhost apparmor profile name")
+		}
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: *profile.LocalhostProfile,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile
+
+	default:
+		// Shouldn't happen.
+		return nil, "", fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
+	}
+
+	return securityProfile, deprecatedProfile, nil
 }

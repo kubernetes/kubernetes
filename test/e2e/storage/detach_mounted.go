@@ -27,24 +27,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage          = imageutils.GetE2EImage(imageutils.BusyBox)
 	durationForStuckMount = 110 * time.Second
 )
 
-var _ = utils.SIGDescribe("Detaching volumes", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 
@@ -53,7 +54,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 	var node *v1.Node
 	var suffix string
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
@@ -62,21 +63,21 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		cs = f.ClientSet
 		ns = f.Namespace
 		var err error
-		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should not work when mount is in progress [Slow]", func() {
+	f.It("should not work when mount is in progress", f.WithSlow(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		volumeSource := v1.VolumeSource{
 			FlexVolume: &v1.FlexVolumeSource{
 				Driver: "k8s/" + driverInstallAs,
@@ -85,31 +86,31 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		ginkgo.By("Creating pod that uses slow format volume")
-		pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), clientPod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(ns.Name).Create(ctx, clientPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 
 		ginkgo.By("waiting for volumes to be attached to node")
-		err = waitForVolumesAttached(cs, node.Name, uniqueVolumeName)
+		err = waitForVolumesAttached(ctx, cs, node.Name, uniqueVolumeName)
 		framework.ExpectNoError(err, "while waiting for volume to attach to %s node", node.Name)
 
 		ginkgo.By("waiting for volume-in-use on the node after pod creation")
-		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
+		err = waitForVolumesInUse(ctx, cs, node.Name, uniqueVolumeName)
 		framework.ExpectNoError(err, "while waiting for volume in use")
 
 		ginkgo.By("waiting for kubelet to start mounting the volume")
 		time.Sleep(20 * time.Second)
 
 		ginkgo.By("Deleting the flexvolume pod")
-		err = e2epod.DeletePodWithWait(cs, pod)
+		err = e2epod.DeletePodWithWait(ctx, cs, pod)
 		framework.ExpectNoError(err, "in deleting the pod")
 
 		// Wait a bit for node to sync the volume status
 		time.Sleep(30 * time.Second)
 
 		ginkgo.By("waiting for volume-in-use on the node after pod deletion")
-		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
+		err = waitForVolumesInUse(ctx, cs, node.Name, uniqueVolumeName)
 		framework.ExpectNoError(err, "while waiting for volume in use")
 
 		// Wait for 110s because mount device operation has a sleep of 120 seconds
@@ -117,13 +118,13 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		time.Sleep(durationForStuckMount)
 
 		ginkgo.By("waiting for volume to disappear from node in-use")
-		err = waitForVolumesNotInUse(cs, node.Name, uniqueVolumeName)
+		err = waitForVolumesNotInUse(ctx, cs, node.Name, uniqueVolumeName)
 		framework.ExpectNoError(err, "while waiting for volume to be removed from in-use")
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
-		uninstallFlex(cs, nil, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, nil, "k8s", driverInstallAs)
 	})
 })
 
@@ -131,9 +132,9 @@ func getUniqueVolumeName(pod *v1.Pod, driverName string) string {
 	return fmt.Sprintf("k8s/%s/%s", driverName, pod.Spec.Volumes[0].Name)
 }
 
-func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+func waitForVolumesNotInUse(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
@@ -151,9 +152,9 @@ func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName str
 	return nil
 }
 
-func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+func waitForVolumesAttached(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
@@ -171,9 +172,9 @@ func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName str
 	return nil
 }
 
-func waitForVolumesInUse(client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+func waitForVolumesInUse(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
@@ -208,7 +209,7 @@ func getFlexVolumePod(volumeSource v1.VolumeSource, nodeName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:       "flexvolume-detach-test" + "-client",
-					Image:      BusyBoxImage,
+					Image:      imageutils.GetE2EImage(imageutils.BusyBox),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads vol contents for
 					// us to scan in the tests or by eye.

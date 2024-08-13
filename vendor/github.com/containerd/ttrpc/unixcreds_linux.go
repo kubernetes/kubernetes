@@ -18,25 +18,26 @@ package ttrpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
 type UnixCredentialsFunc func(*unix.Ucred) error
 
-func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error) {
+func (fn UnixCredentialsFunc) Handshake(_ context.Context, conn net.Conn) (net.Conn, interface{}, error) {
 	uc, err := requireUnixSocket(conn)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "ttrpc.UnixCredentialsFunc: require unix socket")
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: require unix socket: %w", err)
 	}
 
 	rs, err := uc.SyscallConn()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "ttrpc.UnixCredentialsFunc: (net.UnixConn).SyscallConn failed")
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: (net.UnixConn).SyscallConn failed: %w", err)
 	}
 	var (
 		ucred    *unix.Ucred
@@ -45,15 +46,15 @@ func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net
 	if err := rs.Control(func(fd uintptr) {
 		ucred, ucredErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
 	}); err != nil {
-		return nil, nil, errors.Wrapf(err, "ttrpc.UnixCredentialsFunc: (*syscall.RawConn).Control failed")
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: (*syscall.RawConn).Control failed: %w", err)
 	}
 
 	if ucredErr != nil {
-		return nil, nil, errors.Wrapf(err, "ttrpc.UnixCredentialsFunc: failed to retrieve socket peer credentials")
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: failed to retrieve socket peer credentials: %w", ucredErr)
 	}
 
 	if err := fn(ucred); err != nil {
-		return nil, nil, errors.Wrapf(err, "ttrpc.UnixCredentialsFunc: credential check failed")
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: credential check failed: %w", err)
 	}
 
 	return uc, ucred, nil
@@ -87,13 +88,9 @@ func UnixSocketRequireSameUser() UnixCredentialsFunc {
 	return UnixSocketRequireUidGid(euid, egid)
 }
 
-func requireRoot(ucred *unix.Ucred) error {
-	return requireUidGid(ucred, 0, 0)
-}
-
 func requireUidGid(ucred *unix.Ucred, uid, gid int) error {
 	if (uid != -1 && uint32(uid) != ucred.Uid) || (gid != -1 && uint32(gid) != ucred.Gid) {
-		return errors.Wrap(syscall.EPERM, "ttrpc: invalid credentials")
+		return fmt.Errorf("ttrpc: invalid credentials: %v", syscall.EPERM)
 	}
 	return nil
 }

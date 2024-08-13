@@ -18,14 +18,49 @@ package test
 
 import (
 	"net"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/testutil"
+	netutils "k8s.io/utils/net"
 )
+
+const NodePollInterval = 10 * time.Millisecond
+
+var AlwaysReady = func() bool { return true }
 
 // MustParseCIDR returns the CIDR range parsed from s or panics if the string
 // cannot be parsed.
 func MustParseCIDR(s string) *net.IPNet {
-	_, ret, err := net.ParseCIDR(s)
+	_, ret, err := netutils.ParseCIDRSloppy(s)
 	if err != nil {
 		panic(err)
 	}
 	return ret
+}
+
+// FakeNodeInformer creates a fakeNodeInformer using the provided fakeNodeHandler.
+func FakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.NodeInformer {
+	fakeClient := &fake.Clientset{}
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
+
+	for _, node := range fakeNodeHandler.Existing {
+		fakeNodeInformer.Informer().GetStore().Add(node)
+	}
+
+	return fakeNodeInformer
+}
+
+func WaitForUpdatedNodeWithTimeout(nodeHandler *testutil.FakeNodeHandler, number int, timeout time.Duration) error {
+	return wait.Poll(NodePollInterval, timeout, func() (bool, error) {
+		if len(nodeHandler.GetUpdatedNodesCopy()) >= number {
+			return true, nil
+		}
+		return false, nil
+	})
 }

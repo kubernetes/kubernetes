@@ -17,17 +17,19 @@ limitations under the License.
 package authorizerfactory
 
 import (
+	"errors"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-// DelegatingAuthorizerConfig is the minimal configuration needed to create an authenticator
+// DelegatingAuthorizerConfig is the minimal configuration needed to create an authorizer
 // built to delegate authorization to a kube API server
 type DelegatingAuthorizerConfig struct {
-	SubjectAccessReviewClient authorizationclient.SubjectAccessReviewInterface
+	SubjectAccessReviewClient authorizationclient.AuthorizationV1Interface
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -35,12 +37,24 @@ type DelegatingAuthorizerConfig struct {
 	// DenyCacheTTL is the length of time that an unsuccessful authorization response will be cached.
 	// You generally want more responsive, "deny, try again" flows.
 	DenyCacheTTL time.Duration
+
+	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
+	if c.WebhookRetryBackoff == nil {
+		return nil, errors.New("retry backoff parameters for delegating authorization webhook has not been specified")
+	}
+
 	return webhook.NewFromInterface(
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,
+		*c.WebhookRetryBackoff,
+		authorizer.DecisionNoOpinion,
+		NewDelegatingAuthorizerMetrics(),
 	)
 }

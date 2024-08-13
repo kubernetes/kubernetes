@@ -17,26 +17,23 @@ limitations under the License.
 package apiclient
 
 import (
-	"net"
-	"strings"
-
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
+	netutils "k8s.io/utils/net"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	utilnet "k8s.io/utils/net"
 )
 
 // InitDryRunGetter implements the DryRunGetter interface and can be used to GET/LIST values in the dryrun fake clientset
 // Need to handle these routes in a special manner:
 // - GET /default/services/kubernetes -- must return a valid Service
 // - GET /clusterrolebindings/system:nodes -- can safely return a NotFound error
-// - GET /kube-system/secrets/bootstrap-token-* -- can safely return a NotFound error
 // - GET /nodes/<node-name> -- must return a valid Node
 // - ...all other, unknown GETs/LISTs will be logged
 type InitDryRunGetter struct {
@@ -61,7 +58,6 @@ func (idr *InitDryRunGetter) HandleGetAction(action core.GetAction) (bool, runti
 		idr.handleKubernetesService,
 		idr.handleGetNode,
 		idr.handleSystemNodesClusterRoleBinding,
-		idr.handleGetBootstrapToken,
 	}
 	for _, f := range funcs {
 		handled, obj, err := f(action)
@@ -80,24 +76,24 @@ func (idr *InitDryRunGetter) HandleListAction(action core.ListAction) (bool, run
 }
 
 // handleKubernetesService returns a faked Kubernetes service in order to be able to continue running kubeadm init.
-// The kube-dns addon code GETs the Kubernetes service in order to extract the service subnet
+// The CoreDNS addon code GETs the Kubernetes service in order to extract the service subnet
 func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (bool, runtime.Object, error) {
 	if action.GetName() != "kubernetes" || action.GetNamespace() != metav1.NamespaceDefault || action.GetResource().Resource != "services" {
 		// We can't handle this event
 		return false, nil, nil
 	}
 
-	_, svcSubnet, err := net.ParseCIDR(idr.serviceSubnet)
+	_, svcSubnet, err := netutils.ParseCIDRSloppy(idr.serviceSubnet)
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "error parsing CIDR %q", idr.serviceSubnet)
 	}
 
-	internalAPIServerVirtualIP, err := utilnet.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := netutils.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}
 
-	// The only used field of this Service object is the ClusterIP, which kube-dns uses to calculate its own IP
+	// The only used field of this Service object is the ClusterIP, which CoreDNS uses to calculate its own IP
 	return true, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kubernetes",
@@ -113,7 +109,7 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 				{
 					Name:       "https",
 					Port:       443,
-					TargetPort: intstr.FromInt(6443),
+					TargetPort: intstr.FromInt32(6443),
 				},
 			},
 		},
@@ -147,15 +143,4 @@ func (idr *InitDryRunGetter) handleSystemNodesClusterRoleBinding(action core.Get
 	// We can safely return a NotFound error here as the code will just proceed normally and don't care about modifying this clusterrolebinding
 	// This can only happen on an upgrade; and in that case the ClientBackedDryRunGetter impl will be used
 	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "clusterrolebinding not found")
-}
-
-// handleGetBootstrapToken handles the case where kubeadm init creates the default token; and the token code GETs the
-// bootstrap token secret first in order to check if it already exists
-func (idr *InitDryRunGetter) handleGetBootstrapToken(action core.GetAction) (bool, runtime.Object, error) {
-	if !strings.HasPrefix(action.GetName(), "bootstrap-token-") || action.GetNamespace() != metav1.NamespaceSystem || action.GetResource().Resource != "secrets" {
-		// We can't handle this event
-		return false, nil, nil
-	}
-	// We can safely return a NotFound error here as the code will just proceed normally and create the Bootstrap Token
-	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "secret not found")
 }

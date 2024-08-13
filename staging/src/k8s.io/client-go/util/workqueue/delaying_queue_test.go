@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestSimpleQueue(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
 	first := "foo"
 
@@ -70,8 +70,8 @@ func TestSimpleQueue(t *testing.T) {
 }
 
 func TestDeduping(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
 	first := "foo"
 
@@ -123,14 +123,11 @@ func TestDeduping(t *testing.T) {
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
-	if q.Len() != 0 {
-		t.Errorf("should not have added")
-	}
 }
 
 func TestAddTwoFireEarly(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
 	first := "foo"
 	second := "bar"
@@ -178,8 +175,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 }
 
 func TestCopyShifting(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
 	first := "foo"
 	second := "bar"
@@ -216,8 +213,8 @@ func TestCopyShifting(t *testing.T) {
 }
 
 func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
-	fakeClock := clock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
 	// Add items
 	for n := 0; n < b.N; n++ {
@@ -244,7 +241,7 @@ func waitForAdded(q DelayingInterface, depth int) error {
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if len(q.(*delayingType).waitingForAddCh) == 0 {
+		if len(q.(*delayingType[any]).waitingForAddCh) == 0 {
 			return true, nil
 		}
 

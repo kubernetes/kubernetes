@@ -22,7 +22,12 @@ import (
 	"io"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+)
+
+const (
+	usageFmt = "Usage:\n  %s\n"
 )
 
 // NamedFlagSets stores named flag sets in the order of calling FlagSet.
@@ -31,6 +36,8 @@ type NamedFlagSets struct {
 	Order []string
 	// FlagSets stores the flag sets by name.
 	FlagSets map[string]*pflag.FlagSet
+	// NormalizeNameFunc is the normalize function which used to initialize FlagSets created by NamedFlagSets.
+	NormalizeNameFunc func(f *pflag.FlagSet, name string) pflag.NormalizedName
 }
 
 // FlagSet returns the flag set with the given name and adds it to the
@@ -40,7 +47,12 @@ func (nfs *NamedFlagSets) FlagSet(name string) *pflag.FlagSet {
 		nfs.FlagSets = map[string]*pflag.FlagSet{}
 	}
 	if _, ok := nfs.FlagSets[name]; !ok {
-		nfs.FlagSets[name] = pflag.NewFlagSet(name, pflag.ExitOnError)
+		flagSet := pflag.NewFlagSet(name, pflag.ExitOnError)
+		flagSet.SetNormalizeFunc(pflag.CommandLine.GetNormalizeFunc())
+		if nfs.NormalizeNameFunc != nil {
+			flagSet.SetNormalizeFunc(nfs.NormalizeNameFunc)
+		}
+		nfs.FlagSets[name] = flagSet
 		nfs.Order = append(nfs.Order, name)
 	}
 	return nfs.FlagSets[name]
@@ -76,4 +88,18 @@ func PrintSections(w io.Writer, fss NamedFlagSets, cols int) {
 			fmt.Fprint(w, buf.String())
 		}
 	}
+}
+
+// SetUsageAndHelpFunc set both usage and help function.
+// Print the flag sets we need instead of all of them.
+func SetUsageAndHelpFunc(cmd *cobra.Command, fss NamedFlagSets, cols int) {
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
+		PrintSections(cmd.OutOrStderr(), fss, cols)
+		return nil
+	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
+		PrintSections(cmd.OutOrStdout(), fss, cols)
+	})
 }

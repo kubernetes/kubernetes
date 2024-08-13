@@ -18,7 +18,6 @@ package gci
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -155,7 +154,7 @@ jelloworld
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			f, err := ioutil.TempFile("", "append_or_replace_test")
+			f, err := os.CreateTemp("", "append_or_replace_test")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
@@ -170,7 +169,7 @@ jelloworld
 			if err != nil {
 				t.Fatalf("Failed to run command: %v: %s", err, stderr)
 			}
-			got, err := ioutil.ReadFile(f.Name())
+			got, err := os.ReadFile(f.Name())
 			if err != nil {
 				t.Fatalf("Failed to read file contents: %v", err)
 			}

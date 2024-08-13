@@ -19,17 +19,17 @@ package generators
 import (
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
-
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-
+	"k8s.io/code-generator/cmd/lister-gen/args"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
 
@@ -59,16 +59,16 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	var packageList generator.Packages
-	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(inputDir)
+	var targetList []generator.Target
+	for _, inputPkg := range context.Inputs {
+		p := context.Universe.Package(inputPkg)
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
@@ -101,7 +101,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+		if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			gv.Group = clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0])
 		}
 
@@ -119,26 +119,33 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
-		packageList = append(packageList, &generator.DefaultPackage{
-			PackageName: strings.ToLower(gv.Version.NonEmpty()),
-			PackagePath: packagePath,
-			HeaderText:  boilerplate,
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		subdir := []string{groupPackageName, strings.ToLower(gv.Version.NonEmpty())}
+		outputDir := filepath.Join(args.OutputDir, filepath.Join(subdir...))
+		outputPkg := path.Join(args.OutputPkg, path.Join(subdir...))
+		targetList = append(targetList, &generator.SimpleTarget{
+			PkgName:       strings.ToLower(gv.Version.NonEmpty()),
+			PkgPath:       outputPkg,
+			PkgDir:        outputDir,
+			HeaderComment: boilerplate,
+			FilterFunc: func(c *generator.Context, t *types.Type) bool {
+				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
+			},
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "expansion_generated",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "expansion_generated.go",
 					},
-					packagePath: filepath.Join(arguments.OutputBase, packagePath),
-					types:       typesToGenerate,
+					outputPath: outputDir,
+					types:      typesToGenerate,
 				})
 
 				for _, t := range typesToGenerate {
 					generators = append(generators, &listerGenerator{
-						DefaultGen: generator.DefaultGen{
-							OptionalName: strings.ToLower(t.Name.Name),
+						GoGenerator: generator.GoGenerator{
+							OutputFilename: strings.ToLower(t.Name.Name) + ".go",
 						},
-						outputPackage:  arguments.OutputPackagePath,
+						outputPackage:  outputPkg,
 						groupVersion:   gv,
 						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
@@ -148,21 +155,17 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				}
 				return generators
 			},
-			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
-			},
 		})
 	}
 
-	return packageList
+	return targetList
 }
 
 // objectMetaForPackage returns the type of ObjectMeta used by package p.
 func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
-		// filter out types which dont have genclient.
+		// filter out types which don't have genclient.
 		if !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient {
 			continue
 		}
@@ -187,7 +190,7 @@ func isInternal(m types.Member) bool {
 // listerGenerator produces a file of listers for a given GroupVersion and
 // type.
 type listerGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage  string
 	groupVersion   clientgentypes.GroupVersion
 	internalGVPkg  string
@@ -212,6 +215,7 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
 	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
+	imports = append(imports, "k8s.io/client-go/listers")
 	// for Indexer
 	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
@@ -233,25 +237,21 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 	}
 
 	if tags.NonNamespaced {
-		sw.Do(typeListerInterface_NonNamespaced, m)
+		sw.Do(typeListerInterfaceNonNamespaced, m)
 	} else {
 		sw.Do(typeListerInterface, m)
 	}
 
 	sw.Do(typeListerStruct, m)
 	sw.Do(typeListerConstructor, m)
-	sw.Do(typeLister_List, m)
 
 	if tags.NonNamespaced {
-		sw.Do(typeLister_NonNamespacedGet, m)
 		return sw.Error()
 	}
 
-	sw.Do(typeLister_NamespaceLister, m)
+	sw.Do(typeListerNamespaceLister, m)
 	sw.Do(namespaceListerInterface, m)
 	sw.Do(namespaceListerStruct, m)
-	sw.Do(namespaceLister_List, m)
-	sw.Do(namespaceLister_Get, m)
 
 	return sw.Error()
 }
@@ -269,7 +269,7 @@ type $.type|public$Lister interface {
 }
 `
 
-var typeListerInterface_NonNamespaced = `
+var typeListerInterfaceNonNamespaced = `
 // $.type|public$Lister helps list $.type|publicPlural$.
 // All objects returned here must be treated as read-only.
 type $.type|public$Lister interface {
@@ -283,48 +283,27 @@ type $.type|public$Lister interface {
 }
 `
 
+// This embeds a typed resource indexer instead of aliasing, so that the struct
+// is available as a receiver for methods specific to the generated type
+// (from the corresponding expansion interface).
 var typeListerStruct = `
 // $.type|private$Lister implements the $.type|public$Lister interface.
 type $.type|private$Lister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*$.type|raw$]
 }
 `
 
 var typeListerConstructor = `
 // New$.type|public$Lister returns a new $.type|public$Lister.
 func New$.type|public$Lister(indexer cache.Indexer) $.type|public$Lister {
-	return &$.type|private$Lister{indexer: indexer}
+	return &$.type|private$Lister{listers.New[*$.type|raw$](indexer, $.Resource|raw$("$.type|lowercaseSingular$"))}
 }
 `
 
-var typeLister_List = `
-// List lists all $.type|publicPlural$ in the indexer.
-func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*$.type|raw$))
-	})
-	return ret, err
-}
-`
-
-var typeLister_NamespaceLister = `
+var typeListerNamespaceLister = `
 // $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|public$NamespaceLister {
-	return $.type|private$NamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-`
-
-var typeLister_NonNamespacedGet = `
-// Get retrieves the $.type|public$ from the index for a given name.
-func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
-  obj, exists, err := s.indexer.GetByKey(name)
-  if err != nil {
-    return nil, err
-  }
-  if !exists {
-    return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
-  }
-  return obj.(*$.type|raw$), nil
+	return $.type|private$NamespaceLister{listers.NewNamespaced[*$.type|raw$](s.ResourceIndexer, namespace)}
 }
 `
 
@@ -342,35 +321,13 @@ type $.type|public$NamespaceLister interface {
 }
 `
 
+// This embeds a typed namespaced resource indexer instead of aliasing, so that the struct
+// is available as a receiver for methods specific to the generated type
+// (from the corresponding expansion interface).
 var namespaceListerStruct = `
 // $.type|private$NamespaceLister implements the $.type|public$NamespaceLister
 // interface.
 type $.type|private$NamespaceLister struct {
-	indexer cache.Indexer
-	namespace string
-}
-`
-
-var namespaceLister_List = `
-// List lists all $.type|publicPlural$ in the indexer for a given namespace.
-func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*$.type|raw$))
-	})
-	return ret, err
-}
-`
-
-var namespaceLister_Get = `
-// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
-func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
-	}
-	return obj.(*$.type|raw$), nil
+	listers.ResourceIndexer[*$.type|raw$]
 }
 `

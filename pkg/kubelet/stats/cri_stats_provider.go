@@ -17,28 +17,30 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	cadvisormemory "github.com/google/cadvisor/cache/memory"
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubetypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -66,14 +68,17 @@ type criStatsProvider struct {
 	runtimeService internalapi.RuntimeService
 	// imageService is used to get the stats of the image filesystem.
 	imageService internalapi.ImageManagerService
-	// logMetrics provides the metrics for container logs
-	logMetricsService LogMetricsService
-	// osInterface is the interface for syscalls.
-	osInterface kubecontainer.OSInterface
+	// hostStatsProvider is used to get the status of the host filesystem consumed by pods.
+	hostStatsProvider HostStatsProvider
+	// windowsNetworkStatsProvider is used by kubelet to gather networking stats on Windows
+	windowsNetworkStatsProvider interface{} //nolint:unused // U1000 We can't import hcsshim due to Build constraints in hcsshim
+	// clock is used report current time
+	clock clock.Clock
 
 	// cpuUsageCache caches the cpu usage for containers.
-	cpuUsageCache map[string]*cpuUsageRecord
-	mutex         sync.RWMutex
+	cpuUsageCache               map[string]*cpuUsageRecord
+	mutex                       sync.RWMutex
+	podAndContainerStatsFromCRI bool
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -83,24 +88,25 @@ func newCRIStatsProvider(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
-	logMetricsService LogMetricsService,
-	osInterface kubecontainer.OSInterface,
+	hostStatsProvider HostStatsProvider,
+	podAndContainerStatsFromCRI bool,
 ) containerStatsProvider {
 	return &criStatsProvider{
-		cadvisor:          cadvisor,
-		resourceAnalyzer:  resourceAnalyzer,
-		runtimeService:    runtimeService,
-		imageService:      imageService,
-		logMetricsService: logMetricsService,
-		osInterface:       osInterface,
-		cpuUsageCache:     make(map[string]*cpuUsageRecord),
+		cadvisor:                    cadvisor,
+		resourceAnalyzer:            resourceAnalyzer,
+		runtimeService:              runtimeService,
+		imageService:                imageService,
+		hostStatsProvider:           hostStatsProvider,
+		cpuUsageCache:               make(map[string]*cpuUsageRecord),
+		podAndContainerStatsFromCRI: podAndContainerStatsFromCRI,
+		clock:                       clock.RealClock{},
 	}
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.
-func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
+func (p *criStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	// Don't update CPU nano core usage.
-	return p.listPodStats(false)
+	return p.listPodStats(ctx, false)
 }
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
@@ -113,12 +119,12 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 // vary and the usage could be incoherent (e.g., spiky). If no caller calls
 // this function, the cpu usage will stay nil. Right now, eviction manager is
 // the only caller, and it calls this function every 10s.
-func (p *criStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+func (p *criStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
 	// Update CPU nano core usage.
-	return p.listPodStats(true)
+	return p.listPodStats(ctx, true)
 }
 
-func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi.PodStats, error) {
+func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUsage bool) ([]statsapi.PodStats, error) {
 	// Gets node root filesystem information, which will be used to populate
 	// the available and capacity bytes/inodes in container stats.
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
@@ -126,21 +132,31 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
 
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containerMap, podSandboxMap, err := p.getPodAndContainerMaps(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all containers: %v", err)
+		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
 	}
 
-	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
+	if p.podAndContainerStatsFromCRI {
+		result, err := p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
+		if err == nil {
+			// Call succeeded
+			return result, nil
+		}
+		s, ok := status.FromError(err)
+		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
+		if !ok || s.Code() != codes.Unimplemented {
+			return nil, err
+		}
+		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
+		klog.V(5).ErrorS(err,
+			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
+		)
 	}
-	podSandboxes = removeTerminatedPods(podSandboxes)
-	for _, s := range podSandboxes {
-		podSandboxMap[s.Id] = s
-	}
+	return p.listPodStatsPartiallyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
+}
+
+func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, updateCPUNanoCoreUsage bool, containerMap map[string]*runtimeapi.Container, podSandboxMap map[string]*runtimeapi.PodSandbox, rootFsInfo *cadvisorapiv2.FsInfo) ([]statsapi.PodStats, error) {
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
@@ -149,23 +165,15 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
-
-	containers = removeTerminatedContainers(containers)
-	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
-	for _, c := range containers {
-		containerMap[c.Id] = c
-	}
-
 	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos := getCRICadvisorStats(allInfos)
+	caInfos, allInfos := getCRICadvisorStats(allInfos)
 
 	// get network stats for containers.
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
@@ -196,19 +204,24 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		}
 
 		// Fill available stats for full set of required pod stats
-		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
+		cs, err := p.makeContainerStats(stats, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
+		if err != nil {
+			return nil, fmt.Errorf("make container stats: %w", err)
+		}
 		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			klog.V(5).Infof("Unable to find cadvisor stats for %q", containerID)
+			klog.V(5).InfoS("Unable to find cadvisor stats for container", "containerID", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
+			p.addProcessStats(ps, &caStats)
 		}
+
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	// cleanup outdated caches.
@@ -216,50 +229,91 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
-		p.makePodStorageStats(s, &rootFsInfo)
+		makePodStorageStats(s, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
 		result = append(result, *s)
 	}
 	return result, nil
 }
 
+func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, updateCPUNanoCoreUsage bool, containerMap map[string]*runtimeapi.Container, podSandboxMap map[string]*runtimeapi.PodSandbox, rootFsInfo *cadvisorapiv2.FsInfo) ([]statsapi.PodStats, error) {
+	criSandboxStats, err := p.runtimeService.ListPodSandboxStats(ctx, &runtimeapi.PodSandboxStatsFilter{})
+	if err != nil {
+		return nil, err
+	}
+
+	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
+	summarySandboxStats := make([]statsapi.PodStats, 0, len(podSandboxMap))
+	for _, criSandboxStat := range criSandboxStats {
+		if criSandboxStat == nil || criSandboxStat.Attributes == nil {
+			klog.V(5).InfoS("Unable to find CRI stats for sandbox")
+			continue
+		}
+		podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
+		if !found {
+			continue
+		}
+		ps := buildPodStats(podSandbox)
+		if err := p.addCRIPodContainerStats(criSandboxStat, ps, fsIDtoInfo, containerMap, podSandbox, rootFsInfo, updateCPUNanoCoreUsage); err != nil {
+			return nil, fmt.Errorf("add CRI pod container stats: %w", err)
+		}
+		addCRIPodNetworkStats(ps, criSandboxStat)
+		addCRIPodCPUStats(ps, criSandboxStat)
+		addCRIPodMemoryStats(ps, criSandboxStat)
+		addCRIPodProcessStats(ps, criSandboxStat)
+		makePodStorageStats(ps, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
+		summarySandboxStats = append(summarySandboxStats, *ps)
+	}
+	return summarySandboxStats, nil
+}
+
 // ListPodCPUAndMemoryStats returns the CPU and Memory stats of all the pod-managed containers.
-func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all containers: %v", err)
-	}
-
-	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
-	}
-	podSandboxes = removeTerminatedPods(podSandboxes)
-	for _, s := range podSandboxes {
-		podSandboxMap[s.Id] = s
-	}
-
+func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
-
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	containerMap, podSandboxMap, err := p.getPodAndContainerMaps(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all container stats: %v", err)
+		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
 	}
 
-	containers = removeTerminatedContainers(containers)
-	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
-	for _, c := range containers {
-		containerMap[c.Id] = c
+	result := make([]statsapi.PodStats, 0, len(podSandboxMap))
+	if p.podAndContainerStatsFromCRI {
+		criSandboxStats, err := p.runtimeService.ListPodSandboxStats(ctx, &runtimeapi.PodSandboxStatsFilter{})
+		// Call succeeded
+		if err == nil {
+			for _, criSandboxStat := range criSandboxStats {
+				podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
+				if !found {
+					continue
+				}
+				ps := buildPodStats(podSandbox)
+				addCRIPodCPUStats(ps, criSandboxStat)
+				addCRIPodMemoryStats(ps, criSandboxStat)
+				result = append(result, *ps)
+			}
+			return result, err
+		}
+		// Call failed, why?
+		s, ok := status.FromError(err)
+		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
+		if !ok || s.Code() != codes.Unimplemented {
+			return nil, err
+		}
+		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
+		klog.ErrorS(err,
+			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
+		)
+	}
+
+	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
 	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos := getCRICadvisorStats(allInfos)
+	caInfos, allInfos := getCRICadvisorStats(allInfos)
 
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
@@ -290,67 +344,99 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			klog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
+			klog.V(4).InfoS("Unable to find cadvisor stats for container", "containerID", containerID)
 		} else {
-			p.addCadvisorContainerStats(cs, &caStats)
+			p.addCadvisorContainerCPUAndMemoryStats(cs, &caStats)
 		}
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	// cleanup outdated caches.
 	p.cleanupOutdatedCaches()
 
-	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
 		result = append(result, *s)
 	}
 	return result, nil
 }
 
-// ImageFsStats returns the stats of the image filesystem.
-func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
-	resp, err := p.imageService.ImageFsInfo()
+func (p *criStatsProvider) getPodAndContainerMaps(ctx context.Context) (map[string]*runtimeapi.Container, map[string]*runtimeapi.PodSandbox, error) {
+	containers, err := p.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to list all containers: %v", err)
+	}
+
+	// Creates pod sandbox map between the pod sandbox ID and the PodSandbox object.
+	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
+	podSandboxes, err := p.runtimeService.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
+	}
+	podSandboxes = removeTerminatedPods(podSandboxes)
+	for _, s := range podSandboxes {
+		podSandboxMap[s.Id] = s
+	}
+
+	containers = removeTerminatedContainers(containers)
+	// Creates container map between the container ID and the Container object.
+	containerMap := make(map[string]*runtimeapi.Container)
+	for _, c := range containers {
+		containerMap[c.Id] = c
+	}
+	return containerMap, podSandboxMap, nil
+}
+
+// ImageFsStats returns the stats of the image filesystem.
+func (p *criStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *statsapi.FsStats, containerFsRet *statsapi.FsStats, errRet error) {
+	resp, err := p.imageService.ImageFsInfo(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// CRI may return the stats of multiple image filesystems but we only
 	// return the first one.
 	//
 	// TODO(yguo0905): Support returning stats of multiple image filesystems.
-	if len(resp) == 0 {
-		return nil, fmt.Errorf("imageFs information is unavailable")
+	if len(resp.GetImageFilesystems()) == 0 {
+		return nil, nil, fmt.Errorf("imageFs information is unavailable")
 	}
-	fs := resp[0]
-	s := &statsapi.FsStats{
+	fs := resp.GetImageFilesystems()[0]
+	imageFsRet = &statsapi.FsStats{
 		Time:      metav1.NewTime(time.Unix(0, fs.Timestamp)),
 		UsedBytes: &fs.UsedBytes.Value,
 	}
 	if fs.InodesUsed != nil {
-		s.InodesUsed = &fs.InodesUsed.Value
+		imageFsRet.InodesUsed = &fs.InodesUsed.Value
 	}
-	imageFsInfo := p.getFsInfo(fs.GetFsId())
+	imageFsInfo, err := p.getFsInfo(fs.GetFsId())
+	if err != nil {
+		return nil, nil, fmt.Errorf("get filesystem info: %w", err)
+	}
 	if imageFsInfo != nil {
 		// The image filesystem id is unknown to the local node or there's
 		// an error on retrieving the stats. In these cases, we omit those
 		// stats and return the best-effort partial result. See
 		// https://github.com/kubernetes/heapster/issues/1793.
-		s.AvailableBytes = &imageFsInfo.Available
-		s.CapacityBytes = &imageFsInfo.Capacity
-		s.InodesFree = imageFsInfo.InodesFree
-		s.Inodes = imageFsInfo.Inodes
+		imageFsRet.AvailableBytes = &imageFsInfo.Available
+		imageFsRet.CapacityBytes = &imageFsInfo.Capacity
+		imageFsRet.InodesFree = imageFsInfo.InodesFree
+		imageFsRet.Inodes = imageFsInfo.Inodes
 	}
-	return s, nil
+	// TODO: For CRI Stats Provider we don't support separate disks yet.
+	return imageFsRet, imageFsRet, nil
 }
 
 // ImageFsDevice returns name of the device where the image filesystem locates,
 // e.g. /dev/sda1.
-func (p *criStatsProvider) ImageFsDevice() (string, error) {
-	resp, err := p.imageService.ImageFsInfo()
+func (p *criStatsProvider) ImageFsDevice(ctx context.Context) (string, error) {
+	resp, err := p.imageService.ImageFsInfo(ctx)
 	if err != nil {
 		return "", err
 	}
-	for _, fs := range resp {
-		fsInfo := p.getFsInfo(fs.GetFsId())
+	for _, fs := range resp.GetImageFilesystems() {
+		fsInfo, err := p.getFsInfo(fs.GetFsId())
+		if err != nil {
+			return "", fmt.Errorf("get filesystem info: %w", err)
+		}
 		if fsInfo != nil {
 			return fsInfo.Device, nil
 		}
@@ -361,23 +447,26 @@ func (p *criStatsProvider) ImageFsDevice() (string, error) {
 // getFsInfo returns the information of the filesystem with the specified
 // fsID. If any error occurs, this function logs the error and returns
 // nil.
-func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cadvisorapiv2.FsInfo {
+func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) (*cadvisorapiv2.FsInfo, error) {
 	if fsID == nil {
-		klog.V(2).Infof("Failed to get filesystem info: fsID is nil.")
-		return nil
+		klog.V(2).InfoS("Failed to get filesystem info: fsID is nil")
+		return nil, nil
 	}
 	mountpoint := fsID.GetMountpoint()
 	fsInfo, err := p.cadvisor.GetDirFsInfo(mountpoint)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to get the info of the filesystem with mountpoint %q: %v.", mountpoint, err)
-		if err == cadvisorfs.ErrNoSuchDevice {
-			klog.V(2).Info(msg)
+		msg := "Failed to get the info of the filesystem with mountpoint"
+		if errors.Is(err, cadvisorfs.ErrNoSuchDevice) ||
+			errors.Is(err, cadvisorfs.ErrDeviceNotInPartitionsMap) ||
+			errors.Is(err, cadvisormemory.ErrDataNotFound) {
+			klog.V(2).InfoS(msg, "mountpoint", mountpoint, "err", err)
 		} else {
-			klog.Error(msg)
+			klog.ErrorS(err, msg, "mountpoint", mountpoint)
+			return nil, fmt.Errorf("%s: %w", msg, err)
 		}
-		return nil
+		return nil, nil
 	}
-	return &fsInfo
+	return &fsInfo, nil
 }
 
 // buildPodStats returns a PodStats that identifies the Pod managing cinfo
@@ -391,29 +480,6 @@ func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 		// The StartTime in the summary API is the pod creation time.
 		StartTime: metav1.NewTime(time.Unix(0, podSandbox.CreatedAt)),
 	}
-}
-
-func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo) {
-	podNs := s.PodRef.Namespace
-	podName := s.PodRef.Name
-	podUID := types.UID(s.PodRef.UID)
-	vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID)
-	if !found {
-		return
-	}
-	podLogDir := kuberuntime.BuildPodLogsDirectory(podNs, podName, podUID)
-	logStats, err := p.getPodLogStats(podLogDir, rootFsInfo)
-	if err != nil {
-		klog.Errorf("Unable to fetch pod log stats for path %s: %v ", podLogDir, err)
-		// If people do in-place upgrade, there might be pods still using
-		// the old log path. For those pods, no pod log stats is returned.
-		// We should continue generating other stats in that case.
-		// calcEphemeralStorage tolerants logStats == nil.
-	}
-	ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
-	copy(ephemeralStats, vstats.EphemeralVolumes)
-	s.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
-	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, true)
 }
 
 func (p *criStatsProvider) addPodNetworkStats(
@@ -440,7 +506,7 @@ func (p *criStatsProvider) addPodNetworkStats(
 	}
 
 	// TODO: sum Pod network stats from container stats.
-	klog.V(4).Infof("Unable to find network stats for sandbox %q", podSandboxID)
+	klog.V(4).InfoS("Unable to find network stats for sandbox", "sandboxID", podSandboxID)
 }
 
 func (p *criStatsProvider) addPodCPUMemoryStats(
@@ -464,7 +530,7 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 			ps.CPU = &statsapi.CPUStats{}
 		}
 
-		ps.CPU.Time = cs.StartTime
+		ps.CPU.Time = cs.CPU.Time
 		usageCoreNanoSeconds := getUint64Value(cs.CPU.UsageCoreNanoSeconds) + getUint64Value(ps.CPU.UsageCoreNanoSeconds)
 		usageNanoCores := getUint64Value(cs.CPU.UsageNanoCores) + getUint64Value(ps.CPU.UsageNanoCores)
 		ps.CPU.UsageCoreNanoSeconds = &usageCoreNanoSeconds
@@ -492,18 +558,38 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 	}
 }
 
-func (p *criStatsProvider) addProcessStats(
+func (p *criStatsProvider) addSwapStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
 	allInfos map[string]cadvisorapiv2.ContainerInfo,
 	cs *statsapi.ContainerStats,
 ) {
-	// try get process stats from cadvisor only.
-	info := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if info != nil {
-		ps.ProcessStats = cadvisorInfoToProcessStats(info)
+	// try get cpu and memory stats from cadvisor first.
+	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+	if podCgroupInfo != nil {
+		ps.Swap = cadvisorInfoToSwapStats(podCgroupInfo)
 		return
 	}
+
+	// Sum Pod cpu and memory stats from containers stats.
+	if cs.Swap != nil {
+		if ps.Swap == nil {
+			ps.Swap = &statsapi.SwapStats{Time: cs.Swap.Time}
+		}
+		swapAvailableBytes := getUint64Value(cs.Swap.SwapAvailableBytes) + getUint64Value(ps.Swap.SwapAvailableBytes)
+		swapUsageBytes := getUint64Value(cs.Swap.SwapUsageBytes) + getUint64Value(ps.Swap.SwapUsageBytes)
+		ps.Swap.SwapAvailableBytes = &swapAvailableBytes
+		ps.Swap.SwapUsageBytes = &swapUsageBytes
+	}
+}
+
+func (p *criStatsProvider) addProcessStats(
+	ps *statsapi.PodStats,
+	container *cadvisorapiv2.ContainerInfo,
+) {
+	processStats := cadvisorInfoToProcessStats(container)
+	// Sum up all of the process stats for each of the containers to obtain the cumulative pod level process count
+	ps.ProcessStats = mergeProcessStats(ps.ProcessStats, processStats)
 }
 
 func (p *criStatsProvider) makeContainerStats(
@@ -513,7 +599,7 @@ func (p *criStatsProvider) makeContainerStats(
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
 	meta *runtimeapi.PodSandboxMetadata,
 	updateCPUNanoCoreUsage bool,
-) *statsapi.ContainerStats {
+) (*statsapi.ContainerStats, error) {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
 		// The StartTime in the summary API is the container creation time.
@@ -521,6 +607,7 @@ func (p *criStatsProvider) makeContainerStats(
 		CPU:       &statsapi.CPUStats{},
 		Memory:    &statsapi.MemoryStats{},
 		Rootfs:    &statsapi.FsStats{},
+		Swap:      &statsapi.SwapStats{},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -551,6 +638,19 @@ func (p *criStatsProvider) makeContainerStats(
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = uint64Ptr(0)
 	}
+	if stats.Swap != nil {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
+		if stats.Swap.SwapUsageBytes != nil {
+			result.Swap.SwapUsageBytes = &stats.Swap.SwapUsageBytes.Value
+		}
+		if stats.Swap.SwapAvailableBytes != nil {
+			result.Swap.SwapAvailableBytes = &stats.Swap.SwapAvailableBytes.Value
+		}
+	} else {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.Swap.SwapUsageBytes = uint64Ptr(0)
+		result.Swap.SwapAvailableBytes = uint64Ptr(0)
+	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
 		if stats.WritableLayer.UsedBytes != nil {
@@ -561,10 +661,14 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	}
 	fsID := stats.GetWritableLayer().GetFsId()
+	var err error
 	if fsID != nil {
 		imageFsInfo, found := fsIDtoInfo[*fsID]
 		if !found {
-			imageFsInfo = p.getFsInfo(fsID)
+			imageFsInfo, err = p.getFsInfo(fsID)
+			if err != nil {
+				return nil, fmt.Errorf("get filesystem info: %w", err)
+			}
 			fsIDtoInfo[*fsID] = imageFsInfo
 		}
 		if imageFsInfo != nil {
@@ -581,16 +685,11 @@ func (p *criStatsProvider) makeContainerStats(
 	// NOTE: This doesn't support the old pod log path, `/var/log/pods/UID`. For containers
 	// using old log path, empty log stats are returned. This is fine, because we don't
 	// officially support in-place upgrade anyway.
-	var (
-		containerLogPath = kuberuntime.BuildContainerLogsDirectory(meta.GetNamespace(),
-			meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName())
-		err error
-	)
-	result.Logs, err = p.getPathFsStats(containerLogPath, rootFsInfo)
+	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
 	if err != nil {
-		klog.Errorf("Unable to fetch container log stats for path %s: %v ", containerLogPath, err)
+		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
-	return result
+	return result, nil
 }
 
 func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
@@ -633,10 +732,16 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	return result
 }
 
-// getContainerUsageNanoCores gets the cached usageNanoCores.
+// getContainerUsageNanoCores first attempts to get the usage nano cores from the stats reported
+// by the CRI. If it is unable to, it gets the information from the cache instead.
 func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
 	if stats == nil || stats.Attributes == nil {
 		return nil
+	}
+
+	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
+	if stats.Cpu != nil && stats.Cpu.UsageNanoCores != nil {
+		return &stats.Cpu.UsageNanoCores.Value
 	}
 
 	p.mutex.RLock()
@@ -651,11 +756,19 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 	return &latestUsage
 }
 
-// getContainerUsageNanoCores computes usageNanoCores based on the given and
-// the cached usageCoreNanoSeconds, updates the cache with the computed
-// usageNanoCores, and returns the usageNanoCores.
+// getAndUpdateContainerUsageNanoCores first attempts to get the usage nano cores from the stats reported
+// by the CRI. If it is unable to, it computes usageNanoCores based on the given and the cached usageCoreNanoSeconds,
+// updates the cache with the computed usageNanoCores, and returns the usageNanoCores.
 func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
-	if stats == nil || stats.Attributes == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
+	if stats == nil || stats.Attributes == nil || stats.Cpu == nil {
+		return nil
+	}
+	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
+	if stats.Cpu.UsageNanoCores != nil {
+		return &stats.Cpu.UsageNanoCores.Value
+	}
+	// If there is no UsageNanoCores, nor UsageCoreNanoSeconds, there is no information to use
+	if stats.Cpu.UsageCoreNanoSeconds == nil {
 		return nil
 	}
 	id := stats.Attributes.Id
@@ -688,7 +801,7 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 
 	if err != nil {
 		// This should not happen. Log now to raise visibility
-		klog.Errorf("failed updating cpu usage nano core: %v", err)
+		klog.ErrorS(err, "Failed updating cpu usage nano core")
 	}
 	return usage
 }
@@ -794,10 +907,27 @@ func (p *criStatsProvider) addCadvisorContainerStats(
 	}
 }
 
-func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[string]cadvisorapiv2.ContainerInfo {
+func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(
+	cs *statsapi.ContainerStats,
+	caPodStats *cadvisorapiv2.ContainerInfo,
+) {
+	if caPodStats.Spec.HasCustomMetrics {
+		cs.UserDefinedMetrics = cadvisorInfoToUserDefinedMetrics(caPodStats)
+	}
+
+	cpu, memory := cadvisorInfoToCPUandMemoryStats(caPodStats)
+	if cpu != nil {
+		cs.CPU = cpu
+	}
+	if memory != nil {
+		cs.Memory = memory
+	}
+}
+
+func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
 	stats := make(map[string]cadvisorapiv2.ContainerInfo)
-	infos = removeTerminatedContainerInfo(infos)
-	for key, info := range infos {
+	filteredInfos, cinfosByPodCgroupKey := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	for key, info := range filteredInfos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
 		// entries in our summary. For details on .mount units:
@@ -809,62 +939,41 @@ func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[strin
 		if !isPodManagedContainer(&info) {
 			continue
 		}
-		stats[path.Base(key)] = info
+		stats[extractIDFromCgroupPath(key)] = info
 	}
-	return stats
+	return stats, cinfosByPodCgroupKey
 }
 
-func (p *criStatsProvider) getPathFsStats(path string, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	m := p.logMetricsService.createLogMetricsProvider(path)
-	logMetrics, err := m.GetMetrics()
-	if err != nil {
-		return nil, err
+func extractIDFromCgroupPath(cgroupPath string) string {
+	// case0 == cgroupfs: "/kubepods/burstable/pod2fc932ce-fdcc-454b-97bd-aadfdeb4c340/9be25294016e2dc0340dd605ce1f57b492039b267a6a618a7ad2a7a58a740f32"
+	id := filepath.Base(cgroupPath)
+
+	// case1 == systemd: "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod2fc932ce_fdcc_454b_97bd_aadfdeb4c340.slice/cri-containerd-aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9.scope"
+	// trim anything before the final '-' and suffix .scope
+	systemdSuffix := ".scope"
+	if strings.HasSuffix(id, systemdSuffix) {
+		id = strings.TrimSuffix(id, systemdSuffix)
+		components := strings.Split(id, "-")
+		if len(components) > 1 {
+			id = components[len(components)-1]
+		}
 	}
-	result := &statsapi.FsStats{
-		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: &rootFsInfo.Available,
-		CapacityBytes:  &rootFsInfo.Capacity,
-		InodesFree:     rootFsInfo.InodesFree,
-		Inodes:         rootFsInfo.Inodes,
-	}
-	usedbytes := uint64(logMetrics.Used.Value())
-	result.UsedBytes = &usedbytes
-	inodesUsed := uint64(logMetrics.InodesUsed.Value())
-	result.InodesUsed = &inodesUsed
-	result.Time = maxUpdateTime(&result.Time, &logMetrics.Time)
-	return result, nil
+	return id
 }
 
-// getPodLogStats gets stats for logs under the pod log directory. Container logs usually exist
-// under the container log directory. However, for some container runtimes, e.g. kata, gvisor,
-// they may want to keep some pod level logs, in that case they can put those logs directly under
-// the pod log directory. And kubelet will take those logs into account as part of pod ephemeral
-// storage.
-func (p *criStatsProvider) getPodLogStats(path string, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	files, err := p.osInterface.ReadDir(path)
-	if err != nil {
-		return nil, err
+func criInterfaceToSummary(criIface *runtimeapi.NetworkInterfaceUsage) statsapi.InterfaceStats {
+	return statsapi.InterfaceStats{
+		Name:     criIface.Name,
+		RxBytes:  valueOfUInt64Value(criIface.RxBytes),
+		RxErrors: valueOfUInt64Value(criIface.RxErrors),
+		TxBytes:  valueOfUInt64Value(criIface.TxBytes),
+		TxErrors: valueOfUInt64Value(criIface.TxErrors),
 	}
-	result := &statsapi.FsStats{
-		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: &rootFsInfo.Available,
-		CapacityBytes:  &rootFsInfo.Capacity,
-		InodesFree:     rootFsInfo.InodesFree,
-		Inodes:         rootFsInfo.Inodes,
+}
+
+func valueOfUInt64Value(value *runtimeapi.UInt64Value) *uint64 {
+	if value == nil {
+		return nil
 	}
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		// Only include *files* under pod log directory.
-		fpath := filepath.Join(path, f.Name())
-		fstats, err := p.getPathFsStats(fpath, rootFsInfo)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get fsstats for %q: %v", fpath, err)
-		}
-		result.UsedBytes = addUsage(result.UsedBytes, fstats.UsedBytes)
-		result.InodesUsed = addUsage(result.InodesUsed, fstats.InodesUsed)
-		result.Time = maxUpdateTime(&result.Time, &fstats.Time)
-	}
-	return result, nil
+	return &value.Value
 }

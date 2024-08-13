@@ -28,52 +28,8 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
-KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
-
-# Validate a ci version
-#
-# Globals:
-#   None
-# Arguments:
-#   version
-# Returns:
-#   If version is a valid ci version
-# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcdef12345678')
-#   VERSION_MAJOR          (e.g. '1')
-#   VERSION_MINOR          (e.g. '2')
-#   VERSION_PATCH          (e.g. '3')
-#   VERSION_PRERELEASE     (e.g. 'alpha')
-#   VERSION_PRERELEASE_REV (e.g. '4')
-#   VERSION_BUILD_INFO     (e.g. '.56+abcdef12345678')
-#   VERSION_COMMITS        (e.g. '56')
-function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
-  local -r version="${1-}"
-  [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
-    return 1
-  }
-
-  # The VERSION variables are used when this file is sourced, hence
-  # the shellcheck SC2034 'appears unused' warning is to be ignored.
-
-  # shellcheck disable=SC2034
-  VERSION_MAJOR="${BASH_REMATCH[1]}"
-  # shellcheck disable=SC2034
-  VERSION_MINOR="${BASH_REMATCH[2]}"
-  # shellcheck disable=SC2034
-  VERSION_PATCH="${BASH_REMATCH[3]}"
-  # shellcheck disable=SC2034
-  VERSION_PRERELEASE="${BASH_REMATCH[4]}"
-  # shellcheck disable=SC2034
-  VERSION_PRERELEASE_REV="${BASH_REMATCH[5]}"
-  # shellcheck disable=SC2034
-  VERSION_BUILD_INFO="${BASH_REMATCH[6]}"
-  # shellcheck disable=SC2034
-  VERSION_COMMITS="${BASH_REMATCH[7]}"
-}
 
 # ---------------------------------------------------------------------------
 # Build final release artifacts
@@ -134,7 +90,7 @@ function kube::release::package_client_tarballs() {
   for platform_long in "${long_platforms[@]}"; do
     local platform
     local platform_tag
-    platform=${platform_long##${LOCAL_OUTPUT_BINPATH}/} # Strip LOCAL_OUTPUT_BINPATH
+    platform=${platform_long##"${LOCAL_OUTPUT_BINPATH}"/} # Strip LOCAL_OUTPUT_BINPATH
     platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
 
@@ -204,6 +160,7 @@ function kube::release::package_node_tarballs() {
       "${release_stage}/node/bin/"
 
     cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
+    echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -216,6 +173,8 @@ function kube::release::package_node_tarballs() {
 
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
+  kube::util::ensure-docker-buildx
+
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
@@ -276,6 +235,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
+    echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -310,7 +270,7 @@ function kube::release::build_conformance_image() {
   local -r save_dir="${4-}"
   kube::log::status "Building conformance image for arch: ${arch}"
   ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
-    make -C cluster/images/conformance/ build >/dev/null
+    make -C test/conformance/image/ build >/dev/null
 
   local conformance_tag
   conformance_tag="${registry}/conformance-${arch}:${version}"
@@ -334,14 +294,14 @@ function kube::release::create_docker_images_for_server() {
     local images_dir
     binary_dir="$1"
     arch="$2"
-    binaries=$(kube::build::get_docker_wrapped_binaries "${arch}")
+    binaries=$(kube::build::get_docker_wrapped_binaries)
     images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    # k8s.gcr.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
+    # registry.k8s.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
     # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
-    # If we use KUBE_DOCKER_REGISTRY="k8s.gcr.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
-    local -r docker_registry="k8s.gcr.io"
+    # If we use KUBE_DOCKER_REGISTRY="registry.k8s.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
+    local -r docker_registry="registry.k8s.io"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -364,26 +324,35 @@ function kube::release::create_docker_images_for_server() {
       local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
-      local docker_file_path="${docker_build_path}/Dockerfile"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
+
+      local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
+      # If this binary has its own Dockerfile use that else use the generic Dockerfile.
+      if [[ -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile" ]]; then
+          docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile"
+      fi
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
-        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
-        chmod 0644 "${docker_build_path}/nsswitch.conf"
-        cat <<EOF > "${docker_file_path}"
-FROM ${base_image}
-COPY ${binary_name} /usr/local/bin/${binary_name}
-EOF
-        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
-        if [[ "${base_image}" =~ busybox ]]; then
-          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
-        fi
 
-        "${DOCKER[@]}" build ${docker_build_opts:+"${docker_build_opts}"} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        local build_log="${docker_build_path}/build.log"
+        if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
+          -f "${docker_file_path}" \
+          --platform linux/"${arch}" \
+          --load ${docker_build_opts:+"${docker_build_opts}"} \
+          -t "${docker_image_tag}" \
+          --build-arg BASEIMAGE="${base_image}" \
+          --build-arg SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE}" \
+          --build-arg BINARY="${binary_name}" \
+          "${docker_build_path}" >"${build_log}" 2>&1; then
+            cat "${build_log}"
+            exit 1
+        fi
+        rm "${build_log}"
+
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
@@ -431,10 +400,10 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/konnectivity-server.yaml" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
+  cp "${src_dir}/cloud-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"

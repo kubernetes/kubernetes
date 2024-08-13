@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRoundTrip(t *testing.T) {
 			Status: v1beta1StatusToV1Status(&converted.Status),
 		}
 		if !reflect.DeepEqual(original, roundtripped) {
-			t.Errorf("diff %s", diff.ObjectReflectDiff(original, roundtripped))
+			t.Errorf("diff %s", cmp.Diff(original, roundtripped))
 		}
 	}
 }
@@ -81,13 +81,15 @@ func v1beta1ResourceAttributesToV1ResourceAttributes(in *authorizationv1beta1.Re
 		return nil
 	}
 	return &authorizationv1.ResourceAttributes{
-		Namespace:   in.Namespace,
-		Verb:        in.Verb,
-		Group:       in.Group,
-		Version:     in.Version,
-		Resource:    in.Resource,
-		Subresource: in.Subresource,
-		Name:        in.Name,
+		Namespace:     in.Namespace,
+		Verb:          in.Verb,
+		Group:         in.Group,
+		Version:       in.Version,
+		Resource:      in.Resource,
+		Subresource:   in.Subresource,
+		Name:          in.Name,
+		FieldSelector: in.FieldSelector,
+		LabelSelector: in.LabelSelector,
 	}
 }
 

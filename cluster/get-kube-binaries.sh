@@ -46,7 +46,7 @@
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #  Set KUBERNETES_DOWNLOAD_TESTS to additionally download and extract the test
 #    binaries tarball.
 
@@ -114,12 +114,15 @@ function detect_client_info() {
       i?86*)
         CLIENT_ARCH="386"
         ;;
+      ppc64le*)
+        CLIENT_ARCH="ppc64le"
+        ;;
       s390x*)
         CLIENT_ARCH="s390x"
         ;;
       *)
         echo "Unknown, unsupported architecture (${machine})." >&2
-        echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, ppc64le, s390x." >&2
         echo "Bailing out." >&2
         exit 3
         ;;
@@ -135,11 +138,11 @@ function md5sum_file() {
   fi
 }
 
-function sha1sum_file() {
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+function sha512sum_file() {
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum "$1" | awk '{ print $1 }'
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    shasum -a512 "$1" | awk '{ print $1 }'
   fi
 }
 
@@ -147,13 +150,16 @@ function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
   local trace_on="off"
-  if [[ -o xtrace ]]; then 
+  if [[ -o xtrace ]]; then
     trace_on="on"
     set +x
   fi
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
-  if [[ $(which curl) ]]; then
+
+  if [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
+  elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
@@ -164,15 +170,15 @@ function download_tarball() {
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
-    echo "Couldn't find curl or wget.  Bailing out." >&2
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out." >&2
     exit 4
   fi
   echo
-  local md5sum sha1sum
+  local md5sum sha512sum
   md5sum=$(md5sum_file "${download_path}/${file}")
   echo "md5sum(${file})=${md5sum}"
-  sha1sum=$(sha1sum_file "${download_path}/${file}")
-  echo "sha1sum(${file})=${sha1sum}"
+  sha512sum=$(sha512sum_file "${download_path}/${file}")
+  echo "sha512sum(${file})=${sha512sum}"
   echo
   # TODO: add actual verification
   if [[ "${trace_on}" == "on" ]]; then

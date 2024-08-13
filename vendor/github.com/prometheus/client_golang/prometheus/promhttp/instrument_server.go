@@ -28,6 +28,26 @@ import (
 // magicString is used for the hacky label test in checkLabels. Remove once fixed.
 const magicString = "zZgWfBxLqvG8kc8IMv3POi2Bb0tZI3vAnBx+gBaFi9FyPzB/CzKUer1yufDa"
 
+// observeWithExemplar is a wrapper for [prometheus.ExemplarAdder.ExemplarObserver],
+// which falls back to [prometheus.Observer.Observe] if no labels are provided.
+func observeWithExemplar(obs prometheus.Observer, val float64, labels map[string]string) {
+	if labels == nil {
+		obs.Observe(val)
+		return
+	}
+	obs.(prometheus.ExemplarObserver).ObserveWithExemplar(val, labels)
+}
+
+// addWithExemplar is a wrapper for [prometheus.ExemplarAdder.AddWithExemplar],
+// which falls back to [prometheus.Counter.Add] if no labels are provided.
+func addWithExemplar(obs prometheus.Counter, val float64, labels map[string]string) {
+	if labels == nil {
+		obs.Add(val)
+		return
+	}
+	obs.(prometheus.ExemplarAdder).AddWithExemplar(val, labels)
+}
+
 // InstrumentHandlerInFlight is a middleware that wraps the provided
 // http.Handler. It sets the provided prometheus.Gauge to the number of
 // requests currently handled by the wrapped http.Handler.
@@ -43,14 +63,17 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 
 // InstrumentHandlerDuration is a middleware that wraps the provided
 // http.Handler to observe the request duration with the provided ObserverVec.
-// The ObserverVec must have zero, one, or two non-const non-curried labels. For
-// those, the only allowed label names are "code" and "method". The function
-// panics otherwise. The Observe method of the Observer in the ObserverVec is
-// called with the request duration in seconds. Partitioning happens by HTTP
-// status code and/or HTTP method if the respective instance label names are
-// present in the ObserverVec. For unpartitioned observations, use an
-// ObserverVec with zero labels. Note that partitioning of Histograms is
-// expensive and should be used judiciously.
+// The ObserverVec must have valid metric and label names and must have zero,
+// one, or two non-const non-curried labels. For those, the only allowed label
+// names are "code" and "method". The function panics otherwise. For the "method"
+// label a predefined default label value set is used to filter given values.
+// Values besides predefined values will count as `unknown` method.
+// `WithExtraMethods` can be used to add more methods to the set. The Observe
+// method of the Observer in the ObserverVec is called with the request duration
+// in seconds. Partitioning happens by HTTP status code and/or HTTP method if
+// the respective instance label names are present in the ObserverVec. For
+// unpartitioned observations, use an ObserverVec with zero labels. Note that
+// partitioning of Histograms is expensive and should be used judiciously.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
@@ -58,66 +81,104 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 //
 // Note that this method is only guaranteed to never observe negative durations
 // if used with Go1.9+.
-func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler) http.HandlerFunc {
-	code, method := checkLabels(obs)
+func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
+	hOpts := defaultOptions()
+	for _, o := range opts {
+		o.apply(hOpts)
+	}
+
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			now := time.Now()
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 
-			obs.With(labels(code, method, r.Method, d.Status())).Observe(time.Since(now).Seconds())
-		})
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		next.ServeHTTP(w, r)
-		obs.With(labels(code, method, r.Method, 0)).Observe(time.Since(now).Seconds())
-	})
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerCounter is a middleware that wraps the provided http.Handler
-// to observe the request result with the provided CounterVec.  The CounterVec
-// must have zero, one, or two non-const non-curried labels. For those, the only
-// allowed label names are "code" and "method". The function panics
-// otherwise. Partitioning of the CounterVec happens by HTTP status code and/or
-// HTTP method if the respective instance label names are present in the
-// CounterVec. For unpartitioned counting, use a CounterVec with zero labels.
+// to observe the request result with the provided CounterVec. The CounterVec
+// must have valid metric and label names and must have zero, one, or two
+// non-const non-curried labels. For those, the only allowed label names are
+// "code" and "method". The function panics otherwise. For the "method"
+// label a predefined default label value set is used to filter given values.
+// Values besides predefined values will count as `unknown` method.
+// `WithExtraMethods` can be used to add more methods to the set. Partitioning of the
+// CounterVec happens by HTTP status code and/or HTTP method if the respective
+// instance label names are present in the CounterVec. For unpartitioned
+// counting, use a CounterVec with zero labels.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
 // If the wrapped Handler panics, the Counter is not incremented.
 //
 // See the example for InstrumentHandlerDuration for example usage.
-func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler) http.HandlerFunc {
-	code, method := checkLabels(counter)
-
-	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			d := newDelegator(w, nil)
-			next.ServeHTTP(d, r)
-			counter.With(labels(code, method, r.Method, d.Status())).Inc()
-		})
+func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler, opts ...Option) http.HandlerFunc {
+	hOpts := defaultOptions()
+	for _, o := range opts {
+		o.apply(hOpts)
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Curry the counter with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(counter.MustCurryWith(hOpts.emptyDynamicLabels()))
+
+	if code {
+		return func(w http.ResponseWriter, r *http.Request) {
+			d := newDelegator(w, nil)
+			next.ServeHTTP(d, r)
+
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+		}
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
-		counter.With(labels(code, method, r.Method, 0)).Inc()
-	})
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerTimeToWriteHeader is a middleware that wraps the provided
 // http.Handler to observe with the provided ObserverVec the request duration
-// until the response headers are written. The ObserverVec must have zero, one,
-// or two non-const non-curried labels. For those, the only allowed label names
-// are "code" and "method". The function panics otherwise. The Observe method of
-// the Observer in the ObserverVec is called with the request duration in
-// seconds. Partitioning happens by HTTP status code and/or HTTP method if the
-// respective instance label names are present in the ObserverVec. For
-// unpartitioned observations, use an ObserverVec with zero labels. Note that
-// partitioning of Histograms is expensive and should be used judiciously.
+// until the response headers are written. The ObserverVec must have valid
+// metric and label names and must have zero, one, or two non-const non-curried
+// labels. For those, the only allowed label names are "code" and "method". The
+// function panics otherwise. For the "method" label a predefined default label
+// value set is used to filter given values. Values besides predefined values
+// will count as `unknown` method.`WithExtraMethods` can be used to add more
+// methods to the set. The Observe method of the Observer in the
+// ObserverVec is called with the request duration in seconds. Partitioning
+// happens by HTTP status code and/or HTTP method if the respective instance
+// label names are present in the ObserverVec. For unpartitioned observations,
+// use an ObserverVec with zero labels. Note that partitioning of Histograms is
+// expensive and should be used judiciously.
 //
 // If the wrapped Handler panics before calling WriteHeader, no value is
 // reported.
@@ -126,79 +187,128 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler)
 // if used with Go1.9+.
 //
 // See the example for InstrumentHandlerDuration for example usage.
-func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Handler) http.HandlerFunc {
-	code, method := checkLabels(obs)
+func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
+	hOpts := defaultOptions()
+	for _, o := range opts {
+		o.apply(hOpts)
+	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
+
+	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		d := newDelegator(w, func(status int) {
-			obs.With(labels(code, method, r.Method, status)).Observe(time.Since(now).Seconds())
+			l := labels(code, method, r.Method, status, hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
 		})
 		next.ServeHTTP(d, r)
-	})
+	}
 }
 
 // InstrumentHandlerRequestSize is a middleware that wraps the provided
-// http.Handler to observe the request size with the provided ObserverVec.  The
-// ObserverVec must have zero, one, or two non-const non-curried labels. For
-// those, the only allowed label names are "code" and "method". The function
-// panics otherwise. The Observe method of the Observer in the ObserverVec is
-// called with the request size in bytes. Partitioning happens by HTTP status
-// code and/or HTTP method if the respective instance label names are present in
-// the ObserverVec. For unpartitioned observations, use an ObserverVec with zero
-// labels. Note that partitioning of Histograms is expensive and should be used
-// judiciously.
+// http.Handler to observe the request size with the provided ObserverVec. The
+// ObserverVec must have valid metric and label names and must have zero, one,
+// or two non-const non-curried labels. For those, the only allowed label names
+// are "code" and "method". The function panics otherwise. For the "method"
+// label a predefined default label value set is used to filter given values.
+// Values besides predefined values will count as `unknown` method.
+// `WithExtraMethods` can be used to add more methods to the set. The Observe
+// method of the Observer in the ObserverVec is called with the request size in
+// bytes. Partitioning happens by HTTP status code and/or HTTP method if the
+// respective instance label names are present in the ObserverVec. For
+// unpartitioned observations, use an ObserverVec with zero labels. Note that
+// partitioning of Histograms is expensive and should be used judiciously.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
 // If the wrapped Handler panics, no values are reported.
 //
 // See the example for InstrumentHandlerDuration for example usage.
-func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler) http.HandlerFunc {
-	code, method := checkLabels(obs)
+func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
+	hOpts := defaultOptions()
+	for _, o := range opts {
+		o.apply(hOpts)
+	}
+
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 			size := computeApproximateRequestSize(r)
-			obs.With(labels(code, method, r.Method, d.Status())).Observe(float64(size))
-		})
+
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
 		size := computeApproximateRequestSize(r)
-		obs.With(labels(code, method, r.Method, 0)).Observe(float64(size))
-	})
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerResponseSize is a middleware that wraps the provided
-// http.Handler to observe the response size with the provided ObserverVec.  The
-// ObserverVec must have zero, one, or two non-const non-curried labels. For
-// those, the only allowed label names are "code" and "method". The function
-// panics otherwise. The Observe method of the Observer in the ObserverVec is
-// called with the response size in bytes. Partitioning happens by HTTP status
-// code and/or HTTP method if the respective instance label names are present in
-// the ObserverVec. For unpartitioned observations, use an ObserverVec with zero
-// labels. Note that partitioning of Histograms is expensive and should be used
-// judiciously.
+// http.Handler to observe the response size with the provided ObserverVec. The
+// ObserverVec must have valid metric and label names and must have zero, one,
+// or two non-const non-curried labels. For those, the only allowed label names
+// are "code" and "method". The function panics otherwise. For the "method"
+// label a predefined default label value set is used to filter given values.
+// Values besides predefined values will count as `unknown` method.
+// `WithExtraMethods` can be used to add more methods to the set. The Observe
+// method of the Observer in the ObserverVec is called with the response size in
+// bytes. Partitioning happens by HTTP status code and/or HTTP method if the
+// respective instance label names are present in the ObserverVec. For
+// unpartitioned observations, use an ObserverVec with zero labels. Note that
+// partitioning of Histograms is expensive and should be used judiciously.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
 // If the wrapped Handler panics, no values are reported.
 //
 // See the example for InstrumentHandlerDuration for example usage.
-func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler) http.Handler {
-	code, method := checkLabels(obs)
+func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.Handler {
+	hOpts := defaultOptions()
+	for _, o := range opts {
+		o.apply(hOpts)
+	}
+
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d := newDelegator(w, nil)
 		next.ServeHTTP(d, r)
-		obs.With(labels(code, method, r.Method, d.Status())).Observe(float64(d.Written()))
+
+		l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(d.Written()), hOpts.getExemplarFn(r.Context()))
 	})
 }
 
-func checkLabels(c prometheus.Collector) (code bool, method bool) {
+// checkLabels returns whether the provided Collector has a non-const,
+// non-curried label named "code" and/or "method". It panics if the provided
+// Collector does not have a Desc or has more than one Desc or its Desc is
+// invalid. It also panics if the Collector has any non-const, non-curried
+// labels that are not named "code" or "method".
+func checkLabels(c prometheus.Collector) (code, method bool) {
 	// TODO(beorn7): Remove this hacky way to check for instance labels
 	// once Descriptors can have their dimensionality queried.
 	var (
@@ -224,6 +334,10 @@ func checkLabels(c prometheus.Collector) (code bool, method bool) {
 	}
 
 	close(descc)
+
+	// Make sure the Collector has a valid Desc by registering it with a
+	// temporary registry.
+	prometheus.NewRegistry().MustRegister(c)
 
 	// Create a ConstMetric with the Desc. Since we don't know how many
 	// variable labels there are, try for as long as it needs.
@@ -275,21 +389,18 @@ func isLabelCurried(c prometheus.Collector, label string) bool {
 	return true
 }
 
-// emptyLabels is a one-time allocation for non-partitioned metrics to avoid
-// unnecessary allocations on each request.
-var emptyLabels = prometheus.Labels{}
-
-func labels(code, method bool, reqMethod string, status int) prometheus.Labels {
-	if !(code || method) {
-		return emptyLabels
-	}
+func labels(code, method bool, reqMethod string, status int, extraMethods ...string) prometheus.Labels {
 	labels := prometheus.Labels{}
+
+	if !(code || method) {
+		return labels
+	}
 
 	if code {
 		labels["code"] = sanitizeCode(status)
 	}
 	if method {
-		labels["method"] = sanitizeMethod(reqMethod)
+		labels["method"] = sanitizeMethod(reqMethod, extraMethods...)
 	}
 
 	return labels
@@ -319,7 +430,12 @@ func computeApproximateRequestSize(r *http.Request) int {
 	return s
 }
 
-func sanitizeMethod(m string) string {
+// If the wrapped http.Handler has a known method, it will be sanitized and returned.
+// Otherwise, "unknown" will be returned. The known method list can be extended
+// as needed by using extraMethods parameter.
+func sanitizeMethod(m string, extraMethods ...string) string {
+	// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods for
+	// the methods chosen as default.
 	switch m {
 	case "GET", "get":
 		return "get"
@@ -337,15 +453,25 @@ func sanitizeMethod(m string) string {
 		return "options"
 	case "NOTIFY", "notify":
 		return "notify"
+	case "TRACE", "trace":
+		return "trace"
+	case "PATCH", "patch":
+		return "patch"
 	default:
-		return strings.ToLower(m)
+		for _, method := range extraMethods {
+			if strings.EqualFold(m, method) {
+				return strings.ToLower(m)
+			}
+		}
+		return "unknown"
 	}
 }
 
 // If the wrapped http.Handler has not set a status code, i.e. the value is
-// currently 0, santizeCode will return 200, for consistency with behavior in
+// currently 0, sanitizeCode will return 200, for consistency with behavior in
 // the stdlib.
 func sanitizeCode(s int) string {
+	// See for accepted codes https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 	switch s {
 	case 100:
 		return "100"
@@ -442,6 +568,9 @@ func sanitizeCode(s int) string {
 		return "511"
 
 	default:
-		return strconv.Itoa(s)
+		if s >= 100 && s <= 599 {
+			return strconv.Itoa(s)
+		}
+		return "unknown"
 	}
 }

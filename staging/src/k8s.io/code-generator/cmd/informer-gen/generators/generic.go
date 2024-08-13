@@ -23,14 +23,14 @@ import (
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // genericGenerator generates the generic informer.
 type genericGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage        string
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions
@@ -73,9 +73,11 @@ type group struct {
 
 type groupSort []group
 
-func (g groupSort) Len() int           { return len(g) }
-func (g groupSort) Less(i, j int) bool { return strings.ToLower(g[i].Name) < strings.ToLower(g[j].Name) }
-func (g groupSort) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g groupSort) Len() int { return len(g) }
+func (g groupSort) Less(i, j int) bool {
+	return strings.ToLower(g[i].Name) < strings.ToLower(g[j].Name)
+}
+func (g groupSort) Swap(i, j int) { g[i], g[j] = g[j], g[i] }
 
 type version struct {
 	Name      string

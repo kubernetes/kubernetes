@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Controls verbosity of the script output and logging.
-KUBE_VERBOSE="${KUBE_VERBOSE:-5}"
+KUBE_VERBOSE="${KUBE_VERBOSE:-2}"
 
 # Handler for when we exit automatically on an error.
 # Borrowed from https://gist.github.com/ahendrix/7030300
@@ -130,7 +130,7 @@ kube::log::usage_from_stdin() {
 # Print out some info that isn't a top level status line
 kube::log::info() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if (( KUBE_VERBOSE < V )); then
     return
   fi
 
@@ -158,7 +158,7 @@ kube::log::info_from_stdin() {
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if (( KUBE_VERBOSE < V )); then
     return
   fi
 

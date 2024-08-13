@@ -73,6 +73,3 @@ $ kubectl delete -n kube-system scalingpolicies.scalingpolicy.kope.io/fluentd-gc
 [cpu]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/
 [memory]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/
 [scalingPolicy]: https://github.com/justinsb/scaler
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/fluentd-gcp/README.md?pixel)]()

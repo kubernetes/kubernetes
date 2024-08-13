@@ -17,52 +17,56 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
-	"os/exec"
+	"os"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	systemdutil "github.com/coreos/go-systemd/util"
-	"github.com/onsi/ginkgo"
+	systemdutil "github.com/coreos/go-systemd/v22/util"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 )
 
-var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
+var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("summary-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
-		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
-			recordSystemCgroupProcesses()
+			recordSystemCgroupProcesses(ctx)
 		})
-		ginkgo.It("should report resource usage through the stats api", func() {
+		ginkgo.It("should report resource usage through the stats api", func(ctx context.Context) {
 			const pod0 = "stats-busybox-0"
 			const pod1 = "stats-busybox-1"
 
 			ginkgo.By("Creating test pods")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
-			gomega.Eventually(func() error {
+			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
+			gomega.Eventually(ctx, func() error {
 				for _, pod := range pods {
-					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
+					err := verifyPodRestartCount(ctx, f, pod.Name, len(pod.Spec.Containers), numRestarts)
 					if err != nil {
 						return err
 					}
@@ -70,7 +74,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return nil
 			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
-			// Wait for cAdvisor to collect 2 stats points
+			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 
 			// Setup expectations.
@@ -78,8 +82,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				maxStartAge = time.Hour * 24 * 365 // 1 year
 				maxStatsAge = time.Minute
 			)
-			// fetch node so we can know proper node memory bounds for unconstrained cgroups
-			node := getLocalNode(f)
+			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
+			node := getLocalNode(ctx, f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
 			fsCapacityBounds := bounded(100*e2evolume.Mb, 10*e2evolume.Tb)
@@ -89,8 +93,12 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Name":      gstruct.Ignore(),
 					"StartTime": recent(maxStartAge),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
-						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(10000, 2e9),
+						"Time": recent(maxStatsAge),
+						// CRI stats provider tries to estimate the value of UsageNanoCores. This value can be
+						// either 0 or between 10000 and 2e9.
+						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
+						// for more information.
+						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e9)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -102,14 +110,24 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
+					"Swap":               swapExpectation(memoryLimit),
 					"Accelerators":       gomega.BeEmpty(),
 					"Rootfs":             gomega.BeNil(),
 					"Logs":               gomega.BeNil(),
 					"UserDefinedMetrics": gomega.BeEmpty(),
 				})
 			}
+			expectedPageFaultsUpperBound := 1000000
+			expectedMajorPageFaultsUpperBound := 1e9
+			if IsCgroup2UnifiedMode() {
+				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
+				// above for the container.
+				expectedPageFaultsUpperBound = 1e9
+				expectedMajorPageFaultsUpperBound = 1e9
+			}
+
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 				"Time": recent(maxStatsAge),
@@ -118,33 +136,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
-				"PageFaults":      bounded(0, 1000000),
-				"MajorPageFaults": bounded(0, 10),
+				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
-			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
-				// Some Linux distributions still ship a docker.service that is missing
-				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
-				// that allows us to monitor the container runtime resource usage through
-				// the "cpu" and "memory" cgroups.
-				//
-				// Make an exception here for those distros, only for Docker, so that they
-				// can pass the full node e2e tests even in that case.
-				//
-				// For newer container runtimes (using CRI) and even distros that still
-				// ship Docker, we should encourage them to always set `Delegate=yes` in
-				// order to make monitoring of the runtime possible.
-				stdout, err := exec.Command("systemctl", "show", "-p", "Delegate", "docker.service").CombinedOutput()
-				if err == nil && strings.TrimSpace(string(stdout)) == "Delegate=no" {
-					// Only make these optional if we can successfully confirm that
-					// Delegate is set to "no" (in other words, unset.) If we fail
-					// to check that, default to requiring it, which might cause
-					// false positives, but that should be the safer approach.
-					ginkgo.By("Making runtime container expectations optional, since systemd was not configured to Delegate=yes the cgroups")
-					runtimeContExpectations.Fields["Memory"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["Memory"])
-					runtimeContExpectations.Fields["CPU"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["CPU"])
-				}
-			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
 				"runtime": runtimeContExpectations,
@@ -163,7 +158,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
-					"MajorPageFaults": bounded(0, 100000),
+					"MajorPageFaults": bounded(0, 1e9),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -186,9 +181,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-							"PageFaults":      bounded(100, 1000000),
-							"MajorPageFaults": bounded(0, 10),
+							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
+							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
+						"Swap":         swapExpectation(memoryLimit),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
@@ -233,13 +229,15 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-					"PageFaults":      bounded(0, 1000000),
-					"MajorPageFaults": bounded(0, 10),
+					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
+				"Swap": swapExpectation(memoryLimit),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
-						"Name":   gomega.Equal("test-empty-dir"),
-						"PVCRef": gomega.BeNil(),
+						"Name":              gomega.Equal("test-empty-dir"),
+						"PVCRef":            gomega.BeNil(),
+						"VolumeHealthStats": gomega.BeNil(),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
@@ -261,7 +259,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"InodesUsed":     bounded(0, 1e8),
 				}),
 				"ProcessStats": ptrMatchAllFields(gstruct.Fields{
-					"ProcessCount": bounded(0, 1e8),
+					"ProcessCount": bounded(1, 1e8),
 				}),
 			})
 
@@ -283,8 +281,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
+					"Swap": swapExpectation(memoryLimit),
 					// TODO(#28407): Handle non-eth0 network interface names.
 					"Network": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
@@ -301,7 +300,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time":           recent(maxStatsAge),
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
-						// we assume we are not running tests on machines < 10tb of disk
+						// we assume we are not running tests on machines more than 10tb of disk
 						"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 						"InodesFree": bounded(1e4, 1e8),
 						"Inodes":     bounded(1e4, 1e8),
@@ -312,7 +311,17 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							// we assume we are not running tests on machines < 10tb of disk
+							// we assume we are not running tests on machines more than 10tb of disk
+							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
+							"InodesFree": bounded(1e4, 1e8),
+							"Inodes":     bounded(1e4, 1e8),
+							"InodesUsed": bounded(0, 1e8),
+						}),
+						"ContainerFs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							// we assume we are not running tests on machines more than 10tb of disk
 							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 							"InodesFree": bounded(1e4, 1e8),
 							"Inodes":     bounded(1e4, 1e8),
@@ -334,9 +343,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 1*time.Minute, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(ctx, getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
-			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Consistently(ctx, getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
 })
@@ -352,8 +361,13 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 				RestartPolicy: v1.RestartPolicyAlways,
 				Containers: []v1.Container{
 					{
-						Name:    "busybox-container",
-						Image:   busyboxImage,
+						Name:  "busybox-container",
+						Image: busyboxImage,
+						SecurityContext: &v1.SecurityContext{
+							Capabilities: &v1.Capabilities{
+								Add: []v1.Capability{"NET_RAW"},
+							},
+						},
 						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
@@ -410,17 +424,38 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 		gomega.BeNumerically("<=", upper)))
 }
 
+func swapExpectation(upper interface{}) types.GomegaMatcher {
+	// Size after which we consider memory to be "unlimited". This is not
+	// MaxInt64 due to rounding by the kernel.
+	const maxMemorySize = uint64(1 << 62)
+
+	swapBytesMatcher := gomega.Or(
+		gomega.BeNil(),
+		bounded(0, upper),
+		gstruct.PointTo(gomega.BeNumerically(">=", maxMemorySize)),
+	)
+
+	return gomega.Or(
+		gomega.BeNil(),
+		ptrMatchAllFields(gstruct.Fields{
+			"Time":               recent(maxStatsAge),
+			"SwapUsageBytes":     swapBytesMatcher,
+			"SwapAvailableBytes": swapBytesMatcher,
+		}),
+	)
+}
+
 func recent(d time.Duration) types.GomegaMatcher {
 	return gomega.WithTransform(func(t metav1.Time) time.Time {
 		return t.Time
 	}, gomega.And(
 		gomega.BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
-		gomega.BeTemporally("<", time.Now().Add(2*time.Minute))))
+		gomega.BeTemporally("<", time.Now().Add(3*time.Minute))))
 }
 
-func recordSystemCgroupProcesses() {
-	cfg, err := getCurrentKubeletConfig()
+func recordSystemCgroupProcesses(ctx context.Context) {
+	cfg, err := getCurrentKubeletConfig(ctx)
 	if err != nil {
 		framework.Logf("Failed to read kubelet config: %v", err)
 		return
@@ -439,7 +474,7 @@ func recordSystemCgroupProcesses() {
 		if IsCgroup2UnifiedMode() {
 			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
 		}
-		pids, err := ioutil.ReadFile(fmt.Sprintf(filePattern, cgroup))
+		pids, err := os.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
 			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
@@ -448,7 +483,7 @@ func recordSystemCgroupProcesses() {
 		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
-			cmd, err := ioutil.ReadFile(path)
+			cmd, err := os.ReadFile(path)
 			if err != nil {
 				framework.Logf("  ginkgo.Failed to read %s: %v", path, err)
 			} else {

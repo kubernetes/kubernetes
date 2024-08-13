@@ -19,47 +19,64 @@ package openapi
 import (
 	"sync"
 
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"k8s.io/client-go/discovery"
 )
 
-// synchronizedOpenAPIGetter fetches the openapi schema once and then caches it in memory
-type synchronizedOpenAPIGetter struct {
+// CachedOpenAPIGetter fetches the openapi schema once and then caches it in memory
+type CachedOpenAPIGetter struct {
+	openAPIClient discovery.OpenAPISchemaInterface
+
 	// Cached results
 	sync.Once
-	openAPISchema Resources
+	openAPISchema *openapi_v2.Document
 	err           error
-
-	openAPIClient discovery.OpenAPISchemaInterface
 }
 
-var _ Getter = &synchronizedOpenAPIGetter{}
-
-// Getter is an interface for fetching openapi specs and parsing them into an Resources struct
-type Getter interface {
-	// OpenAPIData returns the parsed OpenAPIData
-	Get() (Resources, error)
-}
+var _ discovery.OpenAPISchemaInterface = &CachedOpenAPIGetter{}
 
 // NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
 // from a server, and then stores in memory for subsequent invocations
-func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
-	return &synchronizedOpenAPIGetter{
+func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) *CachedOpenAPIGetter {
+	return &CachedOpenAPIGetter{
 		openAPIClient: openAPIClient,
 	}
 }
 
-// Resources implements Getter
-func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
+// OpenAPISchema implements OpenAPISchemaInterface.
+func (g *CachedOpenAPIGetter) OpenAPISchema() (*openapi_v2.Document, error) {
 	g.Do(func() {
-		s, err := g.openAPIClient.OpenAPISchema()
-		if err != nil {
-			g.err = err
-			return
-		}
-
-		g.openAPISchema, g.err = NewOpenAPIData(s)
+		g.openAPISchema, g.err = g.openAPIClient.OpenAPISchema()
 	})
 
-	// Return the save result
+	// Return the saved result.
 	return g.openAPISchema, g.err
+}
+
+type CachedOpenAPIParser struct {
+	openAPIClient discovery.OpenAPISchemaInterface
+
+	// Cached results
+	sync.Once
+	openAPIResources Resources
+	err              error
+}
+
+func NewOpenAPIParser(openAPIClient discovery.OpenAPISchemaInterface) *CachedOpenAPIParser {
+	return &CachedOpenAPIParser{
+		openAPIClient: openAPIClient,
+	}
+}
+
+func (p *CachedOpenAPIParser) Parse() (Resources, error) {
+	p.Do(func() {
+		oapi, err := p.openAPIClient.OpenAPISchema()
+		if err != nil {
+			p.err = err
+			return
+		}
+		p.openAPIResources, p.err = NewOpenAPIData(oapi)
+	})
+
+	return p.openAPIResources, p.err
 }

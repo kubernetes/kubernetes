@@ -32,7 +32,7 @@ ENV FOCUS="\[Conformance\]" \
 	   SKIP="\[Flaky\]|\[Serial\]" \
 	   PARALLELISM=8 \
 	   REPORT_PATH="/var/result" \
-	   FLAKE_ATTEMPTS=2 \
+	   FLAKE_ATTEMPTS=1 \
 	   TEST_ARGS="" \
 	   EXTRA_ENVS=""
 

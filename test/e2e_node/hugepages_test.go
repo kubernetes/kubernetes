@@ -25,38 +25,67 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
+)
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+const (
+	hugepagesSize2M          = 2048
+	hugepagesSize1G          = 1048576
+	hugepagesDirPrefix       = "/sys/kernel/mm/hugepages/hugepages"
+	hugepagesCapacityFile    = "nr_hugepages"
+	hugepagesResourceName2Mi = "hugepages-2Mi"
+	hugepagesResourceName1Gi = "hugepages-1Gi"
+	hugepagesCgroup2MB       = "hugetlb.2MB"
+	hugepagesCgroup1GB       = "hugetlb.1GB"
+	mediumHugepages          = "HugePages"
+	mediumHugepages2Mi       = "HugePages-2Mi"
+	mediumHugepages1Gi       = "HugePages-1Gi"
+)
+
+var (
+	resourceToSize = map[string]int{
+		hugepagesResourceName2Mi: hugepagesSize2M,
+		hugepagesResourceName1Gi: hugepagesSize1G,
+	}
+	resourceToCgroup = map[string]string{
+		hugepagesResourceName2Mi: hugepagesCgroup2MB,
+		hugepagesResourceName1Gi: hugepagesCgroup1GB,
+	}
 )
 
 // makePodToVerifyHugePages returns a pod that verifies specified cgroup with hugetlb
-func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *v1.Pod {
+func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity, hugepagesCgroup string) *v1.Pod {
 	// convert the cgroup name to its literal form
-	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	cgroupFsName := ""
+	if kubeletCfg.CgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
 	}
 
-	command := ""
+	hugetlbLimitFile := ""
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.<LIMIT>
 	if IsCgroup2UnifiedMode() {
-		command = fmt.Sprintf("expected=%v; actual=$(cat /tmp/%v/hugetlb.2MB.max); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
+		hugetlbLimitFile = fmt.Sprintf("/tmp/%s/%s.max", cgroupFsName, hugepagesCgroup)
 	} else {
-		command = fmt.Sprintf("expected=%v; actual=$(cat /tmp/hugetlb/%v/hugetlb.2MB.limit_in_bytes); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
+		hugetlbLimitFile = fmt.Sprintf("/tmp/hugetlb/%s/%s.limit_in_bytes", cgroupFsName, hugepagesCgroup)
 	}
+
+	command := fmt.Sprintf("expected=%v; actual=$(cat %v); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), hugetlbLimitFile)
 	framework.Logf("Pod to run command: %v", command)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,145 +119,376 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 	return pod
 }
 
-// configureHugePages attempts to allocate 10Mi of 2Mi hugepages for testing purposes
-func configureHugePages() error {
+// configureHugePages attempts to allocate hugepages of the specified size
+func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) error {
 	// Compact memory to make bigger contiguous blocks of memory available
 	// before allocating huge pages.
 	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
 	if _, err := os.Stat("/proc/sys/vm/compact_memory"); err == nil {
-		err := exec.Command("/bin/sh", "-c", "echo 1 > /proc/sys/vm/compact_memory").Run()
-		if err != nil {
+		if err := exec.Command("/bin/sh", "-c", "echo 1 > /proc/sys/vm/compact_memory").Run(); err != nil {
 			return err
 		}
 	}
-	err := exec.Command("/bin/sh", "-c", "echo 5 > /proc/sys/vm/nr_hugepages").Run()
+
+	// e.g. hugepages/hugepages-2048kB/nr_hugepages
+	hugepagesSuffix := fmt.Sprintf("hugepages/hugepages-%dkB/%s", hugepagesSize, hugepagesCapacityFile)
+
+	// e.g. /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+	hugepagesFile := fmt.Sprintf("/sys/kernel/mm/%s", hugepagesSuffix)
+	if numaNodeID != nil {
+		// e.g. /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+		hugepagesFile = fmt.Sprintf("/sys/devices/system/node/node%d/%s", *numaNodeID, hugepagesSuffix)
+	}
+
+	// Reserve number of hugepages
+	// e.g. /bin/sh -c "echo 5 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
+	command := fmt.Sprintf("echo %d > %s", hugepagesCount, hugepagesFile)
+	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
+		return err
+	}
+
+	// verify that the number of hugepages was updated
+	// e.g. /bin/sh -c "cat /sys/kernel/mm/hugepages/hugepages-2048kB/vm.nr_hugepages"
+	command = fmt.Sprintf("cat %s", hugepagesFile)
+	outData, err := exec.Command("/bin/sh", "-c", command).Output()
 	if err != nil {
 		return err
 	}
-	outData, err := exec.Command("/bin/sh", "-c", "cat /proc/meminfo | grep 'HugePages_Total' | awk '{print $2}'").Output()
-	if err != nil {
-		return err
-	}
+
 	numHugePages, err := strconv.Atoi(strings.TrimSpace(string(outData)))
 	if err != nil {
 		return err
 	}
-	framework.Logf("HugePages_Total is set to %v", numHugePages)
-	if numHugePages == 5 {
+
+	framework.Logf("Hugepages total is set to %v", numHugePages)
+	if numHugePages == hugepagesCount {
 		return nil
 	}
-	return fmt.Errorf("expected hugepages %v, but found %v", 5, numHugePages)
+
+	return fmt.Errorf("expected hugepages %v, but found %v", hugepagesCount, numHugePages)
 }
 
-// releaseHugePages releases all pre-allocated hugepages
-func releaseHugePages() error {
-	return exec.Command("/bin/sh", "-c", "echo 0 > /proc/sys/vm/nr_hugepages").Run()
-}
-
-// isHugePageSupported returns true if the default hugepagesize on host is 2Mi (i.e. 2048 kB)
-func isHugePageSupported() bool {
-	outData, err := exec.Command("/bin/sh", "-c", "cat /proc/meminfo | grep 'Hugepagesize:' | awk '{print $2}'").Output()
-	framework.ExpectNoError(err)
-	pageSize, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
-	return pageSize == 2048
-}
-
-// pollResourceAsString polls for a specified resource and capacity from node
-func pollResourceAsString(f *framework.Framework, resourceName string) string {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	amount := amountOfResourceAsString(node, resourceName)
-	framework.Logf("amount of %v: %v", resourceName, amount)
-	return amount
-}
-
-// amountOfResourceAsString returns the amount of resourceName advertised by a node
-func amountOfResourceAsString(node *v1.Node, resourceName string) string {
-	val, ok := node.Status.Capacity[v1.ResourceName(resourceName)]
-	if !ok {
-		return ""
+// isHugePageAvailable returns true if hugepages of the specified size is available on the host
+func isHugePageAvailable(hugepagesSize int) bool {
+	path := fmt.Sprintf("%s-%dkB/%s", hugepagesDirPrefix, hugepagesSize, hugepagesCapacityFile)
+	if _, err := os.Stat(path); err != nil {
+		return false
 	}
-	return val.String()
+	return true
 }
 
-func runHugePagesTests(f *framework.Framework) {
-	ginkgo.It("should assign hugepages as expected based on the Pod spec", func() {
-		ginkgo.By("by running a G pod that requests hugepages")
-		pod := f.PodClient().Create(&v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod" + string(uuid.NewUUID()),
-				Namespace: f.Namespace.Name,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Image: imageutils.GetPauseImageName(),
-						Name:  "container" + string(uuid.NewUUID()),
-						Resources: v1.ResourceRequirements{
-							Limits: v1.ResourceList{
-								v1.ResourceName("cpu"):           resource.MustParse("10m"),
-								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
-								v1.ResourceName("hugepages-2Mi"): resource.MustParse("6Mi"),
-							},
-						},
+func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "hugepages-",
+			Namespace:    f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "container" + string(uuid.NewUUID()),
+					Image: busyboxImage,
+					Resources: v1.ResourceRequirements{
+						Limits: limits,
 					},
+					Command:      []string{"sleep", "3600"},
+					VolumeMounts: mounts,
 				},
 			},
-		})
-		podUID := string(pod.UID)
-		ginkgo.By("checking if the expected hugetlb settings were applied")
-		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("6Mi"))
-		f.PodClient().Create(verifyPod)
-		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
-	})
+			Volumes: volumes,
+		},
+	}
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePages]", func() {
+var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[NodeSpecialFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("With config updated with hugepages feature enabled", func() {
-		ginkgo.BeforeEach(func() {
-			ginkgo.By("verifying hugepages are supported")
-			if !isHugePageSupported() {
-				e2eskipper.Skipf("skipping test because hugepages are not supported")
-				return
+	ginkgo.It("should remove resources for huge page sizes no longer supported", func(ctx context.Context) {
+		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
+		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-3Mi", "value": "9Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-3Mi", "value": "9Mi"}]`)
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
+		framework.ExpectNoError(result.Error(), "while patching")
+
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "while getting node status")
+
+		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
+		value, ok := node.Status.Capacity["hugepages-3Mi"]
+		if !ok {
+			framework.Failf("capacity should contain resource hugepages-3Mi: %v", node.Status.Capacity)
+		}
+		gomega.Expect(value.String()).To(gomega.Equal("9Mi"), "huge pages with size 3Mi should be supported")
+
+		ginkgo.By("restarting the node and verifying that huge pages with size 3Mi are not supported")
+		restartKubelet(true)
+
+		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
+		gomega.Eventually(ctx, func() bool {
+			node, err = f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "while getting node status")
+			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalse())
+	})
+
+	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
+		ginkgo.By("Stopping kubelet")
+		startKubelet := stopKubelet()
+		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
+		patch := []byte(`[{"op": "remove", "path": "/status/capacity/hugepages-2Mi"}, {"op": "remove", "path": "/status/allocatable/hugepages-2Mi"}]`)
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
+		framework.ExpectNoError(result.Error(), "while patching")
+
+		ginkgo.By("Starting kubelet again")
+		startKubelet()
+
+		ginkgo.By("verifying that the hugepages-2Mi resource is present")
+		gomega.Eventually(ctx, func() bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "while getting node status")
+			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+	})
+
+	ginkgo.When("start the pod", func() {
+		var (
+			testpod   *v1.Pod
+			limits    v1.ResourceList
+			mounts    []v1.VolumeMount
+			volumes   []v1.Volume
+			hugepages map[string]int
+		)
+
+		setHugepages := func(ctx context.Context) {
+			for hugepagesResource, count := range hugepages {
+				size := resourceToSize[hugepagesResource]
+				ginkgo.By(fmt.Sprintf("Verifying hugepages %d are supported", size))
+				if !isHugePageAvailable(size) {
+					e2eskipper.Skipf("skipping test because hugepages of size %d not supported", size)
+					return
+				}
+
+				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
+				gomega.Eventually(ctx, func() error {
+					if err := configureHugePages(size, count, nil); err != nil {
+						return err
+					}
+					return nil
+				}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 			}
-			ginkgo.By("configuring the host to reserve a number of pre-allocated hugepages")
-			gomega.Eventually(func() error {
-				err := configureHugePages()
+		}
+
+		waitForHugepages := func(ctx context.Context) {
+			ginkgo.By("Waiting for hugepages resource to become available on the local node")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
+
+				for hugepagesResource, count := range hugepages {
+					capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResource)]
+					if !ok {
+						return fmt.Errorf("the node does not have the resource %s", hugepagesResource)
+					}
+
+					size, succeed := capacity.AsInt64()
+					if !succeed {
+						return fmt.Errorf("failed to convert quantity to int64")
+					}
+
+					expectedSize := count * resourceToSize[hugepagesResource] * 1024
+					if size != int64(expectedSize) {
+						return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
+					}
+				}
+				return nil
+			}, time.Minute, framework.Poll).Should(gomega.BeNil())
+		}
+
+		releaseHugepages := func(ctx context.Context) {
+			ginkgo.By("Releasing hugepages")
+			gomega.Eventually(ctx, func() error {
+				for hugepagesResource := range hugepages {
+					command := fmt.Sprintf("echo 0 > %s-%dkB/%s", hugepagesDirPrefix, resourceToSize[hugepagesResource], hugepagesCapacityFile)
+					if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
+						return err
+					}
+				}
 				return nil
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+		}
+
+		runHugePagesTests := func() {
+			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func(ctx context.Context) {
+				ginkgo.By("getting mounts for the test pod")
+				command := []string{"mount"}
+				out := e2epod.ExecCommandInContainer(f, testpod.Name, testpod.Spec.Containers[0].Name, command...)
+
+				for _, mount := range mounts {
+					ginkgo.By(fmt.Sprintf("checking that the hugetlb mount %s exists under the container", mount.MountPath))
+					gomega.Expect(out).To(gomega.ContainSubstring(mount.MountPath))
+				}
+
+				for resourceName := range hugepages {
+					verifyPod := makePodToVerifyHugePages(
+						"pod"+string(testpod.UID),
+						testpod.Spec.Containers[0].Resources.Limits[v1.ResourceName(resourceName)],
+						resourceToCgroup[resourceName],
+					)
+					ginkgo.By("checking if the expected hugetlb settings were applied")
+					e2epod.NewPodClient(f).Create(ctx, verifyPod)
+					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+					framework.ExpectNoError(err)
+				}
+			})
+		}
+
+		// setup
+		ginkgo.JustBeforeEach(func(ctx context.Context) {
+			setHugepages(ctx)
+
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
-			ginkgo.By("by waiting for hugepages resource to become available on the local node")
-			gomega.Eventually(func() string {
-				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(gomega.Equal("10Mi"))
+			restartKubelet(true)
+
+			waitForHugepages(ctx)
+
+			pod := getHugepagesTestPod(f, limits, mounts, volumes)
+
+			ginkgo.By("by running a test pod that requests hugepages")
+			testpod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 		})
 
-		runHugePagesTests(f)
+		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
+		ginkgo.JustAfterEach(func(ctx context.Context) {
+			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
+			e2epod.NewPodClient(f).DeleteSync(ctx, testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 
-		ginkgo.AfterEach(func() {
-			ginkgo.By("Releasing hugepages")
-			gomega.Eventually(func() error {
-				err := releaseHugePages()
-				if err != nil {
-					return err
+			releaseHugepages(ctx)
+
+			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
+			restartKubelet(true)
+
+			waitForHugepages(ctx)
+		})
+
+		ginkgo.Context("with the resources requests that contain only one hugepages resource ", func() {
+			ginkgo.Context("with the backward compatible API", func() {
+				ginkgo.BeforeEach(func() {
+					limits = v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					}
+					mounts = []v1.VolumeMount{
+						{
+							Name:      "hugepages",
+							MountPath: "/hugepages",
+						},
+					}
+					volumes = []v1.Volume{
+						{
+							Name: "hugepages",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium: mediumHugepages,
+								},
+							},
+						},
+					}
+					hugepages = map[string]int{hugepagesResourceName2Mi: 5}
+				})
+				// run tests
+				runHugePagesTests()
+			})
+
+			ginkgo.Context("with the new API", func() {
+				ginkgo.BeforeEach(func() {
+					limits = v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					}
+					mounts = []v1.VolumeMount{
+						{
+							Name:      "hugepages-2mi",
+							MountPath: "/hugepages-2Mi",
+						},
+					}
+					volumes = []v1.Volume{
+						{
+							Name: "hugepages-2mi",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium: mediumHugepages2Mi,
+								},
+							},
+						},
+					}
+					hugepages = map[string]int{hugepagesResourceName2Mi: 5}
+				})
+
+				runHugePagesTests()
+			})
+
+			ginkgo.JustAfterEach(func() {
+				hugepages = map[string]int{hugepagesResourceName2Mi: 0}
+			})
+		})
+
+		ginkgo.Context("with the resources requests that contain multiple hugepages resources ", func() {
+			ginkgo.BeforeEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 5,
+					hugepagesResourceName1Gi: 1,
 				}
-				return nil
-			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
-			ginkgo.By("restarting kubelet to release hugepages")
-			restartKubelet()
-			ginkgo.By("by waiting for hugepages resource to not appear available on the local node")
-			gomega.Eventually(func() string {
-				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(gomega.Equal("0"))
+				limits = v1.ResourceList{
+					v1.ResourceCPU:           resource.MustParse("10m"),
+					v1.ResourceMemory:        resource.MustParse("100Mi"),
+					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+				}
+				mounts = []v1.VolumeMount{
+					{
+						Name:      "hugepages-2mi",
+						MountPath: "/hugepages-2Mi",
+					},
+					{
+						Name:      "hugepages-1gi",
+						MountPath: "/hugepages-1Gi",
+					},
+				}
+				volumes = []v1.Volume{
+					{
+						Name: "hugepages-2mi",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: mediumHugepages2Mi,
+							},
+						},
+					},
+					{
+						Name: "hugepages-1gi",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: mediumHugepages1Gi,
+							},
+						},
+					},
+				}
+			})
+
+			runHugePagesTests()
+
+			ginkgo.JustAfterEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 0,
+					hugepagesResourceName1Gi: 0,
+				}
+			})
 		})
 	})
 })

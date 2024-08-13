@@ -1,7 +1,5 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- tallclair
-reviewers:
-- egernst
-- yastij
+  - tallclair
+reviewers: []

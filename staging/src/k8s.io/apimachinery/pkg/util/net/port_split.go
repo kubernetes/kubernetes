@@ -25,9 +25,9 @@ import (
 var validSchemes = sets.NewString("http", "https", "")
 
 // SplitSchemeNamePort takes a string of the following forms:
-//  * "<name>",                 returns "",        "<name>","",      true
-//  * "<name>:<port>",          returns "",        "<name>","<port>",true
-//  * "<scheme>:<name>:<port>", returns "<scheme>","<name>","<port>",true
+//   - "<name>",                 returns "",        "<name>","",      true
+//   - "<name>:<port>",          returns "",        "<name>","<port>",true
+//   - "<scheme>:<name>:<port>", returns "<scheme>","<name>","<port>",true
 //
 // Name must be non-empty or valid will be returned false.
 // Scheme must be "http" or "https" if specified
@@ -57,9 +57,10 @@ func SplitSchemeNamePort(id string) (scheme, name, port string, valid bool) {
 }
 
 // JoinSchemeNamePort returns a string that specifies the scheme, name, and port:
-//  * "<name>"
-//  * "<name>:<port>"
-//  * "<scheme>:<name>:<port>"
+//   - "<name>"
+//   - "<name>:<port>"
+//   - "<scheme>:<name>:<port>"
+//
 // None of the parameters may contain a ':' character
 // Name is required
 // Scheme must be "", "http", or "https"

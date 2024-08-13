@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -122,6 +123,18 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 	// true. If so, only allows the change if the user has delete permission of
 	// the _OWNER_
 	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
+	if len(newBlockingRefs) == 0 {
+		return nil
+	}
+
+	// There can be a case where a restMapper tries to hit discovery endpoints and times out if the network is inaccessible.
+	// This can prevent creating the pod to run the network to be able to do discovery and it appears as a timeout, not a rejection.
+	// Because the timeout is wrapper on admission/request, we can run a single check to see if the user can finalize any
+	// possible resource.
+	if decision, _, _ := a.authorizer.Authorize(ctx, finalizeAnythingRecord(attributes.GetUserInfo())); decision == authorizer.DecisionAllow {
+		return nil
+	}
+
 	for _, ref := range newBlockingRefs {
 		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
@@ -173,6 +186,20 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 	return false
 }
 
+func finalizeAnythingRecord(userInfo user.Info) authorizer.AttributesRecord {
+	return authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "update",
+		APIGroup:        "*",
+		APIVersion:      "*",
+		Resource:        "*",
+		Subresource:     "finalizers",
+		Name:            "*",
+		ResourceRequest: true,
+		Path:            "",
+	}
+}
+
 // Translates ref to a DeleteAttribute deleting the object referred by the ref.
 // OwnerReference only records the object kind, which might map to multiple
 // resources, so multiple DeleteAttribute might be returned.
@@ -211,7 +238,7 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 func blockingOwnerRefs(refs []metav1.OwnerReference) []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	for _, ref := range refs {
-		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion == true {
+		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			ret = append(ret, ref)
 		}
 	}

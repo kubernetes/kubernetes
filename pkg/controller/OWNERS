@@ -1,12 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- deads2k
-- derekwaynecarr
-- mikedanese
-- janetkuo
+  - deads2k
+  - derekwaynecarr
+  - mikedanese
+  - janetkuo
+  - cheftako
+  - andrewsykim
+  - sig-apps-approvers
 reviewers:
-- deads2k
-- cheftako
+  - andrewsykim
+  - deads2k
+  - cheftako
+  - sig-apps-reviewers
 labels:
-- sig/apps
+  - sig/apps

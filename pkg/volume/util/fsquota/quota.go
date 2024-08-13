@@ -17,16 +17,21 @@ limitations under the License.
 package fsquota
 
 import (
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
 // Interface -- quota interface
 type Interface interface {
+	// GetQuotaOnDir gets the quota ID (if any) that applies to
+	// this directory
+	GetQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error)
+
 	// Does the path provided support quotas, and if so, what types
 	SupportsQuotas(m mount.Interface, path string) (bool, error)
 	// Assign a quota (picked by the quota mechanism) to a path,

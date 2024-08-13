@@ -34,7 +34,6 @@ func (o *DeploymentControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", o.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more responsive deployments, but more CPU (and network) load")
-	fs.DurationVar(&o.DeploymentControllerSyncPeriod.Duration, "deployment-controller-sync-period", o.DeploymentControllerSyncPeriod.Duration, "Period for syncing the deployments.")
 }
 
 // ApplyTo fills up DeploymentController config with options.
@@ -44,7 +43,6 @@ func (o *DeploymentControllerOptions) ApplyTo(cfg *deploymentconfig.DeploymentCo
 	}
 
 	cfg.ConcurrentDeploymentSyncs = o.ConcurrentDeploymentSyncs
-	cfg.DeploymentControllerSyncPeriod = o.DeploymentControllerSyncPeriod
 
 	return nil
 }

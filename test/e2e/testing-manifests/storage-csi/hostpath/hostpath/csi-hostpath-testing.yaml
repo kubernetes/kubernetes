@@ -1,0 +1,87 @@
+# WARNING: this is only for testing purposes. Do not install in a production
+# cluster.
+#
+# This exposes the hostpath's Unix domain csi.sock as a TCP port to the
+# outside world. The mapping from Unix domain socket to TCP is done
+# by socat.
+#
+# This is useful for testing with csi-sanity or csc.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostpath-service
+  namespace: default
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: csi-hostpath-socat
+    app.kubernetes.io/component: socat
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: csi-hostpath-socat
+    app.kubernetes.io/component: socat
+  ports:
+  - port: 10000 # fixed port inside the pod, dynamically allocated port outside
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpath-socat
+  namespace: default
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: csi-hostpath-socat
+    app.kubernetes.io/component: socat
+spec:
+  serviceName: "csi-hostpath-socat"
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: hostpath.csi.k8s.io
+      app.kubernetes.io/part-of: csi-driver-host-path
+      app.kubernetes.io/name: csi-hostpath-socat
+      app.kubernetes.io/component: socat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: hostpath.csi.k8s.io
+        app.kubernetes.io/part-of: csi-driver-host-path
+        app.kubernetes.io/name: csi-hostpath-socat
+        app.kubernetes.io/component: socat
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                  - hostpath.csi.k8s.io
+            topologyKey: kubernetes.io/hostname
+      containers:
+        - name: socat
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.14.0
+          command:
+          - socat
+          args:
+            - tcp-listen:10000,fork,reuseaddr
+            - unix-connect:/csi/csi.sock
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath
+            type: DirectoryOrCreate
+          name: socket-dir

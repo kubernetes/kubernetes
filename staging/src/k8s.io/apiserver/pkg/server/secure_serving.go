@@ -20,8 +20,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -29,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 )
 
@@ -81,45 +86,52 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			s.SNICerts,
 			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
 		)
-		// register if possible
-		if notifier, ok := s.ClientCA.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+
+		if s.ClientCA != nil {
+			s.ClientCA.AddListener(dynamicCertificateController)
 		}
-		if notifier, ok := s.Cert.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+		if s.Cert != nil {
+			s.Cert.AddListener(dynamicCertificateController)
 		}
+		// generate a context from stopCh. This is to avoid modifying files which are relying on apiserver
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-stopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		for _, sniCert := range s.SNICerts {
-			if notifier, ok := sniCert.(dynamiccertificates.Notifier); ok {
-				notifier.AddListener(dynamicCertificateController)
-			}
-
+			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
-				go controller.Run(1, stopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 
@@ -139,14 +151,15 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
 // The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. Serve does not block.
 // It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
-func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, error) {
+// It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
+func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
 	if s.Listener == nil {
-		return nil, fmt.Errorf("listener must not be nil")
+		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
 
 	tlsConfig, err := s.tlsConfig(stopCh)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	secureServer := &http.Server{
@@ -154,6 +167,9 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig:      tlsConfig,
+
+		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
@@ -161,7 +177,9 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	// and small enough to allow a per connection buffer of this size multiplied by `MaxConcurrentStreams`.
 	const resourceBody99Percentile = 256 * 1024
 
-	http2Options := &http2.Server{}
+	http2Options := &http2.Server{
+		IdleTimeout: 90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+	}
 
 	// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
 	http2Options.MaxUploadBufferPerStream = resourceBody99Percentile
@@ -171,7 +189,10 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	if s.HTTP2MaxStreamsPerConnection > 0 {
 		http2Options.MaxConcurrentStreams = uint32(s.HTTP2MaxStreamsPerConnection)
 	} else {
-		http2Options.MaxConcurrentStreams = 250
+		// match http2.initialMaxConcurrentStreams used by clients
+		// this makes it so that a malicious client can only open 400 streams before we forcibly close the connection
+		// https://github.com/golang/net/commit/b225e7ca6dde1ef5a5ae5ce922861bda011cfabd
+		http2Options.MaxConcurrentStreams = 100
 	}
 
 	// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams
@@ -180,9 +201,14 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	if !s.DisableHTTP2 {
 		// apply settings to the server
 		if err := http2.ConfigureServer(secureServer, http2Options); err != nil {
-			return nil, fmt.Errorf("error configuring http2: %v", err)
+			return nil, nil, fmt.Errorf("error configuring http2: %v", err)
 		}
 	}
+
+	// use tlsHandshakeErrorWriter to handle messages of tls handshake error
+	tlsErrorWriter := &tlsHandshakeErrorWriter{os.Stderr}
+	tlsErrorLogger := log.New(tlsErrorWriter, "", 0)
+	secureServer.ErrorLog = tlsErrorLogger
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
 	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
@@ -199,15 +225,15 @@ func RunServer(
 	ln net.Listener,
 	shutDownTimeout time.Duration,
 	stopCh <-chan struct{},
-) (<-chan struct{}, error) {
+) (<-chan struct{}, <-chan struct{}, error) {
 	if ln == nil {
-		return nil, fmt.Errorf("listener must not be nil")
+		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
 
 	// Shutdown server gracefully.
-	stoppedCh := make(chan struct{})
+	serverShutdownCh, listenerStoppedCh := make(chan struct{}), make(chan struct{})
 	go func() {
-		defer close(stoppedCh)
+		defer close(serverShutdownCh)
 		<-stopCh
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
 		server.Shutdown(ctx)
@@ -216,9 +242,10 @@ func RunServer(
 
 	go func() {
 		defer utilruntime.HandleCrash()
+		defer close(listenerStoppedCh)
 
 		var listener net.Listener
-		listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+		listener = tcpKeepAliveListener{ln}
 		if server.TLSConfig != nil {
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
@@ -234,7 +261,7 @@ func RunServer(
 		}
 	}()
 
-	return stoppedCh, nil
+	return serverShutdownCh, listenerStoppedCh, nil
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
@@ -244,15 +271,36 @@ func RunServer(
 //
 // Copied from Go 1.7.2 net/http/server.go
 type tcpKeepAliveListener struct {
-	*net.TCPListener
+	net.Listener
 }
 
 func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
-	tc, err := ln.AcceptTCP()
+	c, err := ln.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
-	return tc, nil
+	if tc, ok := c.(*net.TCPConn); ok {
+		tc.SetKeepAlive(true)
+		tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
+	}
+	return c, nil
+}
+
+// tlsHandshakeErrorWriter writes TLS handshake errors to klog with
+// trace level - V(5), to avoid flooding of tls handshake errors.
+type tlsHandshakeErrorWriter struct {
+	out io.Writer
+}
+
+const tlsHandshakeErrorPrefix = "http: TLS handshake error"
+
+func (w *tlsHandshakeErrorWriter) Write(p []byte) (int, error) {
+	if strings.Contains(string(p), tlsHandshakeErrorPrefix) {
+		klog.V(5).Info(string(p))
+		metrics.TLSHandshakeErrors.Inc()
+		return len(p), nil
+	}
+
+	// for non tls handshake error, log it as usual
+	return w.out.Write(p)
 }

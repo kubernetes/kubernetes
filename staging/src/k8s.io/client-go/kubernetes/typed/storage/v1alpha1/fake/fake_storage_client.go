@@ -28,8 +28,16 @@ type FakeStorageV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeStorageV1alpha1) CSIStorageCapacities(namespace string) v1alpha1.CSIStorageCapacityInterface {
+	return &FakeCSIStorageCapacities{c, namespace}
+}
+
 func (c *FakeStorageV1alpha1) VolumeAttachments() v1alpha1.VolumeAttachmentInterface {
 	return &FakeVolumeAttachments{c}
+}
+
+func (c *FakeStorageV1alpha1) VolumeAttributesClasses() v1alpha1.VolumeAttributesClassInterface {
+	return &FakeVolumeAttributesClasses{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

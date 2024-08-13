@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks whether the source codes need to be formatted or not by
-# `gofmt`. We should run `hack/update-gofmt.sh` if actually formats them.
+# This script checks whether the source code needs to be formatted or not by
+# `gofmt`. Run `hack/update-gofmt.sh` to actually format sources.
+#
+# Note: gofmt output can change between go versions.
+#
 # Usage: `hack/verify-gofmt.sh`.
-# Note: GoFmt apparently is changing @ head...
 
 set -o errexit
 set -o nounset
@@ -28,25 +30,18 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-# Prefer bazel's gofmt.
-gofmt="external/io_bazel_rules_go_toolchain/bin/gofmt"
-if [[ ! -x "${gofmt}" ]]; then
-  gofmt=$(which gofmt)
-  kube::golang::verify_go_version
-fi
+kube::golang::setup_env
 
 find_files() {
   find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './.git' \
+        -wholename './.git' \
         -o -wholename './_output' \
-        -o -wholename './_gopath' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
-        -o -wholename './staging/src/k8s.io/client-go/*vendor/*' \
+        -o -wholename '*/testdata/*' \
         -o -wholename '*/bindata.go' \
       \) -prune \
     \) -name '*.go'
@@ -56,7 +51,7 @@ find_files() {
 # formatting (e.g., a file does not parse correctly). Without "|| true" this
 # would have led to no useful error message from gofmt, because the script would
 # have failed before getting to the "echo" in the block below.
-diff=$(find_files | xargs "${gofmt}" -d -s 2>&1) || true
+diff=$(find_files | xargs gofmt -d -s 2>&1) || true
 if [[ -n "${diff}" ]]; then
   echo "${diff}" >&2
   echo >&2

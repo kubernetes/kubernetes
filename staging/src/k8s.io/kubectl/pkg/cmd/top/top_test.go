@@ -20,15 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
@@ -39,7 +38,7 @@ func TestTopSubcommandsExist(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	cmd := NewCmdTop(f, genericclioptions.NewTestIOStreamsDiscard())
+	cmd := NewCmdTop(f, genericiooptions.NewTestIOStreamsDiscard())
 	if !cmd.HasSubCommands() {
 		t.Error("top command should have subcommands")
 	}
@@ -50,7 +49,7 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(bytes.NewReader(result)), nil
+	return io.NopCloser(bytes.NewReader(result)), nil
 }
 
 func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeList) {

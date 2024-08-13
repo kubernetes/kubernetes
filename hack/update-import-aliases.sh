@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script fixes imports programmatically according to 
+# This script fixes imports programmatically according to
 # all the imports that we have our preferred alias(es).
 # Usage: `hack/update-import-aliases.sh`.
 
@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::verify_go_version
+kube::golang::setup_env
 
 cd "${KUBE_ROOT}"
 

@@ -17,20 +17,24 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -72,18 +76,7 @@ func validNewReplicaSet() *apps.ReplicaSet {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:                     "test",
-							Image:                    "test_image",
-							ImagePullPolicy:          api.PullIfNotPresent,
-							TerminationMessagePolicy: api.TerminationMessageReadFile,
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
+				Spec: podtest.MakePodSpec(),
 			},
 			Replicas: 7,
 		},
@@ -294,7 +287,7 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
 	if !apiequality.Semantic.DeepEqual(got, want) {
-		t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, want))
+		t.Errorf("unexpected scale: %s", cmp.Diff(got, want))
 	}
 }
 
@@ -338,7 +331,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = rs.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !apierrors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -394,4 +387,128 @@ func TestCategories(t *testing.T) {
 	defer storage.ReplicaSet.Store.DestroyFunc()
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage.ReplicaSet, expected)
+}
+
+func TestScalePatchErrors(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	validObj := &validReplicaSet
+	namespace := validObj.Namespace
+	name := validObj.Name
+	resourceStore := storage.ReplicaSet.Store
+	scaleStore := storage.Scale
+
+	defer resourceStore.DestroyFunc()
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+
+	{
+		applyNotFoundPatch := func() rest.TransformFunc {
+			return func(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+				t.Errorf("notfound patch called")
+				return currentObject, nil
+			}
+		}
+		_, _, err := scaleStore.Update(ctx, "bad-name", rest.DefaultUpdatedObjectInfo(nil, applyNotFoundPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if !apierrors.IsNotFound(err) {
+			t.Errorf("expected notfound, got %v", err)
+		}
+	}
+
+	if _, err := resourceStore.Create(ctx, validObj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	{
+		applyBadUIDPatch := func() rest.TransformFunc {
+			return func(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+				currentObject.(*autoscaling.Scale).UID = "123"
+				return currentObject, nil
+			}
+		}
+		_, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadUIDPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if !apierrors.IsConflict(err) {
+			t.Errorf("expected conflict, got %v", err)
+		}
+	}
+
+	{
+		applyBadResourceVersionPatch := func() rest.TransformFunc {
+			return func(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+				currentObject.(*autoscaling.Scale).ResourceVersion = "123"
+				return currentObject, nil
+			}
+		}
+		_, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadResourceVersionPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if !apierrors.IsConflict(err) {
+			t.Errorf("expected conflict, got %v", err)
+		}
+	}
+}
+
+func TestScalePatchConflicts(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	validObj := &validReplicaSet
+	namespace := validObj.Namespace
+	name := validObj.Name
+	resourceStore := storage.ReplicaSet.Store
+	scaleStore := storage.Scale
+
+	defer resourceStore.DestroyFunc()
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	if _, err := resourceStore.Create(ctx, validObj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	applyLabelPatch := func(labelName, labelValue string) rest.TransformFunc {
+		return func(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+			currentObject.(metav1.Object).SetLabels(map[string]string{labelName: labelValue})
+			return currentObject, nil
+		}
+	}
+	stopCh := make(chan struct{})
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// continuously submits a patch that updates a label and verifies the label update was effective
+		labelName := "timestamp"
+		for i := 0; ; i++ {
+			select {
+			case <-stopCh:
+				return
+			default:
+				expectedLabelValue := fmt.Sprint(i)
+				updated, _, err := resourceStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyLabelPatch(labelName, fmt.Sprint(i))), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+				if err != nil {
+					t.Errorf("error patching main resource: %v", err)
+					return
+				}
+				gotLabelValue := updated.(metav1.Object).GetLabels()[labelName]
+				if gotLabelValue != expectedLabelValue {
+					t.Errorf("wrong label value: expected: %s, got: %s", expectedLabelValue, gotLabelValue)
+					return
+				}
+			}
+		}
+	}()
+
+	// continuously submits a scale patch of replicas for a monotonically increasing replica value
+	applyReplicaPatch := func(replicas int) rest.TransformFunc {
+		return func(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+			currentObject.(*autoscaling.Scale).Spec.Replicas = int32(replicas)
+			return currentObject, nil
+		}
+	}
+	for i := 0; i < 100; i++ {
+		result, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyReplicaPatch(i)), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("error patching scale: %v", err)
+		}
+		scale := result.(*autoscaling.Scale)
+		if scale.Spec.Replicas != int32(i) {
+			t.Errorf("wrong replicas count: expected: %d got: %d", i, scale.Spec.Replicas)
+		}
+	}
+	close(stopCh)
+	wg.Wait()
 }

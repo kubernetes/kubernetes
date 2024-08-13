@@ -76,6 +76,10 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 		p.t.Errorf("invariant violated, specifying resource version (%s) is not allowed when using continue (%s).", options.ResourceVersion, options.Continue)
 		return nil, fmt.Errorf("invariant violated")
 	}
+	if options.Continue != "" && options.ResourceVersionMatch != "" {
+		p.t.Errorf("invariant violated, specifying resource version match type (%s) is not allowed when using continue (%s).", options.ResourceVersionMatch, options.Continue)
+		return nil, fmt.Errorf("invariant violated")
+	}
 	var list metainternalversion.List
 	total := options.Limit
 	if total == 0 {
@@ -201,6 +205,13 @@ func TestListPager_List(t *testing.T) {
 			want:      list(11, "rv:20"),
 			wantPaged: true,
 		},
+		{
+			name:      "two pages with resourceVersion and resourceVersionMatch",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
+			args:      args{options: metav1.ListOptions{ResourceVersion: "rv:10", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}},
+			want:      list(11, "rv:20"),
+			wantPaged: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -290,15 +301,9 @@ func TestListPager_EachListItem(t *testing.T) {
 		{
 			name:                "cancel context while processing",
 			fields:              fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 51, rv: "rv:20"}).PagedList},
-			want:                list(3, "rv:20"), // all the items <= the one the processor returned an error on should have been visited
+			want:                list(10, "rv:20"), // The whole PageSize worth of items got returned.
 			wantErr:             true,
 			cancelContextOnItem: 3,
-		},
-		{
-			name:      "panic processing item",
-			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 51, rv: "rv:20"}).PagedList},
-			want:      list(3, "rv:20"), // all the items <= the one the processor returned an error on should have been visited
-			wantPanic: true,
 		},
 	}
 
@@ -334,8 +339,7 @@ func TestListPager_EachListItem(t *testing.T) {
 				err = p.EachListItem(ctx, metav1.ListOptions{}, fn)
 			}()
 			if (panic != nil) && !tt.wantPanic {
-				t.Fatalf(".EachListItem() panic = %v, wantPanic %v", panic, tt.wantPanic)
-			} else {
+				t.Errorf(".EachListItem() panic = %v, wantPanic %v", panic, tt.wantPanic)
 				return
 			}
 			if (err != nil) != tt.wantErr {

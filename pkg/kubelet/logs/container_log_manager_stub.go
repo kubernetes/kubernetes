@@ -16,9 +16,15 @@ limitations under the License.
 
 package logs
 
+import "context"
+
 type containerLogManagerStub struct{}
 
 func (*containerLogManagerStub) Start() {}
+
+func (*containerLogManagerStub) Clean(ctx context.Context, containerID string) error {
+	return nil
+}
 
 // NewStubContainerLogManager returns an empty ContainerLogManager which does nothing.
 func NewStubContainerLogManager() ContainerLogManager {

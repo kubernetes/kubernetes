@@ -17,9 +17,9 @@ package manager
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path"
 	"regexp"
@@ -27,18 +27,20 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	v2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/stats"
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
 
-	units "github.com/docker/go-units"
+	"github.com/docker/go-units"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -47,9 +49,14 @@ import (
 var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
+// TODO: replace regular expressions with something simpler, such as strings.Split().
 // cgroup type chosen to fetch the cgroup path of a process.
-// Memory has been chosen, as it is one of the default cgroups that is enabled for most containers.
-var cgroupPathRegExp = regexp.MustCompile(`memory[^:]*:(.*?)[,;$]`)
+// Memory has been chosen, as it is one of the default cgroups that is enabled for most containers...
+var cgroupMemoryPathRegExp = regexp.MustCompile(`memory[^:]*:(.*?)[,;$]`)
+
+// ... but there are systems (e.g. Raspberry Pi 4) where memory cgroup controller is disabled by default.
+// We should check cpu cgroup then.
+var cgroupCPUPathRegExp = regexp.MustCompile(`cpu[^:]*:(.*?)[,;$]`)
 
 type containerInfo struct {
 	info.ContainerReference
@@ -58,6 +65,7 @@ type containerInfo struct {
 }
 
 type containerData struct {
+	oomEvents                uint64
 	handler                  container.ContainerHandler
 	info                     containerInfo
 	memoryCache              *memory.InMemoryCache
@@ -89,11 +97,11 @@ type containerData struct {
 	// Runs custom metric collectors.
 	collectorManager collector.CollectorManager
 
-	// nvidiaCollector updates stats for Nvidia GPUs attached to the container.
-	nvidiaCollector stats.Collector
-
 	// perfCollector updates stats for perf_event cgroup controller.
 	perfCollector stats.Collector
+
+	// resctrlCollector updates stats for resctrl controller.
+	resctrlCollector stats.Collector
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,
@@ -119,6 +127,7 @@ func (cd *containerData) Stop() error {
 	}
 	close(cd.stop)
 	cd.perfCollector.Destroy()
+	cd.resctrlCollector.Destroy()
 	return nil
 }
 
@@ -135,7 +144,10 @@ func (cd *containerData) allowErrorLogging() bool {
 // periodic housekeeping to reset.  This should be used sparingly, as calling OnDemandHousekeeping frequently
 // can have serious performance costs.
 func (cd *containerData) OnDemandHousekeeping(maxAge time.Duration) {
-	if cd.clock.Since(cd.statsLastUpdatedTime) > maxAge {
+	cd.lock.Lock()
+	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime)
+	cd.lock.Unlock()
+	if timeSinceStatsLastUpdate > maxAge {
 		housekeepingFinishedChan := make(chan struct{})
 		cd.onDemandChan <- housekeepingFinishedChan
 		select {
@@ -159,7 +171,7 @@ func (cd *containerData) notifyOnDemand() {
 
 func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo, error) {
 	// Get spec and subcontainers.
-	if cd.clock.Since(cd.infoLastUpdatedTime) > 5*time.Second {
+	if cd.clock.Since(cd.infoLastUpdatedTime) > 5*time.Second || shouldUpdateSubcontainers {
 		err := cd.updateSpec()
 		if err != nil {
 			return nil, err
@@ -192,20 +204,28 @@ func (cd *containerData) DerivedStats() (v2.DerivedStats, error) {
 	return cd.summaryReader.DerivedStats()
 }
 
-func (cd *containerData) getCgroupPath(cgroups string) (string, error) {
+func (cd *containerData) getCgroupPath(cgroups string) string {
 	if cgroups == "-" {
-		return "/", nil
+		return "/"
 	}
 	if strings.HasPrefix(cgroups, "0::") {
-		return cgroups[3:], nil
+		return cgroups[3:]
 	}
-	matches := cgroupPathRegExp.FindSubmatch([]byte(cgroups))
+	matches := cgroupMemoryPathRegExp.FindSubmatch([]byte(cgroups))
 	if len(matches) != 2 {
-		klog.V(3).Infof("failed to get memory cgroup path from %q", cgroups)
-		// return root in case of failures - memory hierarchy might not be enabled.
-		return "/", nil
+		klog.V(3).Infof(
+			"failed to get memory cgroup path from %q, will try to get cpu cgroup path",
+			cgroups,
+		)
+		// On some systems (e.g. Raspberry PI 4) cgroup memory controlled is disabled by default.
+		matches = cgroupCPUPathRegExp.FindSubmatch([]byte(cgroups))
+		if len(matches) != 2 {
+			klog.V(3).Infof("failed to get cpu cgroup path from %q; assuming root cgroup", cgroups)
+			// return root in case of failures - memory hierarchy might not be enabled.
+			return "/"
+		}
 	}
-	return string(matches[1]), nil
+	return string(matches[1])
 }
 
 // Returns contents of a file inside the container root.
@@ -223,7 +243,7 @@ func (cd *containerData) ReadFile(filepath string, inHostNamespace bool) ([]byte
 	for _, pid := range pids {
 		filePath := path.Join(rootfs, "/proc", pid, "/root", filepath)
 		klog.V(3).Infof("Trying path %q", filePath)
-		data, err := ioutil.ReadFile(filePath)
+		data, err := os.ReadFile(filePath)
 		if err == nil {
 			return data, err
 		}
@@ -268,10 +288,7 @@ func (cd *containerData) getContainerPids(inHostNamespace bool) ([]string, error
 			return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
 		}
 		pid := fields[0]
-		cgroup, err := cd.getCgroupPath(fields[1])
-		if err != nil {
-			return nil, fmt.Errorf("could not parse cgroup path from %q: %v", fields[1], err)
-		}
+		cgroup := cd.getCgroupPath(fields[1])
 		if cd.info.Name == cgroup {
 			pids = append(pids, pid)
 		}
@@ -280,98 +297,128 @@ func (cd *containerData) getContainerPids(inHostNamespace bool) ([]string, error
 }
 
 func (cd *containerData) GetProcessList(cadvisorContainer string, inHostNamespace bool) ([]v2.ProcessInfo, error) {
-	// report all processes for root.
-	isRoot := cd.info.Name == "/"
-	rootfs := "/"
-	if !inHostNamespace {
-		rootfs = "/rootfs"
-	}
-	format := "user,pid,ppid,stime,pcpu,pmem,rss,vsz,stat,time,comm,cgroup"
+	format := "user,pid,ppid,stime,pcpu,pmem,rss,vsz,stat,time,comm,psr,cgroup"
 	out, err := cd.getPsOutput(inHostNamespace, format)
 	if err != nil {
 		return nil, err
 	}
-	expectedFields := 12
+	return cd.parseProcessList(cadvisorContainer, inHostNamespace, out)
+}
+
+func (cd *containerData) parseProcessList(cadvisorContainer string, inHostNamespace bool, out []byte) ([]v2.ProcessInfo, error) {
+	rootfs := "/"
+	if !inHostNamespace {
+		rootfs = "/rootfs"
+	}
 	processes := []v2.ProcessInfo{}
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines[1:] {
-		if len(line) == 0 {
+		processInfo, err := cd.parsePsLine(line, cadvisorContainer, inHostNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse line %s: %v", line, err)
+		}
+		if processInfo == nil {
 			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < expectedFields {
-			return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
-		}
-		pid, err := strconv.Atoi(fields[1])
-		if err != nil {
-			return nil, fmt.Errorf("invalid pid %q: %v", fields[1], err)
-		}
-		ppid, err := strconv.Atoi(fields[2])
-		if err != nil {
-			return nil, fmt.Errorf("invalid ppid %q: %v", fields[2], err)
-		}
-		percentCPU, err := strconv.ParseFloat(fields[4], 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid cpu percent %q: %v", fields[4], err)
-		}
-		percentMem, err := strconv.ParseFloat(fields[5], 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid memory percent %q: %v", fields[5], err)
-		}
-		rss, err := strconv.ParseUint(fields[6], 0, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid rss %q: %v", fields[6], err)
-		}
-		// convert to bytes
-		rss *= 1024
-		vs, err := strconv.ParseUint(fields[7], 0, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid virtual size %q: %v", fields[7], err)
-		}
-		// convert to bytes
-		vs *= 1024
-		cgroup, err := cd.getCgroupPath(fields[11])
-		if err != nil {
-			return nil, fmt.Errorf("could not parse cgroup path from %q: %v", fields[11], err)
-		}
-		// Remove the ps command we just ran from cadvisor container.
-		// Not necessary, but makes the cadvisor page look cleaner.
-		if !inHostNamespace && cadvisorContainer == cgroup && fields[10] == "ps" {
-			continue
-		}
-		var cgroupPath string
-		if isRoot {
-			cgroupPath = cgroup
 		}
 
 		var fdCount int
-		dirPath := path.Join(rootfs, "/proc", strconv.Itoa(pid), "fd")
-		fds, err := ioutil.ReadDir(dirPath)
+		dirPath := path.Join(rootfs, "/proc", strconv.Itoa(processInfo.Pid), "fd")
+		fds, err := os.ReadDir(dirPath)
 		if err != nil {
 			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
 			continue
 		}
 		fdCount = len(fds)
+		processInfo.FdCount = fdCount
 
-		if isRoot || cd.info.Name == cgroup {
-			processes = append(processes, v2.ProcessInfo{
-				User:          fields[0],
-				Pid:           pid,
-				Ppid:          ppid,
-				StartTime:     fields[3],
-				PercentCpu:    float32(percentCPU),
-				PercentMemory: float32(percentMem),
-				RSS:           rss,
-				VirtualSize:   vs,
-				Status:        fields[8],
-				RunningTime:   fields[9],
-				Cmd:           fields[10],
-				CgroupPath:    cgroupPath,
-				FdCount:       fdCount,
-			})
-		}
+		processes = append(processes, *processInfo)
 	}
 	return processes, nil
+}
+
+func (cd *containerData) isRoot() bool {
+	return cd.info.Name == "/"
+}
+
+func (cd *containerData) parsePsLine(line, cadvisorContainer string, inHostNamespace bool) (*v2.ProcessInfo, error) {
+	const expectedFields = 13
+	if len(line) == 0 {
+		return nil, nil
+	}
+
+	info := v2.ProcessInfo{}
+	var err error
+
+	fields := strings.Fields(line)
+	if len(fields) < expectedFields {
+		return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
+	}
+	info.User = fields[0]
+	info.StartTime = fields[3]
+	info.Status = fields[8]
+	info.RunningTime = fields[9]
+
+	info.Pid, err = strconv.Atoi(fields[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid pid %q: %v", fields[1], err)
+	}
+	info.Ppid, err = strconv.Atoi(fields[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid ppid %q: %v", fields[2], err)
+	}
+
+	percentCPU, err := strconv.ParseFloat(fields[4], 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cpu percent %q: %v", fields[4], err)
+	}
+	info.PercentCpu = float32(percentCPU)
+	percentMem, err := strconv.ParseFloat(fields[5], 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid memory percent %q: %v", fields[5], err)
+	}
+	info.PercentMemory = float32(percentMem)
+
+	info.RSS, err = strconv.ParseUint(fields[6], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rss %q: %v", fields[6], err)
+	}
+	info.VirtualSize, err = strconv.ParseUint(fields[7], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid virtual size %q: %v", fields[7], err)
+	}
+	// convert to bytes
+	info.RSS *= 1024
+	info.VirtualSize *= 1024
+
+	// According to `man ps`: The following user-defined format specifiers may contain spaces: args, cmd, comm, command,
+	// fname, ucmd, ucomm, lstart, bsdstart, start.
+	// Therefore we need to be able to parse comm that consists of multiple space-separated parts.
+	info.Cmd = strings.Join(fields[10:len(fields)-2], " ")
+
+	// These are last two parts of the line. We create a subslice of `fields` to handle comm that includes spaces.
+	lastTwoFields := fields[len(fields)-2:]
+	info.Psr, err = strconv.Atoi(lastTwoFields[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid psr %q: %v", lastTwoFields[0], err)
+	}
+	info.CgroupPath = cd.getCgroupPath(lastTwoFields[1])
+
+	// Remove the ps command we just ran from cadvisor container.
+	// Not necessary, but makes the cadvisor page look cleaner.
+	if !inHostNamespace && cadvisorContainer == info.CgroupPath && info.Cmd == "ps" {
+		return nil, nil
+	}
+
+	// Do not report processes from other containers when non-root container requested.
+	if !cd.isRoot() && info.CgroupPath != cd.info.Name {
+		return nil, nil
+	}
+
+	// Remove cgroup information when non-root container requested.
+	if !cd.isRoot() {
+		info.CgroupPath = ""
+	}
+	return &info, nil
 }
 
 func newContainerData(containerName string, memoryCache *memory.InMemoryCache, handler container.ContainerHandler, logUsage bool, collectorManager collector.CollectorManager, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, clock clock.Clock) (*containerData, error) {
@@ -399,7 +446,7 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		onDemandChan:             make(chan chan struct{}, 100),
 		clock:                    clock,
 		perfCollector:            &stats.NoopCollector{},
-		nvidiaCollector:          &stats.NoopCollector{},
+		resctrlCollector:         &stats.NoopCollector{},
 	}
 	cont.info.ContainerReference = ref
 
@@ -435,7 +482,7 @@ func (cd *containerData) nextHousekeepingInterval() time.Duration {
 		stats, err := cd.memoryCache.RecentStats(cd.info.Name, empty, empty, 2)
 		if err != nil {
 			if cd.allowErrorLogging() {
-				klog.Warningf("Failed to get RecentStats(%q) while determining the next housekeeping: %v", cd.info.Name, err)
+				klog.V(4).Infof("Failed to get RecentStats(%q) while determining the next housekeeping: %v", cd.info.Name, err)
 			}
 		} else if len(stats) == 2 {
 			// TODO(vishnuk): Use no processes as a signal.
@@ -506,7 +553,7 @@ func (cd *containerData) housekeeping() {
 				usageCPUNs := uint64(0)
 				for i := range stats {
 					if i > 0 {
-						usageCPUNs += (stats[i].Cpu.Usage.Total - stats[i-1].Cpu.Usage.Total)
+						usageCPUNs += stats[i].Cpu.Usage.Total - stats[i-1].Cpu.Usage.Total
 					}
 				}
 				usageMemory := stats[numSamples-1].Memory.Usage
@@ -545,6 +592,8 @@ func (cd *containerData) housekeepingTick(timer <-chan time.Time, longHousekeepi
 		klog.V(3).Infof("[%s] Housekeeping took %s", cd.info.Name, duration)
 	}
 	cd.notifyOnDemand()
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
 	cd.statsLastUpdatedTime = cd.clock.Now()
 	return true
 }
@@ -619,6 +668,9 @@ func (cd *containerData) updateStats() error {
 			klog.V(2).Infof("Failed to add summary stats for %q: %v", cd.info.Name, err)
 		}
 	}
+
+	stats.OOMEvents = atomic.LoadUint64(&cd.oomEvents)
+
 	var customStatsErr error
 	cm := cd.collectorManager.(*collector.GenericCollectorManager)
 	if len(cm.Collectors) > 0 {
@@ -633,13 +685,9 @@ func (cd *containerData) updateStats() error {
 		}
 	}
 
-	var nvidiaStatsErr error
-	if cd.nvidiaCollector != nil {
-		// This updates the Accelerators field of the stats struct
-		nvidiaStatsErr = cd.nvidiaCollector.UpdateStats(stats)
-	}
-
 	perfStatsErr := cd.perfCollector.UpdateStats(stats)
+
+	resctrlStatsErr := cd.resctrlCollector.UpdateStats(stats)
 
 	ref, err := cd.handler.ContainerReference()
 	if err != nil {
@@ -661,13 +709,13 @@ func (cd *containerData) updateStats() error {
 	if statsErr != nil {
 		return statsErr
 	}
-	if nvidiaStatsErr != nil {
-		klog.Errorf("error occurred while collecting nvidia stats for container %s: %s", cInfo.Name, err)
-		return nvidiaStatsErr
-	}
 	if perfStatsErr != nil {
 		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, err)
 		return perfStatsErr
+	}
+	if resctrlStatsErr != nil {
+		klog.Errorf("error occurred while collecting resctrl stats for container %s: %s", cInfo.Name, resctrlStatsErr)
+		return resctrlStatsErr
 	}
 	return customStatsErr
 }

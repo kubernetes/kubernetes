@@ -4,10 +4,8 @@
 options:
   no_parent_owners: true
 reviewers:
-  - bgrant0607
   - smarterclayton
   - spiffxp
-  - timothysc
   - dims
   - johnbelamaric
 approvers:

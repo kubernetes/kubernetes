@@ -27,24 +27,18 @@ function get-num-nodes {
 #   NUM_NODES
 #   NUM_WINDOWS_NODES
 function get-master-size {
-  local suggested_master_size=1
-  if [[ "$(get-num-nodes)" -gt "5" ]]; then
-    suggested_master_size=2
-  fi
+  local suggested_master_size=2
   if [[ "$(get-num-nodes)" -gt "10" ]]; then
     suggested_master_size=4
   fi
-  if [[ "$(get-num-nodes)" -gt "100" ]]; then
+  if [[ "$(get-num-nodes)" -gt "50" ]]; then
     suggested_master_size=8
   fi
-  if [[ "$(get-num-nodes)" -gt "250" ]]; then
+  if [[ "$(get-num-nodes)" -gt "100" ]]; then
     suggested_master_size=16
   fi
   if [[ "$(get-num-nodes)" -gt "500" ]]; then
     suggested_master_size=32
-  fi
-  if [[ "$(get-num-nodes)" -gt "3000" ]]; then
-    suggested_master_size=64
   fi
   echo "${suggested_master_size}"
 }
@@ -142,7 +136,7 @@ export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
 export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v0.8.5"
+export WINDOWS_CNI_VERSION="v1.5.0"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
@@ -157,5 +151,27 @@ export WINDOWS_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.kubeconfig"
 export WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-kubeconfig"
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
+# Path for kube-proxy kubeconfig file on Windows nodes.
+export WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\node-problem-detector.kubeconfig"
 # Pause container image for Windows container.
-export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.2.1"
+export WINDOWS_INFRA_CONTAINER="registry.k8s.io/pause:3.10"
+# Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
+export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
+# Version for csi-proxy
+export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.1.1-gke.0}"
+# csi-proxy additional flags, there are additional flags that cannot be unset in k8s-node-setup.psm1
+export CSI_PROXY_FLAGS="${CSI_PROXY_FLAGS:-}"
+# Storage path for auth-provider-gcp binaries
+export AUTH_PROVIDER_GCP_STORAGE_PATH="${AUTH_PROVIDER_GCP_STORAGE_PATH:-https://storage.googleapis.com/gke-release/auth-provider-gcp}"
+# auth-provider-gcp version
+export AUTH_PROVIDER_GCP_VERSION="${AUTH_PROVIDER_GCP_VERSION:-v0.0.2-gke.4}"
+# Hash of auth-provider-gcp.exe binary
+export AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64="${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64:-348af2c189d938e1a4fa5ac5c640d21e003da1f000abcd6fd7eef2acd0678638286e40703618758d4fdfe2cc4b90e920f0422128ec777c74054af9dd4405de12}"
+# Directory of kubelet image credential provider binary files on windows
+export AUTH_PROVIDER_GCP_LINUX_BIN_DIR="${AUTH_PROVIDER_GCP_LINUX_BIN_DIR:-/home/kubernetes/bin}"
+# Location of kubelet image credential provider config file on windows
+export AUTH_PROVIDER_GCP_LINUX_CONF_FILE="${AUTH_PROVIDER_GCP_LINUX_CONF_FILE:-/home/kubernetes/cri-auth-config.yaml}"
+# Directory of kubelet image credential provider binary files on windows
+export AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR=${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR:-${WINDOWS_NODE_DIR}}
+# Location of kubelet image credential provider config file on windows
+export AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE="${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE:-${WINDOWS_K8S_DIR}\cri-auth-config.yaml}"

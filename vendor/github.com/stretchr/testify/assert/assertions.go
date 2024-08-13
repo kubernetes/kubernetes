@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 	"unicode"
@@ -18,10 +19,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pmezard/go-difflib/difflib"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
-//go:generate go run ../_codegen/main.go -output-package=assert -template=assertion_format.go.tmpl
+//go:generate sh -c "cd ../_codegen && go build && cd - && ../_codegen/_codegen -output-package=assert -template=assertion_format.go.tmpl"
 
 // TestingT is an interface wrapper around *testing.T
 type TestingT interface {
@@ -44,7 +45,7 @@ type BoolAssertionFunc func(TestingT, bool, ...interface{}) bool
 // for table driven tests.
 type ErrorAssertionFunc func(TestingT, error, ...interface{}) bool
 
-// Comparison a custom function that returns true on success and false on failure
+// Comparison is a custom function that returns true on success and false on failure
 type Comparison func() (success bool)
 
 /*
@@ -74,6 +75,84 @@ func ObjectsAreEqual(expected, actual interface{}) bool {
 	return bytes.Equal(exp, act)
 }
 
+// copyExportedFields iterates downward through nested data structures and creates a copy
+// that only contains the exported struct fields.
+func copyExportedFields(expected interface{}) interface{} {
+	if isNil(expected) {
+		return expected
+	}
+
+	expectedType := reflect.TypeOf(expected)
+	expectedKind := expectedType.Kind()
+	expectedValue := reflect.ValueOf(expected)
+
+	switch expectedKind {
+	case reflect.Struct:
+		result := reflect.New(expectedType).Elem()
+		for i := 0; i < expectedType.NumField(); i++ {
+			field := expectedType.Field(i)
+			isExported := field.IsExported()
+			if isExported {
+				fieldValue := expectedValue.Field(i)
+				if isNil(fieldValue) || isNil(fieldValue.Interface()) {
+					continue
+				}
+				newValue := copyExportedFields(fieldValue.Interface())
+				result.Field(i).Set(reflect.ValueOf(newValue))
+			}
+		}
+		return result.Interface()
+
+	case reflect.Ptr:
+		result := reflect.New(expectedType.Elem())
+		unexportedRemoved := copyExportedFields(expectedValue.Elem().Interface())
+		result.Elem().Set(reflect.ValueOf(unexportedRemoved))
+		return result.Interface()
+
+	case reflect.Array, reflect.Slice:
+		var result reflect.Value
+		if expectedKind == reflect.Array {
+			result = reflect.New(reflect.ArrayOf(expectedValue.Len(), expectedType.Elem())).Elem()
+		} else {
+			result = reflect.MakeSlice(expectedType, expectedValue.Len(), expectedValue.Len())
+		}
+		for i := 0; i < expectedValue.Len(); i++ {
+			index := expectedValue.Index(i)
+			if isNil(index) {
+				continue
+			}
+			unexportedRemoved := copyExportedFields(index.Interface())
+			result.Index(i).Set(reflect.ValueOf(unexportedRemoved))
+		}
+		return result.Interface()
+
+	case reflect.Map:
+		result := reflect.MakeMap(expectedType)
+		for _, k := range expectedValue.MapKeys() {
+			index := expectedValue.MapIndex(k)
+			unexportedRemoved := copyExportedFields(index.Interface())
+			result.SetMapIndex(k, reflect.ValueOf(unexportedRemoved))
+		}
+		return result.Interface()
+
+	default:
+		return expected
+	}
+}
+
+// ObjectsExportedFieldsAreEqual determines if the exported (public) fields of two objects are
+// considered equal. This comparison of only exported fields is applied recursively to nested data
+// structures.
+//
+// This function does no assertion of any kind.
+//
+// Deprecated: Use [EqualExportedValues] instead.
+func ObjectsExportedFieldsAreEqual(expected, actual interface{}) bool {
+	expectedCleaned := copyExportedFields(expected)
+	actualCleaned := copyExportedFields(actual)
+	return ObjectsAreEqualValues(expectedCleaned, actualCleaned)
+}
+
 // ObjectsAreEqualValues gets whether two objects are equal, or if their
 // values are equal.
 func ObjectsAreEqualValues(expected, actual interface{}) bool {
@@ -81,17 +160,40 @@ func ObjectsAreEqualValues(expected, actual interface{}) bool {
 		return true
 	}
 
-	actualType := reflect.TypeOf(actual)
-	if actualType == nil {
+	expectedValue := reflect.ValueOf(expected)
+	actualValue := reflect.ValueOf(actual)
+	if !expectedValue.IsValid() || !actualValue.IsValid() {
 		return false
 	}
-	expectedValue := reflect.ValueOf(expected)
-	if expectedValue.IsValid() && expectedValue.Type().ConvertibleTo(actualType) {
-		// Attempt comparison after type conversion
-		return reflect.DeepEqual(expectedValue.Convert(actualType).Interface(), actual)
+
+	expectedType := expectedValue.Type()
+	actualType := actualValue.Type()
+	if !expectedType.ConvertibleTo(actualType) {
+		return false
 	}
 
-	return false
+	if !isNumericType(expectedType) || !isNumericType(actualType) {
+		// Attempt comparison after type conversion
+		return reflect.DeepEqual(
+			expectedValue.Convert(actualType).Interface(), actual,
+		)
+	}
+
+	// If BOTH values are numeric, there are chances of false positives due
+	// to overflow or underflow. So, we need to make sure to always convert
+	// the smaller type to a larger type before comparing.
+	if expectedType.Size() >= actualType.Size() {
+		return actualValue.Convert(expectedType).Interface() == expected
+	}
+
+	return expectedValue.Convert(actualType).Interface() == actual
+}
+
+// isNumericType returns true if the type is one of:
+// int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+// float32, float64, complex64, complex128
+func isNumericType(t reflect.Type) bool {
+	return t.Kind() >= reflect.Int && t.Kind() <= reflect.Complex128
 }
 
 /* CallerInfo is necessary because the assert functions use the testing object
@@ -103,11 +205,11 @@ the problem actually occurred in calling code.*/
 // failed.
 func CallerInfo() []string {
 
-	pc := uintptr(0)
-	file := ""
-	line := 0
-	ok := false
-	name := ""
+	var pc uintptr
+	var ok bool
+	var file string
+	var line int
+	var name string
 
 	callers := []string{}
 	for i := 0; ; i++ {
@@ -139,10 +241,10 @@ func CallerInfo() []string {
 		}
 
 		parts := strings.Split(file, "/")
-		file = parts[len(parts)-1]
 		if len(parts) > 1 {
+			filename := parts[len(parts)-1]
 			dir := parts[len(parts)-2]
-			if (dir != "assert" && dir != "mock" && dir != "require") || file == "mock_test.go" {
+			if (dir != "assert" && dir != "mock" && dir != "require") || filename == "mock_test.go" {
 				callers = append(callers, fmt.Sprintf("%s:%d", file, line))
 			}
 		}
@@ -171,8 +273,8 @@ func isTest(name, prefix string) bool {
 	if len(name) == len(prefix) { // "Test" is ok
 		return true
 	}
-	rune, _ := utf8.DecodeRuneInString(name[len(prefix):])
-	return !unicode.IsLower(rune)
+	r, _ := utf8.DecodeRuneInString(name[len(prefix):])
+	return !unicode.IsLower(r)
 }
 
 func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
@@ -194,7 +296,7 @@ func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
 
 // Aligns the provided message so that all lines after the first line start at the same location as the first line.
 // Assumes that the first line starts at the correct location (after carriage return, tab, label, spacer and tab).
-// The longestLabelLen parameter specifies the length of the longest label in the output (required becaues this is the
+// The longestLabelLen parameter specifies the length of the longest label in the output (required because this is the
 // basis on which the alignment occurs).
 func indentMessageLines(message string, longestLabelLen int) string {
 	outBuf := new(bytes.Buffer)
@@ -270,7 +372,7 @@ type labeledContent struct {
 
 // labeledOutput returns a string consisting of the provided labeledContent. Each labeled output is appended in the following manner:
 //
-//   \t{{label}}:{{align_spaces}}\t{{content}}\n
+//	\t{{label}}:{{align_spaces}}\t{{content}}\n
 //
 // The initial carriage return is required to undo/erase any padding added by testing.T.Errorf. The "\t{{label}}:" is for the label.
 // If a label is shorter than the longest label provided, padding spaces are added to make all the labels match in length. Once this
@@ -293,7 +395,7 @@ func labeledOutput(content ...labeledContent) string {
 
 // Implements asserts that an object is implemented by the specified interface.
 //
-//    assert.Implements(t, (*MyInterface)(nil), new(MyObject))
+//	assert.Implements(t, (*MyInterface)(nil), new(MyObject))
 func Implements(t TestingT, interfaceObject interface{}, object interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -305,6 +407,25 @@ func Implements(t TestingT, interfaceObject interface{}, object interface{}, msg
 	}
 	if !reflect.TypeOf(object).Implements(interfaceType) {
 		return Fail(t, fmt.Sprintf("%T must implement %v", object, interfaceType), msgAndArgs...)
+	}
+
+	return true
+}
+
+// NotImplements asserts that an object does not implement the specified interface.
+//
+//	assert.NotImplements(t, (*MyInterface)(nil), new(MyObject))
+func NotImplements(t TestingT, interfaceObject interface{}, object interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	interfaceType := reflect.TypeOf(interfaceObject).Elem()
+
+	if object == nil {
+		return Fail(t, fmt.Sprintf("Cannot check if nil does not implement %v", interfaceType), msgAndArgs...)
+	}
+	if reflect.TypeOf(object).Implements(interfaceType) {
+		return Fail(t, fmt.Sprintf("%T implements %v", object, interfaceType), msgAndArgs...)
 	}
 
 	return true
@@ -325,7 +446,7 @@ func IsType(t TestingT, expectedType interface{}, object interface{}, msgAndArgs
 
 // Equal asserts that two objects are equal.
 //
-//    assert.Equal(t, 123, 123)
+//	assert.Equal(t, 123, 123)
 //
 // Pointer variable equality is determined based on the equality of the
 // referenced values (as opposed to the memory addresses). Function equality
@@ -351,9 +472,22 @@ func Equal(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) 
 
 }
 
+// validateEqualArgs checks whether provided arguments can be safely used in the
+// Equal/NotEqual functions.
+func validateEqualArgs(expected, actual interface{}) error {
+	if expected == nil && actual == nil {
+		return nil
+	}
+
+	if isFunction(expected) || isFunction(actual) {
+		return errors.New("cannot take func type as argument")
+	}
+	return nil
+}
+
 // Same asserts that two pointers reference the same object.
 //
-//    assert.Same(t, ptr1, ptr2)
+//	assert.Same(t, ptr1, ptr2)
 //
 // Both arguments must be pointer variables. Pointer variable sameness is
 // determined based on the equality of both type and value.
@@ -362,18 +496,7 @@ func Same(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) b
 		h.Helper()
 	}
 
-	expectedPtr, actualPtr := reflect.ValueOf(expected), reflect.ValueOf(actual)
-	if expectedPtr.Kind() != reflect.Ptr || actualPtr.Kind() != reflect.Ptr {
-		return Fail(t, "Invalid operation: both arguments must be pointers", msgAndArgs...)
-	}
-
-	expectedType, actualType := reflect.TypeOf(expected), reflect.TypeOf(actual)
-	if expectedType != actualType {
-		return Fail(t, fmt.Sprintf("Pointer expected to be of type %v, but was %v",
-			expectedType, actualType), msgAndArgs...)
-	}
-
-	if expected != actual {
+	if !samePointers(expected, actual) {
 		return Fail(t, fmt.Sprintf("Not same: \n"+
 			"expected: %p %#v\n"+
 			"actual  : %p %#v", expected, expected, actual, actual), msgAndArgs...)
@@ -382,26 +505,77 @@ func Same(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) b
 	return true
 }
 
+// NotSame asserts that two pointers do not reference the same object.
+//
+//	assert.NotSame(t, ptr1, ptr2)
+//
+// Both arguments must be pointer variables. Pointer variable sameness is
+// determined based on the equality of both type and value.
+func NotSame(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	if samePointers(expected, actual) {
+		return Fail(t, fmt.Sprintf(
+			"Expected and actual point to the same object: %p %#v",
+			expected, expected), msgAndArgs...)
+	}
+	return true
+}
+
+// samePointers compares two generic interface objects and returns whether
+// they point to the same object
+func samePointers(first, second interface{}) bool {
+	firstPtr, secondPtr := reflect.ValueOf(first), reflect.ValueOf(second)
+	if firstPtr.Kind() != reflect.Ptr || secondPtr.Kind() != reflect.Ptr {
+		return false
+	}
+
+	firstType, secondType := reflect.TypeOf(first), reflect.TypeOf(second)
+	if firstType != secondType {
+		return false
+	}
+
+	// compare pointer addresses
+	return first == second
+}
+
 // formatUnequalValues takes two values of arbitrary types and returns string
 // representations appropriate to be presented to the user.
 //
 // If the values are not of like type, the returned strings will be prefixed
-// with the type name, and the value will be enclosed in parenthesis similar
+// with the type name, and the value will be enclosed in parentheses similar
 // to a type conversion in the Go grammar.
 func formatUnequalValues(expected, actual interface{}) (e string, a string) {
 	if reflect.TypeOf(expected) != reflect.TypeOf(actual) {
-		return fmt.Sprintf("%T(%#v)", expected, expected),
-			fmt.Sprintf("%T(%#v)", actual, actual)
+		return fmt.Sprintf("%T(%s)", expected, truncatingFormat(expected)),
+			fmt.Sprintf("%T(%s)", actual, truncatingFormat(actual))
 	}
-
-	return fmt.Sprintf("%#v", expected),
-		fmt.Sprintf("%#v", actual)
+	switch expected.(type) {
+	case time.Duration:
+		return fmt.Sprintf("%v", expected), fmt.Sprintf("%v", actual)
+	}
+	return truncatingFormat(expected), truncatingFormat(actual)
 }
 
-// EqualValues asserts that two objects are equal or convertable to the same types
+// truncatingFormat formats the data and truncates it if it's too long.
+//
+// This helps keep formatted error messages lines from exceeding the
+// bufio.MaxScanTokenSize max line length that the go testing framework imposes.
+func truncatingFormat(data interface{}) string {
+	value := fmt.Sprintf("%#v", data)
+	max := bufio.MaxScanTokenSize - 100 // Give us some space the type info too if needed.
+	if len(value) > max {
+		value = value[0:max] + "<... truncated>"
+	}
+	return value
+}
+
+// EqualValues asserts that two objects are equal or convertible to the same types
 // and equal.
 //
-//    assert.EqualValues(t, uint32(123), int32(123))
+//	assert.EqualValues(t, uint32(123), int32(123))
 func EqualValues(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -419,9 +593,60 @@ func EqualValues(t TestingT, expected, actual interface{}, msgAndArgs ...interfa
 
 }
 
+// EqualExportedValues asserts that the types of two objects are equal and their public
+// fields are also equal. This is useful for comparing structs that have private fields
+// that could potentially differ.
+//
+//	 type S struct {
+//		Exported     	int
+//		notExported   	int
+//	 }
+//	 assert.EqualExportedValues(t, S{1, 2}, S{1, 3}) => true
+//	 assert.EqualExportedValues(t, S{1, 2}, S{2, 3}) => false
+func EqualExportedValues(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	aType := reflect.TypeOf(expected)
+	bType := reflect.TypeOf(actual)
+
+	if aType != bType {
+		return Fail(t, fmt.Sprintf("Types expected to match exactly\n\t%v != %v", aType, bType), msgAndArgs...)
+	}
+
+	if aType.Kind() == reflect.Ptr {
+		aType = aType.Elem()
+	}
+	if bType.Kind() == reflect.Ptr {
+		bType = bType.Elem()
+	}
+
+	if aType.Kind() != reflect.Struct {
+		return Fail(t, fmt.Sprintf("Types expected to both be struct or pointer to struct \n\t%v != %v", aType.Kind(), reflect.Struct), msgAndArgs...)
+	}
+
+	if bType.Kind() != reflect.Struct {
+		return Fail(t, fmt.Sprintf("Types expected to both be struct or pointer to struct \n\t%v != %v", bType.Kind(), reflect.Struct), msgAndArgs...)
+	}
+
+	expected = copyExportedFields(expected)
+	actual = copyExportedFields(actual)
+
+	if !ObjectsAreEqualValues(expected, actual) {
+		diff := diff(expected, actual)
+		expected, actual = formatUnequalValues(expected, actual)
+		return Fail(t, fmt.Sprintf("Not equal (comparing only exported fields): \n"+
+			"expected: %s\n"+
+			"actual  : %s%s", expected, actual, diff), msgAndArgs...)
+	}
+
+	return true
+}
+
 // Exactly asserts that two objects are equal in value and type.
 //
-//    assert.Exactly(t, int32(123), int64(123))
+//	assert.Exactly(t, int32(123), int64(123))
 func Exactly(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -440,26 +665,15 @@ func Exactly(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}
 
 // NotNil asserts that the specified object is not nil.
 //
-//    assert.NotNil(t, err)
+//	assert.NotNil(t, err)
 func NotNil(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
 	if !isNil(object) {
 		return true
 	}
-	return Fail(t, "Expected value not to be nil.", msgAndArgs...)
-}
-
-// containsKind checks if a specified kind in the slice of kinds.
-func containsKind(kinds []reflect.Kind, kind reflect.Kind) bool {
-	for i := 0; i < len(kinds); i++ {
-		if kind == kinds[i] {
-			return true
-		}
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
 	}
-
-	return false
+	return Fail(t, "Expected value not to be nil.", msgAndArgs...)
 }
 
 // isNil checks if a specified object is nil or not, without Failing.
@@ -469,16 +683,13 @@ func isNil(object interface{}) bool {
 	}
 
 	value := reflect.ValueOf(object)
-	kind := value.Kind()
-	isNilableKind := containsKind(
-		[]reflect.Kind{
-			reflect.Chan, reflect.Func,
-			reflect.Interface, reflect.Map,
-			reflect.Ptr, reflect.Slice},
-		kind)
+	switch value.Kind() {
+	case
+		reflect.Chan, reflect.Func,
+		reflect.Interface, reflect.Map,
+		reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
 
-	if isNilableKind && value.IsNil() {
-		return true
+		return value.IsNil()
 	}
 
 	return false
@@ -486,13 +697,13 @@ func isNil(object interface{}) bool {
 
 // Nil asserts that the specified object is nil.
 //
-//    assert.Nil(t, err)
+//	assert.Nil(t, err)
 func Nil(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
 	if isNil(object) {
 		return true
+	}
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
 	}
 	return Fail(t, fmt.Sprintf("Expected nil, but got: %#v", object), msgAndArgs...)
 }
@@ -509,16 +720,17 @@ func isEmpty(object interface{}) bool {
 
 	switch objValue.Kind() {
 	// collection types are empty when they have no element
-	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice:
+	case reflect.Chan, reflect.Map, reflect.Slice:
 		return objValue.Len() == 0
-		// pointers are empty if nil or if the value they point to is empty
+	// pointers are empty if nil or if the value they point to is empty
 	case reflect.Ptr:
 		if objValue.IsNil() {
 			return true
 		}
 		deref := objValue.Elem().Interface()
 		return isEmpty(deref)
-		// for all other types, compare against the zero value
+	// for all other types, compare against the zero value
+	// array types are empty when they match their zero-initialized state
 	default:
 		zero := reflect.Zero(objValue.Type())
 		return reflect.DeepEqual(object, zero.Interface())
@@ -528,14 +740,13 @@ func isEmpty(object interface{}) bool {
 // Empty asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
 // a slice or a channel with len == 0.
 //
-//  assert.Empty(t, obj)
+//	assert.Empty(t, obj)
 func Empty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
-
 	pass := isEmpty(object)
 	if !pass {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		Fail(t, fmt.Sprintf("Should be empty, but was %v", object), msgAndArgs...)
 	}
 
@@ -546,16 +757,15 @@ func Empty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 // NotEmpty asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
 // a slice or a channel with len == 0.
 //
-//  if assert.NotEmpty(t, obj) {
-//    assert.Equal(t, "two", obj[1])
-//  }
+//	if assert.NotEmpty(t, obj) {
+//	  assert.Equal(t, "two", obj[1])
+//	}
 func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
-
 	pass := !isEmpty(object)
 	if !pass {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		Fail(t, fmt.Sprintf("Should NOT be empty, but was %v", object), msgAndArgs...)
 	}
 
@@ -563,51 +773,43 @@ func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 
 }
 
-// getLen try to get length of object.
-// return (false, 0) if impossible.
-func getLen(x interface{}) (ok bool, length int) {
+// getLen tries to get the length of an object.
+// It returns (0, false) if impossible.
+func getLen(x interface{}) (length int, ok bool) {
 	v := reflect.ValueOf(x)
 	defer func() {
-		if e := recover(); e != nil {
-			ok = false
-		}
+		ok = recover() == nil
 	}()
-	return true, v.Len()
+	return v.Len(), true
 }
 
 // Len asserts that the specified object has specific length.
 // Len also fails if the object has a type that len() not accept.
 //
-//    assert.Len(t, mySlice, 3)
+//	assert.Len(t, mySlice, 3)
 func Len(t TestingT, object interface{}, length int, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	ok, l := getLen(object)
+	l, ok := getLen(object)
 	if !ok {
-		return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", object), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("\"%v\" could not be applied builtin len()", object), msgAndArgs...)
 	}
 
 	if l != length {
-		return Fail(t, fmt.Sprintf("\"%s\" should have %d item(s), but has %d", object, length, l), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("\"%v\" should have %d item(s), but has %d", object, length, l), msgAndArgs...)
 	}
 	return true
 }
 
 // True asserts that the specified value is true.
 //
-//    assert.True(t, myBool)
+//	assert.True(t, myBool)
 func True(t TestingT, value bool, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
-	if h, ok := t.(interface {
-		Helper()
-	}); ok {
-		h.Helper()
-	}
-
-	if value != true {
+	if !value {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		return Fail(t, "Should be true", msgAndArgs...)
 	}
 
@@ -617,13 +819,12 @@ func True(t TestingT, value bool, msgAndArgs ...interface{}) bool {
 
 // False asserts that the specified value is false.
 //
-//    assert.False(t, myBool)
+//	assert.False(t, myBool)
 func False(t TestingT, value bool, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
-
-	if value != false {
+	if value {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		return Fail(t, "Should be false", msgAndArgs...)
 	}
 
@@ -633,7 +834,7 @@ func False(t TestingT, value bool, msgAndArgs ...interface{}) bool {
 
 // NotEqual asserts that the specified values are NOT equal.
 //
-//    assert.NotEqual(t, obj1, obj2)
+//	assert.NotEqual(t, obj1, obj2)
 //
 // Pointer variable equality is determined based on the equality of the
 // referenced values (as opposed to the memory addresses).
@@ -654,14 +855,33 @@ func NotEqual(t TestingT, expected, actual interface{}, msgAndArgs ...interface{
 
 }
 
+// NotEqualValues asserts that two objects are not equal even when converted to the same type
+//
+//	assert.NotEqualValues(t, obj1, obj2)
+func NotEqualValues(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	if ObjectsAreEqualValues(expected, actual) {
+		return Fail(t, fmt.Sprintf("Should not be: %#v\n", actual), msgAndArgs...)
+	}
+
+	return true
+}
+
 // containsElement try loop over the list check if the list includes the element.
 // return (false, false) if impossible.
 // return (true, false) if element was not found.
 // return (true, true) if element was found.
-func includeElement(list interface{}, element interface{}) (ok, found bool) {
+func containsElement(list interface{}, element interface{}) (ok, found bool) {
 
 	listValue := reflect.ValueOf(list)
-	listKind := reflect.TypeOf(list).Kind()
+	listType := reflect.TypeOf(list)
+	if listType == nil {
+		return false, false
+	}
+	listKind := listType.Kind()
 	defer func() {
 		if e := recover(); e != nil {
 			ok = false
@@ -696,20 +916,20 @@ func includeElement(list interface{}, element interface{}) (ok, found bool) {
 // Contains asserts that the specified string, list(array, slice...) or map contains the
 // specified substring or element.
 //
-//    assert.Contains(t, "Hello World", "World")
-//    assert.Contains(t, ["Hello", "World"], "World")
-//    assert.Contains(t, {"Hello": "World"}, "Hello")
+//	assert.Contains(t, "Hello World", "World")
+//	assert.Contains(t, ["Hello", "World"], "World")
+//	assert.Contains(t, {"Hello": "World"}, "Hello")
 func Contains(t TestingT, s, contains interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
-	ok, found := includeElement(s, contains)
+	ok, found := containsElement(s, contains)
 	if !ok {
-		return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", s), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("%#v could not be applied builtin len()", s), msgAndArgs...)
 	}
 	if !found {
-		return Fail(t, fmt.Sprintf("\"%s\" does not contain \"%s\"", s, contains), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("%#v does not contain %#v", s, contains), msgAndArgs...)
 	}
 
 	return true
@@ -719,30 +939,31 @@ func Contains(t TestingT, s, contains interface{}, msgAndArgs ...interface{}) bo
 // NotContains asserts that the specified string, list(array, slice...) or map does NOT contain the
 // specified substring or element.
 //
-//    assert.NotContains(t, "Hello World", "Earth")
-//    assert.NotContains(t, ["Hello", "World"], "Earth")
-//    assert.NotContains(t, {"Hello": "World"}, "Earth")
+//	assert.NotContains(t, "Hello World", "Earth")
+//	assert.NotContains(t, ["Hello", "World"], "Earth")
+//	assert.NotContains(t, {"Hello": "World"}, "Earth")
 func NotContains(t TestingT, s, contains interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
-	ok, found := includeElement(s, contains)
+	ok, found := containsElement(s, contains)
 	if !ok {
-		return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", s), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("%#v could not be applied builtin len()", s), msgAndArgs...)
 	}
 	if found {
-		return Fail(t, fmt.Sprintf("\"%s\" should not contain \"%s\"", s, contains), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("%#v should not contain %#v", s, contains), msgAndArgs...)
 	}
 
 	return true
 
 }
 
-// Subset asserts that the specified list(array, slice...) contains all
-// elements given in the specified subset(array, slice...).
+// Subset asserts that the specified list(array, slice...) or map contains all
+// elements given in the specified subset list(array, slice...) or map.
 //
-//    assert.Subset(t, [1, 2, 3], [1, 2], "But [1, 2, 3] does contain [1, 2]")
+//	assert.Subset(t, [1, 2, 3], [1, 2])
+//	assert.Subset(t, {"x": 1, "y": 2}, {"x": 1})
 func Subset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok bool) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -751,71 +972,97 @@ func Subset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok
 		return true // we consider nil to be equal to the nil set
 	}
 
-	subsetValue := reflect.ValueOf(subset)
-	defer func() {
-		if e := recover(); e != nil {
-			ok = false
-		}
-	}()
-
 	listKind := reflect.TypeOf(list).Kind()
-	subsetKind := reflect.TypeOf(subset).Kind()
-
-	if listKind != reflect.Array && listKind != reflect.Slice {
+	if listKind != reflect.Array && listKind != reflect.Slice && listKind != reflect.Map {
 		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", list, listKind), msgAndArgs...)
 	}
 
-	if subsetKind != reflect.Array && subsetKind != reflect.Slice {
+	subsetKind := reflect.TypeOf(subset).Kind()
+	if subsetKind != reflect.Array && subsetKind != reflect.Slice && listKind != reflect.Map {
 		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", subset, subsetKind), msgAndArgs...)
 	}
 
-	for i := 0; i < subsetValue.Len(); i++ {
-		element := subsetValue.Index(i).Interface()
-		ok, found := includeElement(list, element)
+	if subsetKind == reflect.Map && listKind == reflect.Map {
+		subsetMap := reflect.ValueOf(subset)
+		actualMap := reflect.ValueOf(list)
+
+		for _, k := range subsetMap.MapKeys() {
+			ev := subsetMap.MapIndex(k)
+			av := actualMap.MapIndex(k)
+
+			if !av.IsValid() {
+				return Fail(t, fmt.Sprintf("%#v does not contain %#v", list, subset), msgAndArgs...)
+			}
+			if !ObjectsAreEqual(ev.Interface(), av.Interface()) {
+				return Fail(t, fmt.Sprintf("%#v does not contain %#v", list, subset), msgAndArgs...)
+			}
+		}
+
+		return true
+	}
+
+	subsetList := reflect.ValueOf(subset)
+	for i := 0; i < subsetList.Len(); i++ {
+		element := subsetList.Index(i).Interface()
+		ok, found := containsElement(list, element)
 		if !ok {
-			return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", list), msgAndArgs...)
+			return Fail(t, fmt.Sprintf("%#v could not be applied builtin len()", list), msgAndArgs...)
 		}
 		if !found {
-			return Fail(t, fmt.Sprintf("\"%s\" does not contain \"%s\"", list, element), msgAndArgs...)
+			return Fail(t, fmt.Sprintf("%#v does not contain %#v", list, element), msgAndArgs...)
 		}
 	}
 
 	return true
 }
 
-// NotSubset asserts that the specified list(array, slice...) contains not all
-// elements given in the specified subset(array, slice...).
+// NotSubset asserts that the specified list(array, slice...) or map does NOT
+// contain all elements given in the specified subset list(array, slice...) or
+// map.
 //
-//    assert.NotSubset(t, [1, 3, 4], [1, 2], "But [1, 3, 4] does not contain [1, 2]")
+//	assert.NotSubset(t, [1, 3, 4], [1, 2])
+//	assert.NotSubset(t, {"x": 1, "y": 2}, {"z": 3})
 func NotSubset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok bool) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 	if subset == nil {
-		return Fail(t, fmt.Sprintf("nil is the empty set which is a subset of every set"), msgAndArgs...)
+		return Fail(t, "nil is the empty set which is a subset of every set", msgAndArgs...)
 	}
 
-	subsetValue := reflect.ValueOf(subset)
-	defer func() {
-		if e := recover(); e != nil {
-			ok = false
-		}
-	}()
-
 	listKind := reflect.TypeOf(list).Kind()
-	subsetKind := reflect.TypeOf(subset).Kind()
-
-	if listKind != reflect.Array && listKind != reflect.Slice {
+	if listKind != reflect.Array && listKind != reflect.Slice && listKind != reflect.Map {
 		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", list, listKind), msgAndArgs...)
 	}
 
-	if subsetKind != reflect.Array && subsetKind != reflect.Slice {
+	subsetKind := reflect.TypeOf(subset).Kind()
+	if subsetKind != reflect.Array && subsetKind != reflect.Slice && listKind != reflect.Map {
 		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", subset, subsetKind), msgAndArgs...)
 	}
 
-	for i := 0; i < subsetValue.Len(); i++ {
-		element := subsetValue.Index(i).Interface()
-		ok, found := includeElement(list, element)
+	if subsetKind == reflect.Map && listKind == reflect.Map {
+		subsetMap := reflect.ValueOf(subset)
+		actualMap := reflect.ValueOf(list)
+
+		for _, k := range subsetMap.MapKeys() {
+			ev := subsetMap.MapIndex(k)
+			av := actualMap.MapIndex(k)
+
+			if !av.IsValid() {
+				return true
+			}
+			if !ObjectsAreEqual(ev.Interface(), av.Interface()) {
+				return true
+			}
+		}
+
+		return Fail(t, fmt.Sprintf("%q is a subset of %q", subset, list), msgAndArgs...)
+	}
+
+	subsetList := reflect.ValueOf(subset)
+	for i := 0; i < subsetList.Len(); i++ {
+		element := subsetList.Index(i).Interface()
+		ok, found := containsElement(list, element)
 		if !ok {
 			return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", list), msgAndArgs...)
 		}
@@ -840,26 +1087,38 @@ func ElementsMatch(t TestingT, listA, listB interface{}, msgAndArgs ...interface
 		return true
 	}
 
-	aKind := reflect.TypeOf(listA).Kind()
-	bKind := reflect.TypeOf(listB).Kind()
-
-	if aKind != reflect.Array && aKind != reflect.Slice {
-		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", listA, aKind), msgAndArgs...)
+	if !isList(t, listA, msgAndArgs...) || !isList(t, listB, msgAndArgs...) {
+		return false
 	}
 
-	if bKind != reflect.Array && bKind != reflect.Slice {
-		return Fail(t, fmt.Sprintf("%q has an unsupported type %s", listB, bKind), msgAndArgs...)
+	extraA, extraB := diffLists(listA, listB)
+
+	if len(extraA) == 0 && len(extraB) == 0 {
+		return true
 	}
 
+	return Fail(t, formatListDiff(listA, listB, extraA, extraB), msgAndArgs...)
+}
+
+// isList checks that the provided value is array or slice.
+func isList(t TestingT, list interface{}, msgAndArgs ...interface{}) (ok bool) {
+	kind := reflect.TypeOf(list).Kind()
+	if kind != reflect.Array && kind != reflect.Slice {
+		return Fail(t, fmt.Sprintf("%q has an unsupported type %s, expecting array or slice", list, kind),
+			msgAndArgs...)
+	}
+	return true
+}
+
+// diffLists diffs two arrays/slices and returns slices of elements that are only in A and only in B.
+// If some element is present multiple times, each instance is counted separately (e.g. if something is 2x in A and
+// 5x in B, it will be 0x in extraA and 3x in extraB). The order of items in both lists is ignored.
+func diffLists(listA, listB interface{}) (extraA, extraB []interface{}) {
 	aValue := reflect.ValueOf(listA)
 	bValue := reflect.ValueOf(listB)
 
 	aLen := aValue.Len()
 	bLen := bValue.Len()
-
-	if aLen != bLen {
-		return Fail(t, fmt.Sprintf("lengths don't match: %d != %d", aLen, bLen), msgAndArgs...)
-	}
 
 	// Mark indexes in bValue that we already used
 	visited := make([]bool, bLen)
@@ -877,11 +1136,38 @@ func ElementsMatch(t TestingT, listA, listB interface{}, msgAndArgs ...interface
 			}
 		}
 		if !found {
-			return Fail(t, fmt.Sprintf("element %s appears more times in %s than in %s", element, aValue, bValue), msgAndArgs...)
+			extraA = append(extraA, element)
 		}
 	}
 
-	return true
+	for j := 0; j < bLen; j++ {
+		if visited[j] {
+			continue
+		}
+		extraB = append(extraB, bValue.Index(j).Interface())
+	}
+
+	return
+}
+
+func formatListDiff(listA, listB interface{}, extraA, extraB []interface{}) string {
+	var msg bytes.Buffer
+
+	msg.WriteString("elements differ")
+	if len(extraA) > 0 {
+		msg.WriteString("\n\nextra elements in list A:\n")
+		msg.WriteString(spewConfig.Sdump(extraA))
+	}
+	if len(extraB) > 0 {
+		msg.WriteString("\n\nextra elements in list B:\n")
+		msg.WriteString(spewConfig.Sdump(extraB))
+	}
+	msg.WriteString("\n\nlistA:\n")
+	msg.WriteString(spewConfig.Sdump(listA))
+	msg.WriteString("\n\nlistB:\n")
+	msg.WriteString(spewConfig.Sdump(listB))
+
+	return msg.String()
 }
 
 // Condition uses a Comparison to assert a complex condition.
@@ -901,36 +1187,32 @@ func Condition(t TestingT, comp Comparison, msgAndArgs ...interface{}) bool {
 type PanicTestFunc func()
 
 // didPanic returns true if the function passed to it panics. Otherwise, it returns false.
-func didPanic(f PanicTestFunc) (bool, interface{}) {
+func didPanic(f PanicTestFunc) (didPanic bool, message interface{}, stack string) {
+	didPanic = true
 
-	didPanic := false
-	var message interface{}
-	func() {
-
-		defer func() {
-			if message = recover(); message != nil {
-				didPanic = true
-			}
-		}()
-
-		// call the target function
-		f()
-
+	defer func() {
+		message = recover()
+		if didPanic {
+			stack = string(debug.Stack())
+		}
 	}()
 
-	return didPanic, message
+	// call the target function
+	f()
+	didPanic = false
 
+	return
 }
 
 // Panics asserts that the code inside the specified PanicTestFunc panics.
 //
-//   assert.Panics(t, func(){ GoCrazy() })
+//	assert.Panics(t, func(){ GoCrazy() })
 func Panics(t TestingT, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
-	if funcDidPanic, panicValue := didPanic(f); !funcDidPanic {
+	if funcDidPanic, panicValue, _ := didPanic(f); !funcDidPanic {
 		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%#v", f, panicValue), msgAndArgs...)
 	}
 
@@ -940,18 +1222,40 @@ func Panics(t TestingT, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 // PanicsWithValue asserts that the code inside the specified PanicTestFunc panics, and that
 // the recovered panic value equals the expected panic value.
 //
-//   assert.PanicsWithValue(t, "crazy error", func(){ GoCrazy() })
+//	assert.PanicsWithValue(t, "crazy error", func(){ GoCrazy() })
 func PanicsWithValue(t TestingT, expected interface{}, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
-	funcDidPanic, panicValue := didPanic(f)
+	funcDidPanic, panicValue, panickedStack := didPanic(f)
 	if !funcDidPanic {
 		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%#v", f, panicValue), msgAndArgs...)
 	}
 	if panicValue != expected {
-		return Fail(t, fmt.Sprintf("func %#v should panic with value:\t%#v\n\tPanic value:\t%#v", f, expected, panicValue), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("func %#v should panic with value:\t%#v\n\tPanic value:\t%#v\n\tPanic stack:\t%s", f, expected, panicValue, panickedStack), msgAndArgs...)
+	}
+
+	return true
+}
+
+// PanicsWithError asserts that the code inside the specified PanicTestFunc
+// panics, and that the recovered panic value is an error that satisfies the
+// EqualError comparison.
+//
+//	assert.PanicsWithError(t, "crazy error", func(){ GoCrazy() })
+func PanicsWithError(t TestingT, errString string, f PanicTestFunc, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	funcDidPanic, panicValue, panickedStack := didPanic(f)
+	if !funcDidPanic {
+		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%#v", f, panicValue), msgAndArgs...)
+	}
+	panicErr, ok := panicValue.(error)
+	if !ok || panicErr.Error() != errString {
+		return Fail(t, fmt.Sprintf("func %#v should panic with error message:\t%#v\n\tPanic value:\t%#v\n\tPanic stack:\t%s", f, errString, panicValue, panickedStack), msgAndArgs...)
 	}
 
 	return true
@@ -959,14 +1263,14 @@ func PanicsWithValue(t TestingT, expected interface{}, f PanicTestFunc, msgAndAr
 
 // NotPanics asserts that the code inside the specified PanicTestFunc does NOT panic.
 //
-//   assert.NotPanics(t, func(){ RemainCalm() })
+//	assert.NotPanics(t, func(){ RemainCalm() })
 func NotPanics(t TestingT, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
-	if funcDidPanic, panicValue := didPanic(f); funcDidPanic {
-		return Fail(t, fmt.Sprintf("func %#v should not panic\n\tPanic value:\t%v", f, panicValue), msgAndArgs...)
+	if funcDidPanic, panicValue, panickedStack := didPanic(f); funcDidPanic {
+		return Fail(t, fmt.Sprintf("func %#v should not panic\n\tPanic value:\t%v\n\tPanic stack:\t%s", f, panicValue, panickedStack), msgAndArgs...)
 	}
 
 	return true
@@ -974,7 +1278,7 @@ func NotPanics(t TestingT, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 
 // WithinDuration asserts that the two times are within duration delta of each other.
 //
-//   assert.WithinDuration(t, time.Now(), time.Now(), 10*time.Second)
+//	assert.WithinDuration(t, time.Now(), time.Now(), 10*time.Second)
 func WithinDuration(t TestingT, expected, actual time.Time, delta time.Duration, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -988,11 +1292,34 @@ func WithinDuration(t TestingT, expected, actual time.Time, delta time.Duration,
 	return true
 }
 
+// WithinRange asserts that a time is within a time range (inclusive).
+//
+//	assert.WithinRange(t, time.Now(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+func WithinRange(t TestingT, actual, start, end time.Time, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	if end.Before(start) {
+		return Fail(t, "Start should be before end", msgAndArgs...)
+	}
+
+	if actual.Before(start) {
+		return Fail(t, fmt.Sprintf("Time %v expected to be in time range %v to %v, but is before the range", actual, start, end), msgAndArgs...)
+	} else if actual.After(end) {
+		return Fail(t, fmt.Sprintf("Time %v expected to be in time range %v to %v, but is after the range", actual, start, end), msgAndArgs...)
+	}
+
+	return true
+}
+
 func toFloat(x interface{}) (float64, bool) {
 	var xf float64
 	xok := true
 
 	switch xn := x.(type) {
+	case uint:
+		xf = float64(xn)
 	case uint8:
 		xf = float64(xn)
 	case uint16:
@@ -1014,7 +1341,7 @@ func toFloat(x interface{}) (float64, bool) {
 	case float32:
 		xf = float64(xn)
 	case float64:
-		xf = float64(xn)
+		xf = xn
 	case time.Duration:
 		xf = float64(xn)
 	default:
@@ -1026,7 +1353,7 @@ func toFloat(x interface{}) (float64, bool) {
 
 // InDelta asserts that the two numerals are within delta of each other.
 //
-// 	 assert.InDelta(t, math.Pi, (22 / 7.0), 0.01)
+//	assert.InDelta(t, math.Pi, 22/7.0, 0.01)
 func InDelta(t TestingT, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1036,11 +1363,15 @@ func InDelta(t TestingT, expected, actual interface{}, delta float64, msgAndArgs
 	bf, bok := toFloat(actual)
 
 	if !aok || !bok {
-		return Fail(t, fmt.Sprintf("Parameters must be numerical"), msgAndArgs...)
+		return Fail(t, "Parameters must be numerical", msgAndArgs...)
+	}
+
+	if math.IsNaN(af) && math.IsNaN(bf) {
+		return true
 	}
 
 	if math.IsNaN(af) {
-		return Fail(t, fmt.Sprintf("Expected must not be NaN"), msgAndArgs...)
+		return Fail(t, "Expected must not be NaN", msgAndArgs...)
 	}
 
 	if math.IsNaN(bf) {
@@ -1063,7 +1394,7 @@ func InDeltaSlice(t TestingT, expected, actual interface{}, delta float64, msgAn
 	if expected == nil || actual == nil ||
 		reflect.TypeOf(actual).Kind() != reflect.Slice ||
 		reflect.TypeOf(expected).Kind() != reflect.Slice {
-		return Fail(t, fmt.Sprintf("Parameters must be slice"), msgAndArgs...)
+		return Fail(t, "Parameters must be slice", msgAndArgs...)
 	}
 
 	actualSlice := reflect.ValueOf(actual)
@@ -1125,15 +1456,21 @@ func InDeltaMapValues(t TestingT, expected, actual interface{}, delta float64, m
 
 func calcRelativeError(expected, actual interface{}) (float64, error) {
 	af, aok := toFloat(expected)
-	if !aok {
-		return 0, fmt.Errorf("expected value %q cannot be converted to float", expected)
+	bf, bok := toFloat(actual)
+	if !aok || !bok {
+		return 0, fmt.Errorf("Parameters must be numerical")
+	}
+	if math.IsNaN(af) && math.IsNaN(bf) {
+		return 0, nil
+	}
+	if math.IsNaN(af) {
+		return 0, errors.New("expected value must not be NaN")
 	}
 	if af == 0 {
 		return 0, fmt.Errorf("expected value must have a value other than zero to calculate the relative error")
 	}
-	bf, bok := toFloat(actual)
-	if !bok {
-		return 0, fmt.Errorf("actual value %q cannot be converted to float", actual)
+	if math.IsNaN(bf) {
+		return 0, errors.New("actual value must not be NaN")
 	}
 
 	return math.Abs(af-bf) / math.Abs(af), nil
@@ -1143,6 +1480,9 @@ func calcRelativeError(expected, actual interface{}) (float64, error) {
 func InEpsilon(t TestingT, expected, actual interface{}, epsilon float64, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
+	}
+	if math.IsNaN(epsilon) {
+		return Fail(t, "epsilon must not be NaN", msgAndArgs...)
 	}
 	actualEpsilon, err := calcRelativeError(expected, actual)
 	if err != nil {
@@ -1161,19 +1501,26 @@ func InEpsilonSlice(t TestingT, expected, actual interface{}, epsilon float64, m
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	if expected == nil || actual == nil ||
-		reflect.TypeOf(actual).Kind() != reflect.Slice ||
-		reflect.TypeOf(expected).Kind() != reflect.Slice {
-		return Fail(t, fmt.Sprintf("Parameters must be slice"), msgAndArgs...)
+
+	if expected == nil || actual == nil {
+		return Fail(t, "Parameters must be slice", msgAndArgs...)
 	}
 
-	actualSlice := reflect.ValueOf(actual)
 	expectedSlice := reflect.ValueOf(expected)
+	actualSlice := reflect.ValueOf(actual)
 
-	for i := 0; i < actualSlice.Len(); i++ {
-		result := InEpsilon(t, actualSlice.Index(i).Interface(), expectedSlice.Index(i).Interface(), epsilon)
-		if !result {
-			return result
+	if expectedSlice.Type().Kind() != reflect.Slice {
+		return Fail(t, "Expected value must be slice", msgAndArgs...)
+	}
+
+	expectedLen := expectedSlice.Len()
+	if !IsType(t, expected, actual) || !Len(t, actual, expectedLen) {
+		return false
+	}
+
+	for i := 0; i < expectedLen; i++ {
+		if !InEpsilon(t, expectedSlice.Index(i).Interface(), actualSlice.Index(i).Interface(), epsilon, "at index %d", i) {
+			return false
 		}
 	}
 
@@ -1186,15 +1533,15 @@ func InEpsilonSlice(t TestingT, expected, actual interface{}, epsilon float64, m
 
 // NoError asserts that a function returned no error (i.e. `nil`).
 //
-//   actualObj, err := SomeFunction()
-//   if assert.NoError(t, err) {
-//	   assert.Equal(t, expectedObj, actualObj)
-//   }
+//	  actualObj, err := SomeFunction()
+//	  if assert.NoError(t, err) {
+//		   assert.Equal(t, expectedObj, actualObj)
+//	  }
 func NoError(t TestingT, err error, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
 	if err != nil {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		return Fail(t, fmt.Sprintf("Received unexpected error:\n%+v", err), msgAndArgs...)
 	}
 
@@ -1203,16 +1550,15 @@ func NoError(t TestingT, err error, msgAndArgs ...interface{}) bool {
 
 // Error asserts that a function returned an error (i.e. not `nil`).
 //
-//   actualObj, err := SomeFunction()
-//   if assert.Error(t, err) {
-//	   assert.Equal(t, expectedError, err)
-//   }
+//	  actualObj, err := SomeFunction()
+//	  if assert.Error(t, err) {
+//		   assert.Equal(t, expectedError, err)
+//	  }
 func Error(t TestingT, err error, msgAndArgs ...interface{}) bool {
-	if h, ok := t.(tHelper); ok {
-		h.Helper()
-	}
-
 	if err == nil {
+		if h, ok := t.(tHelper); ok {
+			h.Helper()
+		}
 		return Fail(t, "An error is expected but got nil.", msgAndArgs...)
 	}
 
@@ -1222,8 +1568,8 @@ func Error(t TestingT, err error, msgAndArgs ...interface{}) bool {
 // EqualError asserts that a function returned an error (i.e. not `nil`)
 // and that it is equal to the provided error.
 //
-//   actualObj, err := SomeFunction()
-//   assert.EqualError(t, err,  expectedErrorString)
+//	actualObj, err := SomeFunction()
+//	assert.EqualError(t, err,  expectedErrorString)
 func EqualError(t TestingT, theError error, errString string, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1239,6 +1585,27 @@ func EqualError(t TestingT, theError error, errString string, msgAndArgs ...inte
 			"expected: %q\n"+
 			"actual  : %q", expected, actual), msgAndArgs...)
 	}
+	return true
+}
+
+// ErrorContains asserts that a function returned an error (i.e. not `nil`)
+// and that the error contains the specified substring.
+//
+//	actualObj, err := SomeFunction()
+//	assert.ErrorContains(t, err,  expectedErrorSubString)
+func ErrorContains(t TestingT, theError error, contains string, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if !Error(t, theError, msgAndArgs...) {
+		return false
+	}
+
+	actual := theError.Error()
+	if !strings.Contains(actual, contains) {
+		return Fail(t, fmt.Sprintf("Error %#v does not contain %#v", actual, contains), msgAndArgs...)
+	}
+
 	return true
 }
 
@@ -1258,8 +1625,8 @@ func matchRegexp(rx interface{}, str interface{}) bool {
 
 // Regexp asserts that a specified regexp matches a string.
 //
-//  assert.Regexp(t, regexp.MustCompile("start"), "it's starting")
-//  assert.Regexp(t, "start...$", "it's not starting")
+//	assert.Regexp(t, regexp.MustCompile("start"), "it's starting")
+//	assert.Regexp(t, "start...$", "it's not starting")
 func Regexp(t TestingT, rx interface{}, str interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1276,8 +1643,8 @@ func Regexp(t TestingT, rx interface{}, str interface{}, msgAndArgs ...interface
 
 // NotRegexp asserts that a specified regexp does not match a string.
 //
-//  assert.NotRegexp(t, regexp.MustCompile("starts"), "it's starting")
-//  assert.NotRegexp(t, "^start", "it's not starting")
+//	assert.NotRegexp(t, regexp.MustCompile("starts"), "it's starting")
+//	assert.NotRegexp(t, "^start", "it's not starting")
 func NotRegexp(t TestingT, rx interface{}, str interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1314,7 +1681,8 @@ func NotZero(t TestingT, i interface{}, msgAndArgs ...interface{}) bool {
 	return true
 }
 
-// FileExists checks whether a file exists in the given path. It also fails if the path points to a directory or there is an error when trying to check the file.
+// FileExists checks whether a file exists in the given path. It also fails if
+// the path points to a directory or there is an error when trying to check the file.
 func FileExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1332,7 +1700,24 @@ func FileExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
 	return true
 }
 
-// DirExists checks whether a directory exists in the given path. It also fails if the path is a file rather a directory or there is an error checking whether it exists.
+// NoFileExists checks whether a file does not exist in a given path. It fails
+// if the path points to an existing _file_ only.
+func NoFileExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return true
+	}
+	if info.IsDir() {
+		return true
+	}
+	return Fail(t, fmt.Sprintf("file %q exists", path), msgAndArgs...)
+}
+
+// DirExists checks whether a directory exists in the given path. It also fails
+// if the path is a file rather a directory or there is an error checking whether it exists.
 func DirExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1350,9 +1735,28 @@ func DirExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
 	return true
 }
 
+// NoDirExists checks whether a directory does not exist in the given path.
+// It fails if the path points to an existing _directory_ only.
+func NoDirExists(t TestingT, path string, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true
+		}
+		return true
+	}
+	if !info.IsDir() {
+		return true
+	}
+	return Fail(t, fmt.Sprintf("directory %q exists", path), msgAndArgs...)
+}
+
 // JSONEq asserts that two JSON strings are equivalent.
 //
-//  assert.JSONEq(t, `{"hello": "world", "foo": "bar"}`, `{"foo": "bar", "hello": "world"}`)
+//	assert.JSONEq(t, `{"hello": "world", "foo": "bar"}`, `{"foo": "bar", "hello": "world"}`)
 func JSONEq(t TestingT, expected string, actual string, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1418,12 +1822,17 @@ func diff(expected interface{}, actual interface{}) string {
 	}
 
 	var e, a string
-	if et != reflect.TypeOf("") {
-		e = spewConfig.Sdump(expected)
-		a = spewConfig.Sdump(actual)
-	} else {
+
+	switch et {
+	case reflect.TypeOf(""):
 		e = reflect.ValueOf(expected).String()
 		a = reflect.ValueOf(actual).String()
+	case reflect.TypeOf(time.Time{}):
+		e = spewConfigStringerEnabled.Sdump(expected)
+		a = spewConfigStringerEnabled.Sdump(actual)
+	default:
+		e = spewConfig.Sdump(expected)
+		a = spewConfig.Sdump(actual)
 	}
 
 	diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
@@ -1439,15 +1848,6 @@ func diff(expected interface{}, actual interface{}) string {
 	return "\n\nDiff:\n" + diff
 }
 
-// validateEqualArgs checks whether provided arguments can be safely used in the
-// Equal/NotEqual functions.
-func validateEqualArgs(expected, actual interface{}) error {
-	if isFunction(expected) || isFunction(actual) {
-		return errors.New("cannot take func type as argument")
-	}
-	return nil
-}
-
 func isFunction(arg interface{}) bool {
 	if arg == nil {
 		return false
@@ -1460,6 +1860,16 @@ var spewConfig = spew.ConfigState{
 	DisablePointerAddresses: true,
 	DisableCapacities:       true,
 	SortKeys:                true,
+	DisableMethods:          true,
+	MaxDepth:                10,
+}
+
+var spewConfigStringerEnabled = spew.ConfigState{
+	Indent:                  " ",
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+	SortKeys:                true,
+	MaxDepth:                10,
 }
 
 type tHelper interface {
@@ -1469,30 +1879,227 @@ type tHelper interface {
 // Eventually asserts that given condition will be met in waitFor time,
 // periodically checking target function each tick.
 //
-//    assert.Eventually(t, func() bool { return true; }, time.Second, 10*time.Millisecond)
+//	assert.Eventually(t, func() bool { return true; }, time.Second, 10*time.Millisecond)
 func Eventually(t TestingT, condition func() bool, waitFor time.Duration, tick time.Duration, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
 
+	ch := make(chan bool, 1)
+
 	timer := time.NewTimer(waitFor)
-	ticker := time.NewTicker(tick)
-	checkPassed := make(chan bool)
 	defer timer.Stop()
+
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
-	defer close(checkPassed)
-	for {
+
+	for tick := ticker.C; ; {
 		select {
 		case <-timer.C:
 			return Fail(t, "Condition never satisfied", msgAndArgs...)
-		case result := <-checkPassed:
-			if result {
+		case <-tick:
+			tick = nil
+			go func() { ch <- condition() }()
+		case v := <-ch:
+			if v {
 				return true
 			}
-		case <-ticker.C:
-			go func() {
-				checkPassed <- condition()
-			}()
+			tick = ticker.C
 		}
 	}
+}
+
+// CollectT implements the TestingT interface and collects all errors.
+type CollectT struct {
+	errors []error
+}
+
+// Errorf collects the error.
+func (c *CollectT) Errorf(format string, args ...interface{}) {
+	c.errors = append(c.errors, fmt.Errorf(format, args...))
+}
+
+// FailNow panics.
+func (*CollectT) FailNow() {
+	panic("Assertion failed")
+}
+
+// Deprecated: That was a method for internal usage that should not have been published. Now just panics.
+func (*CollectT) Reset() {
+	panic("Reset() is deprecated")
+}
+
+// Deprecated: That was a method for internal usage that should not have been published. Now just panics.
+func (*CollectT) Copy(TestingT) {
+	panic("Copy() is deprecated")
+}
+
+// EventuallyWithT asserts that given condition will be met in waitFor time,
+// periodically checking target function each tick. In contrast to Eventually,
+// it supplies a CollectT to the condition function, so that the condition
+// function can use the CollectT to call other assertions.
+// The condition is considered "met" if no errors are raised in a tick.
+// The supplied CollectT collects all errors from one tick (if there are any).
+// If the condition is not met before waitFor, the collected errors of
+// the last tick are copied to t.
+//
+//	externalValue := false
+//	go func() {
+//		time.Sleep(8*time.Second)
+//		externalValue = true
+//	}()
+//	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+//		// add assertions as needed; any assertion failure will fail the current tick
+//		assert.True(c, externalValue, "expected 'externalValue' to be true")
+//	}, 1*time.Second, 10*time.Second, "external state has not changed to 'true'; still false")
+func EventuallyWithT(t TestingT, condition func(collect *CollectT), waitFor time.Duration, tick time.Duration, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	var lastFinishedTickErrs []error
+	ch := make(chan []error, 1)
+
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	for tick := ticker.C; ; {
+		select {
+		case <-timer.C:
+			for _, err := range lastFinishedTickErrs {
+				t.Errorf("%v", err)
+			}
+			return Fail(t, "Condition never satisfied", msgAndArgs...)
+		case <-tick:
+			tick = nil
+			go func() {
+				collect := new(CollectT)
+				defer func() {
+					ch <- collect.errors
+				}()
+				condition(collect)
+			}()
+		case errs := <-ch:
+			if len(errs) == 0 {
+				return true
+			}
+			// Keep the errors from the last ended condition, so that they can be copied to t if timeout is reached.
+			lastFinishedTickErrs = errs
+			tick = ticker.C
+		}
+	}
+}
+
+// Never asserts that the given condition doesn't satisfy in waitFor time,
+// periodically checking the target function each tick.
+//
+//	assert.Never(t, func() bool { return false; }, time.Second, 10*time.Millisecond)
+func Never(t TestingT, condition func() bool, waitFor time.Duration, tick time.Duration, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+
+	ch := make(chan bool, 1)
+
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	for tick := ticker.C; ; {
+		select {
+		case <-timer.C:
+			return true
+		case <-tick:
+			tick = nil
+			go func() { ch <- condition() }()
+		case v := <-ch:
+			if v {
+				return Fail(t, "Condition satisfied", msgAndArgs...)
+			}
+			tick = ticker.C
+		}
+	}
+}
+
+// ErrorIs asserts that at least one of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func ErrorIs(t TestingT, err, target error, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if errors.Is(err, target) {
+		return true
+	}
+
+	var expectedText string
+	if target != nil {
+		expectedText = target.Error()
+	}
+
+	chain := buildErrorChainString(err)
+
+	return Fail(t, fmt.Sprintf("Target error should be in err chain:\n"+
+		"expected: %q\n"+
+		"in chain: %s", expectedText, chain,
+	), msgAndArgs...)
+}
+
+// NotErrorIs asserts that at none of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func NotErrorIs(t TestingT, err, target error, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if !errors.Is(err, target) {
+		return true
+	}
+
+	var expectedText string
+	if target != nil {
+		expectedText = target.Error()
+	}
+
+	chain := buildErrorChainString(err)
+
+	return Fail(t, fmt.Sprintf("Target error should not be in err chain:\n"+
+		"found: %q\n"+
+		"in chain: %s", expectedText, chain,
+	), msgAndArgs...)
+}
+
+// ErrorAs asserts that at least one of the errors in err's chain matches target, and if so, sets target to that error value.
+// This is a wrapper for errors.As.
+func ErrorAs(t TestingT, err error, target interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if errors.As(err, target) {
+		return true
+	}
+
+	chain := buildErrorChainString(err)
+
+	return Fail(t, fmt.Sprintf("Should be in error chain:\n"+
+		"expected: %q\n"+
+		"in chain: %s", target, chain,
+	), msgAndArgs...)
+}
+
+func buildErrorChainString(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	e := errors.Unwrap(err)
+	chain := fmt.Sprintf("%q", err.Error())
+	for e != nil {
+		chain += fmt.Sprintf("\n\t%q", e.Error())
+		e = errors.Unwrap(e)
+	}
+	return chain
 }

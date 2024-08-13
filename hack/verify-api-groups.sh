@@ -23,12 +23,11 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 
 register_files=()
-while IFS= read -d $'\0' -r file ; do
+while read -r file ; do
 	register_files+=("${file}")
-done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
+done < <(find pkg/apis -name register.go | sort)
 
 # every register file should contain a GroupName.  Gather the different representations.
 # 1. group directory name for client gen
@@ -38,9 +37,8 @@ group_dirnames=()
 external_group_versions=()
 expected_install_packages=()
 for register_file in "${register_files[@]}"; do
-	package="${register_file#"${prefix}"}"
-	package="${package%"/register.go"}"
-	group_dirname="${package#"k8s.io/kubernetes/pkg/apis/"}"
+	package="${register_file%"/register.go"}"
+	group_dirname="${package#"pkg/apis/"}"
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
@@ -50,11 +48,11 @@ for register_file in "${register_files[@]}"; do
 		exit 1
 	fi
 
-	# does the dirname doesn't have a slash, then it's the internal package.
-	# if does have one, then its an external
+	# If the dirname doesn't have a slash, then it's the internal package.
+	# if does have one, then it's versioned (e.g. foobar/v1).
 	if [[ "${group_dirname#*'/'}" == "${group_dirname}" ]]; then
 		group_dirnames+=("${group_dirname}")
-		expected_install_packages+=("${package}")
+		expected_install_packages+=("k8s.io/kubernetes/${package}")
 	else
 		version=$(echo "${group_dirname}" | cut -d/ -f2 -)
 		external_group_versions+=("${group_name}/${version}")
@@ -67,11 +65,10 @@ done
 # them.  This happens for types that aren't served from the API server
 groups_without_codegen=(
 	"abac"
-	"componentconfig"
 	"imagepolicy"
 	"admission"
 )
-client_gen_file="${KUBE_ROOT}/vendor/k8s.io/code-generator/cmd/client-gen/main.go"
+client_gen_file="${KUBE_ROOT}/staging/src/k8s.io/code-generator/cmd/client-gen/main.go"
 
 for group_dirname in "${group_dirnames[@]}"; do
 	if ! grep -q "${group_dirname}/" "${client_gen_file}" ; then
@@ -94,10 +91,10 @@ done
 packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/admission"
-	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
+	"k8s.io/kubernetes/pkg/apis/apidiscovery"
 )
 known_version_files=(
-	"pkg/master/import_known_versions.go"
+	"pkg/controlplane/import_known_versions.go"
 )
 for expected_install_package in "${expected_install_packages[@]}"; do
 	found=0

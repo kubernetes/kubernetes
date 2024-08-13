@@ -21,8 +21,9 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/examples/set-gen/sets"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/types"
+	"k8s.io/kube-openapi/pkg/util/sets"
 )
 
 const extensionPrefix = "x-kubernetes-"
@@ -65,6 +66,10 @@ var tagToExtension = map[string]extensionAttributes{
 		xName:         "x-kubernetes-map-type",
 		kind:          types.Struct,
 		allowedValues: sets.NewString("atomic", "granular"),
+	},
+	"validations": {
+		xName: "x-kubernetes-validations",
+		kind:  types.Slice,
 	},
 }
 
@@ -167,7 +172,7 @@ func parseExtensions(comments []string) ([]extension, []error) {
 		}
 	}
 	// Next, generate extensions from "idlTags" (e.g. +listType)
-	tagValues := types.ExtractCommentTags("+", comments)
+	tagValues := gengo.ExtractCommentTags("+", comments)
 	for _, idlTag := range sortedMapKeys(tagValues) {
 		xAttrs, exists := tagToExtension[idlTag]
 		if !exists {

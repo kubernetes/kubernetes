@@ -28,8 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
@@ -38,7 +39,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
-func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
+func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, containerName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
 	zero := int64(0)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +60,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:            imageName,
+							Name:            containerName,
 							Image:           image,
 							SecurityContext: &v1.SecurityContext{},
 						},
@@ -71,40 +72,40 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 }
 
 // CreateDeployment creates a deployment.
-func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*appsv1.Deployment, error) {
-	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
-	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+func CreateDeployment(ctx context.Context, client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) (*appsv1.Deployment, error) {
+	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, securityLevel, command)
+	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q Create API error: %w", deploymentSpec.Name, err)
 	}
 	framework.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q failed to complete: %w", deploymentSpec.Name, err)
 	}
 	return deployment, nil
 }
 
 // GetPodsForDeployment gets pods for the given deployment
-func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (*v1.PodList, error) {
+func GetPodsForDeployment(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment) (*v1.PodList, error) {
 	replicaSetSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
 	replicaSetListOptions := metav1.ListOptions{LabelSelector: replicaSetSelector.String()}
-	allReplicaSets, err := client.AppsV1().ReplicaSets(deployment.Namespace).List(context.TODO(), replicaSetListOptions)
+	allReplicaSets, err := client.AppsV1().ReplicaSets(deployment.Namespace).List(ctx, replicaSetListOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	ownedReplicaSets := make([]*appsv1.ReplicaSet, 0, len(allReplicaSets.Items))
-	for _, rs := range allReplicaSets.Items {
-		if !metav1.IsControlledBy(&rs, deployment) {
+	for i := range allReplicaSets.Items {
+		if !metav1.IsControlledBy(&allReplicaSets.Items[i], deployment) {
 			continue
 		}
 
-		ownedReplicaSets = append(ownedReplicaSets, &rs)
+		ownedReplicaSets = append(ownedReplicaSets, &allReplicaSets.Items[i])
 	}
 
 	// We ignore pod-template-hash because:
@@ -126,8 +127,8 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 	// see https://github.com/kubernetes/kubernetes/issues/40415
 	// We deterministically choose the oldest new ReplicaSet.
 	sort.Sort(replicaSetsByCreationTimestamp(ownedReplicaSets))
-	for _, rs := range ownedReplicaSets {
-		if !podTemplatesEqualsIgnoringHash(&rs.Spec.Template, &deployment.Spec.Template) {
+	for i, rs := range ownedReplicaSets {
+		if !podTemplatesEqualsIgnoringHash(&ownedReplicaSets[i].Spec.Template, &deployment.Spec.Template) {
 			continue
 		}
 
@@ -144,15 +145,15 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 		return nil, err
 	}
 	podListOptions := metav1.ListOptions{LabelSelector: podSelector.String()}
-	allPods, err := client.CoreV1().Pods(deployment.Namespace).List(context.TODO(), podListOptions)
+	allPods, err := client.CoreV1().Pods(deployment.Namespace).List(ctx, podListOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	replicaSetUID := replicaSet.UID
 	ownedPods := &v1.PodList{Items: make([]v1.Pod, 0, len(allPods.Items))}
-	for _, pod := range allPods.Items {
-		controllerRef := metav1.GetControllerOf(&pod)
+	for i, pod := range allPods.Items {
+		controllerRef := metav1.GetControllerOf(&allPods.Items[i])
 		if controllerRef != nil && controllerRef.UID == replicaSetUID {
 			ownedPods.Items = append(ownedPods.Items, pod)
 		}
@@ -175,9 +176,9 @@ func (o replicaSetsByCreationTimestamp) Less(i, j int) bool {
 
 // testDeployment creates a deployment definition based on the namespace. The deployment references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *appsv1.Deployment {
+func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) *appsv1.Deployment {
 	if len(command) == 0 {
-		command = "trap exit TERM; while true; do sleep 1; done"
+		command = e2epod.InfiniteSleepCommand
 	}
 	zero := int64(0)
 	deploymentName := "deployment-" + string(uuid.NewUUID())
@@ -199,13 +200,10 @@ func testDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:    "write-pod",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"/bin/sh"},
-							Args:    []string{"-c", command},
-							SecurityContext: &v1.SecurityContext{
-								Privileged: &isPrivileged,
-							},
+							Name:            "write-pod",
+							Image:           e2epod.GetDefaultTestImage(),
+							Command:         e2epod.GenerateScriptCmd(command),
+							SecurityContext: e2epod.GenerateContainerSecurityContext(securityLevel),
 						},
 					},
 					RestartPolicy: v1.RestartPolicyAlways,

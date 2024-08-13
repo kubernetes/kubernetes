@@ -26,6 +26,14 @@ type CSIDriverListerExpansion interface{}
 // CSINodeLister.
 type CSINodeListerExpansion interface{}
 
+// CSIStorageCapacityListerExpansion allows custom methods to be added to
+// CSIStorageCapacityLister.
+type CSIStorageCapacityListerExpansion interface{}
+
+// CSIStorageCapacityNamespaceListerExpansion allows custom methods to be added to
+// CSIStorageCapacityNamespaceLister.
+type CSIStorageCapacityNamespaceListerExpansion interface{}
+
 // StorageClassListerExpansion allows custom methods to be added to
 // StorageClassLister.
 type StorageClassListerExpansion interface{}
@@ -33,3 +41,7 @@ type StorageClassListerExpansion interface{}
 // VolumeAttachmentListerExpansion allows custom methods to be added to
 // VolumeAttachmentLister.
 type VolumeAttachmentListerExpansion interface{}
+
+// VolumeAttributesClassListerExpansion allows custom methods to be added to
+// VolumeAttributesClassLister.
+type VolumeAttributesClassListerExpansion interface{}

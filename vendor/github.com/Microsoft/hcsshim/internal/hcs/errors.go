@@ -1,14 +1,14 @@
 package hcs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"syscall"
 
-	"github.com/Microsoft/hcsshim/internal/interop"
-	"github.com/Microsoft/hcsshim/internal/logfields"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/log"
 )
 
 var (
@@ -60,7 +60,7 @@ var (
 	// ErrVmcomputeOperationInvalidState is an error encountered when the compute system is not in a valid state for the requested operation
 	ErrVmcomputeOperationInvalidState = syscall.Errno(0xc0370105)
 
-	// ErrProcNotFound is an error encountered when the the process cannot be found
+	// ErrProcNotFound is an error encountered when a procedure look up fails.
 	ErrProcNotFound = syscall.Errno(0x7f)
 
 	// ErrVmcomputeOperationAccessIsDenied is an error which can be encountered when enumerating compute systems in RS1/RS2
@@ -117,17 +117,11 @@ func (ev *ErrorEvent) String() string {
 	return evs
 }
 
-func processHcsResult(resultp *uint16) []ErrorEvent {
-	if resultp != nil {
-		resultj := interop.ConvertAndFreeCoTaskMemString(resultp)
-		logrus.WithField(logfields.JSON, resultj).
-			Debug("HCS Result")
+func processHcsResult(ctx context.Context, resultJSON string) []ErrorEvent {
+	if resultJSON != "" {
 		result := &hcsResult{}
-		if err := json.Unmarshal([]byte(resultj), result); err != nil {
-			logrus.WithFields(logrus.Fields{
-				logfields.JSON:  resultj,
-				logrus.ErrorKey: err,
-			}).Warning("Could not unmarshal HCS result")
+		if err := json.Unmarshal([]byte(resultJSON), result); err != nil {
+			log.G(ctx).WithError(err).Warning("Could not unmarshal HCS result")
 			return nil
 		}
 		return result.ErrorEvents
@@ -141,12 +135,24 @@ type HcsError struct {
 	Events []ErrorEvent
 }
 
+var _ net.Error = &HcsError{}
+
 func (e *HcsError) Error() string {
 	s := e.Op + ": " + e.Err.Error()
 	for _, ev := range e.Events {
 		s += "\n" + ev.String()
 	}
 	return s
+}
+
+func (e *HcsError) Temporary() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Temporary()
+}
+
+func (e *HcsError) Timeout() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Timeout()
 }
 
 // ProcessError is an error encountered in HCS during an operation on a Process object
@@ -158,27 +164,37 @@ type ProcessError struct {
 	Events   []ErrorEvent
 }
 
+var _ net.Error = &ProcessError{}
+
 // SystemError is an error encountered in HCS during an operation on a Container object
 type SystemError struct {
 	ID     string
 	Op     string
 	Err    error
-	Extra  string
 	Events []ErrorEvent
 }
+
+var _ net.Error = &SystemError{}
 
 func (e *SystemError) Error() string {
 	s := e.Op + " " + e.ID + ": " + e.Err.Error()
 	for _, ev := range e.Events {
 		s += "\n" + ev.String()
 	}
-	if e.Extra != "" {
-		s += "\n(extra info: " + e.Extra + ")"
-	}
 	return s
 }
 
-func makeSystemError(system *System, op string, extra string, err error, events []ErrorEvent) error {
+func (e *SystemError) Temporary() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Temporary()
+}
+
+func (e *SystemError) Timeout() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Timeout()
+}
+
+func makeSystemError(system *System, op string, err error, events []ErrorEvent) error {
 	// Don't double wrap errors
 	if _, ok := err.(*SystemError); ok {
 		return err
@@ -186,7 +202,6 @@ func makeSystemError(system *System, op string, extra string, err error, events 
 	return &SystemError{
 		ID:     system.ID(),
 		Op:     op,
-		Extra:  extra,
 		Err:    err,
 		Events: events,
 	}
@@ -198,6 +213,16 @@ func (e *ProcessError) Error() string {
 		s += "\n" + ev.String()
 	}
 	return s
+}
+
+func (e *ProcessError) Temporary() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Temporary()
+}
+
+func (e *ProcessError) Timeout() bool {
+	err, ok := e.Err.(net.Error)
+	return ok && err.Timeout()
 }
 
 func makeProcessError(process *Process, op string, err error, events []ErrorEvent) error {
@@ -217,12 +242,11 @@ func makeProcessError(process *Process, op string, err error, events []ErrorEven
 // IsNotExist checks if an error is caused by the Container or Process not existing.
 // Note: Currently, ErrElementNotFound can mean that a Process has either
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
-// will currently return true when the error is ErrElementNotFound or ErrProcNotFound.
+// will currently return true when the error is ErrElementNotFound.
 func IsNotExist(err error) bool {
 	err = getInnerError(err)
 	return err == ErrComputeSystemDoesNotExist ||
-		err == ErrElementNotFound ||
-		err == ErrProcNotFound
+		err == ErrElementNotFound
 }
 
 // IsAlreadyClosed checks if an error is caused by the Container or Process having been
@@ -242,6 +266,9 @@ func IsPending(err error) bool {
 // IsTimeout returns a boolean indicating whether the error is caused by
 // a timeout waiting for the operation to complete.
 func IsTimeout(err error) bool {
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		return true
+	}
 	err = getInnerError(err)
 	return err == ErrTimeout
 }
@@ -250,12 +277,11 @@ func IsTimeout(err error) bool {
 // a Container or Process being already stopped.
 // Note: Currently, ErrElementNotFound can mean that a Process has either
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
-// will currently return true when the error is ErrElementNotFound or ErrProcNotFound.
+// will currently return true when the error is ErrElementNotFound.
 func IsAlreadyStopped(err error) bool {
 	err = getInnerError(err)
 	return err == ErrVmcomputeAlreadyStopped ||
-		err == ErrElementNotFound ||
-		err == ErrProcNotFound
+		err == ErrElementNotFound
 }
 
 // IsNotSupported returns a boolean indicating whether the error is caused by
@@ -277,6 +303,13 @@ func IsNotSupported(err error) bool {
 func IsOperationInvalidState(err error) bool {
 	err = getInnerError(err)
 	return err == ErrVmcomputeOperationInvalidState
+}
+
+// IsAccessIsDenied returns true when err is caused by
+// `ErrVmcomputeOperationAccessIsDenied`.
+func IsAccessIsDenied(err error) bool {
+	err = getInnerError(err)
+	return err == ErrVmcomputeOperationAccessIsDenied
 }
 
 func getInnerError(err error) error {

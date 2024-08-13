@@ -17,100 +17,85 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-)
-
-const (
-	nodeV1beta1YAML    = "testdata/conversion/node/v1beta1.yaml"
-	nodeV1beta2YAML    = "testdata/conversion/node/v1beta2.yaml"
-	nodeInternalYAML   = "testdata/conversion/node/internal.yaml"
-	nodeIncompleteYAML = "testdata/defaulting/node/incomplete.yaml"
-	nodeDefaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
-	nodeInvalidYAML    = "testdata/validation/invalid_nodecfg.yaml"
+	"github.com/lithammer/dedent"
 )
 
 func TestLoadJoinConfigurationFromFile(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	// cfgFiles is in cluster_test.go
 	var tests = []struct {
-		name, in, out string
-		groupVersion  schema.GroupVersion
-		expectedErr   bool
+		name         string
+		fileContents string
+		expectErr    bool
 	}{
-		// These tests are reading one file, loading it using LoadJoinConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
-		// and then marshals the internal object to the expected groupVersion
-		{ // v1beta1 -> internal
-			name:         "v1beta1ToInternal",
-			in:           nodeV1beta1YAML,
-			out:          nodeInternalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
+		{
+			name:      "empty file causes error",
+			expectErr: true,
 		},
-		{ // v1beta1 -> internal -> v1beta1
-			name:         "v1beta1Tov1beta1",
-			in:           nodeV1beta1YAML,
-			out:          nodeV1beta1YAML,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
+		{
+			name: "Invalid v1beta4 causes error",
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/v1beta4
+				kind: JoinConfiguration
+			`),
+			expectErr: true,
 		},
-		{ // v1beta2 -> internal
-			name:         "v1beta2ToInternal",
-			in:           nodeV1beta2YAML,
-			out:          nodeInternalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1beta2 -> internal -> v1beta2
-			name:         "v1beta2Tov1beta2",
-			in:           nodeV1beta2YAML,
-			out:          nodeV1beta2YAML,
-			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
-		},
-		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadJoinConfigurationFromFile,
-		// and then marshals the internal object to the expected groupVersion
-		{ // v1beta2 -> default -> validate -> internal -> v1beta2
-			name:         "incompleteYAMLToDefaultedv1beta2",
-			in:           nodeIncompleteYAML,
-			out:          nodeDefaultedYAML,
-			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
-		},
-		{ // v1beta2 -> validation should fail
-			name:        "invalidYAMLShouldFail",
-			in:          nodeInvalidYAML,
-			expectedErr: true,
+		{
+			name: "valid v1beta4 is loaded",
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/v1beta4
+				kind: JoinConfiguration
+				caCertPath: /etc/kubernetes/pki/ca.crt
+				nodeRegistration:
+				  criSocket: "unix:///var/run/unknown.sock"
+				discovery:
+				  bootstrapToken:
+				    apiServerEndpoint: kube-apiserver:6443
+				    token: abcdef.0123456789abcdef
+				    unsafeSkipCAVerification: true
+				  timeout: 5m0s
+				  tlsBootstrapToken: abcdef.0123456789abcdef
+			`),
 		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
-			internalcfg, err := LoadJoinConfigurationFromFile(rt.in)
+			cfgPath := filepath.Join(tmpdir, rt.name)
+			err := os.WriteFile(cfgPath, []byte(rt.fileContents), 0644)
 			if err != nil {
-				if rt.expectedErr {
+				t.Errorf("Couldn't create file: %v", err)
+				return
+			}
+
+			opts := LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			}
+
+			obj, err := LoadJoinConfigurationFromFile(cfgPath, opts)
+			if rt.expectErr {
+				if err == nil {
+					t.Error("Unexpected success")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Error reading file: %v", err)
 					return
 				}
-				t2.Fatalf("couldn't unmarshal test data: %v", err)
-			} else if rt.expectedErr {
-				t2.Fatalf("expected error, but no error returned")
-			}
 
-			actual, err := kubeadmutil.MarshalToYamlForCodecs(internalcfg, rt.groupVersion, scheme.Codecs)
-			if err != nil {
-				t2.Fatalf("couldn't marshal internal object: %v", err)
-			}
-
-			expected, err := ioutil.ReadFile(rt.out)
-			if err != nil {
-				t2.Fatalf("couldn't read test data: %v", err)
-			}
-
-			if !bytes.Equal(expected, actual) {
-				t2.Errorf("the expected and actual output differs.\n\tin: %s\n\tout: %s\n\tgroupversion: %s\n\tdiff: \n%s\n",
-					rt.in, rt.out, rt.groupVersion.String(), diff(expected, actual))
+				if obj == nil {
+					t.Error("Unexpected nil return value")
+				}
 			}
 		})
 	}

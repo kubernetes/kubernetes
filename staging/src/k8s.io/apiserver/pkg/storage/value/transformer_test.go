@@ -18,12 +18,18 @@ package value
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 )
 
 type testTransformer struct {
@@ -33,13 +39,13 @@ type testTransformer struct {
 	receivedFrom, receivedTo []byte
 }
 
-func (t *testTransformer) TransformFromStorage(from []byte, context Context) (data []byte, stale bool, err error) {
-	t.receivedFrom = from
+func (t *testTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error) {
+	t.receivedFrom = data
 	return t.from, t.stale, t.err
 }
 
-func (t *testTransformer) TransformToStorage(to []byte, context Context) (data []byte, err error) {
-	t.receivedTo = to
+func (t *testTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error) {
+	t.receivedTo = data
 	return t.to, t.err
 }
 
@@ -68,7 +74,7 @@ func TestPrefixFrom(t *testing.T) {
 		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
-		got, stale, err := p.TransformFromStorage(test.input, nil)
+		got, stale, err := p.TransformFromStorage(context.Background(), test.input, nil)
 		if err != test.err || stale != test.stale || !bytes.Equal(got, test.expect) {
 			t.Errorf("%d: unexpected out: %q %t %#v", i, string(got), stale, err)
 			continue
@@ -93,7 +99,7 @@ func TestPrefixTo(t *testing.T) {
 	}
 	for i, test := range testCases {
 		p := NewPrefixTransformers(testErr, test.transformers...)
-		got, err := p.TransformToStorage([]byte("value"), nil)
+		got, err := p.TransformToStorage(context.Background(), []byte("value"), nil)
 		if err != test.err || !bytes.Equal(got, test.expect) {
 			t.Errorf("%d: unexpected out: %q %#v", i, string(got), err)
 			continue
@@ -128,7 +134,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="identity"} 1
   `,
@@ -142,7 +148,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="other:"} 1
   `,
@@ -156,9 +162,9 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="other:"} 1
   `,
 			err: nil,
 		},
@@ -170,9 +176,9 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="unknown"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="unknown"} 1
   `,
 			err: nil,
 		},
@@ -183,7 +189,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.prefix.TransformFromStorage(tc.input, nil)
+			tc.prefix.TransformFromStorage(context.Background(), tc.input, nil)
 			defer transformerOperationsTotal.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Fatal(err)
@@ -214,7 +220,7 @@ func TestPrefixToMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="other:"} 1
   `,
@@ -228,9 +234,9 @@ func TestPrefixToMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="to_storage",transformer_prefix="other:"} 1
   `,
 			err: nil,
 		},
@@ -241,11 +247,71 @@ func TestPrefixToMetrics(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.prefix.TransformToStorage(tc.input, nil)
+			tc.prefix.TransformToStorage(context.Background(), tc.input, nil)
 			defer transformerOperationsTotal.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Fatal(err)
 			}
 		})
 	}
+}
+
+func TestLogTransformErr(t *testing.T) {
+	klog.InitFlags(nil)
+	tests := []struct {
+		name        string
+		ctx         context.Context
+		err         error
+		message     string
+		expectedLog string
+	}{
+		{
+			name: "log error with request info",
+			ctx: genericapirequest.WithRequestInfo(testContext(t), &genericapirequest.RequestInfo{
+				APIGroup:    "awesome.bears.com",
+				APIVersion:  "v1",
+				Resource:    "pandas",
+				Subresource: "status",
+				Namespace:   "kube-system",
+				Name:        "panda",
+				Verb:        "update",
+			}),
+			err:         errors.New("encryption failed"),
+			message:     "failed to encrypt data",
+			expectedLog: "\"failed to encrypt data\" err=\"encryption failed\" group=\"awesome.bears.com\" version=\"v1\" resource=\"pandas\" subresource=\"status\" verb=\"update\" namespace=\"kube-system\" name=\"panda\"\n",
+		},
+		{
+			name:        "log error without request info",
+			ctx:         context.Background(),
+			err:         errors.New("decryption failed"),
+			message:     "failed to decrypt data",
+			expectedLog: "\"failed to decrypt data\" err=\"decryption failed\" group=\"\" version=\"\" resource=\"\" subresource=\"\" verb=\"\" namespace=\"\" name=\"\"\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			flag.Set("v", "6")
+			flag.Parse()
+			klog.SetOutput(&buf)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+
+			logTransformErr(tt.ctx, tt.err, tt.message)
+
+			// remove timestamp and goroutine id from log message to make it easier to compare
+			gotLog := regexp.MustCompile(`\w+ \d+:\d+:\d+\.\d+.*\d+.*transformer_test.go:\d+].`).ReplaceAllString(buf.String(), "")
+
+			if gotLog != tt.expectedLog {
+				t.Errorf("expected log message %q, got %q", tt.expectedLog, gotLog)
+			}
+		})
+	}
+}
+
+func testContext(t *testing.T) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }

@@ -21,10 +21,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,16 +37,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
-	errBadCertificate    = "Get .*: remote error: tls: bad certificate"
+	errBadCertificate    = "Get .*: remote error: tls: (bad certificate|unknown certificate authority)"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
 	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
-	errSignedByUnknownCA = "Get .*: x509: certificate signed by unknown authority"
+	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
 )
 
 var (
@@ -68,7 +73,7 @@ var (
 		Name: "test-cluster",
 	}
 	groupVersions = []schema.GroupVersion{}
-	retryBackoff  = time.Duration(500) * time.Millisecond
+	retryBackoff  = DefaultRetryBackoffWithInitialDelay(time.Duration(500) * time.Millisecond)
 )
 
 // TestKubeConfigFile ensures that a kube config file, regardless of validity, is handled properly
@@ -157,15 +162,41 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: fmt.Sprintf(errMissingCertPath, "certificate-authority", badCAPath, "", badCAPath),
 		},
 		{
-			test: "cluster with invalid CA certificate ",
+			test: "cluster with invalid CA certificate",
 			cluster: &v1.NamedCluster{
 				Cluster: v1.Cluster{
 					Server:                   namedCluster.Cluster.Server,
-					CertificateAuthorityData: caKey,
+					CertificateAuthorityData: caKey, // pretend user put caKey here instead of caCert
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "", // Not an error at parse time, only when using the webhook
+			errRegex: "unable to load root certificates: no valid certificate authority data seen",
+		},
+		{
+			test: "cluster with invalid CA certificate - no PEM",
+			cluster: &v1.NamedCluster{
+				Cluster: v1.Cluster{
+					Server:                   namedCluster.Cluster.Server,
+					CertificateAuthorityData: []byte(`not a cert`),
+				},
+			},
+			user:     &defaultUser,
+			errRegex: "unable to load root certificates: unable to parse bytes as PEM block",
+		},
+		{
+			test: "cluster with invalid CA certificate - parse error",
+			cluster: &v1.NamedCluster{
+				Cluster: v1.Cluster{
+					Server: namedCluster.Cluster.Server,
+					CertificateAuthorityData: []byte(`
+-----BEGIN CERTIFICATE-----
+MIIDGTCCAgGgAwIBAgIUOS2M
+-----END CERTIFICATE-----
+`),
+				},
+			},
+			user:     &defaultUser,
+			errRegex: "unable to load root certificates: failed to parse certificate: (asn1: syntax error: data truncated|x509: malformed certificate)",
 		},
 		{
 			test:    "user with invalid client certificate path",
@@ -236,53 +267,60 @@ func TestKubeConfigFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		// Use a closure so defer statements trigger between loop iterations.
-		err := func() error {
-			kubeConfig := v1.Config{}
+		t.Run(tt.test, func(t *testing.T) {
+			// Use a closure so defer statements trigger between loop iterations.
+			err := func() error {
+				kubeConfig := v1.Config{}
 
-			if tt.cluster != nil {
-				kubeConfig.Clusters = []v1.NamedCluster{*tt.cluster}
-			}
+				if tt.cluster != nil {
+					kubeConfig.Clusters = []v1.NamedCluster{*tt.cluster}
+				}
 
-			if tt.context != nil {
-				kubeConfig.Contexts = []v1.NamedContext{*tt.context}
-			}
+				if tt.context != nil {
+					kubeConfig.Contexts = []v1.NamedContext{*tt.context}
+				}
 
-			if tt.user != nil {
-				kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
-			}
+				if tt.user != nil {
+					kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
+				}
 
-			kubeConfig.CurrentContext = tt.currentContext
+				kubeConfig.CurrentContext = tt.currentContext
 
-			kubeConfigFile, err := newKubeConfigFile(kubeConfig)
+				kubeConfigFile, err := newKubeConfigFile(kubeConfig)
+				if err != nil {
+					return err
+				}
 
-			if err == nil {
 				defer os.Remove(kubeConfigFile)
 
-				_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, nil)
-			}
+				config, err := LoadKubeconfig(kubeConfigFile, nil)
+				if err != nil {
+					return err
+				}
 
-			return err
-		}()
+				_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
+				return err
+			}()
 
-		if err == nil {
-			if tt.errRegex != "" {
-				t.Errorf("%s: expected an error", tt.test)
+			if err == nil {
+				if tt.errRegex != "" {
+					t.Errorf("%s: expected an error", tt.test)
+				}
+			} else {
+				if tt.errRegex == "" {
+					t.Errorf("%s: unexpected error: %v", tt.test, err)
+				} else if !regexp.MustCompile(tt.errRegex).MatchString(err.Error()) {
+					t.Errorf("%s: unexpected error message to match:\n  Expected: %s\n  Actual:   %s", tt.test, tt.errRegex, err.Error())
+				}
 			}
-		} else {
-			if tt.errRegex == "" {
-				t.Errorf("%s: unexpected error: %v", tt.test, err)
-			} else if !regexp.MustCompile(tt.errRegex).MatchString(err.Error()) {
-				t.Errorf("%s: unexpected error message to match:\n  Expected: %s\n  Actual:   %s", tt.test, tt.errRegex, err.Error())
-			}
-		}
+		})
 	}
 }
 
 // TestMissingKubeConfigFile ensures that a kube config path to a missing file is handled properly
 func TestMissingKubeConfigFile(t *testing.T) {
 	kubeConfigPath := "/some/missing/path"
-	_, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff, nil)
+	_, err := LoadKubeconfig(kubeConfigPath, nil)
 
 	if err == nil {
 		t.Errorf("creating the webhook should had failed")
@@ -295,10 +333,12 @@ func TestMissingKubeConfigFile(t *testing.T) {
 func TestTLSConfig(t *testing.T) {
 	invalidCert := []byte("invalid")
 	tests := []struct {
-		test                            string
-		clientCert, clientKey, clientCA []byte
-		serverCert, serverKey, serverCA []byte
-		errRegex                        string
+		test                             string
+		clientCert, clientKey, clientCA  []byte
+		serverCert, serverKey, serverCA  []byte
+		errRegex                         string
+		increaseSANWarnCounter           bool
+		increaseSHA1SignatureWarnCounter bool
 	}{
 		{
 			test:       "invalid server CA",
@@ -349,21 +389,52 @@ func TestTLSConfig(t *testing.T) {
 			errRegex: "",
 		},
 		{
-			test:     "webhook does not support insecure servers",
+			test:       "webhook does not support insecure servers",
+			serverCert: serverCert, serverKey: serverKey,
 			errRegex: errSignedByUnknownCA,
+		},
+		{
+			// this will fail when GODEBUG is set to x509ignoreCN=0 with
+			// expected err, but the SAN counter gets increased
+			test:       "server cert does not have SAN extension",
+			clientCA:   caCert,
+			serverCert: serverCertNoSAN, serverKey: serverKey,
+			errRegex:               "x509: certificate relies on legacy Common Name field",
+			increaseSANWarnCounter: true,
+		},
+		{
+			test:       "server cert with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(sha1ServerCertInter, byte('\n')), caCertInter...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
+		},
+		{
+			test:       "server cert signed by an intermediate CA with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(serverCertInterSHA1, byte('\n')), caCertInterSHA1...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
 		},
 	}
 
+	lastSHA1SigCounter := 0
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
 			// Create and start a simple HTTPS server
 			server, err := newTestServer(tt.serverCert, tt.serverKey, tt.serverCA, nil)
-
 			if err != nil {
 				t.Errorf("%s: failed to create server: %v", tt.test, err)
 				return
 			}
+
+			serverURL, err := url.Parse(server.URL)
+			if err != nil {
+				t.Errorf("%s: failed to parse the testserver URL: %v", tt.test, err)
+				return
+			}
+			serverURL.Host = net.JoinHostPort("localhost", serverURL.Port())
 
 			defer server.Close()
 
@@ -372,7 +443,7 @@ func TestTLSConfig(t *testing.T) {
 				Clusters: []v1.NamedCluster{
 					{
 						Cluster: v1.Cluster{
-							Server:                   server.URL,
+							Server:                   serverURL.String(),
 							CertificateAuthorityData: tt.clientCA,
 						},
 					},
@@ -394,7 +465,12 @@ func TestTLSConfig(t *testing.T) {
 
 			defer os.Remove(configFile)
 
-			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+			config, err := LoadKubeconfig(configFile, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 			if err == nil {
 				err = wh.RestClient.Get().Do(context.TODO()).Error()
@@ -411,6 +487,31 @@ func TestTLSConfig(t *testing.T) {
 					t.Errorf("%s: unexpected error message mismatch:\n  Expected: %s\n  Actual:   %s", tt.test, tt.errRegex, err.Error())
 				}
 			}
+
+			if tt.increaseSANWarnCounter {
+				errorCounter := getSingleCounterValueFromRegistry(t, legacyregistry.DefaultGatherer, "apiserver_webhooks_x509_missing_san_total")
+
+				if errorCounter == -1 {
+					t.Errorf("failed to get the x509_common_name_error_count metrics: %v", err)
+				}
+				if int(errorCounter) != 1 {
+					t.Errorf("expected the x509_common_name_error_count to be 1, but it's %d", errorCounter)
+				}
+			}
+
+			if tt.increaseSHA1SignatureWarnCounter {
+				errorCounter := getSingleCounterValueFromRegistry(t, legacyregistry.DefaultGatherer, "apiserver_webhooks_x509_insecure_sha1_total")
+
+				if errorCounter == -1 {
+					t.Errorf("failed to get the apiserver_webhooks_x509_insecure_sha1_total metrics: %v", err)
+				}
+
+				if int(errorCounter) != lastSHA1SigCounter+1 {
+					t.Errorf("expected the apiserver_webhooks_x509_insecure_sha1_total counter to be 1, but it's %d", errorCounter)
+				}
+
+				lastSHA1SigCounter++
+			}
 		}()
 	}
 }
@@ -420,7 +521,6 @@ func TestRequestTimeout(t *testing.T) {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		<-done
-		return
 	}
 
 	// Create and start a simple HTTPS server
@@ -459,7 +559,14 @@ func TestRequestTimeout(t *testing.T) {
 
 	var requestTimeout = 10 * time.Millisecond
 
-	wh, err := newGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config.Timeout = requestTimeout
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
@@ -545,7 +652,12 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	defer os.Remove(configFile)
 
-	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
@@ -575,7 +687,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 }
 
 func bootstrapTestDir(t *testing.T) string {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 
 	if err != nil {
 		t.Fatal(err)
@@ -590,7 +702,8 @@ func bootstrapTestDir(t *testing.T) string {
 
 	// Write the certificate files to disk or fail
 	for fileName, fileData := range files {
-		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
+			os.RemoveAll(dir)
 			t.Fatal(err)
 		}
 	}
@@ -599,7 +712,11 @@ func bootstrapTestDir(t *testing.T) string {
 }
 
 func newKubeConfigFile(config v1.Config) (string, error) {
-	configFile, err := ioutil.TempFile("", "")
+	configFile, err := os.CreateTemp("", "")
+	if err != nil {
+		return "", err
+	}
+	defer configFile.Close()
 
 	if err != nil {
 		return "", fmt.Errorf("unable to create the Kubernetes client config file: %v", err)
@@ -652,4 +769,161 @@ func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.Respo
 	server.StartTLS()
 
 	return server, nil
+}
+
+func TestWithExponentialBackoffContextIsAlreadyCanceled(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() error {
+		attemptsGot++
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+
+	// We don't expect the webhook function to be called since the context is already canceled.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	errExpected := fmt.Errorf("webhook call failed: %s", context.Canceled)
+	if errExpected.Error() != err.Error() {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+	if attemptsGot != 0 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 0, attemptsGot)
+	}
+}
+
+func TestWithExponentialBackoffWebhookErrorIsMostImportant(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	attemptsGot := 0
+	errExpected := errors.New("webhook not available")
+	webhookFunc := func() error {
+		attemptsGot++
+
+		// after the first attempt, the context is canceled
+		cancel()
+
+		return errExpected
+	}
+
+	// webhook err has higher priority than ctx error. we expect the webhook error to be returned.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	if attemptsGot != 1 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 1, attemptsGot)
+	}
+	if errExpected != err {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+}
+
+func TestWithExponentialBackoffWithRetryExhaustedWhileContextIsNotCanceled(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	attemptsGot := 0
+	errExpected := errors.New("webhook not available")
+	webhookFunc := func() error {
+		attemptsGot++
+		return errExpected
+	}
+
+	// webhook err has higher priority than ctx error. we expect the webhook error to be returned.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	if attemptsGot != 5 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 1, attemptsGot)
+	}
+	if errExpected != err {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+}
+
+func TestWithExponentialBackoffParametersNotSet(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() error {
+		attemptsGot++
+		return nil
+	}
+
+	err := WithExponentialBackoff(context.TODO(), wait.Backoff{}, webhookFunc, alwaysRetry)
+
+	errExpected := fmt.Errorf("webhook call failed: %s", wait.ErrWaitTimeout)
+	if errExpected.Error() != err.Error() {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+	if attemptsGot != 0 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 0, attemptsGot)
+	}
+}
+
+func TestGenericWebhookWithExponentialBackoff(t *testing.T) {
+	attemptsPerCallExpected := 5
+	webhook := &GenericWebhook{
+		RetryBackoff: wait.Backoff{
+			Duration: time.Millisecond,
+			Factor:   1.5,
+			Jitter:   0.2,
+			Steps:    attemptsPerCallExpected,
+		},
+
+		ShouldRetry: func(e error) bool {
+			return true
+		},
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() rest.Result {
+		attemptsGot++
+		return rest.Result{}
+	}
+
+	// number of retries should always be local to each call.
+	totalAttemptsExpected := attemptsPerCallExpected * 2
+	webhook.WithExponentialBackoff(context.TODO(), webhookFunc)
+	webhook.WithExponentialBackoff(context.TODO(), webhookFunc)
+
+	if totalAttemptsExpected != attemptsGot {
+		t.Errorf("expected a total of %d webhook attempts but got: %d", totalAttemptsExpected, attemptsGot)
+	}
+}
+
+func getSingleCounterValueFromRegistry(t *testing.T, r metrics.Gatherer, name string) int {
+	mfs, err := r.Gather()
+	if err != nil {
+		t.Logf("failed to gather local registry metrics: %v", err)
+		return -1
+	}
+
+	for _, mf := range mfs {
+		if mf.Name != nil && *mf.Name == name {
+			mfMetric := mf.GetMetric()
+			for _, m := range mfMetric {
+				if m.GetCounter() != nil {
+					return int(m.GetCounter().GetValue())
+				}
+			}
+		}
+	}
+
+	return -1
 }

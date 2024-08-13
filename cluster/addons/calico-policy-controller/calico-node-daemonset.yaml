@@ -27,8 +27,8 @@ spec:
       terminationGracePeriodSeconds: 0
       initContainers:
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v3.8.4
-          command: ["/install-cni.sh"]
+          image: gcr.io/projectcalico-org/cni:v3.19.1
+          command: ["/opt/cni/bin/install"]
           env:
             - name: CNI_CONF_NAME
               value: "10-calico.conflist"
@@ -51,7 +51,7 @@ spec:
                         "type": "k8s"
                       },
                       "kubernetes": {
-                        "kubeconfig": "__KUBECONFIG_FILEPATH__"
+                        "kubeconfig": "/etc/cni/net.d/calico-kubeconfig"
                       }
                     },
                     {
@@ -78,7 +78,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v3.8.4
+          image: gcr.io/projectcalico-org/node:v3.19.1
           env:
             - name: CALICO_MANAGE_CNI
               value: "true"
@@ -104,10 +104,12 @@ spec:
               value: "0"
             - name: FELIX_TYPHAK8SSERVICENAME
               value: "calico-typha"
+            - name: FELIX_ROUTETABLERANGE
+              value: "10-250"
             - name: USE_POD_CIDR
               value: "true"
             - name: IP
-              value: ""
+              value: "autodetect"
             - name: NO_DEFAULT_POOLS
               value: "true"
             - name: NODENAME

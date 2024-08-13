@@ -2,94 +2,29 @@ package ebpf
 
 import (
 	"bytes"
-	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
-	"unsafe"
+	"errors"
+	"fmt"
 
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 	"github.com/cilium/ebpf/internal/unix"
-
-	"github.com/pkg/errors"
 )
 
-var errClosedFd = errors.New("use of closed file descriptor")
-
-type bpfFD struct {
-	raw int64
-}
-
-func newBPFFD(value uint32) *bpfFD {
-	fd := &bpfFD{int64(value)}
-	runtime.SetFinalizer(fd, (*bpfFD).close)
-	return fd
-}
-
-func (fd *bpfFD) String() string {
-	return strconv.FormatInt(fd.raw, 10)
-}
-
-func (fd *bpfFD) value() (uint32, error) {
-	if fd.raw < 0 {
-		return 0, errClosedFd
-	}
-
-	return uint32(fd.raw), nil
-}
-
-func (fd *bpfFD) close() error {
-	if fd.raw < 0 {
-		return nil
-	}
-
-	value := int(fd.raw)
-	fd.raw = -1
-
-	fd.forget()
-	return unix.Close(value)
-}
-
-func (fd *bpfFD) forget() {
-	runtime.SetFinalizer(fd, nil)
-}
-
-func (fd *bpfFD) dup() (*bpfFD, error) {
-	if fd.raw < 0 {
-		return nil, errClosedFd
-	}
-
-	dup, err := unix.FcntlInt(uintptr(fd.raw), unix.F_DUPFD_CLOEXEC, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't dup fd")
-	}
-
-	return newBPFFD(uint32(dup)), nil
-}
-
-// bpfObjName is a null-terminated string made up of
-// 'A-Za-z0-9_' characters.
-type bpfObjName [unix.BPF_OBJ_NAME_LEN]byte
-
-// newBPFObjName truncates the result if it is too long.
-func newBPFObjName(name string) (bpfObjName, error) {
-	idx := strings.IndexFunc(name, invalidBPFObjNameChar)
-	if idx != -1 {
-		return bpfObjName{}, errors.Errorf("invalid character '%c' in name '%s'", name[idx], name)
-	}
-
-	var result bpfObjName
-	copy(result[:unix.BPF_OBJ_NAME_LEN-1], name)
-	return result, nil
-}
-
+// invalidBPFObjNameChar returns true if char may not appear in
+// a BPF object name.
 func invalidBPFObjNameChar(char rune) bool {
+	dotAllowed := objNameAllowsDot() == nil
+
 	switch {
 	case char >= 'A' && char <= 'Z':
-		fallthrough
+		return false
 	case char >= 'a' && char <= 'z':
-		fallthrough
+		return false
 	case char >= '0' && char <= '9':
-		fallthrough
+		return false
+	case dotAllowed && char == '.':
+		return false
 	case char == '_':
 		return false
 	default:
@@ -97,324 +32,233 @@ func invalidBPFObjNameChar(char rune) bool {
 	}
 }
 
-type bpfMapCreateAttr struct {
-	mapType    MapType
-	keySize    uint32
-	valueSize  uint32
-	maxEntries uint32
-	flags      uint32
-	innerMapFd uint32     // since 4.12 56f668dfe00d
-	numaNode   uint32     // since 4.14 96eabe7a40aa
-	mapName    bpfObjName // since 4.15 ad5b177bd73f
-}
-
-type bpfMapOpAttr struct {
-	mapFd   uint32
-	padding uint32
-	key     syscallPtr
-	value   syscallPtr
-	flags   uint64
-}
-
-type bpfMapInfo struct {
-	mapType    uint32
-	id         uint32
-	keySize    uint32
-	valueSize  uint32
-	maxEntries uint32
-	flags      uint32
-	mapName    bpfObjName // since 4.15 ad5b177bd73f
-}
-
-type bpfPinObjAttr struct {
-	fileName syscallPtr
-	fd       uint32
-	padding  uint32
-}
-
-type bpfProgLoadAttr struct {
-	progType           ProgramType
-	insCount           uint32
-	instructions       syscallPtr
-	license            syscallPtr
-	logLevel           uint32
-	logSize            uint32
-	logBuf             syscallPtr
-	kernelVersion      uint32     // since 4.1  2541517c32be
-	progFlags          uint32     // since 4.11 e07b98d9bffe
-	progName           bpfObjName // since 4.15 067cae47771c
-	progIfIndex        uint32     // since 4.15 1f6f4cb7ba21
-	expectedAttachType AttachType // since 4.17 5e43f899b03a
-}
-
-type bpfProgInfo struct {
-	progType     uint32
-	id           uint32
-	tag          [unix.BPF_TAG_SIZE]byte
-	jitedLen     uint32
-	xlatedLen    uint32
-	jited        syscallPtr
-	xlated       syscallPtr
-	loadTime     uint64 // since 4.15 cb4d2b3f03d8
-	createdByUID uint32
-	nrMapIDs     uint32
-	mapIds       syscallPtr
-	name         bpfObjName
-}
-
-type bpfProgTestRunAttr struct {
-	fd          uint32
-	retval      uint32
-	dataSizeIn  uint32
-	dataSizeOut uint32
-	dataIn      syscallPtr
-	dataOut     syscallPtr
-	repeat      uint32
-	duration    uint32
-}
-
-type bpfProgAlterAttr struct {
-	targetFd    uint32
-	attachBpfFd uint32
-	attachType  uint32
-	attachFlags uint32
-}
-
-type bpfObjGetInfoByFDAttr struct {
-	fd      uint32
-	infoLen uint32
-	info    syscallPtr // May be either bpfMapInfo or bpfProgInfo
-}
-
-type bpfGetFDByIDAttr struct {
-	id   uint32
-	next uint32
-}
-
-func newPtr(ptr unsafe.Pointer) syscallPtr {
-	return syscallPtr{ptr: ptr}
-}
-
-func bpfProgLoad(attr *bpfProgLoadAttr) (*bpfFD, error) {
-	for {
-		fd, err := bpfCall(_ProgLoad, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
-		// As of ~4.20 the verifier can be interrupted by a signal,
-		// and returns EAGAIN in that case.
-		if err == unix.EAGAIN {
-			continue
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		return newBPFFD(uint32(fd)), nil
-	}
-}
-
-func bpfProgAlter(cmd int, attr *bpfProgAlterAttr) error {
-	_, err := bpfCall(cmd, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
-	return err
-}
-
-func bpfMapCreate(attr *bpfMapCreateAttr) (*bpfFD, error) {
-	fd, err := bpfCall(_MapCreate, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
-	if err != nil {
+func progLoad(insns asm.Instructions, typ ProgramType, license string) (*sys.FD, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, insns.Size()))
+	if err := insns.Marshal(buf, internal.NativeEndian); err != nil {
 		return nil, err
 	}
+	bytecode := buf.Bytes()
 
-	return newBPFFD(uint32(fd)), nil
+	return sys.ProgLoad(&sys.ProgLoadAttr{
+		ProgType: sys.ProgType(typ),
+		License:  sys.NewStringPointer(license),
+		Insns:    sys.NewSlicePointer(bytecode),
+		InsnCnt:  uint32(len(bytecode) / asm.InstructionSize),
+	})
 }
 
-func bpfMapLookupElem(m *bpfFD, key, valueOut syscallPtr) error {
-	fd, err := m.value()
+var haveNestedMaps = internal.FeatureTest("nested maps", "4.12", func() error {
+	_, err := sys.MapCreate(&sys.MapCreateAttr{
+		MapType:    sys.MapType(ArrayOfMaps),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		// Invalid file descriptor.
+		InnerMapFd: ^uint32(0),
+	})
+	if errors.Is(err, unix.EINVAL) {
+		return internal.ErrNotSupported
+	}
+	if errors.Is(err, unix.EBADF) {
+		return nil
+	}
+	return err
+})
+
+var haveMapMutabilityModifiers = internal.FeatureTest("read- and write-only maps", "5.2", func() error {
+	// This checks BPF_F_RDONLY_PROG and BPF_F_WRONLY_PROG. Since
+	// BPF_MAP_FREEZE appeared in 5.2 as well we don't do a separate check.
+	m, err := sys.MapCreate(&sys.MapCreateAttr{
+		MapType:    sys.MapType(Array),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapFlags:   unix.BPF_F_RDONLY_PROG,
+	})
 	if err != nil {
-		return err
+		return internal.ErrNotSupported
+	}
+	_ = m.Close()
+	return nil
+})
+
+var haveMmapableMaps = internal.FeatureTest("mmapable maps", "5.5", func() error {
+	// This checks BPF_F_MMAPABLE, which appeared in 5.5 for array maps.
+	m, err := sys.MapCreate(&sys.MapCreateAttr{
+		MapType:    sys.MapType(Array),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapFlags:   unix.BPF_F_MMAPABLE,
+	})
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	_ = m.Close()
+	return nil
+})
+
+var haveInnerMaps = internal.FeatureTest("inner maps", "5.10", func() error {
+	// This checks BPF_F_INNER_MAP, which appeared in 5.10.
+	m, err := sys.MapCreate(&sys.MapCreateAttr{
+		MapType:    sys.MapType(Array),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapFlags:   unix.BPF_F_INNER_MAP,
+	})
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	_ = m.Close()
+	return nil
+})
+
+var haveNoPreallocMaps = internal.FeatureTest("prealloc maps", "4.6", func() error {
+	// This checks BPF_F_NO_PREALLOC, which appeared in 4.6.
+	m, err := sys.MapCreate(&sys.MapCreateAttr{
+		MapType:    sys.MapType(Hash),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapFlags:   unix.BPF_F_NO_PREALLOC,
+	})
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	_ = m.Close()
+	return nil
+})
+
+func wrapMapError(err error) error {
+	if err == nil {
+		return nil
 	}
 
-	attr := bpfMapOpAttr{
-		mapFd: fd,
-		key:   key,
-		value: valueOut,
+	if errors.Is(err, unix.ENOENT) {
+		return sys.Error(ErrKeyNotExist, unix.ENOENT)
 	}
-	_, err = bpfCall(_MapLookupElem, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
+
+	if errors.Is(err, unix.EEXIST) {
+		return sys.Error(ErrKeyExist, unix.EEXIST)
+	}
+
+	if errors.Is(err, unix.ENOTSUPP) {
+		return sys.Error(ErrNotSupported, unix.ENOTSUPP)
+	}
+
+	if errors.Is(err, unix.E2BIG) {
+		return fmt.Errorf("key too big for map: %w", err)
+	}
+
 	return err
 }
 
-func bpfMapUpdateElem(m *bpfFD, key, valueOut syscallPtr, flags uint64) error {
-	fd, err := m.value()
+var haveObjName = internal.FeatureTest("object names", "4.15", func() error {
+	attr := sys.MapCreateAttr{
+		MapType:    sys.MapType(Array),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapName:    sys.NewObjName("feature_test"),
+	}
+
+	fd, err := sys.MapCreate(&attr)
 	if err != nil {
+		return internal.ErrNotSupported
+	}
+
+	_ = fd.Close()
+	return nil
+})
+
+var objNameAllowsDot = internal.FeatureTest("dot in object names", "5.2", func() error {
+	if err := haveObjName(); err != nil {
 		return err
 	}
 
-	attr := bpfMapOpAttr{
-		mapFd: fd,
-		key:   key,
-		value: valueOut,
-		flags: flags,
+	attr := sys.MapCreateAttr{
+		MapType:    sys.MapType(Array),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: 1,
+		MapName:    sys.NewObjName(".test"),
 	}
-	_, err = bpfCall(_MapUpdateElem, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	return err
-}
 
-func bpfMapDeleteElem(m *bpfFD, key syscallPtr) error {
-	fd, err := m.value()
+	fd, err := sys.MapCreate(&attr)
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+
+	_ = fd.Close()
+	return nil
+})
+
+var haveBatchAPI = internal.FeatureTest("map batch api", "5.6", func() error {
+	var maxEntries uint32 = 2
+	attr := sys.MapCreateAttr{
+		MapType:    sys.MapType(Hash),
+		KeySize:    4,
+		ValueSize:  4,
+		MaxEntries: maxEntries,
+	}
+
+	fd, err := sys.MapCreate(&attr)
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	defer fd.Close()
+
+	keys := []uint32{1, 2}
+	values := []uint32{3, 4}
+	kp, _ := marshalPtr(keys, 8)
+	vp, _ := marshalPtr(values, 8)
+
+	err = sys.MapUpdateBatch(&sys.MapUpdateBatchAttr{
+		MapFd:  fd.Uint(),
+		Keys:   kp,
+		Values: vp,
+		Count:  maxEntries,
+	})
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	return nil
+})
+
+var haveProbeReadKernel = internal.FeatureTest("bpf_probe_read_kernel", "5.5", func() error {
+	insns := asm.Instructions{
+		asm.Mov.Reg(asm.R1, asm.R10),
+		asm.Add.Imm(asm.R1, -8),
+		asm.Mov.Imm(asm.R2, 8),
+		asm.Mov.Imm(asm.R3, 0),
+		asm.FnProbeReadKernel.Call(),
+		asm.Return(),
+	}
+
+	fd, err := progLoad(insns, Kprobe, "GPL")
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	_ = fd.Close()
+	return nil
+})
+
+var haveBPFToBPFCalls = internal.FeatureTest("bpf2bpf calls", "4.16", func() error {
+	insns := asm.Instructions{
+		asm.Call.Label("prog2").WithSymbol("prog1"),
+		asm.Return(),
+		asm.Mov.Imm(asm.R0, 0).WithSymbol("prog2"),
+		asm.Return(),
+	}
+
+	fd, err := progLoad(insns, SocketFilter, "MIT")
+	if errors.Is(err, unix.EINVAL) {
+		return internal.ErrNotSupported
+	}
 	if err != nil {
 		return err
 	}
-
-	attr := bpfMapOpAttr{
-		mapFd: fd,
-		key:   key,
-	}
-	_, err = bpfCall(_MapDeleteElem, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	return err
-}
-
-func bpfMapGetNextKey(m *bpfFD, key, nextKeyOut syscallPtr) error {
-	fd, err := m.value()
-	if err != nil {
-		return err
-	}
-
-	attr := bpfMapOpAttr{
-		mapFd: fd,
-		key:   key,
-		value: nextKeyOut,
-	}
-	_, err = bpfCall(_MapGetNextKey, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	return err
-}
-
-const bpfFSType = 0xcafe4a11
-
-func bpfPinObject(fileName string, fd *bpfFD) error {
-	dirName := filepath.Dir(fileName)
-	var statfs unix.Statfs_t
-	if err := unix.Statfs(dirName, &statfs); err != nil {
-		return err
-	}
-	if uint64(statfs.Type) != bpfFSType {
-		return errors.Errorf("%s is not on a bpf filesystem", fileName)
-	}
-
-	value, err := fd.value()
-	if err != nil {
-		return err
-	}
-
-	_, err = bpfCall(_ObjPin, unsafe.Pointer(&bpfPinObjAttr{
-		fileName: newPtr(unsafe.Pointer(&[]byte(fileName)[0])),
-		fd:       value,
-	}), 16)
-	return errors.Wrapf(err, "pin object %s", fileName)
-}
-
-func bpfGetObject(fileName string) (*bpfFD, error) {
-	ptr, err := bpfCall(_ObjGet, unsafe.Pointer(&bpfPinObjAttr{
-		fileName: newPtr(unsafe.Pointer(&[]byte(fileName)[0])),
-	}), 16)
-	if err != nil {
-		return nil, errors.Wrapf(err, "get object %s", fileName)
-	}
-	return newBPFFD(uint32(ptr)), nil
-}
-
-func bpfGetObjectInfoByFD(fd *bpfFD, info unsafe.Pointer, size uintptr) error {
-	value, err := fd.value()
-	if err != nil {
-		return err
-	}
-
-	// available from 4.13
-	attr := bpfObjGetInfoByFDAttr{
-		fd:      value,
-		infoLen: uint32(size),
-		info:    newPtr(info),
-	}
-	_, err = bpfCall(_ObjGetInfoByFD, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	return errors.Wrapf(err, "fd %d", value)
-}
-
-func bpfGetProgInfoByFD(fd *bpfFD) (*bpfProgInfo, error) {
-	var info bpfProgInfo
-	err := bpfGetObjectInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info))
-	return &info, errors.Wrap(err, "can't get program info")
-}
-
-func bpfGetMapInfoByFD(fd *bpfFD) (*bpfMapInfo, error) {
-	var info bpfMapInfo
-	err := bpfGetObjectInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info))
-	return &info, errors.Wrap(err, "can't get map info:")
-}
-
-var haveObjName = featureTest{
-	Fn: func() bool {
-		name, err := newBPFObjName("feature_test")
-		if err != nil {
-			// This really is a fatal error, but it should be caught
-			// by the unit tests not working.
-			return false
-		}
-
-		attr := bpfMapCreateAttr{
-			mapType:    Array,
-			keySize:    4,
-			valueSize:  4,
-			maxEntries: 1,
-			mapName:    name,
-		}
-
-		fd, err := bpfMapCreate(&attr)
-		if err != nil {
-			return false
-		}
-
-		_ = fd.close()
-		return true
-	},
-}
-
-func bpfGetMapFDByID(id uint32) (*bpfFD, error) {
-	// available from 4.13
-	attr := bpfGetFDByIDAttr{
-		id: id,
-	}
-	ptr, err := bpfCall(_MapGetFDByID, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't get fd for map id %d", id)
-	}
-	return newBPFFD(uint32(ptr)), nil
-}
-
-func bpfGetProgramFDByID(id uint32) (*bpfFD, error) {
-	// available from 4.13
-	attr := bpfGetFDByIDAttr{
-		id: id,
-	}
-	ptr, err := bpfCall(_ProgGetFDByID, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't get fd for program id %d", id)
-	}
-	return newBPFFD(uint32(ptr)), nil
-}
-
-func bpfCall(cmd int, attr unsafe.Pointer, size uintptr) (uintptr, error) {
-	r1, _, errNo := unix.Syscall(unix.SYS_BPF, uintptr(cmd), uintptr(attr), size)
-	runtime.KeepAlive(attr)
-
-	var err error
-	if errNo != 0 {
-		err = errNo
-	}
-
-	return r1, err
-}
-
-func convertCString(in []byte) string {
-	inLen := bytes.IndexByte(in, 0)
-	if inLen == -1 {
-		return ""
-	}
-	return string(in[:inLen])
-}
+	_ = fd.Close()
+	return nil
+})

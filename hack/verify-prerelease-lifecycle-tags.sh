@@ -24,26 +24,22 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::verify_go_version
+# Tags must be put on all non-alpha API types
+# prerelease-lifecycle-gen itself makes sure every type with TypeMeta in the 
+# package contains atleast an introduced tag
+
+DIRGLOBS=(
+  "staging/src/k8s.io/api/**/*/doc.go"
+  "staging/src/k8s.io/kube-aggregator/pkg/apis/**/*/doc.go"
+  "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/**/*/doc.go"
+)
 
 cd "${KUBE_ROOT}"
-if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/api/**/*beta*/doc.go'; then
-  echo "!!! Some beta packages doc.go do not include prerelease-lifecycle tags."
-  echo "To fix these errors, add '// +k8s:prerelease-lifecycle-gen=true' to doc.go and"
-  echo "add '// +k8s:prerelease-lifecycle-gen:introduced=1.<release>' to every type that embeds metav1.TypeMeta"
-  exit 1
-fi
-
-if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/kube-aggregator/pkg/apis/**/*beta*/doc.go'; then
-  echo "!!! Some beta packages doc.go do not include prerelease-lifecycle tags."
-  echo "To fix these errors, add '// +k8s:prerelease-lifecycle-gen=true' to doc.go and"
-  echo "add '// +k8s:prerelease-lifecycle-gen:introduced=1.<release>' to every type that embeds metav1.TypeMeta"
-  exit 1
-fi
-
-if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/apiextensions-apisever/pkg/apis/**/*beta*/doc.go'; then
-  echo "!!! Some beta packages doc.go do not include prerelease-lifecycle tags."
-  echo "To fix these errors, add '// +k8s:prerelease-lifecycle-gen=true' to doc.go and"
-  echo "add '// +k8s:prerelease-lifecycle-gen:introduced=1.<release>' to every type that embeds metav1.TypeMeta"
-  exit 1
-fi
+for DOCGLOB in "${DIRGLOBS[@]}"; do
+  if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- "$DOCGLOB" ":!*api*/*alpha*/doc.go"; then
+    echo "!!! Some non-alpha packages doc.go do not include prerelease-lifecycle tags."
+    echo "To fix these errors, add '// +k8s:prerelease-lifecycle-gen=true' to doc.go and"
+    echo "add '// +k8s:prerelease-lifecycle-gen:introduced=1.<release>' to every type that embeds metav1.TypeMeta"
+    exit 1
+  fi
+done

@@ -3,7 +3,8 @@ package hcn
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Microsoft/hcsshim/internal/guid"
+
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
 )
@@ -36,6 +37,7 @@ type HostComputeEndpoint struct {
 	Routes               []Route          `json:",omitempty"`
 	MacAddress           string           `json:",omitempty"`
 	Flags                EndpointFlags    `json:",omitempty"`
+	Health               Health           `json:",omitempty"`
 	SchemaVersion        SchemaVersion    `json:",omitempty"`
 }
 
@@ -55,6 +57,13 @@ type ModifyEndpointSettingRequest struct {
 	ResourceType EndpointResourceType `json:",omitempty"` // Policy, Port
 	RequestType  RequestType          `json:",omitempty"` // Add, Remove, Update, Refresh
 	Settings     json.RawMessage      `json:",omitempty"`
+}
+
+// VmEndpointRequest creates a switch port with identifier `PortId`.
+type VmEndpointRequest struct {
+	PortId           guid.GUID `json:",omitempty"`
+	VirtualNicName   string    `json:",omitempty"`
+	VirtualMachineId guid.GUID `json:",omitempty"`
 }
 
 type PolicyEndpointRequest struct {
@@ -121,7 +130,10 @@ func enumerateEndpoints(query string) ([]HostComputeEndpoint, error) {
 }
 
 func createEndpoint(networkId string, endpointSettings string) (*HostComputeEndpoint, error) {
-	networkGuid := guid.FromString(networkId)
+	networkGuid, err := guid.FromString(networkId)
+	if err != nil {
+		return nil, errInvalidNetworkID
+	}
 	// Open network.
 	var networkHandle hcnNetwork
 	var resultBuffer *uint16
@@ -167,7 +179,10 @@ func createEndpoint(networkId string, endpointSettings string) (*HostComputeEndp
 }
 
 func modifyEndpoint(endpointId string, settings string) (*HostComputeEndpoint, error) {
-	endpointGuid := guid.FromString(endpointId)
+	endpointGuid, err := guid.FromString(endpointId)
+	if err != nil {
+		return nil, errInvalidEndpointID
+	}
 	// Open endpoint
 	var (
 		endpointHandle   hcnEndpoint
@@ -208,7 +223,10 @@ func modifyEndpoint(endpointId string, settings string) (*HostComputeEndpoint, e
 }
 
 func deleteEndpoint(endpointId string) error {
-	endpointGuid := guid.FromString(endpointId)
+	endpointGuid, err := guid.FromString(endpointId)
+	if err != nil {
+		return errInvalidEndpointID
+	}
 	var resultBuffer *uint16
 	hr := hcnDeleteEndpoint(&endpointGuid, &resultBuffer)
 	if err := checkForErrors("hcnDeleteEndpoint", hr, resultBuffer); err != nil {
@@ -343,7 +361,7 @@ func ModifyEndpointSettings(endpointId string, request *ModifyEndpointSettingReq
 }
 
 // ApplyPolicy applies a Policy (ex: ACL) on the Endpoint.
-func (endpoint *HostComputeEndpoint) ApplyPolicy(endpointPolicy PolicyEndpointRequest) error {
+func (endpoint *HostComputeEndpoint) ApplyPolicy(requestType RequestType, endpointPolicy PolicyEndpointRequest) error {
 	logrus.Debugf("hcn::HostComputeEndpoint::ApplyPolicy id=%s", endpoint.Id)
 
 	settingsJson, err := json.Marshal(endpointPolicy)
@@ -352,7 +370,7 @@ func (endpoint *HostComputeEndpoint) ApplyPolicy(endpointPolicy PolicyEndpointRe
 	}
 	requestMessage := &ModifyEndpointSettingRequest{
 		ResourceType: EndpointResourceTypePolicy,
-		RequestType:  RequestTypeUpdate,
+		RequestType:  requestType,
 		Settings:     settingsJson,
 	}
 

@@ -19,6 +19,7 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -36,6 +36,21 @@ import (
 // resource prefix.
 func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
+}
+
+// IsHugePageResourceValueDivisible returns true if the resource value of storage is
+// integer multiple of page size.
+func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
+	pageSize, err := HugePageSizeFromResourceName(name)
+	if err != nil {
+		return false
+	}
+
+	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+		return false
+	}
+
+	return quantity.Value()%pageSize.Value() == 0
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota
@@ -98,36 +113,37 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResourceQuotaScopes = sets.NewString(
-	string(core.ResourceQuotaScopeTerminating),
-	string(core.ResourceQuotaScopeNotTerminating),
-	string(core.ResourceQuotaScopeBestEffort),
-	string(core.ResourceQuotaScopeNotBestEffort),
-	string(core.ResourceQuotaScopePriorityClass),
+var standardResourceQuotaScopes = sets.New(
+	core.ResourceQuotaScopeTerminating,
+	core.ResourceQuotaScopeNotTerminating,
+	core.ResourceQuotaScopeBestEffort,
+	core.ResourceQuotaScopeNotBestEffort,
+	core.ResourceQuotaScopePriorityClass,
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
-func IsStandardResourceQuotaScope(str string) bool {
-	return standardResourceQuotaScopes.Has(str)
+func IsStandardResourceQuotaScope(scope core.ResourceQuotaScope) bool {
+	return standardResourceQuotaScopes.Has(scope) || scope == core.ResourceQuotaScopeCrossNamespacePodAffinity
 }
 
-var podObjectCountQuotaResources = sets.NewString(
-	string(core.ResourcePods),
+var podObjectCountQuotaResources = sets.New(
+	core.ResourcePods,
 )
 
-var podComputeQuotaResources = sets.NewString(
-	string(core.ResourceCPU),
-	string(core.ResourceMemory),
-	string(core.ResourceLimitsCPU),
-	string(core.ResourceLimitsMemory),
-	string(core.ResourceRequestsCPU),
-	string(core.ResourceRequestsMemory),
+var podComputeQuotaResources = sets.New(
+	core.ResourceCPU,
+	core.ResourceMemory,
+	core.ResourceLimitsCPU,
+	core.ResourceLimitsMemory,
+	core.ResourceRequestsCPU,
+	core.ResourceRequestsMemory,
 )
 
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
-func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
+func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource core.ResourceName) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort,
+		core.ResourceQuotaScopePriorityClass, core.ResourceQuotaScopeCrossNamespacePodAffinity:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)
@@ -136,16 +152,16 @@ func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resourc
 	}
 }
 
-var standardContainerResources = sets.NewString(
-	string(core.ResourceCPU),
-	string(core.ResourceMemory),
-	string(core.ResourceEphemeralStorage),
+var standardContainerResources = sets.New(
+	core.ResourceCPU,
+	core.ResourceMemory,
+	core.ResourceEphemeralStorage,
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
-func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
+func IsStandardContainerResourceName(name core.ResourceName) bool {
+	return standardContainerResources.Has(name) || IsHugePageResourceName(name)
 }
 
 // IsExtendedResourceName returns true if:
@@ -159,7 +175,7 @@ func IsExtendedResourceName(name core.ResourceName) bool {
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
 	nameForQuota := fmt.Sprintf("%s%s", core.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+	if errs := validation.IsQualifiedName(nameForQuota); len(errs) != 0 {
 		return false
 	}
 	return true
@@ -180,97 +196,100 @@ func IsOvercommitAllowed(name core.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
-var standardLimitRangeTypes = sets.NewString(
-	string(core.LimitTypePod),
-	string(core.LimitTypeContainer),
-	string(core.LimitTypePersistentVolumeClaim),
+var standardLimitRangeTypes = sets.New(
+	core.LimitTypePod,
+	core.LimitTypeContainer,
+	core.LimitTypePersistentVolumeClaim,
 )
 
 // IsStandardLimitRangeType returns true if the type is Pod or Container
-func IsStandardLimitRangeType(str string) bool {
-	return standardLimitRangeTypes.Has(str)
+func IsStandardLimitRangeType(value core.LimitType) bool {
+	return standardLimitRangeTypes.Has(value)
 }
 
-var standardQuotaResources = sets.NewString(
-	string(core.ResourceCPU),
-	string(core.ResourceMemory),
-	string(core.ResourceEphemeralStorage),
-	string(core.ResourceRequestsCPU),
-	string(core.ResourceRequestsMemory),
-	string(core.ResourceRequestsStorage),
-	string(core.ResourceRequestsEphemeralStorage),
-	string(core.ResourceLimitsCPU),
-	string(core.ResourceLimitsMemory),
-	string(core.ResourceLimitsEphemeralStorage),
-	string(core.ResourcePods),
-	string(core.ResourceQuotas),
-	string(core.ResourceServices),
-	string(core.ResourceReplicationControllers),
-	string(core.ResourceSecrets),
-	string(core.ResourcePersistentVolumeClaims),
-	string(core.ResourceConfigMaps),
-	string(core.ResourceServicesNodePorts),
-	string(core.ResourceServicesLoadBalancers),
+var standardQuotaResources = sets.New(
+	core.ResourceCPU,
+	core.ResourceMemory,
+	core.ResourceEphemeralStorage,
+	core.ResourceRequestsCPU,
+	core.ResourceRequestsMemory,
+	core.ResourceRequestsStorage,
+	core.ResourceRequestsEphemeralStorage,
+	core.ResourceLimitsCPU,
+	core.ResourceLimitsMemory,
+	core.ResourceLimitsEphemeralStorage,
+	core.ResourcePods,
+	core.ResourceQuotas,
+	core.ResourceServices,
+	core.ResourceReplicationControllers,
+	core.ResourceSecrets,
+	core.ResourcePersistentVolumeClaims,
+	core.ResourceConfigMaps,
+	core.ResourceServicesNodePorts,
+	core.ResourceServicesLoadBalancers,
 )
 
 // IsStandardQuotaResourceName returns true if the resource is known to
 // the quota tracking system
-func IsStandardQuotaResourceName(str string) bool {
-	return standardQuotaResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
+func IsStandardQuotaResourceName(name core.ResourceName) bool {
+	return standardQuotaResources.Has(name) || IsQuotaHugePageResourceName(name)
 }
 
-var standardResources = sets.NewString(
-	string(core.ResourceCPU),
-	string(core.ResourceMemory),
-	string(core.ResourceEphemeralStorage),
-	string(core.ResourceRequestsCPU),
-	string(core.ResourceRequestsMemory),
-	string(core.ResourceRequestsEphemeralStorage),
-	string(core.ResourceLimitsCPU),
-	string(core.ResourceLimitsMemory),
-	string(core.ResourceLimitsEphemeralStorage),
-	string(core.ResourcePods),
-	string(core.ResourceQuotas),
-	string(core.ResourceServices),
-	string(core.ResourceReplicationControllers),
-	string(core.ResourceSecrets),
-	string(core.ResourceConfigMaps),
-	string(core.ResourcePersistentVolumeClaims),
-	string(core.ResourceStorage),
-	string(core.ResourceRequestsStorage),
-	string(core.ResourceServicesNodePorts),
-	string(core.ResourceServicesLoadBalancers),
+var standardResources = sets.New(
+	core.ResourceCPU,
+	core.ResourceMemory,
+	core.ResourceEphemeralStorage,
+	core.ResourceRequestsCPU,
+	core.ResourceRequestsMemory,
+	core.ResourceRequestsEphemeralStorage,
+	core.ResourceLimitsCPU,
+	core.ResourceLimitsMemory,
+	core.ResourceLimitsEphemeralStorage,
+	core.ResourcePods,
+	core.ResourceQuotas,
+	core.ResourceServices,
+	core.ResourceReplicationControllers,
+	core.ResourceSecrets,
+	core.ResourceConfigMaps,
+	core.ResourcePersistentVolumeClaims,
+	core.ResourceStorage,
+	core.ResourceRequestsStorage,
+	core.ResourceServicesNodePorts,
+	core.ResourceServicesLoadBalancers,
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
-func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
+func IsStandardResourceName(name core.ResourceName) bool {
+	return standardResources.Has(name) || IsQuotaHugePageResourceName(name)
 }
 
-var integerResources = sets.NewString(
-	string(core.ResourcePods),
-	string(core.ResourceQuotas),
-	string(core.ResourceServices),
-	string(core.ResourceReplicationControllers),
-	string(core.ResourceSecrets),
-	string(core.ResourceConfigMaps),
-	string(core.ResourcePersistentVolumeClaims),
-	string(core.ResourceServicesNodePorts),
-	string(core.ResourceServicesLoadBalancers),
+var integerResources = sets.New(
+	core.ResourcePods,
+	core.ResourceQuotas,
+	core.ResourceServices,
+	core.ResourceReplicationControllers,
+	core.ResourceSecrets,
+	core.ResourceConfigMaps,
+	core.ResourcePersistentVolumeClaims,
+	core.ResourceServicesNodePorts,
+	core.ResourceServicesLoadBalancers,
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
-func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsExtendedResourceName(core.ResourceName(str))
+func IsIntegerResourceName(name core.ResourceName) bool {
+	return integerResources.Has(name) || IsExtendedResourceName(name)
 }
 
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *core.Service) bool {
-	return service.Spec.ClusterIP != core.ClusterIPNone && service.Spec.ClusterIP != ""
+	// This function assumes that the service is semantically validated
+	// it does not test if the IP is valid, just makes sure that it is set.
+	return len(service.Spec.ClusterIP) > 0 &&
+		service.Spec.ClusterIP != core.ClusterIPNone
 }
 
-var standardFinalizers = sets.NewString(
+var standardFinalizers = sets.New(
 	string(core.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,
 	metav1.FinalizerDeleteDependents,
@@ -282,18 +301,21 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
-// modes, when present, are always in the same order: RWO,ROX,RWX.
+// modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
-	if containsAccessMode(modes, core.ReadWriteOnce) {
+	if ContainsAccessMode(modes, core.ReadWriteOnce) {
 		modesStr = append(modesStr, "RWO")
 	}
-	if containsAccessMode(modes, core.ReadOnlyMany) {
+	if ContainsAccessMode(modes, core.ReadOnlyMany) {
 		modesStr = append(modesStr, "ROX")
 	}
-	if containsAccessMode(modes, core.ReadWriteMany) {
+	if ContainsAccessMode(modes, core.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
+	}
+	if ContainsAccessMode(modes, core.ReadWriteOncePod) {
+		modesStr = append(modesStr, "RWOP")
 	}
 	return strings.Join(modesStr, ",")
 }
@@ -311,6 +333,8 @@ func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 			accessModes = append(accessModes, core.ReadOnlyMany)
 		case s == "RWX":
 			accessModes = append(accessModes, core.ReadWriteMany)
+		case s == "RWOP":
+			accessModes = append(accessModes, core.ReadWriteOncePod)
 		}
 	}
 	return accessModes
@@ -320,14 +344,14 @@ func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 func removeDuplicateAccessModes(modes []core.PersistentVolumeAccessMode) []core.PersistentVolumeAccessMode {
 	accessModes := []core.PersistentVolumeAccessMode{}
 	for _, m := range modes {
-		if !containsAccessMode(accessModes, m) {
+		if !ContainsAccessMode(accessModes, m) {
 			accessModes = append(accessModes, m)
 		}
 	}
 	return accessModes
 }
 
-func containsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.PersistentVolumeAccessMode) bool {
+func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -336,70 +360,26 @@ func containsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (labels.Selector, error) {
-	if len(nsm) == 0 {
-		return labels.Nothing(), nil
+func ClaimContainsAllocatedResources(pvc *core.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
 	}
-	selector := labels.NewSelector()
-	for _, expr := range nsm {
-		var op selection.Operator
-		switch expr.Operator {
-		case core.NodeSelectorOpIn:
-			op = selection.In
-		case core.NodeSelectorOpNotIn:
-			op = selection.NotIn
-		case core.NodeSelectorOpExists:
-			op = selection.Exists
-		case core.NodeSelectorOpDoesNotExist:
-			op = selection.DoesNotExist
-		case core.NodeSelectorOpGt:
-			op = selection.GreaterThan
-		case core.NodeSelectorOpLt:
-			op = selection.LessThan
-		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
+
+	if pvc.Status.AllocatedResources != nil {
+		return true
 	}
-	return selector, nil
+	return false
 }
 
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {
-	if len(nsm) == 0 {
-		return fields.Nothing(), nil
+func ClaimContainsAllocatedResourceStatus(pvc *core.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
 	}
 
-	selectors := []fields.Selector{}
-	for _, expr := range nsm {
-		switch expr.Operator {
-		case core.NodeSelectorOpIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
-
-		case core.NodeSelectorOpNotIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
-
-		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
-		}
+	if pvc.Status.AllocatedResourceStatuses != nil {
+		return true
 	}
-
-	return fields.AndSelectors(selectors...), nil
+	return false
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
@@ -493,4 +473,30 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetDeletionCostFromPodAnnotations returns the integer value of pod-deletion-cost. Returns 0
+// if not set or the value is invalid.
+func GetDeletionCostFromPodAnnotations(annotations map[string]string) (int32, error) {
+	if value, exist := annotations[core.PodDeletionCost]; exist {
+		// values that start with plus sign (e.g, "+10") or leading zeros (e.g., "008") are not valid.
+		if !validFirstDigit(value) {
+			return 0, fmt.Errorf("invalid value %q", value)
+		}
+
+		i, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			// make sure we default to 0 on error.
+			return 0, err
+		}
+		return int32(i), nil
+	}
+	return 0, nil
+}
+
+func validFirstDigit(str string) bool {
+	if len(str) == 0 {
+		return false
+	}
+	return str[0] == '-' || (str[0] == '0' && str == "0") || (str[0] >= '1' && str[0] <= '9')
 }

@@ -17,12 +17,13 @@ limitations under the License.
 package helper
 
 import (
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // DefaultNormalizeScore generates a Normalize Score function that can normalize the
-// scores to [0, maxPriority]. If reverse is set to true, it reverses the scores by
-// subtracting it from maxPriority.
+// scores from [0, max(scores)] to [0, maxPriority]. If reverse is set to true, it
+// reverses the scores by subtracting it from maxPriority.
+// Note: The input scores are always assumed to be non-negative integers.
 func DefaultNormalizeScore(maxPriority int64, reverse bool, scores framework.NodeScoreList) *framework.Status {
 	var maxCount int64
 	for i := range scores {

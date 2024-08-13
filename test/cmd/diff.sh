@@ -30,10 +30,10 @@ run_kubectl_diff_tests() {
     output_message=$(! kubectl diff -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
     # Ensure diff only dry-runs and doesn't persist change
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" ':'
 
     kubectl apply -f hack/testdata/pod.yaml
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" 'found:'
     initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
 
     # Make sure that diffing the resource right after returns nothing (0 exit code).
@@ -46,16 +46,18 @@ run_kubectl_diff_tests() {
     # Make sure that:
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
-    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+    # 3. the output doesn't indicate this is an error
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml 2>&1 || test $? -eq 1)
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
+    kube::test::if_has_not_string "${output_message}" 'exit status 1'
 
     # Ensure diff only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
     kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
     # Test found diff with server-side apply
-    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side --force-conflicts || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side || test $? -eq 1)
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
 
     # Ensure diff --server-side only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
@@ -73,11 +75,11 @@ run_kubectl_diff_tests() {
     output_message=$(! kubectl diff --server-side -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
     # Ensure diff --server-side only dry-runs and doesn't persist change
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" ':'
 
     # Server-side apply the Pod
     kubectl apply --server-side -f hack/testdata/pod.yaml
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" 'found:'
 
     # Make sure that --server-side diffing the resource right after returns nothing (0 exit code).
     kubectl diff --server-side -f hack/testdata/pod.yaml
@@ -86,10 +88,114 @@ run_kubectl_diff_tests() {
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
     output_message=$(kubectl diff --server-side -f hack/testdata/pod-changed.yaml || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
+
+    ## kubectl diff --prune
+    kubectl create ns nsb
+    kubectl apply --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml
+    kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
+    # Make sure that kubectl diff does not return pod 'a' without prune flag
+    output_message=$(kubectl diff -l prune-group=true -f hack/testdata/prune/b.yaml || test $? -eq 1)
+    kube::test::if_has_not_string "${output_message}" "name: a"
+    # Make sure that for kubectl diff --prune:
+    # 1. the exit code for diff is 1 because it found a difference
+    # 2. the difference contains the pruned pod
+    output_message=$(kubectl diff --prune -l prune-group=true -f hack/testdata/prune/b.yaml || test $? -eq 1)
+    # pod 'a' should be in output, it is pruned
+    kube::test::if_has_string "${output_message}" 'name: a'
+    # apply b with namespace
+    kubectl apply --prune --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+    # check right pod exists and wrong pod doesn't exist
+    kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
+    # Make sure that diff --prune returns nothing (0 exit code) for 'b'.
+    kubectl diff --prune -l prune-group=true -f hack/testdata/prune/b.yaml
 
     # Cleanup
     kubectl delete -f hack/testdata/pod.yaml
+    kubectl delete -f hack/testdata/prune/b.yaml
+    kubectl delete namespace nsb
+
+    ## kubectl diff --prune with label selector
+    kubectl create ns nsbprune
+    kubectl apply --namespace nsbprune -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: b
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+    - name: kubernetes-pause
+      image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c
+  namespace: nsbprune
+  labels:
+    prune-group: "false"
+spec:
+  containers:
+    - name: kubernetes-pause
+      image: registry.k8s.io/pause:3.10
+EOF
+    kube::test::get_object_assert 'pods a -n nsbprune' "{{${id_field:?}}}" 'a'
+    kube::test::get_object_assert 'pods b -n nsbprune' "{{${id_field:?}}}" 'b'
+    kube::test::get_object_assert 'pods c -n nsbprune' "{{${id_field:?}}}" 'c'
+    # Make sure that kubectl diff does not return either pod 'b' or pod 'c' without prune flag
+    PRUNE=$(cat <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c
+  namespace: nsbprune
+  labels:
+    prune-group: "false"
+spec:
+  containers:
+    - name: kubernetes-pause
+      image: registry.k8s.io/pause:3.10
+EOF
+)
+    output_message=$(echo "${PRUNE}" | kubectl diff -l prune-group=true -f -)
+    kube::test::if_has_not_string "${output_message}" "name: b"
+    kube::test::if_has_not_string "${output_message}" "name: c"
+    # the exit code for diff is 1 because pod 'b' is found in the given label selector but not 'c'
+    output_message=$(echo "${PRUNE}" | kubectl diff --prune -l prune-group=true -f - || test $? -eq 1)
+    # pod 'b' should be in output, it is pruned. On the other hand, 'c' should not be, it's label selector is different
+    kube::test::if_has_string "${output_message}" 'name: b'
+    kube::test::if_has_not_string "${output_message}" "name: c"
+
+    # Cleanup
+    kubectl delete namespace nsbprune
+
 
     set +o nounset
     set +o errexit

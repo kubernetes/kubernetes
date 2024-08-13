@@ -17,17 +17,19 @@ limitations under the License.
 package manifest
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
+	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -75,8 +77,8 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	json, err := utilyaml.ToJSON(data)
+	statefulsetYaml := commonutils.SubstituteImageName(string(data))
+	json, err := utilyaml.ToJSON([]byte(statefulsetYaml))
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +95,19 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 }
 
 // DaemonSetFromURL reads from a url and returns the daemonset in it.
-func DaemonSetFromURL(url string) (*appsv1.DaemonSet, error) {
+func DaemonSetFromURL(ctx context.Context, url string) (*appsv1.DaemonSet, error) {
 	framework.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
 	var err error
 
 	for i := 1; i <= 5; i++ {
-		response, err = http.Get(url)
+		request, reqErr := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if reqErr != nil {
+			err = reqErr
+			continue
+		}
+		response, err = http.DefaultClient.Do(request)
 		if err == nil && response.StatusCode == 200 {
 			break
 		}
@@ -108,16 +115,16 @@ func DaemonSetFromURL(url string) (*appsv1.DaemonSet, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get url: %v", err)
+		return nil, fmt.Errorf("Failed to get url: %w", err)
 	}
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
 	}
 	defer response.Body.Close()
 
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read html response body: %v", err)
+		return nil, fmt.Errorf("Failed to read html response body: %w", err)
 	}
 	return DaemonSetFromData(data)
 }
@@ -127,12 +134,12 @@ func DaemonSetFromData(data []byte) (*appsv1.DaemonSet, error) {
 	var ds appsv1.DaemonSet
 	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
+		return nil, fmt.Errorf("Failed to parse data to json: %w", err)
 	}
 
 	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %w", err)
 	}
 	return &ds, nil
 }

@@ -17,8 +17,9 @@ limitations under the License.
 package converter
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -117,7 +118,7 @@ func doConversionV1(convertRequest *v1.ConversionRequest, convert convertFunc) *
 func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -131,7 +132,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		return
 	}
 
-	klog.V(2).Infof("handling request: %v", body)
+	klog.V(2).Infof("handling request: %s", string(body))
 	obj, gvk, err := serializer.Decode(body, nil, nil)
 	if err != nil {
 		msg := fmt.Sprintf("failed to deserialize body (%v) with error %v", string(body), err)
@@ -152,7 +153,6 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		}
 		convertReview.Response = doConversionV1beta1(convertReview.Request, convert)
 		convertReview.Response.UID = convertReview.Request.UID
-		klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
 
 		// reset the request, it is not needed in a response.
 		convertReview.Request = &v1beta1.ConversionRequest{}
@@ -167,7 +167,6 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		}
 		convertReview.Response = doConversionV1(convertReview.Request, convert)
 		convertReview.Response.UID = convertReview.Request.UID
-		klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
 
 		// reset the request, it is not needed in a response.
 		convertReview.Request = &v1.ConversionRequest{}
@@ -187,12 +186,14 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
-	err = outSerializer.Encode(responseObj, w)
+	var buf bytes.Buffer
+	err = outSerializer.Encode(responseObj, io.MultiWriter(w, &buf))
 	if err != nil {
 		klog.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	klog.V(2).Infof("sending response: %s", buf.String())
 }
 
 // ServeExampleConvert servers endpoint for the example converter defined as convertExampleCRD function.
@@ -216,8 +217,8 @@ func addToScheme(scheme *runtime.Scheme) {
 }
 
 var serializers = map[mediaType]runtime.Serializer{
-	{"application", "json"}: json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false),
-	{"application", "yaml"}: json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme),
+	{"application", "json"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Pretty: false}),
+	{"application", "yaml"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Yaml: true}),
 }
 
 func getInputSerializer(contentType string) runtime.Serializer {

@@ -22,11 +22,25 @@ import (
 )
 
 const (
-// Every feature gate should add method here following this template:
-//
-// // owner: @username
-// // alpha: v1.4
-// MyFeature() bool
+	// Every feature gate should add method here following this template:
+	//
+	// // owner: @username
+	// // alpha: v1.4
+	// MyFeature() bool
+
+	// owner: @alexzielenski
+	// alpha: v1.28
+	//
+	// Ignores errors raised on unchanged fields of Custom Resources
+	// across UPDATE/PATCH requests.
+	CRDValidationRatcheting featuregate.Feature = "CRDValidationRatcheting"
+
+	// owner: @jpbetz
+	// alpha: v1.30
+	//
+	// CustomResourceDefinitions may include SelectableFields to declare which fields
+	// may be used as field selectors.
+	CustomResourceFieldSelectors featuregate.Feature = "CustomResourceFieldSelectors"
 )
 
 func init() {
@@ -36,4 +50,7 @@ func init() {
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	CRDValidationRatcheting:      {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceFieldSelectors: {Default: true, PreRelease: featuregate.Beta},
+}

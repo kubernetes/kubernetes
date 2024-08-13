@@ -12,39 +12,20 @@ package securejoin
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
-
-	"github.com/pkg/errors"
 )
-
-// ErrSymlinkLoop is returned by SecureJoinVFS when too many symlinks have been
-// evaluated in attempting to securely join the two given paths.
-var ErrSymlinkLoop = errors.Wrap(syscall.ELOOP, "secure join")
 
 // IsNotExist tells you if err is an error that implies that either the path
 // accessed does not exist (or path components don't exist). This is
 // effectively a more broad version of os.IsNotExist.
 func IsNotExist(err error) bool {
-	// If it's a bone-fide ENOENT just bail.
-	if os.IsNotExist(errors.Cause(err)) {
-		return true
-	}
-
 	// Check that it's not actually an ENOTDIR, which in some cases is a more
 	// convoluted case of ENOENT (usually involving weird paths).
-	var errno error
-	switch err := errors.Cause(err).(type) {
-	case *os.PathError:
-		errno = err.Err
-	case *os.LinkError:
-		errno = err.Err
-	case *os.SyscallError:
-		errno = err.Err
-	}
-	return errno == syscall.ENOTDIR || errno == syscall.ENOENT
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.Is(err, syscall.ENOENT)
 }
 
 // SecureJoinVFS joins the two given path components (similar to Join) except
@@ -58,17 +39,27 @@ func IsNotExist(err error) bool {
 // components in the returned string are not modified (in other words are not
 // replaced with symlinks on the filesystem) after this function has returned.
 // Such a symlink race is necessarily out-of-scope of SecureJoin.
+//
+// Volume names in unsafePath are always discarded, regardless if they are
+// provided via direct input or when evaluating symlinks. Therefore:
+//
+// "C:\Temp" + "D:\path\to\file.txt" results in "C:\Temp\path\to\file.txt"
 func SecureJoinVFS(root, unsafePath string, vfs VFS) (string, error) {
 	// Use the os.* VFS implementation if none was specified.
 	if vfs == nil {
 		vfs = osVFS{}
 	}
 
+	unsafePath = filepath.FromSlash(unsafePath)
 	var path bytes.Buffer
 	n := 0
 	for unsafePath != "" {
 		if n > 255 {
-			return "", ErrSymlinkLoop
+			return "", &os.PathError{Op: "SecureJoin", Path: root + string(filepath.Separator) + unsafePath, Err: syscall.ELOOP}
+		}
+
+		if v := filepath.VolumeName(unsafePath); v != "" {
+			unsafePath = unsafePath[len(v):]
 		}
 
 		// Next path component, p.

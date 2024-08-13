@@ -23,26 +23,28 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
+
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
 	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}} \
-    {{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
-    --control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
+	{{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
+	--control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
 ))
 
 // GetJoinWorkerCommand returns the kubeadm join command for a given token and
-// and Kubernetes cluster (the current cluster in the kubeconfig file)
+// Kubernetes cluster (the current cluster in the kubeconfig file)
 func GetJoinWorkerCommand(kubeConfigFile, token string, skipTokenPrint bool) (string, error) {
 	return getJoinCommand(kubeConfigFile, token, "", false, skipTokenPrint, false)
 }
 
 // GetJoinControlPlaneCommand returns the kubeadm join command for a given token and
-// and Kubernetes cluster (the current cluster in the kubeconfig file)
+// Kubernetes cluster (the current cluster in the kubeconfig file)
 func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
 	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
 }
@@ -55,7 +57,7 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	}
 
 	// load the default cluster config
-	clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
+	_, clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if clusterConfig == nil {
 		return "", errors.New("failed to get default cluster config")
 	}

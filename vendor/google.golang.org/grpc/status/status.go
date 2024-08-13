@@ -32,89 +32,25 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
+
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/internal/status"
 )
 
-func init() {
-	internal.StatusRawProto = statusRawProto
-}
-
-func statusRawProto(s *Status) *spb.Status { return s.s }
-
-// statusError is an alias of a status proto.  It implements error and Status,
-// and a nil statusError should never be returned by this package.
-type statusError spb.Status
-
-func (se *statusError) Error() string {
-	p := (*spb.Status)(se)
-	return fmt.Sprintf("rpc error: code = %s desc = %s", codes.Code(p.GetCode()), p.GetMessage())
-}
-
-func (se *statusError) GRPCStatus() *Status {
-	return &Status{s: (*spb.Status)(se)}
-}
-
-// Is implements future error.Is functionality.
-// A statusError is equivalent if the code and message are identical.
-func (se *statusError) Is(target error) bool {
-	tse, ok := target.(*statusError)
-	if !ok {
-		return false
-	}
-
-	return proto.Equal((*spb.Status)(se), (*spb.Status)(tse))
-}
-
-// Status represents an RPC status code, message, and details.  It is immutable
-// and should be created with New, Newf, or FromProto.
-type Status struct {
-	s *spb.Status
-}
-
-// Code returns the status code contained in s.
-func (s *Status) Code() codes.Code {
-	if s == nil || s.s == nil {
-		return codes.OK
-	}
-	return codes.Code(s.s.Code)
-}
-
-// Message returns the message contained in s.
-func (s *Status) Message() string {
-	if s == nil || s.s == nil {
-		return ""
-	}
-	return s.s.Message
-}
-
-// Proto returns s's status as an spb.Status proto message.
-func (s *Status) Proto() *spb.Status {
-	if s == nil {
-		return nil
-	}
-	return proto.Clone(s.s).(*spb.Status)
-}
-
-// Err returns an immutable error representing s; returns nil if s.Code() is
-// OK.
-func (s *Status) Err() error {
-	if s.Code() == codes.OK {
-		return nil
-	}
-	return (*statusError)(s.s)
-}
+// Status references google.golang.org/grpc/internal/status. It represents an
+// RPC status code, message, and details.  It is immutable and should be
+// created with New, Newf, or FromProto.
+// https://godoc.org/google.golang.org/grpc/internal/status
+type Status = status.Status
 
 // New returns a Status representing c and msg.
 func New(c codes.Code, msg string) *Status {
-	return &Status{s: &spb.Status{Code: int32(c), Message: msg}}
+	return status.New(c, msg)
 }
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
-func Newf(c codes.Code, format string, a ...interface{}) *Status {
+func Newf(c codes.Code, format string, a ...any) *Status {
 	return New(c, fmt.Sprintf(format, a...))
 }
 
@@ -124,7 +60,7 @@ func Error(c codes.Code, msg string) error {
 }
 
 // Errorf returns Error(c, fmt.Sprintf(format, a...)).
-func Errorf(c codes.Code, format string, a ...interface{}) error {
+func Errorf(c codes.Code, format string, a ...any) error {
 	return Error(c, fmt.Sprintf(format, a...))
 }
 
@@ -135,20 +71,57 @@ func ErrorProto(s *spb.Status) error {
 
 // FromProto returns a Status representing s.
 func FromProto(s *spb.Status) *Status {
-	return &Status{s: proto.Clone(s).(*spb.Status)}
+	return status.FromProto(s)
 }
 
-// FromError returns a Status representing err if it was produced from this
-// package or has a method `GRPCStatus() *Status`. Otherwise, ok is false and a
-// Status is returned with codes.Unknown and the original error message.
+// FromError returns a Status representation of err.
+//
+//   - If err was produced by this package or implements the method `GRPCStatus()
+//     *Status` and `GRPCStatus()` does not return nil, or if err wraps a type
+//     satisfying this, the Status from `GRPCStatus()` is returned.  For wrapped
+//     errors, the message returned contains the entire err.Error() text and not
+//     just the wrapped status. In that case, ok is true.
+//
+//   - If err is nil, a Status is returned with codes.OK and no message, and ok
+//     is true.
+//
+//   - If err implements the method `GRPCStatus() *Status` and `GRPCStatus()`
+//     returns nil (which maps to Codes.OK), or if err wraps a type
+//     satisfying this, a Status is returned with codes.Unknown and err's
+//     Error() message, and ok is false.
+//
+//   - Otherwise, err is an error not compatible with this package.  In this
+//     case, a Status is returned with codes.Unknown and err's Error() message,
+//     and ok is false.
 func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return nil, true
 	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
-		return se.GRPCStatus(), true
+	type grpcstatus interface{ GRPCStatus() *Status }
+	if gs, ok := err.(grpcstatus); ok {
+		grpcStatus := gs.GRPCStatus()
+		if grpcStatus == nil {
+			// Error has status nil, which maps to codes.OK. There
+			// is no sensible behavior for this, so we turn it into
+			// an error with codes.Unknown and discard the existing
+			// status.
+			return New(codes.Unknown, err.Error()), false
+		}
+		return grpcStatus, true
+	}
+	var gs grpcstatus
+	if errors.As(err, &gs) {
+		grpcStatus := gs.GRPCStatus()
+		if grpcStatus == nil {
+			// Error wraps an error that has status nil, which maps
+			// to codes.OK.  There is no sensible behavior for this,
+			// so we turn it into an error with codes.Unknown and
+			// discard the existing status.
+			return New(codes.Unknown, err.Error()), false
+		}
+		p := grpcStatus.Proto()
+		p.Message = err.Error()
+		return status.FromProto(p), true
 	}
 	return New(codes.Unknown, err.Error()), false
 }
@@ -160,69 +133,30 @@ func Convert(err error) *Status {
 	return s
 }
 
-// WithDetails returns a new status with the provided details messages appended to the status.
-// If any errors are encountered, it returns nil and the first error encountered.
-func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
-	if s.Code() == codes.OK {
-		return nil, errors.New("no error details for status with code OK")
-	}
-	// s.Code() != OK implies that s.Proto() != nil.
-	p := s.Proto()
-	for _, detail := range details {
-		any, err := ptypes.MarshalAny(detail)
-		if err != nil {
-			return nil, err
-		}
-		p.Details = append(p.Details, any)
-	}
-	return &Status{s: p}, nil
-}
-
-// Details returns a slice of details messages attached to the status.
-// If a detail cannot be decoded, the error is returned in place of the detail.
-func (s *Status) Details() []interface{} {
-	if s == nil || s.s == nil {
-		return nil
-	}
-	details := make([]interface{}, 0, len(s.s.Details))
-	for _, any := range s.s.Details {
-		detail := &ptypes.DynamicAny{}
-		if err := ptypes.UnmarshalAny(any, detail); err != nil {
-			details = append(details, err)
-			continue
-		}
-		details = append(details, detail.Message)
-	}
-	return details
-}
-
-// Code returns the Code of the error if it is a Status error, codes.OK if err
-// is nil, or codes.Unknown otherwise.
+// Code returns the Code of the error if it is a Status error or if it wraps a
+// Status error. If that is not the case, it returns codes.OK if err is nil, or
+// codes.Unknown otherwise.
 func Code(err error) codes.Code {
 	// Don't use FromError to avoid allocation of OK status.
 	if err == nil {
 		return codes.OK
 	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
-		return se.GRPCStatus().Code()
-	}
-	return codes.Unknown
+
+	return Convert(err).Code()
 }
 
-// FromContextError converts a context error into a Status.  It returns a
-// Status with codes.OK if err is nil, or a Status with codes.Unknown if err is
-// non-nil and not a context error.
+// FromContextError converts a context error or wrapped context error into a
+// Status.  It returns a Status with codes.OK if err is nil, or a Status with
+// codes.Unknown if err is non-nil and not a context error.
 func FromContextError(err error) *Status {
-	switch err {
-	case nil:
+	if err == nil {
 		return nil
-	case context.DeadlineExceeded:
-		return New(codes.DeadlineExceeded, err.Error())
-	case context.Canceled:
-		return New(codes.Canceled, err.Error())
-	default:
-		return New(codes.Unknown, err.Error())
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return New(codes.DeadlineExceeded, err.Error())
+	}
+	if errors.Is(err, context.Canceled) {
+		return New(codes.Canceled, err.Error())
+	}
+	return New(codes.Unknown, err.Error())
 }

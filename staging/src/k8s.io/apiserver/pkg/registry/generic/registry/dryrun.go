@@ -18,7 +18,10 @@ package registry
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -35,7 +38,7 @@ func (s *DryRunnableStorage) Versioner() storage.Versioner {
 
 func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64, dryRun bool) error {
 	if dryRun {
-		if err := s.Storage.Get(ctx, key, "", out, false); err == nil {
+		if err := s.Storage.Get(ctx, key, storage.GetOptions{}, out); err == nil {
 			return storage.NewKeyExistsError(key, 0)
 		}
 		return s.copyInto(obj, out)
@@ -43,9 +46,9 @@ func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out ru
 	return s.Storage.Create(ctx, key, obj, out, ttl)
 }
 
-func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool) error {
+func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool, cachedExistingObject runtime.Object) error {
 	if dryRun {
-		if err := s.Storage.Get(ctx, key, "", out, false); err != nil {
+		if err := s.Storage.Get(ctx, key, storage.GetOptions{}, out); err != nil {
 			return err
 		}
 		if err := preconditions.Check(key, out); err != nil {
@@ -53,52 +56,55 @@ func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime
 		}
 		return deleteValidation(ctx, out)
 	}
-	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
+	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation, cachedExistingObject)
 }
 
-func (s *DryRunnableStorage) Watch(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
-	return s.Storage.Watch(ctx, key, resourceVersion, p)
+func (s *DryRunnableStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	return s.Storage.Watch(ctx, key, opts)
 }
 
-func (s *DryRunnableStorage) WatchList(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
-	return s.Storage.WatchList(ctx, key, resourceVersion, p)
+func (s *DryRunnableStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	return s.Storage.Get(ctx, key, opts, objPtr)
 }
 
-func (s *DryRunnableStorage) Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error {
-	return s.Storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
-}
-
-func (s *DryRunnableStorage) GetToList(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
-	return s.Storage.GetToList(ctx, key, resourceVersion, p, listObj)
-}
-
-func (s *DryRunnableStorage) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
-	return s.Storage.List(ctx, key, resourceVersion, p, listObj)
+func (s *DryRunnableStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	return s.Storage.GetList(ctx, key, opts, listObj)
 }
 
 func (s *DryRunnableStorage) GuaranteedUpdate(
-	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, suggestion ...runtime.Object) error {
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, cachedExistingObject runtime.Object) error {
 	if dryRun {
-		err := s.Storage.Get(ctx, key, "", ptrToType, ignoreNotFound)
+		var current runtime.Object
+		v, err := conversion.EnforcePtr(destination)
+		if err != nil {
+			return fmt.Errorf("unable to convert output object to pointer: %v", err)
+		}
+		if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
+			current = u.NewEmptyInstance()
+		} else {
+			current = reflect.New(v.Type()).Interface().(runtime.Object)
+		}
+
+		err = s.Storage.Get(ctx, key, storage.GetOptions{IgnoreNotFound: ignoreNotFound}, current)
 		if err != nil {
 			return err
 		}
-		err = preconditions.Check(key, ptrToType)
+		err = preconditions.Check(key, current)
 		if err != nil {
 			return err
 		}
-		rev, err := s.Versioner().ObjectResourceVersion(ptrToType)
+		rev, err := s.Versioner().ObjectResourceVersion(current)
 		if err != nil {
 			return err
 		}
-		out, _, err := tryUpdate(ptrToType, storage.ResponseMeta{ResourceVersion: rev})
+		updated, _, err := tryUpdate(current, storage.ResponseMeta{ResourceVersion: rev})
 		if err != nil {
 			return err
 		}
-		return s.copyInto(out, ptrToType)
+		return s.copyInto(updated, destination)
 	}
-	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, suggestion...)
+	return s.Storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 }
 
 func (s *DryRunnableStorage) Count(key string) (int64, error) {
@@ -113,9 +119,5 @@ func (s *DryRunnableStorage) copyInto(in, out runtime.Object) error {
 		return err
 	}
 	_, _, err = s.Codec.Decode(data, nil, out)
-	if err != nil {
-		return err
-	}
-	return nil
-
+	return err
 }

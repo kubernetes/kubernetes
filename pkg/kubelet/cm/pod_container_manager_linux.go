@@ -17,12 +17,13 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -59,14 +60,6 @@ type podContainerManagerImpl struct {
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerImpl{}
 
-// applyLimits sets pod cgroup resource limits
-// It also updates the resource limits on top level qos containers.
-func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
-	// This function will house the logic for setting the resource parameters
-	// on the pod container config and updating top level qos container configs
-	return nil
-}
-
 // Exists checks if the pod's cgroup already exists
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
@@ -77,28 +70,29 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesn't already exist it is created.
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
-	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
+		enforceMemoryQoS := false
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+			libcontainercgroups.IsCgroup2UnifiedMode() {
+			enforceMemoryQoS = true
+		}
 		// Create the pod container
+		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
+		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+		}
+		if enforceMemoryQoS {
+			klog.V(4).InfoS("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
-	}
-	// Apply appropriate resource limits on the pod container
-	// Top level qos containers limits are not updated
-	// until we figure how to maintain the desired state in the kubelet.
-	// Because maintaining the desired state is difficult without checkpointing.
-	if err := m.applyLimits(pod); err != nil {
-		return fmt.Errorf("failed to apply resource limits on container for %v : %v", podContainerName, err)
 	}
 	return nil
 }
@@ -126,6 +120,25 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	return cgroupName, cgroupfsName
 }
 
+func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	memUsage, err := m.cgroupManager.MemoryUsage(podCgroupName)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(memUsage), nil
+}
+
+func (m *podContainerManagerImpl) GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.GetCgroupConfig(podCgroupName, resource)
+}
+
+func (m *podContainerManagerImpl) SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.SetCgroupConfig(podCgroupName, resource, resourceConfig)
+}
+
 // Kill one process ID
 func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	// os.FindProcess never returns an error on POSIX
@@ -133,11 +146,8 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	p, _ := os.FindProcess(pid)
 	if err := p.Kill(); err != nil {
 		// If the process already exited, that's fine.
-		if strings.Contains(err.Error(), "process already finished") {
-			// Hate parsing strings, but
-			// vendor/github.com/opencontainers/runc/libcontainer/
-			// also does this.
-			klog.V(3).Infof("process with pid %v no longer exists", pid)
+		if errors.Is(err, os.ErrProcessDone) {
+			klog.V(3).InfoS("Process no longer exists", "pid", pid)
 			return nil
 		}
 		return err
@@ -160,23 +170,23 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 	removed := map[int]bool{}
 	for i := 0; i < 5; i++ {
 		if i != 0 {
-			klog.V(3).Infof("Attempt %v failed to kill all unwanted process from cgroup: %v. Retyring", i, podCgroup)
+			klog.V(3).InfoS("Attempt failed to kill all unwanted process from cgroup, retrying", "attempt", i, "cgroupName", podCgroup)
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
 			if _, ok := removed[pid]; ok {
 				continue
 			}
-			klog.V(3).Infof("Attempt to kill process with pid: %v from cgroup: %v", pid, podCgroup)
+			klog.V(3).InfoS("Attempting to kill process from cgroup", "pid", pid, "cgroupName", podCgroup)
 			if err := m.killOnePid(pid); err != nil {
-				klog.V(3).Infof("failed to kill process with pid: %v from cgroup: %v", pid, podCgroup)
+				klog.V(3).InfoS("Failed to kill process from cgroup", "pid", pid, "cgroupName", podCgroup, "err", err)
 				errlist = append(errlist, err)
 			} else {
 				removed[pid] = true
 			}
 		}
 		if len(errlist) == 0 {
-			klog.V(3).Infof("successfully killed all unwanted processes from cgroup: %v", podCgroup)
+			klog.V(3).InfoS("Successfully killed all unwanted processes from cgroup", "cgroupName", podCgroup)
 			return nil
 		}
 	}
@@ -187,7 +197,7 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 	// Try killing all the processes attached to the pod cgroup
 	if err := m.tryKillingCgroupProcesses(podCgroup); err != nil {
-		klog.Warningf("failed to kill all the processes attached to the %v cgroups", podCgroup)
+		klog.InfoS("Failed to kill all the processes attached to cgroup", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %v", podCgroup, err)
 	}
 
@@ -197,7 +207,7 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		ResourceParameters: &ResourceConfig{},
 	}
 	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
-		klog.Warningf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+		klog.InfoS("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
 	}
 	return nil
@@ -248,7 +258,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 			// get the subsystems QoS cgroup absolute name
 			qcConversion := m.cgroupManager.Name(qosContainerName)
 			qc := path.Join(val, qcConversion)
-			dirInfo, err := ioutil.ReadDir(qc)
+			dirInfo, err := os.ReadDir(qc)
 			if err != nil {
 				if os.IsNotExist(err) {
 					continue
@@ -276,7 +286,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				parts := strings.Split(basePath, podCgroupNamePrefix)
 				// the uid is missing, so we log the unexpected cgroup not of form pod<uid>
 				if len(parts) != 2 {
-					klog.Errorf("pod cgroup manager ignoring unexpected cgroup %v because it is not a pod", cgroupfsPath)
+					klog.InfoS("Pod cgroup manager ignored unexpected cgroup because it is not a pod", "path", cgroupfsPath)
 					continue
 				}
 				podUID := parts[1]
@@ -330,4 +340,16 @@ func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 
 func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+
+func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+	return nil
 }

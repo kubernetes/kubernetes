@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kube-openapi/pkg/util/sets"
 
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 var (
@@ -56,24 +56,29 @@ Go field names must be CamelCase. JSON field names must be camelCase. Other than
 initial letter, the two should almost always match. No underscores nor dashes in either.
 This rule verifies the convention "Other than capitalization of the initial letter, the two should almost always match."
 Examples (also in unit test):
-    Go name      | JSON name    | match
-                   podSpec        false
-    PodSpec        podSpec        true
-    PodSpec        PodSpec        false
-    podSpec        podSpec        false
-    PodSpec        spec           false
-    Spec           podSpec        false
-    JSONSpec       jsonSpec       true
-    JSONSpec       jsonspec       false
-    HTTPJSONSpec   httpJSONSpec   true
+
+	Go name      | JSON name    | match
+	               podSpec        false
+	PodSpec        podSpec        true
+	PodSpec        PodSpec        false
+	podSpec        podSpec        false
+	PodSpec        spec           false
+	Spec           podSpec        false
+	JSONSpec       jsonSpec       true
+	JSONSpec       jsonspec       false
+	HTTPJSONSpec   httpJSONSpec   true
+
 NOTE: this validator cannot tell two sequential all-capital words from one word, therefore the case below
 is also considered matched.
-    HTTPJSONSpec   httpjsonSpec   true
+
+	HTTPJSONSpec   httpjsonSpec   true
+
 NOTE: JSON names in jsonNameBlacklist should skip evaluation
-                                  true
-    podSpec                       true
-    podSpec        -              true
-    podSpec        metadata       true
+
+	                              true
+	podSpec                       true
+	podSpec        -              true
+	podSpec        metadata       true
 */
 type NamesMatch struct{}
 
@@ -114,14 +119,15 @@ func (n *NamesMatch) Validate(t *types.Type) ([]string, error) {
 
 // namesMatch evaluates if goName and jsonName match the API rule
 // TODO: Use an off-the-shelf CamelCase solution instead of implementing this logic. The following existing
-//       packages have been tried out:
-//		github.com/markbates/inflect
-//		github.com/segmentio/go-camelcase
-//		github.com/iancoleman/strcase
-//		github.com/fatih/camelcase
-//	 Please see https://github.com/kubernetes/kube-openapi/pull/83#issuecomment-400842314 for more details
-//	 about why they don't satisfy our need. What we need can be a function that detects an acronym at the
-//	 beginning of a string.
+//
+//	      packages have been tried out:
+//			github.com/markbates/inflect
+//			github.com/segmentio/go-camelcase
+//			github.com/iancoleman/strcase
+//			github.com/fatih/camelcase
+//		 Please see https://github.com/kubernetes/kube-openapi/pull/83#issuecomment-400842314 for more details
+//		 about why they don't satisfy our need. What we need can be a function that detects an acronym at the
+//		 beginning of a string.
 func namesMatch(goName, jsonName string) bool {
 	if jsonNameBlacklist.Has(jsonName) {
 		return true
@@ -129,7 +135,7 @@ func namesMatch(goName, jsonName string) bool {
 	if !isAllowedName(goName) || !isAllowedName(jsonName) {
 		return false
 	}
-	if strings.ToLower(goName) != strings.ToLower(jsonName) {
+	if !strings.EqualFold(goName, jsonName) {
 		return false
 	}
 	// Go field names must be CamelCase. JSON field names must be camelCase.
@@ -155,7 +161,7 @@ func namesMatch(goName, jsonName string) bool {
 	return true
 }
 
-// isCaptical returns true if one character is capital
+// isCapital returns true if one character is capital
 func isCapital(b byte) bool {
 	return b >= 'A' && b <= 'Z'
 }

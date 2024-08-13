@@ -20,12 +20,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 // BuildNamedCertificates returns a map of *tls.Certificate by name. It's
@@ -50,7 +50,7 @@ func (c *DynamicServingCertificateController) BuildNamedCertificates(sniCerts []
 			byNameExplicit[name] = &cert
 		}
 
-		klog.V(2).Infof("loaded SNI cert [%d/%q]: %s", i, c.sniCerts[i].Name(), GetHumanCertDetail(x509Cert))
+		klog.V(2).InfoS("Loaded SNI cert", "index", i, "certName", c.sniCerts[i].Name(), "certDetail", GetHumanCertDetail(x509Cert))
 		if c.eventRecorder != nil {
 			c.eventRecorder.Eventf(&corev1.ObjectReference{Name: c.sniCerts[i].Name()}, nil, corev1.EventTypeWarning, "TLSConfigChanged", "SNICertificateReload", "loaded SNI cert [%d/%q]: %s with explicit names %v", i, c.sniCerts[i].Name(), GetHumanCertDetail(x509Cert), names)
 		}
@@ -77,15 +77,13 @@ func getCertificateNames(cert *x509.Certificate) []string {
 	var names []string
 
 	cn := cert.Subject.CommonName
-	cnIsIP := net.ParseIP(cn) != nil
+	cnIsIP := netutils.ParseIPSloppy(cn) != nil
 	cnIsValidDomain := cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0
 	// don't use the CN if it is a valid IP because our IP serving detection may unexpectedly use it to terminate the connection.
 	if !cnIsIP && cnIsValidDomain {
 		names = append(names, cn)
 	}
-	for _, san := range cert.DNSNames {
-		names = append(names, san)
-	}
+	names = append(names, cert.DNSNames...)
 	// intentionally all IPs in the cert are ignored as SNI forbids passing IPs
 	// to select a cert. Before go 1.6 the tls happily passed IPs as SNI values.
 

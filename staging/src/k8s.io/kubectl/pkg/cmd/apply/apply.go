@@ -17,10 +17,14 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,55 +35,81 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/openapi3"
+	"k8s.io/client-go/util/csaupgrade"
+	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/cmd/delete"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
 
+// ApplyFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
+// reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
+// the logic itself easy to unit test
+type ApplyFlags struct {
+	RecordFlags *genericclioptions.RecordFlags
+	PrintFlags  *genericclioptions.PrintFlags
+
+	DeleteFlags *cmddelete.DeleteFlags
+
+	FieldManager   string
+	Selector       string
+	Prune          bool
+	PruneResources []prune.Resource
+	ApplySetRef    string
+	All            bool
+	Overwrite      bool
+	OpenAPIPatch   bool
+
+	PruneAllowlist []string
+
+	genericiooptions.IOStreams
+}
+
 // ApplyOptions defines flags and other configuration parameters for the `apply` command
 type ApplyOptions struct {
-	RecordFlags *genericclioptions.RecordFlags
-	Recorder    genericclioptions.Recorder
+	Recorder genericclioptions.Recorder
 
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	DeleteFlags   *delete.DeleteFlags
-	DeleteOptions *delete.DeleteOptions
+	DeleteOptions *cmddelete.DeleteOptions
 
 	ServerSideApply bool
 	ForceConflicts  bool
 	FieldManager    string
 	Selector        string
 	DryRunStrategy  cmdutil.DryRunStrategy
-	DryRunVerifier  *resource.DryRunVerifier
 	Prune           bool
-	PruneResources  []pruneResource
+	PruneResources  []prune.Resource
 	cmdBaseName     string
 	All             bool
 	Overwrite       bool
 	OpenAPIPatch    bool
-	PruneWhitelist  []string
 
-	Validator     validation.Schema
-	Builder       *resource.Builder
-	Mapper        meta.RESTMapper
-	DynamicClient dynamic.Interface
-	OpenAPISchema openapi.Resources
+	ValidationDirective string
+	Validator           validation.Schema
+	Builder             *resource.Builder
+	Mapper              meta.RESTMapper
+	DynamicClient       dynamic.Interface
+	OpenAPIGetter       openapi.OpenAPIResourcesGetter
+	OpenAPIV3Root       openapi3.Root
 
 	Namespace        string
 	EnforceNamespace bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	// Objects (and some denormalized data) which are to be
 	// applied. The standard way to fill in this structure
@@ -93,8 +123,8 @@ type ApplyOptions struct {
 
 	// Stores visited objects/namespaces for later use
 	// calculating the set of objects to prune.
-	VisitedUids       sets.String
-	VisitedNamespaces sets.String
+	VisitedUids       sets.Set[types.UID]
+	VisitedNamespaces sets.Set[string]
 
 	// Function run after the objects are generated and
 	// stored in the "objects" field, but before the
@@ -103,11 +133,15 @@ type ApplyOptions struct {
 	// Function run after all objects have been applied.
 	// The standard PostProcessorFn is "PrintAndPrunePostProcessor()".
 	PostProcessorFn func() error
+
+	// ApplySet tracks the set of objects that have been applied, for the purposes of pruning.
+	// See git.k8s.io/enhancements/keps/sig-cli/3659-kubectl-apply-prune
+	ApplySet *ApplySet
 }
 
 var (
 	applyLong = templates.LongDesc(i18n.T(`
-		Apply a configuration to a resource by filename or stdin.
+		Apply a configuration to a resource by file name or stdin.
 		The resource name must be specified. This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
@@ -116,116 +150,242 @@ var (
 		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`))
 
 	applyExample = templates.Examples(i18n.T(`
-		# Apply the configuration in pod.json to a pod.
+		# Apply the configuration in pod.json to a pod
 		kubectl apply -f ./pod.json
 
-		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl apply -k dir/
 
-		# Apply the JSON passed into stdin to a pod.
+		# Apply the JSON passed into stdin to a pod
 		cat pod.json | kubectl apply -f -
 
+		# Apply the configuration from all files that end with '.json'
+		kubectl apply -f '*.json'
+
 		# Note: --prune is still in Alpha
-		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.
+		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all other resources that are not in the file and match label app=nginx
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
-		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+		# Apply the configuration in manifest.yaml and delete all the other config maps that are not in the file
+		kubectl apply --prune -f manifest.yaml --all --prune-allowlist=core/v1/ConfigMap`))
 
-	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
+	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
+	warningChangesOnDeletingResource     = "Warning: Detected changes to resource %[1]s which is currently being deleted.\n"
+	warningMigrationLastAppliedFailed    = "Warning: failed to migrate kubectl.kubernetes.io/last-applied-configuration for Server-Side Apply. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
+	warningMigrationPatchFailed          = "Warning: server rejected managed fields migration to Server-Side Apply. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
+	warningMigrationReapplyFailed        = "Warning: failed to re-apply configuration after performing Server-Side Apply migration. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
 )
 
-// NewApplyOptions creates new ApplyOptions for the `apply` command
-func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
-	return &ApplyOptions{
+var ApplySetToolVersion = version.Get().GitVersion
+
+// NewApplyFlags returns a default ApplyFlags
+func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
+	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
+		DeleteFlags: cmddelete.NewDeleteFlags("The files that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
 		OpenAPIPatch: true,
 
-		Recorder: genericclioptions.NoopRecorder{},
-
-		IOStreams: ioStreams,
-
-		objects:       []*resource.Info{},
-		objectsCached: false,
-
-		VisitedUids:       sets.NewString(),
-		VisitedNamespaces: sets.NewString(),
+		IOStreams: streams,
 	}
 }
 
 // NewCmdApply creates the `apply` command
-func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewApplyOptions(ioStreams)
-
-	// Store baseName for use in printing warnings / messages involving the base command name.
-	// This is useful for downstream command that wrap this one.
-	o.cmdBaseName = baseName
+func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+	flags := NewApplyFlags(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
+		Short:                 i18n.T("Apply a configuration to a resource by file name or stdin"),
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(o.Prune, o.All, o.Selector))
+			o, err := flags.ToOptions(f, cmd, baseName, args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	// bind flag structs
-	o.DeleteFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
-
-	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
-	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().Bool("server-dry-run", false, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
-	cmd.Flags().MarkDeprecated("server-dry-run", "--server-dry-run is deprecated and can be replaced with --dry-run=server.")
-	cmd.Flags().MarkHidden("server-dry-run")
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddServerSideApplyFlags(cmd)
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
+	flags.AddFlags(cmd)
 
 	// apply subcommands
-	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
-	cmd.AddCommand(NewCmdApplySetLastApplied(f, ioStreams))
-	cmd.AddCommand(NewCmdApplyEditLastApplied(f, ioStreams))
+	cmd.AddCommand(NewCmdApplyViewLastApplied(f, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplySetLastApplied(f, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(f, flags.IOStreams))
 
 	return cmd
 }
 
-// Complete verifies if ApplyOptions are valid and without conflicts.
-func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	var err error
-	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
-	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
-	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
-	o.DynamicClient, err = f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
-	o.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
+// AddFlags registers flags for a cli
+func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
+	// bind flag structs
+	flags.DeleteFlags.AddFlags(cmd)
+	flags.RecordFlags.AddFlags(cmd)
+	flags.PrintFlags.AddFlags(cmd)
 
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddServerSideApplyFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, FieldManagerClientSideApply)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
+	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef)
+	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
+	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+}
+
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseName string, args []string) (*ApplyOptions, error) {
+	if len(args) != 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+
+	serverSideApply := cmdutil.GetServerSideApplyFlag(cmd)
+	forceConflicts := cmdutil.GetForceConflictsFlag(cmd)
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+
+	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
+
+	// allow for a success message operation to be specified at print time
+	toPrinter := func(operation string) (printers.ResourcePrinter, error) {
+		flags.PrintFlags.NamePrintFlags.Operation = operation
+		cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
+		return flags.PrintFlags.ToPrinter()
+	}
+
+	flags.RecordFlags.Complete(cmd)
+	recorder, err := flags.RecordFlags.ToRecorder()
+	if err != nil {
+		return nil, err
+	}
+
+	deleteOptions, err := flags.DeleteFlags.ToOptions(dynamicClient, flags.IOStreams)
+	if err != nil {
+		return nil, err
+	}
+
+	err = deleteOptions.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return nil, err
+	}
+
+	var openAPIV3Root openapi3.Root
+	if !cmdutil.OpenAPIV3Patch.IsDisabled() {
+		openAPIV3Client, err := f.OpenAPIV3Client()
+		if err == nil {
+			openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+		} else {
+			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
+		}
+	}
+
+	validationDirective, err := cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return nil, err
+	}
+	validator, err := f.Validator(validationDirective)
+	if err != nil {
+		return nil, err
+	}
+	builder := f.NewBuilder()
+	mapper, err := f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
+	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	var applySet *ApplySet
+	if flags.ApplySetRef != "" {
+		parent, err := ParseApplySetParentRef(flags.ApplySetRef, mapper)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parent reference %q: %w", flags.ApplySetRef, err)
+		}
+		// ApplySet uses the namespace value from the flag, but not from the kubeconfig or defaults
+		// This means the namespace flag is required when using a namespaced parent.
+		if enforceNamespace && parent.IsNamespaced() {
+			parent.Namespace = namespace
+		}
+		tooling := ApplySetTooling{Name: baseName, Version: ApplySetToolVersion}
+		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+		}
+		if restClient == nil {
+			return nil, fmt.Errorf("could not build RESTClient for ApplySet")
+		}
+		applySet = NewApplySet(parent, tooling, mapper, restClient)
+	}
+	if flags.Prune {
+		flags.PruneResources, err = prune.ParseResources(mapper, flags.PruneAllowlist)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	o := &ApplyOptions{
+		// 	Store baseName for use in printing warnings / messages involving the base command name.
+		// 	This is useful for downstream command that wrap this one.
+		cmdBaseName: baseName,
+
+		PrintFlags: flags.PrintFlags,
+
+		DeleteOptions:   deleteOptions,
+		ToPrinter:       toPrinter,
+		ServerSideApply: serverSideApply,
+		ForceConflicts:  forceConflicts,
+		FieldManager:    fieldManager,
+		Selector:        flags.Selector,
+		DryRunStrategy:  dryRunStrategy,
+		Prune:           flags.Prune,
+		PruneResources:  flags.PruneResources,
+		All:             flags.All,
+		Overwrite:       flags.Overwrite,
+		OpenAPIPatch:    flags.OpenAPIPatch,
+
+		Recorder:            recorder,
+		Namespace:           namespace,
+		EnforceNamespace:    enforceNamespace,
+		Validator:           validator,
+		ValidationDirective: validationDirective,
+		Builder:             builder,
+		Mapper:              mapper,
+		DynamicClient:       dynamicClient,
+		OpenAPIGetter:       f,
+		OpenAPIV3Root:       openAPIV3Root,
+
+		IOStreams: flags.IOStreams,
+
+		objects:       []*resource.Info{},
+		objectsCached: false,
+
+		VisitedUids:       sets.New[types.UID](),
+		VisitedNamespaces: sets.New[string](),
+
+		ApplySet: applySet,
+	}
+
+	o.PostProcessorFn = o.PrintAndPrunePostProcessor()
+
+	return o, nil
+}
+
+// Validate verifies if ApplyOptions are valid and without conflicts.
+func (o *ApplyOptions) Validate() error {
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
@@ -234,76 +394,51 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
 	}
 
-	var deprecatedServerDryRunFlag = cmdutil.GetFlagBool(cmd, "server-dry-run")
-	if o.DryRunStrategy == cmdutil.DryRunClient && deprecatedServerDryRunFlag {
-		return fmt.Errorf("--dry-run=client and --server-dry-run can't be used together (did you mean --dry-run=server instead?)")
+	if o.ServerSideApply && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--force cannot be used with --server-side")
 	}
 
-	if o.DryRunStrategy == cmdutil.DryRunNone && deprecatedServerDryRunFlag {
-		o.DryRunStrategy = cmdutil.DryRunServer
+	if o.DryRunStrategy == cmdutil.DryRunServer && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--dry-run=server cannot be used with --force")
 	}
 
-	// allow for a success message operation to be specified at print time
-	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
-		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-		return o.PrintFlags.ToPrinter()
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 
-	o.RecordFlags.Complete(cmd)
-	o.Recorder, err = o.RecordFlags.ToRecorder()
-	if err != nil {
-		return err
-	}
-
-	o.DeleteOptions = o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
-	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
-	if err != nil {
-		return err
-	}
-
-	o.OpenAPISchema, _ = f.OpenAPISchema()
-	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
-	if err != nil {
-		return err
-	}
-	o.Builder = f.NewBuilder()
-	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	if o.Prune {
-		o.PruneResources, err = parsePruneResources(o.Mapper, o.PruneWhitelist)
-		if err != nil {
+	if o.ApplySet != nil {
+		if !o.Prune {
+			return fmt.Errorf("--applyset requires --prune")
+		}
+		if err := o.ApplySet.Validate(context.TODO(), o.DynamicClient); err != nil {
 			return err
 		}
 	}
+	if o.Prune {
+		// Do not force the recreation of an object(s) if we're pruning; this can cause
+		// undefined behavior since object UID's change.
+		if o.DeleteOptions.ForceDeletion {
+			return fmt.Errorf("--force cannot be used with --prune")
+		}
 
-	o.PostProcessorFn = o.PrintAndPrunePostProcessor()
-
-	return nil
-}
-
-func validateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+		if o.ApplySet != nil {
+			if o.All {
+				return fmt.Errorf("--all is incompatible with --applyset")
+			} else if o.Selector != "" {
+				return fmt.Errorf("--selector is incompatible with --applyset")
+			} else if len(o.PruneResources) > 0 {
+				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
+			}
+		} else {
+			if !o.All && o.Selector == "" {
+				return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+			}
+			if o.ServerSideApply {
+				return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
+			}
+		}
 	}
-	return nil
-}
 
-func validatePruneAll(prune, all bool, selector string) error {
-	if all && len(selector) > 0 {
-		return fmt.Errorf("cannot set --all and --selector at the same time")
-	}
-	if prune && !all && selector == "" {
-		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
-	}
 	return nil
 }
 
@@ -326,8 +461,6 @@ func isIncompatibleServerError(err error) bool {
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	var err error = nil
 	if !o.objectsCached {
-		// include the uninitialized objects by default if --prune is true
-		// unless explicitly set --include-uninitialized=false
 		r := o.Builder.
 			Unstructured().
 			Schema(o.Validator).
@@ -337,7 +470,15 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 			LabelSelectorParam(o.Selector).
 			Flatten().
 			Do()
+
 		o.objects, err = r.Infos()
+
+		if o.ApplySet != nil {
+			if err := o.ApplySet.AddLabels(o.objects...); err != nil {
+				return nil, err
+			}
+		}
+
 		o.objectsCached = true
 	}
 	return o.objects, err
@@ -352,7 +493,6 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
-
 	if o.PreProcessorFn != nil {
 		klog.V(4).Infof("Running apply pre-processor function")
 		if err := o.PreProcessorFn(); err != nil {
@@ -375,6 +515,13 @@ func (o *ApplyOptions) Run() error {
 	if len(infos) == 0 && len(errs) == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
+
+	if o.ApplySet != nil {
+		if err := o.ApplySet.BeforeApply(infos, o.DryRunStrategy, o.ValidationDirective); err != nil {
+			return err
+		}
+	}
+
 	// Iterate through all objects, applying each one.
 	for _, info := range infos {
 		if err := o.applyOneObject(info); err != nil {
@@ -407,6 +554,19 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
+	if len(info.Name) == 0 {
+		metadata, _ := meta.Accessor(info.Object)
+		generatedName := metadata.GetGenerateName()
+		if len(generatedName) > 0 {
+			return fmt.Errorf("from %s: cannot use generate name with apply", generatedName)
+		}
+	}
+
+	helper := resource.NewHelper(info.Client, info.Mapping).
+		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+		WithFieldManager(o.FieldManager).
+		WithFieldValidation(o.ValidationDirective)
+
 	if o.ServerSideApply {
 		// Send the full object to be applied on the server side.
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
@@ -416,14 +576,6 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 
 		options := metav1.PatchOptions{
 			Force: &o.ForceConflicts,
-		}
-		helper := resource.NewHelper(info.Client, info.Mapping).
-			WithFieldManager(o.FieldManager)
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-			helper.DryRun(true)
 		}
 		obj, err := helper.Patch(
 			info.Namespace,
@@ -448,12 +600,48 @@ are the ways you can resolve this warning:
 * You may co-own fields by updating your manifest to match the existing
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
-See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
+See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`, err)
 			}
 			return err
 		}
 
 		info.Refresh(obj, true)
+
+		// Migrate managed fields if necessary.
+		//
+		// By checking afterward instead of fetching the object beforehand and
+		// unconditionally fetching we can make 3 network requests in the rare
+		// case of migration and 1 request if migration is unnecessary.
+		//
+		// To check beforehand means 2 requests for most operations, and 3
+		// requests in worst case.
+		if err = o.saveLastApplyAnnotationIfNecessary(helper, info); err != nil {
+			fmt.Fprintf(o.ErrOut, warningMigrationLastAppliedFailed, err.Error())
+		} else if performedMigration, err := o.migrateToSSAIfNecessary(helper, info); err != nil {
+			// Print-error as a warning.
+			// This is a non-fatal error because object was successfully applied
+			// above, but it might have issues since migration failed.
+			//
+			// This migration will be re-attempted if necessary upon next
+			// apply.
+			fmt.Fprintf(o.ErrOut, warningMigrationPatchFailed, err.Error())
+		} else if performedMigration {
+			if obj, err = helper.Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+				&options,
+			); err != nil {
+				// Re-send original SSA patch (this will allow dropped fields to
+				// finally be removed)
+				fmt.Fprintf(o.ErrOut, warningMigrationReapplyFailed, err.Error())
+			} else {
+				info.Refresh(obj, false)
+			}
+		}
+
+		WarnIfDeleting(info.Object, o.ErrOut)
 
 		if err := o.MarkObjectVisited(info); err != nil {
 			return err
@@ -493,16 +681,14 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
+		// prune nulls when client-side apply does a create to match what will happen when client-side applying an update.
+		// do this after CreateApplyAnnotation so the annotation matches what will be persisted on an update apply of the same manifest.
+		if u, ok := info.Object.(runtime.Unstructured); ok {
+			pruneNullsFromMap(u.UnstructuredContent())
+		}
+
 		if o.DryRunStrategy != cmdutil.DryRunClient {
 			// Then create the resource and skip the three-way merge
-			helper := resource.NewHelper(info.Client, info.Mapping).
-				WithFieldManager(o.FieldManager)
-			if o.DryRunStrategy == cmdutil.DryRunServer {
-				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-				helper.DryRun(true)
-			}
 			obj, err := helper.Create(info.Namespace, true, info.Object)
 			if err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -536,10 +722,10 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		metadata, _ := meta.Accessor(info.Object)
 		annotationMap := metadata.GetAnnotations()
 		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
+			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName)
 		}
 
-		patcher, err := newPatcher(o, info)
+		patcher, err := newPatcher(o, info, helper)
 		if err != nil {
 			return err
 		}
@@ -549,6 +735,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 
 		info.Refresh(patchedObject, true)
+
+		WarnIfDeleting(info.Object, o.ErrOut)
 
 		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
 			printer, err := o.ToPrinter("unchanged")
@@ -575,6 +763,206 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 	}
 
 	return nil
+}
+
+func pruneNullsFromMap(data map[string]interface{}) {
+	for k, v := range data {
+		if v == nil {
+			delete(data, k)
+		} else {
+			pruneNulls(v)
+		}
+	}
+}
+func pruneNullsFromSlice(data []interface{}) {
+	for _, v := range data {
+		pruneNulls(v)
+	}
+}
+func pruneNulls(v interface{}) {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		pruneNullsFromMap(v)
+	case []interface{}:
+		pruneNullsFromSlice(v)
+	}
+}
+
+// Saves the last-applied-configuration annotation in a separate SSA field manager
+// to prevent it from being dropped by users who have transitioned to SSA.
+//
+// If this operation is not performed, then the last-applied-configuration annotation
+// would be removed from the object upon the first SSA usage. We want to keep it
+// around for a few releases since it is required to downgrade to
+// SSA per [1] and [2]. This code should be removed once the annotation is
+// deprecated.
+//
+// - [1] https://kubernetes.io/docs/reference/using-api/server-side-apply/#downgrading-from-server-side-apply-to-client-side-apply
+// - [2] https://github.com/kubernetes/kubernetes/pull/90187
+//
+// If the annotation is not already present, or if it is already managed by the
+// separate SSA fieldmanager, this is a no-op.
+func (o *ApplyOptions) saveLastApplyAnnotationIfNecessary(
+	helper *resource.Helper,
+	info *resource.Info,
+) error {
+	if o.FieldManager != fieldManagerServerSideApply {
+		// There is no point in preserving the annotation if the field manager
+		// will not remain default. This is because the server will not keep
+		// the annotation up to date.
+		return nil
+	}
+
+	// Send an apply patch with the last-applied-annotation
+	// so that it is not orphaned by SSA in the following patch:
+	accessor, err := meta.Accessor(info.Object)
+	if err != nil {
+		return err
+	}
+
+	// Get the current annotations from the object.
+	annots := accessor.GetAnnotations()
+	if annots == nil {
+		annots = map[string]string{}
+	}
+
+	fieldManager := fieldManagerLastAppliedAnnotation
+	originalAnnotation, hasAnnotation := annots[corev1.LastAppliedConfigAnnotation]
+
+	// If the annotation does not already exist, we do not do anything
+	if !hasAnnotation {
+		return nil
+	}
+
+	// If there is already an SSA field manager which owns the field, then there
+	// is nothing to do here.
+	if owners := csaupgrade.FindFieldsOwners(
+		accessor.GetManagedFields(),
+		metav1.ManagedFieldsOperationApply,
+		lastAppliedAnnotationFieldPath,
+	); len(owners) > 0 {
+		return nil
+	}
+
+	justAnnotation := &unstructured.Unstructured{}
+	justAnnotation.SetGroupVersionKind(info.Mapping.GroupVersionKind)
+	justAnnotation.SetName(accessor.GetName())
+	justAnnotation.SetNamespace(accessor.GetNamespace())
+	justAnnotation.SetAnnotations(map[string]string{
+		corev1.LastAppliedConfigAnnotation: originalAnnotation,
+	})
+
+	modified, err := runtime.Encode(unstructured.UnstructuredJSONScheme, justAnnotation)
+	if err != nil {
+		return nil
+	}
+
+	helperCopy := *helper
+	newObj, err := helperCopy.WithFieldManager(fieldManager).Patch(
+		info.Namespace,
+		info.Name,
+		types.ApplyPatchType,
+		modified,
+		nil,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return info.Refresh(newObj, false)
+}
+
+// Check if the returned object needs to have its kubectl-client-side-apply
+// managed fields migrated server-side-apply.
+//
+// field ownership metadata is stored in three places:
+//   - server-side managed fields
+//   - client-side managed fields
+//   - and the last_applied_configuration annotation.
+//
+// The migration merges the client-side-managed fields into the
+// server-side-managed fields, leaving the last_applied_configuration
+// annotation in place. Server will keep the annotation up to date
+// after every server-side-apply where the following conditions are ment:
+//
+//  1. field manager is 'kubectl'
+//  2. annotation already exists
+func (o *ApplyOptions) migrateToSSAIfNecessary(
+	helper *resource.Helper,
+	info *resource.Info,
+) (migrated bool, err error) {
+	accessor, err := meta.Accessor(info.Object)
+	if err != nil {
+		return false, err
+	}
+
+	// To determine which field managers were used by kubectl for client-side-apply
+	// we search for a manager used in `Update` operations which owns the
+	// last-applied-annotation.
+	//
+	// This is the last client-side-apply manager which changed the field.
+	//
+	// There may be multiple owners if multiple managers wrote the same exact
+	// configuration. In this case there are multiple owners, we want to migrate
+	// them all.
+	csaManagers := csaupgrade.FindFieldsOwners(
+		accessor.GetManagedFields(),
+		metav1.ManagedFieldsOperationUpdate,
+		lastAppliedAnnotationFieldPath)
+
+	managerNames := sets.New[string]()
+	for _, entry := range csaManagers {
+		managerNames.Insert(entry.Manager)
+	}
+
+	// Re-attempt patch as many times as it is conflicting due to ResourceVersion
+	// test failing
+	for i := 0; i < maxPatchRetry; i++ {
+		var patchData []byte
+		var obj runtime.Object
+
+		patchData, err = csaupgrade.UpgradeManagedFieldsPatch(
+			info.Object, managerNames, o.FieldManager)
+
+		if err != nil {
+			// If patch generation failed there was likely a bug.
+			return false, err
+		} else if patchData == nil {
+			// nil patch data means nothing to do - object is already migrated
+			return false, nil
+		}
+
+		// Send the patch to upgrade the managed fields if it is non-nil
+		obj, err = helper.Patch(
+			info.Namespace,
+			info.Name,
+			types.JSONPatchType,
+			patchData,
+			nil,
+		)
+
+		if err == nil {
+			// Stop retrying upon success.
+			info.Refresh(obj, false)
+			return true, nil
+		} else if !errors.IsConflict(err) {
+			// Only retry if there was a conflict
+			return false, err
+		}
+
+		// Refresh the object for next iteration
+		err = info.Get()
+		if err != nil {
+			// If there was an error fetching, return error
+			return false, err
+		}
+	}
+
+	// Reaching this point with non-nil error means there was a conflict and
+	// max retries was hit
+	// Return the last error witnessed (which will be a conflict)
+	return false, err
 }
 
 func (o *ApplyOptions) shouldPrintObject() bool {
@@ -640,18 +1028,19 @@ func (o *ApplyOptions) MarkNamespaceVisited(info *resource.Info) {
 	}
 }
 
-// MarkNamespaceVisited keeps track of UIDs of the applied
+// MarkObjectVisited keeps track of UIDs of the applied
 // objects. Used for pruning.
 func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 	metadata, err := meta.Accessor(info.Object)
 	if err != nil {
 		return err
 	}
-	o.VisitedUids.Insert(string(metadata.GetUID()))
+	o.VisitedUids.Insert(metadata.GetUID())
+
 	return nil
 }
 
-// PrintAndPrune returns a function which meets the PostProcessorFn
+// PrintAndPrunePostProcessor returns a function which meets the PostProcessorFn
 // function signature. This returned function prints all the
 // objects as a list (if configured for that), and prunes the
 // objects not applied. The returned function is the standard
@@ -659,13 +1048,23 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 	return func() error {
+		ctx := context.TODO()
 		if err := o.printObjects(); err != nil {
 			return err
 		}
 
 		if o.Prune {
-			p := newPruner(o)
-			return p.pruneAll(o)
+			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
+				if err := o.ApplySet.Prune(ctx, o); err != nil {
+					// Do not update the ApplySet. If pruning failed, we want to keep the superset
+					// of the previous and current resources in the ApplySet, so that the pruning
+					// step of the next apply will be able to clean up the set correctly.
+					return err
+				}
+			} else {
+				p := newPruner(o)
+				return p.pruneAll(o)
+			}
 		}
 
 		return nil
@@ -683,6 +1082,16 @@ const (
 	// for backward compatibility to not conflict with old versions
 	// of kubectl server-side apply where `kubectl` has already been the field manager.
 	fieldManagerServerSideApply = "kubectl"
+
+	fieldManagerLastAppliedAnnotation = "kubectl-last-applied"
+)
+
+var (
+	lastAppliedAnnotationFieldPath = fieldpath.NewSet(
+		fieldpath.MakePathOrDie(
+			"metadata", "annotations",
+			corev1.LastAppliedConfigAnnotation),
+	)
 )
 
 // GetApplyFieldManagerFlag gets the field manager for kubectl apply
@@ -701,4 +1110,13 @@ func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide bool) string {
 	}
 
 	return FieldManagerClientSideApply
+}
+
+// WarnIfDeleting prints a warning if a resource is being deleted
+func WarnIfDeleting(obj runtime.Object, stderr io.Writer) {
+	metadata, _ := meta.Accessor(obj)
+	if metadata != nil && metadata.GetDeletionTimestamp() != nil {
+		// just warn the user about the conflict
+		fmt.Fprintf(stderr, warningChangesOnDeletingResource, metadata.GetName())
+	}
 }
