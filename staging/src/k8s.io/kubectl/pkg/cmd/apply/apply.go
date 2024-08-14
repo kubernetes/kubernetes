@@ -576,6 +576,7 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 
 		options := metav1.PatchOptions{
 			Force: &o.ForceConflicts,
+			FieldManager: o.FieldManager,
 		}
 		obj, err := helper.Patch(
 			info.Namespace,
@@ -863,7 +864,9 @@ func (o *ApplyOptions) saveLastApplyAnnotationIfNecessary(
 		info.Name,
 		types.ApplyPatchType,
 		modified,
-		nil,
+		&metav1.PatchOptions{
+			FieldManager: o.FieldManager,
+		},
 	)
 
 	if err != nil {
