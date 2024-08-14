@@ -2056,7 +2056,7 @@ func (og *operationGenerator) nodeExpandVolume(
 			currentSize := pvc.Status.Capacity.Storage()
 			if err != nil {
 				// Return error rather than leave the file system un-resized, caller will log and retry
-				return false, *currentSize, fmt.Errorf("mountVolume.NodeExpandVolume get PVC failed : %v", err)
+				return false, *currentSize, fmt.Errorf("mountVolume.NodeExpandVolume get PVC failed : %w", err)
 			}
 
 			if volumeToMount.VolumeSpec.ReadOnly {

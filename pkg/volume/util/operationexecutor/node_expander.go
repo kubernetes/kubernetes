@@ -175,7 +175,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error, testRe
 	// File system resize succeeded, now update the PVC's Capacity to match the PV's
 	ne.pvc, err = util.MarkFSResizeFinished(ne.pvc, ne.pluginResizeOpts.NewSize, ne.kubeClient)
 	if err != nil {
-		return true, ne.pluginResizeOpts.NewSize, fmt.Errorf("mountVolume.NodeExpandVolume update pvc status failed: %v", err), testResponseData{true, true}
+		return true, ne.pluginResizeOpts.NewSize, fmt.Errorf("mountVolume.NodeExpandVolume update pvc status failed: %w", err), testResponseData{true, true}
 	}
 	return true, ne.pluginResizeOpts.NewSize, nil, testResponseData{true, true}
 }

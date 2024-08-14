@@ -960,7 +960,7 @@ func (asw *actualStateOfWorld) volumeNeedsExpansion(volumeObj attachedVolume, de
 		return currentSize, false
 	}
 
-	klog.V(5).Infof("NodeExpandVolume checking size, actual size %s, desired size %s, for volume %s", volumeObj.persistentVolumeSize.String(), desiredVolumeSize.String(), volumeObj.volumeName)
+	klog.V(5).InfoS("NodeExpandVolume checking size", "actualSize", volumeObj.persistentVolumeSize.String(), "desiredSize", desiredVolumeSize.String(), "volume", volumeObj.volumeName)
 
 	if desiredVolumeSize.Cmp(*volumeObj.persistentVolumeSize) > 0 {
 		volumePlugin, err := asw.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeObj.spec)
