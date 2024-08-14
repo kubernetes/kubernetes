@@ -33,7 +33,7 @@ VOLUME=${HOME}
 
 # Assume that this is running in Docker on a bridge.  Allow connections from
 # anything on the local subnet.
-ALLOW=$(ip route | awk  '/^default via/ { reg = "^[0-9./]+ dev "$5 } ; $0 ~ reg { print $1 }')
+ALLOW=$(ip route | awk  '/^default via/ { reg = "^[0-9./]+ dev "$5 } ; $0 ~ reg { print $1 }' | tr '\n' ' ')
 
 CONFDIR="/tmp/rsync.k8s"
 PIDFILE="${CONFDIR}/rsyncd.pid"
