@@ -209,7 +209,7 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, p
 	return framework.NewStatus(framework.Code(pl.inj.FilterStatus), injectFilterReason)
 }
 
-func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	return nil, framework.NewStatus(framework.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
