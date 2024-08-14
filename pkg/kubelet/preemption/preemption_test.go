@@ -90,59 +90,20 @@ func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller 
 	}
 }
 
-func TestEvictPodsToFreeRequestsWithError(t *testing.T) {
-	type testRun struct {
-		testName              string
-		inputPods             []*v1.Pod
-		insufficientResources admissionRequirementList
-		expectErr             bool
-		expectedOutput        []*v1.Pod
-	}
-	podProvider := newFakePodProvider()
-	podKiller := newFakePodKiller(true)
-	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
-	allPods := getTestPods()
-	runs := []testRun{
-		{
-			testName: "multiple pods eviction error",
-			inputPods: []*v1.Pod{
-				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
-				allPods[guaranteed], allPods[highRequestGuaranteed]},
-			insufficientResources: getAdmissionRequirementList(0, 550, 0),
-			expectErr:             false,
-			expectedOutput:        nil,
-		},
-	}
-	for _, r := range runs {
-		podProvider.setPods(r.inputPods)
-		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[clusterCritical], r.insufficientResources)
-		outputPods := podKiller.getKilledPods()
-		if !r.expectErr && outErr != nil {
-			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
-		} else if r.expectErr && outErr == nil {
-			t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
-		} else if !podListEqual(r.expectedOutput, outputPods) {
-			t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
-		}
-		podKiller.clear()
-	}
-}
-
 func TestEvictPodsToFreeRequests(t *testing.T) {
 	type testRun struct {
 		testName              string
+		isPodKillerWithError  bool
 		inputPods             []*v1.Pod
 		insufficientResources admissionRequirementList
 		expectErr             bool
 		expectedOutput        []*v1.Pod
 	}
-	podProvider := newFakePodProvider()
-	podKiller := newFakePodKiller(false)
-	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
 	allPods := getTestPods()
 	runs := []testRun{
 		{
 			testName:              "critical pods cannot be preempted",
+			isPodKillerWithError:  false,
 			inputPods:             []*v1.Pod{allPods[clusterCritical]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
@@ -150,13 +111,15 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		},
 		{
 			testName:              "best effort pods are not preempted when attempting to free resources",
+			isPodKillerWithError:  false,
 			inputPods:             []*v1.Pod{allPods[bestEffort]},
 			insufficientResources: getAdmissionRequirementList(0, 1, 0),
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
 		{
-			testName: "multiple pods evicted",
+			testName:             "multiple pods evicted",
+			isPodKillerWithError: false,
 			inputPods: []*v1.Pod{
 				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
 				allPods[guaranteed], allPods[highRequestGuaranteed]},
@@ -164,19 +127,34 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 			expectErr:             false,
 			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
 		},
+		{
+			testName:             "multiple pods with eviction error",
+			isPodKillerWithError: true,
+			inputPods: []*v1.Pod{
+				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
+				allPods[guaranteed], allPods[highRequestGuaranteed]},
+			insufficientResources: getAdmissionRequirementList(0, 550, 0),
+			expectErr:             false,
+			expectedOutput:        nil,
+		},
 	}
 	for _, r := range runs {
-		podProvider.setPods(r.inputPods)
-		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[clusterCritical], r.insufficientResources)
-		outputPods := podKiller.getKilledPods()
-		if !r.expectErr && outErr != nil {
-			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
-		} else if r.expectErr && outErr == nil {
-			t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
-		} else if !podListEqual(r.expectedOutput, outputPods) {
-			t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
-		}
-		podKiller.clear()
+		t.Run(r.testName, func(t *testing.T) {
+			podProvider := newFakePodProvider()
+			podKiller := newFakePodKiller(r.isPodKillerWithError)
+			criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
+			podProvider.setPods(r.inputPods)
+			outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[clusterCritical], r.insufficientResources)
+			outputPods := podKiller.getKilledPods()
+			if !r.expectErr && outErr != nil {
+				t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
+			} else if r.expectErr && outErr == nil {
+				t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
+			} else if !podListEqual(r.expectedOutput, outputPods) {
+				t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
+			}
+			podKiller.clear()
+		})
 	}
 }
 
@@ -305,14 +283,16 @@ func TestGetPodsToPreempt(t *testing.T) {
 	}
 
 	for _, r := range runs {
-		outputPods, outErr := getPodsToPreempt(r.preemptor, r.inputPods, r.insufficientResources)
-		if !r.expectErr && outErr != nil {
-			t.Errorf("getPodsToPreempt returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
-		} else if r.expectErr && outErr == nil {
-			t.Errorf("getPodsToPreempt expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
-		} else if !podListEqual(r.expectedOutput, outputPods) {
-			t.Errorf("getPodsToPreempt expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
-		}
+		t.Run(r.testName, func(t *testing.T) {
+			outputPods, outErr := getPodsToPreempt(r.preemptor, r.inputPods, r.insufficientResources)
+			if !r.expectErr && outErr != nil {
+				t.Errorf("getPodsToPreempt returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
+			} else if r.expectErr && outErr == nil {
+				t.Errorf("getPodsToPreempt expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
+			} else if !podListEqual(r.expectedOutput, outputPods) {
+				t.Errorf("getPodsToPreempt expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
+			}
+		})
 	}
 }
 
@@ -351,10 +331,12 @@ func TestAdmissionRequirementsDistance(t *testing.T) {
 		},
 	}
 	for _, run := range runs {
-		output := run.requirements.distance(run.inputPod)
-		if output != run.expectedOutput {
-			t.Errorf("expected: %f, got: %f for %s test", run.expectedOutput, output, run.testName)
-		}
+		t.Run(run.testName, func(t *testing.T) {
+			output := run.requirements.distance(run.inputPod)
+			if output != run.expectedOutput {
+				t.Errorf("expected: %f, got: %f for %s test", run.expectedOutput, output, run.testName)
+			}
+		})
 	}
 }
 
@@ -399,10 +381,12 @@ func TestAdmissionRequirementsSubtract(t *testing.T) {
 		},
 	}
 	for _, run := range runs {
-		output := run.initial.subtract(run.inputPod)
-		if !admissionRequirementListEqual(output, run.expectedOutput) {
-			t.Errorf("expected: %s, got: %s for %s test", run.expectedOutput.toString(), output.toString(), run.testName)
-		}
+		t.Run(run.testName, func(t *testing.T) {
+			output := run.initial.subtract(run.inputPod)
+			if !admissionRequirementListEqual(output, run.expectedOutput) {
+				t.Errorf("expected: %s, got: %s for %s test", run.expectedOutput.toString(), output.toString(), run.testName)
+			}
+		})
 	}
 }
 
