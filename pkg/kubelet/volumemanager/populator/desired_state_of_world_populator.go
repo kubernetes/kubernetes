@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -103,12 +104,13 @@ func NewDesiredStateOfWorldPopulator(
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		kubeClient:          kubeClient,
-		loopSleepDuration:   loopSleepDuration,
-		podManager:          podManager,
-		podStateProvider:    podStateProvider,
-		desiredStateOfWorld: desiredStateOfWorld,
-		actualStateOfWorld:  actualStateOfWorld,
+		kubeClient:               kubeClient,
+		loopSleepDuration:        loopSleepDuration,
+		initialLoopSleepDuration: loopSleepDuration,
+		podManager:               podManager,
+		podStateProvider:         podStateProvider,
+		desiredStateOfWorld:      desiredStateOfWorld,
+		actualStateOfWorld:       actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
 		kubeContainerRuntime:     kubeContainerRuntime,
@@ -123,6 +125,7 @@ func NewDesiredStateOfWorldPopulator(
 type desiredStateOfWorldPopulator struct {
 	kubeClient               clientset.Interface
 	loopSleepDuration        time.Duration
+	initialLoopSleepDuration time.Duration
 	podManager               PodManager
 	podStateProvider         PodStateProvider
 	desiredStateOfWorld      cache.DesiredStateOfWorld
@@ -155,7 +158,23 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 		dswp.hasAddedPods = true
 	}
 	dswp.hasAddedPodsLock.Unlock()
-	wait.Until(dswp.populatorLoop, dswp.loopSleepDuration, stopCh)
+	wait.DyanmicPeriodUntil(func() {
+		podsOldState := dswp.desiredStateOfWorld.GetPods()
+		dswp.populatorLoop()
+		podsNewState := dswp.desiredStateOfWorld.GetPods()
+		// affect the next iteration
+		if reflect.DeepEqual(podsOldState, podsNewState) {
+			klog.InfoS("Populator sleep period moved to initial state * 10")
+			// No pod change => increase the sleep duration
+			dswp.loopSleepDuration = dswp.initialLoopSleepDuration * 10
+		} else {
+			klog.InfoS("Populator sleep period moved to initial state")
+			// Pods have changed => reset to the default duration
+			dswp.loopSleepDuration = dswp.initialLoopSleepDuration
+		}
+	}, func() time.Duration {
+		return dswp.loopSleepDuration
+	}, 0, true, stopCh)
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(

@@ -105,6 +105,7 @@ func NewReconciler(
 		kubeClient:                      kubeClient,
 		controllerAttachDetachEnabled:   controllerAttachDetachEnabled,
 		loopSleepDuration:               loopSleepDuration,
+		initialLoopSleepDuration:        loopSleepDuration,
 		waitForAttachTimeout:            waitForAttachTimeout,
 		nodeName:                        nodeName,
 		desiredStateOfWorld:             desiredStateOfWorld,
@@ -126,6 +127,7 @@ type reconciler struct {
 	kubeClient                    clientset.Interface
 	controllerAttachDetachEnabled bool
 	loopSleepDuration             time.Duration
+	initialLoopSleepDuration      time.Duration
 	waitForAttachTimeout          time.Duration
 	nodeName                      types.NodeName
 	desiredStateOfWorld           cache.DesiredStateOfWorld

@@ -17,6 +17,9 @@ limitations under the License.
 package reconciler
 
 import (
+	"reflect"
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -24,7 +27,23 @@ import (
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")
-	wait.Until(rc.reconcile, rc.loopSleepDuration, stopCh)
+	wait.DyanmicPeriodUntil(func() {
+		mountedVolumesOldState := rc.actualStateOfWorld.GetAllMountedVolumes()
+		rc.reconcile()
+		mountedVolumesNewState := rc.actualStateOfWorld.GetAllMountedVolumes()
+		// affect the next iteration
+		if reflect.DeepEqual(mountedVolumesOldState, mountedVolumesNewState) {
+			klog.InfoS("reconciler sleep period moved to initial state * 10")
+			// No volume change => increase the sleep duration
+			rc.loopSleepDuration = rc.initialLoopSleepDuration * 10
+		} else {
+			klog.InfoS("reconciler sleep period moved to initial state")
+			// Pods have changed => reset to the default duration
+			rc.loopSleepDuration = rc.initialLoopSleepDuration
+		}
+	}, func() time.Duration {
+		return rc.loopSleepDuration
+	}, 0, true, stopCh)
 }
 
 func (rc *reconciler) reconcile() {
