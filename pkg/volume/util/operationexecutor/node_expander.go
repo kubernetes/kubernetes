@@ -115,11 +115,11 @@ func (ne *NodeExpander) runPreCheck() bool {
 	return false
 }
 
-func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
+func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error, testResponseData) {
 	allowExpansion := ne.runPreCheck()
 	if !allowExpansion {
 		klog.V(3).Infof("NodeExpandVolume is not allowed to proceed for volume %s with resizeStatus %s", ne.vmt.VolumeName, ne.resizeStatus)
-		return false, nil, testResponseData{false, true}
+		return false, ne.pluginResizeOpts.OldSize, nil, testResponseData{false, true}
 	}
 
 	var err error
@@ -131,7 +131,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 		if err != nil {
 			msg := ne.vmt.GenerateErrorDetailed("MountVolume.NodeExpandVolume failed to mark node expansion in progress: %v", err)
 			klog.Errorf(msg.Error())
-			return false, err, testResponseData{}
+			return false, ne.pluginResizeOpts.OldSize, err, testResponseData{}
 		}
 	}
 	_, resizeErr := ne.volumePlugin.NodeExpand(ne.pluginResizeOpts)
@@ -158,9 +158,9 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 		if volumetypes.IsFailedPreconditionError(resizeErr) {
 			ne.actualStateOfWorld.MarkForInUseExpansionError(ne.vmt.VolumeName)
 			klog.Errorf(ne.vmt.GenerateErrorDetailed("MountVolume.NodeExapndVolume failed with %v", resizeErr).Error())
-			return false, nil, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
+			return false, ne.pluginResizeOpts.OldSize, nil, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
 		}
-		return false, resizeErr, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
+		return false, ne.pluginResizeOpts.OldSize, resizeErr, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
 	}
 	simpleMsg, detailedMsg := ne.vmt.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
 	ne.recorder.Eventf(ne.vmt.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
@@ -169,13 +169,13 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 
 	// no need to update PVC object if we already updated it
 	if ne.pvcAlreadyUpdated {
-		return true, nil, testResponseData{true, true}
+		return true, ne.pluginResizeOpts.NewSize, nil, testResponseData{true, true}
 	}
 
 	// File system resize succeeded, now update the PVC's Capacity to match the PV's
 	ne.pvc, err = util.MarkFSResizeFinished(ne.pvc, ne.pluginResizeOpts.NewSize, ne.kubeClient)
 	if err != nil {
-		return true, fmt.Errorf("mountVolume.NodeExpandVolume update pvc status failed: %v", err), testResponseData{true, true}
+		return true, ne.pluginResizeOpts.NewSize, fmt.Errorf("mountVolume.NodeExpandVolume update pvc status failed: %v", err), testResponseData{true, true}
 	}
-	return true, nil, testResponseData{true, true}
+	return true, ne.pluginResizeOpts.NewSize, nil, testResponseData{true, true}
 }

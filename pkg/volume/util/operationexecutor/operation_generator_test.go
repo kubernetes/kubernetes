@@ -305,7 +305,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 			asow := newFakeActualStateOfWorld()
 
 			ogInstance, _ := og.(*operationGenerator)
-			_, err := ogInstance.nodeExpandVolume(vmt, asow, pluginResizeOpts)
+			_, _, err := ogInstance.nodeExpandVolume(vmt, asow, pluginResizeOpts)
 
 			if !test.expectError && err != nil {
 				t.Errorf("For test %s, expected no error got: %v", test.name, err)

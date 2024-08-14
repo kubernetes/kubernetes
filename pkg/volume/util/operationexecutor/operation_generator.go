@@ -1957,14 +1957,14 @@ func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	resizeOptions volume.NodeResizeOptions) (bool, error, error) {
 
-	resizeDone, err := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
+	resizeDone, newSize, err := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 	if err != nil {
 		e1, e2 := volumeToMount.GenerateError("NodeExpandVolume.NodeExpandVolume failed", err)
 		klog.Errorf(e2.Error())
 		return false, e1, e2
 	}
 	if resizeDone {
-		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, &resizeOptions.NewSize)
+		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, &newSize)
 		if !markingDone {
 			// On failure, return error. Caller will log and retry.
 			genericFailureError := fmt.Errorf("unable to mark volume as resized")
@@ -2013,7 +2013,7 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
 				resizeOp.pluginResizeOpts = rsOpts
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
+				resizeFinished, _, err, _ := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
 			} else {
 				return og.legacyCallNodeExpandOnPlugin(resizeOp)
@@ -2044,7 +2044,7 @@ func (og *operationGenerator) checkIfSupportsNodeExpansion(volumeToMount VolumeT
 func (og *operationGenerator) nodeExpandVolume(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	rsOpts volume.NodeResizeOptions) (bool, error) {
+	rsOpts volume.NodeResizeOptions) (bool, resource.Quantity, error) {
 
 	supportsExpansion, expandableVolumePlugin := og.checkIfSupportsNodeExpansion(volumeToMount)
 
@@ -2053,9 +2053,10 @@ func (og *operationGenerator) nodeExpandVolume(
 		if rsOpts.NewSize.Cmp(rsOpts.OldSize) > 0 {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+			currentSize := pvc.Status.Capacity.Storage()
 			if err != nil {
 				// Return error rather than leave the file system un-resized, caller will log and retry
-				return false, fmt.Errorf("mountVolume.NodeExpandVolume get PVC failed : %v", err)
+				return false, *currentSize, fmt.Errorf("mountVolume.NodeExpandVolume get PVC failed : %v", err)
 			}
 
 			if volumeToMount.VolumeSpec.ReadOnly {
@@ -2063,7 +2064,7 @@ func (og *operationGenerator) nodeExpandVolume(
 				klog.Warningf(detailedMsg)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
 				og.recorder.Eventf(pvc, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
-				return true, nil
+				return true, *currentSize, nil
 			}
 			resizeOp := nodeResizeOperationOpts{
 				vmt:                volumeToMount,
@@ -2076,17 +2077,19 @@ func (og *operationGenerator) nodeExpandVolume(
 
 			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
 				// if recovery feature is enabled, we can use allocated size from PVC status as new size
-				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
-				resizeOp.pluginResizeOpts = rsOpts
+				newSize := pvc.Status.AllocatedResources[v1.ResourceStorage]
+				rsOpts.NewSize = newSize
+				resizeOp.pluginResizeOpts.NewSize = newSize
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
-				return resizeFinished, err
+				resizeFinished, newSize, err, _ := nodeExpander.expandOnPlugin()
+				return resizeFinished, newSize, err
 			} else {
-				return og.legacyCallNodeExpandOnPlugin(resizeOp)
+				resizeFinished, err := og.legacyCallNodeExpandOnPlugin(resizeOp)
+				return resizeFinished, rsOpts.NewSize, err
 			}
 		}
 	}
-	return true, nil
+	return true, rsOpts.OldSize, nil
 }
 
 func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
