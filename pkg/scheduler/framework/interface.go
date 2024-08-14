@@ -543,6 +543,9 @@ type FilterPlugin interface {
 	// All FilterPlugins should return "Success" to declare that
 	// the given node fits the pod. If Filter doesn't return "Success",
 	// it will return "Unschedulable", "UnschedulableAndUnresolvable" or "Error".
+	//
+	// "Error" aborts pod scheduling and puts the pod into the backoff queue.
+	//
 	// For the node being evaluated, Filter plugins should look at the passed
 	// nodeInfo reference for this particular node's information (e.g., pods
 	// considered to be running on the node) instead of looking it up in the
