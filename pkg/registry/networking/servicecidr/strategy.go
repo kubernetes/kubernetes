@@ -19,6 +19,7 @@ package servicecidr
 import (
 	"context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -144,6 +145,7 @@ func (serviceCIDRStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old 
 	oldServiceCIDR := old.(*networking.ServiceCIDR)
 	// status changes are not allowed to update spec
 	newServiceCIDR.Spec = oldServiceCIDR.Spec
+	metav1.ResetObjectMetaForStatus(&newServiceCIDR.ObjectMeta, &oldServiceCIDR.ObjectMeta)
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
