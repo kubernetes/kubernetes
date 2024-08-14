@@ -26,7 +26,6 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 	utilstrings "k8s.io/utils/strings"
 
@@ -311,7 +310,7 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 func (kl *Kubelet) GetHostIPs() ([]net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("cannot get node: %v", err)
+		return nil, fmt.Errorf("cannot get node: %w", err)
 	}
 	return utilnode.GetNodeHostIPs(node)
 }
@@ -340,7 +339,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
-		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
+		return volumes, fmt.Errorf("error checking if path %q exists: %w", podVolDir, pathErr)
 	} else if !pathExists {
 		klog.V(6).InfoS("Path does not exist", "path", podVolDir)
 		return volumes, nil
@@ -356,7 +355,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
 		volumeDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
+			return volumes, fmt.Errorf("could not read directory %s: %w", volumePluginPath, err)
 		}
 		unescapePluginName := utilstrings.UnescapeQualifiedName(volumePluginName)
 
@@ -393,7 +392,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	for _, volumePath := range volumePaths {
 		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
 		if err != nil {
-			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %v", volumePath, err)
+			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %w", volumePath, err)
 		}
 		if !isNotMount {
 			mountedVolumes = append(mountedVolumes, volumePath)
@@ -409,7 +408,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podSubpathsDir); pathErr != nil {
-		return nil, fmt.Errorf("error checking if path %q exists: %v", podSubpathsDir, pathErr)
+		return nil, fmt.Errorf("error checking if path %q exists: %w", podSubpathsDir, pathErr)
 	} else if !pathExists {
 		return volumes, nil
 	}
@@ -425,7 +424,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 		volumePluginPath := filepath.Join(podSubpathsDir, volumePluginName)
 		containerDirs, err := os.ReadDir(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
+			return volumes, fmt.Errorf("could not read directory %s: %w", volumePluginPath, err)
 		}
 		for _, containerDir := range containerDirs {
 			containerName := containerDir.Name()
@@ -434,7 +433,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 			// mount points that may not be responsive
 			subPaths, err := utilpath.ReadDirNoStat(containerPath)
 			if err != nil {
-				return volumes, fmt.Errorf("could not read directory %s: %v", containerPath, err)
+				return volumes, fmt.Errorf("could not read directory %s: %w", containerPath, err)
 			}
 			for _, subPathDir := range subPaths {
 				volumes = append(volumes, filepath.Join(containerPath, subPathDir))
