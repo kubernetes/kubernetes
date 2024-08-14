@@ -406,6 +406,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, rsaGenerateKey, tt))
 	}
 
@@ -465,6 +466,8 @@ func singleTestRunner[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](
 	tt singleTest[K, L],
 ) func(t *testing.T) {
 	return func(t *testing.T) {
+		t.Parallel()
+
 		fn := func(t *testing.T, issuerURL, caCert string) string { return "" }
 		if useAuthenticationConfig {
 			fn = func(t *testing.T, issuerURL, caCert string) string {
@@ -502,6 +505,8 @@ jwt:
 }
 
 func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
+	t.Parallel()
+
 	type testRun[K utilsoidc.JosePrivateKey] struct {
 		name                            string
 		configureUpdatingTokenBehaviour func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey K)
@@ -544,6 +549,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expiredIDToken, stubRefreshToken := fetchExpiredToken(t, oidcServer, caCert, signingPrivateKey)
 			clientConfig := configureClientConfigForOIDC(t, apiServer.ClientConfig, defaultOIDCClientID, certPath, expiredIDToken, stubRefreshToken, oidcServer.URL())
@@ -942,7 +948,9 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, tt.authConfigFn, rsaGenerateKey)
 
 			tt.configureOIDCServerBehaviour(t, oidcServer, signingPrivateKey)
@@ -1311,6 +1319,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			authenticationconfigmetrics.ResetMetricsForTest()
 			defer authenticationconfigmetrics.ResetMetricsForTest()
@@ -1472,7 +1481,9 @@ func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
 			signingPrivateKey, publicKey := rsaGenerateKey(t)
 			// set the issuer in the discovery document to issuer url (different from the discovery URL) to assert
