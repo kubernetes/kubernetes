@@ -36,93 +36,16 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
-	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
-// PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
-// Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	var errs []error
-
-	// Upload currently used configuration to the cluster
-	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
-	// depend on centralized information from this source in the future
-	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
-		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
-	}
-
-	// Write the new kubelet config down to disk and the env file if needed
-	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
-	// --cri-socket.
-	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
-	}
-
-	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptoken.AllowBootstrapTokensToGetNodes(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// TODO: Is this needed to do here? I think that updating cluster info should probably be separate from a normal upgrade
-	// Create the cluster-info ConfigMap with the associated RBAC rules
-	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
-	// 	return err
-	//}
-	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
-	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
-		errs = append(errs, err)
-	}
-
-	if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		if err := UpdateKubeletLocalMode(cfg, dryRun); err != nil {
-			return errors.Wrap(err, "failed to update kubelet local mode")
-		}
-	}
-
-	return errorsutil.NewAggregate(errs)
-}
-
 // PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
 func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
-	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
+	unupgradedControlPlanes, err := UnupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
 	}
@@ -186,12 +109,12 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 	return errorsutil.NewAggregate(errs)
 }
 
-// unupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
+// UnupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
 //
 // NB. This function can only be called after the current control plane instance has been upgraded already.
 // Because it determines whether the other control plane instances have been upgraded by checking whether
 // the kube-apiserver image of other control plane instance is the same as that of this instance.
-func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		"component": kubeadmconstants.KubeAPIServer,
 	}))

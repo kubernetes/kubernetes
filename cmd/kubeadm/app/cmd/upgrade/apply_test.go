@@ -23,39 +23,39 @@ import (
 func TestSessionIsInteractive(t *testing.T) {
 	var tcases = []struct {
 		name     string
-		flags    *applyFlags
+		data     *applyData
 		expected bool
 	}{
 		{
 			name: "Explicitly non-interactive",
-			flags: &applyFlags{
+			data: &applyData{
 				nonInteractiveMode: true,
 			},
 			expected: false,
 		},
 		{
 			name: "Implicitly non-interactive since --dryRun is used",
-			flags: &applyFlags{
+			data: &applyData{
 				dryRun: true,
 			},
 			expected: false,
 		},
 		{
 			name: "Implicitly non-interactive since --force is used",
-			flags: &applyFlags{
+			data: &applyData{
 				force: true,
 			},
 			expected: false,
 		},
 		{
 			name:     "Interactive session",
-			flags:    &applyFlags{},
+			data:     &applyData{},
 			expected: true,
 		},
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.flags.sessionIsInteractive() != tt.expected {
+			if tt.data.SessionIsInteractive() != tt.expected {
 				t.Error("unexpected result")
 			}
 		})
