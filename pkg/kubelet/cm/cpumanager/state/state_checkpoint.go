@@ -17,15 +17,17 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/utils/cpuset"
+
+	checkpointerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 var _ State = &stateCheckpoint{}
@@ -98,7 +100,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1); err != nil {
 		checkpointV1 = &CPUManagerCheckpointV1{} // reset it back to 0
 		if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV2); err != nil {
-			if err == errors.ErrCheckpointNotFound {
+			if errors.Is(err, checkpointerrors.ErrCheckpointNotFound) {
 				return sc.storeState()
 			}
 			return err

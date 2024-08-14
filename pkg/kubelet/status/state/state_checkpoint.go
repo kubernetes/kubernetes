@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"sync"
@@ -24,7 +25,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+
+	checkpointerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 var _ State = &stateCheckpoint{}
@@ -64,7 +66,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	checkpoint := NewPodResourceAllocationCheckpoint()
 
 	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpoint); err != nil {
-		if err == errors.ErrCheckpointNotFound {
+		if errors.Is(err, checkpointerrors.ErrCheckpointNotFound) {
 			return sc.storeState()
 		}
 		return err

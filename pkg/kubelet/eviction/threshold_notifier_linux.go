@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -149,7 +150,7 @@ func wait(epfd, eventfd int, timeout time.Duration) (bool, error) {
 	timeoutMS := int(timeout / time.Millisecond)
 	n, err := unix.EpollWait(epfd, events, timeoutMS)
 	if n == -1 {
-		if err == unix.EINTR {
+		if errors.Is(err, unix.EINTR) {
 			// Interrupt, ignore the error
 			return false, nil
 		}

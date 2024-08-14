@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -1132,7 +1133,7 @@ func (p *podWorkers) startPodSync(podUID types.UID) (ctx context.Context, update
 	}
 
 	// initialize a context for the worker if one does not exist
-	if status.ctx == nil || status.ctx.Err() == context.Canceled {
+	if status.ctx == nil || errors.Is(status.ctx.Err(), context.Canceled) {
 		status.ctx, status.cancelFn = context.WithCancel(context.Background())
 	}
 	ctx = status.ctx
@@ -1292,7 +1293,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 
 		var phaseTransition bool
 		switch {
-		case err == context.Canceled:
+		case errors.Is(err, context.Canceled):
 			// when the context is cancelled we expect an update to already be queued
 			klog.V(2).InfoS("Sync exited with context cancellation error", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 

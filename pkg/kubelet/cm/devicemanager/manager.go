@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -505,7 +506,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 func (m *ManagerImpl) readCheckpoint() error {
 	cp, err := m.getCheckpoint()
 	if err != nil {
-		if err == errors.ErrCheckpointNotFound {
+		if errors.Is(err, errors.ErrCheckpointNotFound) {
 			// no point in trying anything else
 			klog.InfoS("Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint, "err", err)
 			return nil

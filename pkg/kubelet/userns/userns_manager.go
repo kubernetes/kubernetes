@@ -18,6 +18,7 @@ package userns
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -186,7 +187,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 // usernsConfFile exists in the pod directory.
 func (m *UsernsManager) recordPodMappings(pod types.UID) error {
 	content, err := m.readMappingsFromFile(pod)
-	if err != nil && err != utilstore.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, utilstore.ErrKeyNotFound) {
 		return err
 	}
 
@@ -421,7 +422,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHan
 	defer m.lock.Unlock()
 
 	content, err := m.readMappingsFromFile(pod.UID)
-	if err != nil && err != utilstore.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, utilstore.ErrKeyNotFound) {
 		return nil, err
 	}
 
