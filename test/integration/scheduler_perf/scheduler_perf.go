@@ -1059,10 +1059,11 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				name := tCtx.Name()
 				// The first part is the same for each work load, therefore we can strip it.
 				name = name[strings.Index(name, "/")+1:]
-				collectors = getTestDataCollectors(collectorCtx, podInformer, fmt.Sprintf("%s/%s", name, namespace), namespace, tc.MetricsCollectorConfig, throughputErrorMargin)
+				collectors = getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", name, namespace), namespace, tc.MetricsCollectorConfig, throughputErrorMargin)
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
+					collector.init()
 					collectorWG.Add(1)
 					go func() {
 						defer collectorWG.Done()
@@ -1299,16 +1300,17 @@ func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsP
 }
 
 type testDataCollector interface {
+	init()
 	run(tCtx ktesting.TContext)
 	collect() []DataItem
 }
 
-func getTestDataCollectors(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+func getTestDataCollectors(podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
 	return []testDataCollector{
-		newThroughputCollector(tCtx, podInformer, map[string]string{"Name": name}, []string{namespace}, throughputErrorMargin),
+		newThroughputCollector(podInformer, map[string]string{"Name": name}, []string{namespace}, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 	}
 }
