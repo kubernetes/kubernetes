@@ -505,6 +505,7 @@ aliases:
     - ehashman # Instrumentation
     - enj # Auth
     - gjtempleton # Autoscaling
+    - haircommander # Node
     - janetkuo # Apps
     - jayunit100 # Windows
     - jpbetz # API Machinery
