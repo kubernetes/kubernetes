@@ -291,7 +291,7 @@ type StatefulSetSpec struct {
 
 	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
 	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+	// StatefulSetAutoDeletePVC feature gate to be enabled.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
 

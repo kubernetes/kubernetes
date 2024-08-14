@@ -8905,7 +8905,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"persistentVolumeClaimRetentionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.",
+							Description: "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled.",
 							Ref:         ref("k8s.io/api/apps/v1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy"),
 						},
 					},
@@ -10604,7 +10604,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"persistentVolumeClaimRetentionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.",
+							Description: "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled.",
 							Ref:         ref("k8s.io/api/apps/v1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy"),
 						},
 					},
