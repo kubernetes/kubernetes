@@ -314,13 +314,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				newPod = oldPod.DeepCopy()
 				newPod.Status.Conditions[0].Message = "injected message"
 
-				if err := testCtx.Scheduler.SchedulingQueue.Update(
-					klog.FromContext(testCtx.Ctx),
-					oldPod,
-					newPod,
-				); err != nil {
-					return fmt.Errorf("failed to update the pod: %w", err)
-				}
+				testCtx.Scheduler.SchedulingQueue.Update(klog.FromContext(testCtx.Ctx), oldPod, newPod)
 				return nil
 			},
 			wantRequeuedPods: sets.Set[string]{},
