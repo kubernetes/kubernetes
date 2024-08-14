@@ -125,7 +125,7 @@ func (s *runtimeState) runtimeErrors() error {
 	}
 	for _, hc := range s.healthChecks {
 		if ok, err := hc.fn(); !ok {
-			errs = append(errs, fmt.Errorf("%s is not healthy: %v", hc.name, err))
+			errs = append(errs, fmt.Errorf("%s is not healthy: %w", hc.name, err))
 		}
 	}
 	if s.runtimeError != nil {

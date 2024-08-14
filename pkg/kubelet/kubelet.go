@@ -40,8 +40,6 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/informers"
-	"k8s.io/mount-utils"
-
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	netutils "k8s.io/utils/net"
 
@@ -644,7 +642,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.ContainerLogMonitorInterval,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize container log manager: %w", err)
 	}
 	klet.containerLogManager = containerLogManager
 
@@ -779,7 +777,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize image manager: %w", err)
 	}
 	klet.imageManager = imageManager
 
@@ -1399,29 +1397,29 @@ func (kl *Kubelet) setupDataDirs() error {
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
 	pluginsDir := kl.getPluginsDir()
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
-		return fmt.Errorf("error creating root directory: %v", err)
+		return fmt.Errorf("error creating root directory: %w", err)
 	}
 	if err := utilfs.MkdirAll(kl.getPodLogsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating pod logs root directory %q: %w", kl.getPodLogsDir(), err)
 	}
 	if err := kl.hostutil.MakeRShared(kl.getRootDir()); err != nil {
-		return fmt.Errorf("error configuring root directory: %v", err)
+		return fmt.Errorf("error configuring root directory: %w", err)
 	}
 	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
-		return fmt.Errorf("error creating pods directory: %v", err)
+		return fmt.Errorf("error creating pods directory: %w", err)
 	}
 	if err := utilfs.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
-		return fmt.Errorf("error creating plugins directory: %v", err)
+		return fmt.Errorf("error creating plugins directory: %w", err)
 	}
 	if err := utilfs.MkdirAll(kl.getPluginsRegistrationDir(), 0750); err != nil {
-		return fmt.Errorf("error creating plugins registry directory: %v", err)
+		return fmt.Errorf("error creating plugins registry directory: %w", err)
 	}
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
-		return fmt.Errorf("error creating podresources directory: %v", err)
+		return fmt.Errorf("error creating podresources directory: %w", err)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
 		if err := utilfs.MkdirAll(kl.getCheckpointsDir(), 0700); err != nil {
-			return fmt.Errorf("error creating checkpoint directory: %v", err)
+			return fmt.Errorf("error creating checkpoint directory: %w", err)
 		}
 	}
 	if selinux.GetEnabled() {
@@ -1509,7 +1507,7 @@ func (kl *Kubelet) initializeModules() error {
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(ContainerLogsDir); err != nil {
 		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %q: %v", ContainerLogsDir, err)
+			return fmt.Errorf("failed to create directory %q: %w", ContainerLogsDir, err)
 		}
 	}
 
@@ -1819,7 +1817,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
-		return false, fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
+		return false, fmt.Errorf("%s: %w", NetworkNotReadyErrorMsg, err)
 	}
 
 	// ensure the kubelet knows about referenced secrets or configmaps used by the pod
@@ -1879,7 +1877,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				}
 				if err := pcm.EnsureExists(pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
-					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %w", pod.UID, err)
 				}
 			}
 		}
