@@ -18,6 +18,8 @@ package util
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"strings"
@@ -524,4 +526,73 @@ func TestValidateStableVersion(t *testing.T) {
 
 func errorFetcher(url string, timeout time.Duration) (string, error) {
 	return "should not make internet calls", errors.Errorf("should not make internet calls, tried to request url: %s", url)
+}
+
+func TestFetchFromURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		url       string
+		expected  string
+		timeout   time.Duration
+		code      int
+		body      string
+		expectErr bool
+	}{
+		{
+			name:      "normal success",
+			url:       "/normal",
+			code:      http.StatusOK,
+			body:      "normal response",
+			expected:  "normal response",
+			expectErr: false,
+		},
+		{
+			name:      "HTTP error status",
+			url:       "/error",
+			code:      http.StatusBadRequest,
+			body:      "bad request",
+			expected:  "bad request",
+			expectErr: true,
+		},
+		{
+			name:      "Request timeout",
+			url:       "/timeout",
+			timeout:   time.Millisecond * 50,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.code != 0 {
+					w.WriteHeader(tt.code)
+				}
+				if tt.body != "" {
+					if _, err := w.Write([]byte(tt.body)); err != nil {
+						t.Error("Write body failed.")
+					}
+				}
+				if tt.timeout == time.Millisecond*50 {
+					time.Sleep(time.Millisecond * 200)
+					w.WriteHeader(http.StatusOK)
+					if _, err := w.Write([]byte("Delayed response")); err != nil {
+						t.Error("Write body failed.")
+					}
+				}
+			})
+
+			ts := httptest.NewServer(handler)
+			defer ts.Close()
+
+			url := ts.URL + tt.url
+			result, err := fetchFromURL(url, tt.timeout)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("expected error: %v, got: %v", tt.expectErr, err)
+			}
+			if tt.expected != result {
+				t.Errorf("expected result: %q, got: %q", tt.expected, result)
+			}
+		})
+	}
 }
