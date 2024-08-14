@@ -18,7 +18,6 @@ package cp
 
 import (
 	"archive/tar"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -269,8 +268,8 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
 			IOStreams: genericiooptions.IOStreams{
-				Out:    bytes.NewBuffer([]byte{}),
-				ErrOut: bytes.NewBuffer([]byte{}),
+				Out:    io.Discard,
+				ErrOut: io.Discard,
 			},
 
 			Namespace: dest.PodNamespace,
