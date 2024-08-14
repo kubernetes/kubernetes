@@ -245,10 +245,10 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 // - container is not an infrastructure (pause) container
 // - container is not already mounting on /etc/hosts
 // Kubernetes will not mount /etc/hosts if:
-// - when the Pod sandbox is being created, its IP is still unknown. Hence, PodIP will not have been set.
-// - Windows pod contains a hostProcess container
+// - the Pod is on the pod network and PodIP has not yet been set (e.g., Pod sandbox is being created).
+// - the Pod is on Windows, and contains a hostProcess container.
 func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
-	shouldMount := len(podIPs) > 0
+	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork
 	if runtime.GOOS == "windows" {
 		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
 	}
