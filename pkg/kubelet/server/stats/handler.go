@@ -173,9 +173,10 @@ func writeResponse(response *restful.Response, stats interface{}) {
 // handleError serializes an error object into an HTTP response.
 // request is provided for logging.
 func handleError(response *restful.Response, request string, err error) {
-	if errors.Is(err, kubecontainer.ErrContainerNotFound) {
+	switch {
+	case errors.Is(err, kubecontainer.ErrContainerNotFound):
 		response.WriteError(http.StatusNotFound, err)
-	} else {
+	default:
 		msg := fmt.Sprintf("Internal Error: %v", err)
 		klog.ErrorS(err, "HTTP InternalServerError serving", "request", request)
 		response.WriteErrorString(http.StatusInternalServerError, msg)
