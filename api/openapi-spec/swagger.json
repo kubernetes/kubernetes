@@ -15961,7 +15961,7 @@
       "properties": {
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "ObjectMeta may contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation."
+          "description": "ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim when creating it. No other fields are allowed and will be rejected during validation."
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimSpec",
