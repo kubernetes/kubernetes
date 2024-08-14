@@ -2013,7 +2013,7 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
 				resizeOp.pluginResizeOpts = rsOpts
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, _, err, _ := nodeExpander.expandOnPlugin()
+				resizeFinished, _, err := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
 			} else {
 				return og.legacyCallNodeExpandOnPlugin(resizeOp)
@@ -2081,7 +2081,7 @@ func (og *operationGenerator) nodeExpandVolume(
 				rsOpts.NewSize = newSize
 				resizeOp.pluginResizeOpts.NewSize = newSize
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, newSize, err, _ := nodeExpander.expandOnPlugin()
+				resizeFinished, newSize, err := nodeExpander.expandOnPlugin()
 				return resizeFinished, newSize, err
 			} else {
 				resizeFinished, err := og.legacyCallNodeExpandOnPlugin(resizeOp)

@@ -162,7 +162,8 @@ func TestNodeExpander(t *testing.T) {
 			ogInstance, _ := og.(*operationGenerator)
 			nodeExpander := newNodeExpander(resizeOp, ogInstance.kubeClient, ogInstance.recorder)
 
-			_, _, err, expansionResponse := nodeExpander.expandOnPlugin()
+			_, _, err := nodeExpander.expandOnPlugin()
+			expansionResponse := nodeExpander.testStatus
 
 			pvc = nodeExpander.pvc
 			pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
