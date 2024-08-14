@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var underscoreWarnings = make(map[string]bool)
+var underscoreWarnings = make(map[string]struct{})
 
 // WordSepNormalizeFunc changes all flags that contain "_" separators
 func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -40,7 +40,7 @@ func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedNam
 		nname := strings.Replace(name, "_", "-", -1)
 		if _, alreadyWarned := underscoreWarnings[name]; !alreadyWarned {
 			klog.Warningf("using an underscore in a flag name is not supported. %s has been converted to %s.", name, nname)
-			underscoreWarnings[name] = true
+			underscoreWarnings[name] = struct{}{}
 		}
 
 		return pflag.NormalizedName(nname)
