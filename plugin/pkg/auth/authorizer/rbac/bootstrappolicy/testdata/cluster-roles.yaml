@@ -893,6 +893,12 @@ items:
     - nodes/stats
     verbs:
     - '*'
+  - apiGroups:
+    - ""
+    resources:
+    - nodes/checkpoint
+    verbs:
+    - '*'
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

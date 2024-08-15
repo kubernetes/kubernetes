@@ -388,17 +388,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role to use for full access to the kubelet API
-			ObjectMeta: metav1.ObjectMeta{Name: "system:kubelet-api-admin"},
-			Rules: []rbacv1.PolicyRule{
-				// Allow read-only access to the Node API objects
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-				// Allow all API calls to the nodes
-				rbacv1helpers.NewRule("proxy").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-				rbacv1helpers.NewRule("*").Groups(legacyGroup).Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
-			},
-		},
-		{
 			// a role to use for bootstrapping a node's client certificates
 			ObjectMeta: metav1.ObjectMeta{Name: "system:node-bootstrapper"},
 			Rules: []rbacv1.PolicyRule{
@@ -514,6 +503,24 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 	}...)
+
+	kubeletAPIAdminRules := []rbacv1.PolicyRule{
+		// Allow read-only access to the Node API objects
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		// Allow all API calls to the nodes
+		rbacv1helpers.NewRule("proxy").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbacv1helpers.NewRule("*").Groups(legacyGroup).Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+		kubeletAPIAdminRules = append(kubeletAPIAdminRules, rbacv1helpers.NewRule("*").Groups(legacyGroup).Resources("nodes/checkpoint").RuleOrDie())
+	}
+
+	roles = append(roles, rbacv1.ClusterRole{
+		// a role to use for full access to the kubelet API
+		ObjectMeta: metav1.ObjectMeta{Name: "system:kubelet-api-admin"},
+		Rules:      kubeletAPIAdminRules,
+	})
 
 	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
 	// Also allow slash-ended URLs to allow clients generated from published openapi docs prior to fixing the trailing slash to work properly
