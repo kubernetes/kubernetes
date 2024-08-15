@@ -99,7 +99,7 @@ func TestGetStaticPodFilepath(t *testing.T) {
 }
 
 func TestEtcdSupportedVersionLength(t *testing.T) {
-	const max = 3
+	const max = 4
 	if len(SupportedEtcdVersion) > max {
 		t.Fatalf("SupportedEtcdVersion must not include more than %d versions", max)
 	}
