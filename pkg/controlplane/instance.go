@@ -499,5 +499,14 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// enable the legacy beta resources that were present before stopped serving new beta APIs by default.
 	ret.EnableResources(legacyBetaEnabledByDefaultResources...)
 
+	// There are some features that require some APIs resources and versions to be enabled.
+	// In order to avoid users to break their clusters by enabling the feature gate but
+	// not enabling the corresponding API groups, we can conditionally enable these APIs for them.
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		ret.EnableResources(
+			networkingapiv1beta1.SchemeGroupVersion.WithResource("ipaddresses"),
+			networkingapiv1beta1.SchemeGroupVersion.WithResource("servicecidrs"),
+		)
+	}
 	return ret
 }
