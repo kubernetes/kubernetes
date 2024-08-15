@@ -193,19 +193,19 @@ func (c *Controller) runProcessNamespaceWorker(ctx context.Context) {
 }
 
 func (c *Controller) processNextWorkItem() bool {
-	queueLength := c.queue.Len()
-	for i := 0; i < queueLength; i++ {
-		pvcKey, quit := c.queue.Get()
-		if quit {
-			return false
-		}
-		pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
-		}
-		c.pvcProcessingStore.addOrUpdate(pvcNamespace, pvcKey, pvcName)
+	pvcKey, quit := c.queue.Get()
+	if quit {
+		return false
 	}
-	return !c.queue.ShuttingDown()
+
+	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
+		return true
+	}
+
+	c.pvcProcessingStore.addOrUpdate(pvcNamespace, pvcKey, pvcName)
+	return true
 }
 
 func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
