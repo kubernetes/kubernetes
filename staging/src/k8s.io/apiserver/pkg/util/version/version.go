@@ -41,6 +41,9 @@ type MutableEffectiveVersion interface {
 }
 
 type effectiveVersion struct {
+	// When true, BinaryVersion() returns the current binary version
+	useDefaultBuildBinaryVersion atomic.Bool
+	// Holds the last binary version stored in Set()
 	binaryVersion atomic.Pointer[version.Version]
 	// If the emulationVersion is set by the users, it could only contain major and minor versions.
 	// In tests, emulationVersion could be the same as the binary version, or set directly,
@@ -51,6 +54,9 @@ type effectiveVersion struct {
 }
 
 func (m *effectiveVersion) BinaryVersion() *version.Version {
+	if m.useDefaultBuildBinaryVersion.Load() {
+		return defaultBuildBinaryVersion()
+	}
 	return m.binaryVersion.Load()
 }
 
@@ -89,6 +95,7 @@ func majorMinor(ver *version.Version) *version.Version {
 
 func (m *effectiveVersion) Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version) {
 	m.binaryVersion.Store(binaryVersion)
+	m.useDefaultBuildBinaryVersion.Store(false)
 	m.emulationVersion.Store(majorMinor(emulationVersion))
 	m.minCompatibilityVersion.Store(majorMinor(minCompatibilityVersion))
 }
@@ -104,7 +111,7 @@ func (m *effectiveVersion) SetMinCompatibilityVersion(minCompatibilityVersion *v
 func (m *effectiveVersion) Validate() []error {
 	var errs []error
 	// Validate only checks the major and minor versions.
-	binaryVersion := m.binaryVersion.Load().WithPatch(0)
+	binaryVersion := m.BinaryVersion().WithPatch(0)
 	emulationVersion := m.emulationVersion.Load()
 	minCompatibilityVersion := m.minCompatibilityVersion.Load()
 
@@ -123,10 +130,11 @@ func (m *effectiveVersion) Validate() []error {
 	return errs
 }
 
-func newEffectiveVersion(binaryVersion *version.Version) MutableEffectiveVersion {
+func newEffectiveVersion(binaryVersion *version.Version, useDefaultBuildBinaryVersion bool) MutableEffectiveVersion {
 	effective := &effectiveVersion{}
 	compatVersion := binaryVersion.SubtractMinor(1)
 	effective.Set(binaryVersion, binaryVersion, compatVersion)
+	effective.useDefaultBuildBinaryVersion.Store(useDefaultBuildBinaryVersion)
 	return effective
 }
 
@@ -135,25 +143,29 @@ func NewEffectiveVersion(binaryVer string) MutableEffectiveVersion {
 		return &effectiveVersion{}
 	}
 	binaryVersion := version.MustParse(binaryVer)
-	return newEffectiveVersion(binaryVersion)
+	return newEffectiveVersion(binaryVersion, false)
+}
+
+func defaultBuildBinaryVersion() *version.Version {
+	verInfo := baseversion.Get()
+	return version.MustParse(verInfo.String()).WithInfo(verInfo)
 }
 
 // DefaultBuildEffectiveVersion returns the MutableEffectiveVersion based on the
 // current build information.
 func DefaultBuildEffectiveVersion() MutableEffectiveVersion {
-	verInfo := baseversion.Get()
-	binaryVersion := version.MustParse(verInfo.String()).WithInfo(verInfo)
+	binaryVersion := defaultBuildBinaryVersion()
 	if binaryVersion.Major() == 0 && binaryVersion.Minor() == 0 {
 		return DefaultKubeEffectiveVersion()
 	}
-	return newEffectiveVersion(binaryVersion)
+	return newEffectiveVersion(binaryVersion, true)
 }
 
 // DefaultKubeEffectiveVersion returns the MutableEffectiveVersion based on the
 // latest K8s release.
 func DefaultKubeEffectiveVersion() MutableEffectiveVersion {
 	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).WithInfo(baseversion.Get())
-	return newEffectiveVersion(binaryVersion)
+	return newEffectiveVersion(binaryVersion, false)
 }
 
 // ValidateKubeEffectiveVersion validates the EmulationVersion is equal to the binary version at 1.31 for kube components.
