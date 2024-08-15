@@ -34,6 +34,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -291,7 +292,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						Architecture:            goruntime.GOARCH,
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        "",
+						KubeProxyVersion:        version.Get().String(),
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -471,7 +472,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        "",
+				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -677,7 +678,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        "",
+				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -908,7 +909,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        "",
+				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
