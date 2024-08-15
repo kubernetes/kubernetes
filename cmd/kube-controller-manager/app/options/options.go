@@ -437,7 +437,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, utilversion.ValidateKubeEffectiveVersion(s.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)))
 
 	// TODO: validate component config, master and kubeconfig
 

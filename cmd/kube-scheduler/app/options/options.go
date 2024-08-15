@@ -279,12 +279,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
 
-	// TODO(#125980): remove in 1.32
-	effectiveVersion := o.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
-	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
-		errs = append(errs, err)
-	}
-
 	return errs
 }
 
