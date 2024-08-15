@@ -39,12 +39,12 @@ func NewUploadConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "upload-config",
 		Aliases: []string{"uploadconfig"},
-		Short:   "Upload the kubeadm and kubelet configuration to a ConfigMap",
+		Short:   "Upload the kubeadm and kubelet configurations to a ConfigMaps",
 		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Upload all configuration to a config map",
+				Short:          "Upload all the configurations to ConfigMaps",
 				RunAllSiblings: true,
 				InheritFlags:   getUploadConfigPhaseFlags(),
 			},
@@ -56,7 +56,7 @@ func NewUploadConfigPhase() workflow.Phase {
 			},
 			{
 				Name:         "kubelet",
-				Short:        "Upload the kubelet component config to a ConfigMap",
+				Short:        "Upload the kubelet configuration config to a ConfigMap",
 				Run:          runUploadKubeletConfig,
 				InheritFlags: getUploadConfigPhaseFlags(),
 			},
@@ -99,19 +99,19 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	}
 
 	if dryRun {
-		fmt.Println("[dryrun] Would upload the kubelet component config to a ConfigMap")
+		fmt.Println("[dryrun] Would upload the kubelet configuration to a ConfigMap")
 		fmt.Println("[dryrun] Would write the CRISocket annotation for the control-plane node")
 		return nil
 	}
 
-	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
+	klog.V(1).Infoln("[upload-config] Uploading the kubelet configuration to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
+		return errors.Wrap(err, "error writing Crisocket information for the control-plane node")
 	}
 
 	return nil

@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-// NewControlPlanePhase creates a kubeadm workflow phase that implements handling of control-plane upgrade.
+// NewControlPlanePhase returns a new control-plane phase.
 func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "control-plane",

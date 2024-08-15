@@ -99,25 +99,21 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			applyData, ok := data.(*applyData)
 			if !ok {
 				return errors.New("invalid data struct")
 			}
-
 			if err := applyRunner.Run(args); err != nil {
 				return err
 			}
-
 			if flags.dryRun {
 				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 				return nil
 			}
 
 			fmt.Println("")
-			fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", applyData.InitCfg().KubernetesVersion)
-			fmt.Println("")
-			fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
+			fmt.Printf("[upgrade/successful] SUCCESS! A control plane node of your cluster was upgraded to %q.\n\n", applyData.InitCfg().KubernetesVersion)
+			fmt.Println("[upgrade/kubelet] Now please proceed with upgrading the rest of the nodes by following the right order.")
 
 			return nil
 		},
@@ -133,7 +129,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
-	// initialize the workflow runner with the list of phases
+	// Initialize the workflow runner with the list of phases
 	applyRunner.AppendPhase(phases.NewPreflightPhase())
 	applyRunner.AppendPhase(phases.NewControlPlanePhase())
 	applyRunner.AppendPhase(phases.NewUploadConfigPhase())
@@ -142,7 +138,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	applyRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	applyRunner.AppendPhase(phases.NewAddonPhase())
 
-	// sets the data builder function, that will be used by the runner
+	// Sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	applyRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		data, err := newApplyData(cmd, args, flags)
@@ -156,7 +152,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 		return data, nil
 	})
 
-	// binds the Runner to kubeadm upgrade apply command by altering
+	// Binds the Runner to kubeadm upgrade apply command by altering
 	// command help, adding --skip-phases flag and by adding phases subcommands
 	applyRunner.BindToCommand(cmd)
 
@@ -173,16 +169,21 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	}
 
 	upgradeVersion := upgradeCfg.Apply.KubernetesVersion
-	// The version arg is mandatory, during upgrade apply, unless it's specified in the config file
+	// The version arg is mandatory, unless it's specified in the config file
 	if upgradeVersion == "" {
 		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
 			return nil, err
 		}
 	}
 
-	// If option was specified in both args and config file, args will overwrite the config file.
+	// If the version was specified in both the arg and config file, the arg will overwrite the config file.
 	if len(args) == 1 {
 		upgradeVersion = args[0]
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(applyFlags.ignorePreflightErrors, upgradeCfg.Apply.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
 	}
 
 	force, ok := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), "force", upgradeCfg.Apply.ForceUpgrade, &applyFlags.force).(*bool)
@@ -239,10 +240,6 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(applyFlags.ignorePreflightErrors, upgradeCfg.Apply.IgnorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 	initCfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
@@ -303,7 +300,7 @@ func (d *applyData) RenewCerts() bool {
 	return d.renewCerts
 }
 
-// Cfg returns upgradeConfiguration.
+// Cfg returns the UpgradeConfiguration.
 func (d *applyData) Cfg() *kubeadmapi.UpgradeConfiguration {
 	return d.cfg
 }
@@ -338,17 +335,17 @@ func (d *applyData) SessionIsInteractive() bool {
 	return !(d.nonInteractiveMode || d.dryRun || d.force)
 }
 
-// AllowExperimentalUpgrades returns true if allow upgrading to an alpha/beta/release candidate version of Kubernetes.
+// AllowExperimentalUpgrades returns true if upgrading to an alpha/beta/release candidate version of Kubernetes is allowed.
 func (d *applyData) AllowExperimentalUpgrades() bool {
 	return d.allowExperimentalUpgrades
 }
 
-// AllowRCUpgrades returns true if allow upgrading to a release candidate version of Kubernetes.
+// AllowRCUpgrades returns true if upgrading to a release candidate version of Kubernetes is allowed.
 func (d *applyData) AllowRCUpgrades() bool {
 	return d.allowRCUpgrades
 }
 
-// ForceUpgrade returns true if force upgrading although some requirements might not be met.
+// ForceUpgrade returns true if force-upgrading is enabled.
 func (d *applyData) ForceUpgrade() bool {
 	return d.force
 }

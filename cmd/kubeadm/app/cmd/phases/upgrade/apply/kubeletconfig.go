@@ -34,7 +34,7 @@ var (
 		`)
 )
 
-// NewKubeletConfigPhase creates a kubeadm workflow phase that implements handling of kubelet-config upgrade.
+// NewKubeletConfigPhase returns a new kubelet-config phase.
 func NewKubeletConfigPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "kubelet-config",
@@ -59,15 +59,14 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 
 	initCfg, dryRun := data.InitCfg(), data.DryRun()
 
-	// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
+	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
 	// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
-	// recovered if there is anything goes wrong.
+	// recovered if anything goes wrong.
 	err := upgrade.WriteKubeletConfigFiles(initCfg, data.PatchesDir(), dryRun, data.OutputWriter())
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("[upgrade] The configuration for this node was successfully updated!")
-	fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
+	fmt.Println("[upgrade] The kubelet configuration for this node was successfully updated!")
 	return nil
 }

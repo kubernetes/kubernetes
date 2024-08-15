@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
 
-// NewKubeconfigPhase creates a kubeadm workflow phase that implements handling of kubeconfig upgrade.
+// NewKubeconfigPhase returns a new kubeconfig phase.
 func NewKubeconfigPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:   "kubeconfig",
@@ -59,7 +59,7 @@ func runKubeconfig() func(c workflow.RunData) error {
 			}
 		}
 
-		fmt.Println("[upgrade] The kubeconfig for this node was successfully updated!")
+		fmt.Println("[upgrade] The kubeconfig files for this node were successfully updated!")
 
 		return nil
 	}

@@ -30,12 +30,11 @@ import (
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 )
 
-// NewBootstrapTokenPhase returns the phase to bootstrapToken
+// NewBootstrapTokenPhase returns a new bootstrap-token phase.
 func NewBootstrapTokenPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:    "bootstrap-token",
-		Aliases: []string{"bootstraptoken"},
-		Short:   "Generates bootstrap tokens used to join a node to a cluster",
+		Name:  "bootstrap-token",
+		Short: "Configures bootstrap token and cluster-info RBAC rules",
 		InheritFlags: []string{
 			options.CfgPath,
 			options.KubeconfigPath,
@@ -56,7 +55,7 @@ func runBootstrapToken(c workflow.RunData) error {
 		return nil
 	}
 
-	fmt.Println("[bootstrap-token] Configuring cluster-info ConfigMap, RBAC Roles")
+	fmt.Println("[bootstrap-token] Configuring the cluster-info ConfigMap and RBAC roles")
 
 	client := data.Client()
 

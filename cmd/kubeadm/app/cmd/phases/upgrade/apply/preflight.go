@@ -38,12 +38,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-// NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for kubeadm upgrade apply.
+// NewPreflightPhase returns a new prefight phase.
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "preflight",
-		Short: "Run upgrade apply pre-flight checks",
-		Long:  "Run pre-flight checks for kubeadm upgrade apply.",
+		Short: "Run upgrade apply preflight checks",
+		Long:  "Run preflight checks for kubeadm upgrade apply.",
 		Run:   runPreflight,
 		InheritFlags: []string{
 			options.CfgPath,
@@ -58,13 +58,12 @@ func NewPreflightPhase() workflow.Phase {
 	}
 }
 
-// runPreflight executes preflight checks logic.
 func runPreflight(c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
-	fmt.Println("[preflight] Running pre-flight checks")
+	fmt.Println("[preflight] Running preflight checks")
 
 	printer := &output.TextPrinter{}
 
@@ -81,7 +80,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Run healthchecks against the cluster
-	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
+	klog.V(1).Infoln("[upgrade/apply] Verifying the cluster health")
 	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, printer); err != nil {
 		return err
 	}
@@ -94,7 +93,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Validate requested and validate actual version
-	klog.V(1).Infoln("[upgrade/apply] validating requested and actual version")
+	klog.V(1).Infoln("[upgrade/apply] Validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&initCfg.ClusterConfiguration); err != nil {
 		return err
 	}
@@ -110,7 +109,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	versionGetter := upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client), initCfg.KubernetesVersion)
-	if err := EnforceVersionPolicies(initCfg.KubernetesVersion, upgradeVersion, data.AllowExperimentalUpgrades(), data.AllowRCUpgrades(), data.ForceUpgrade(), versionGetter); err != nil {
+	if err := enforceVersionPolicies(initCfg.KubernetesVersion, upgradeVersion, data.AllowExperimentalUpgrades(), data.AllowRCUpgrades(), data.ForceUpgrade(), versionGetter); err != nil {
 		return err
 	}
 
@@ -134,23 +133,23 @@ func runPreflight(c workflow.RunData) error {
 	return nil
 }
 
-// EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
+// enforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
-func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
-	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", newK8sVersionStr)
+func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
+	fmt.Printf("[upgrade/version] You have chosen to upgrade the cluster version to %q\n", newK8sVersionStr)
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, newK8sVersionStr, newK8sVersion, allowExperimentalUpgrades, allowRCUpgrades)
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {
-			return errors.Errorf("the --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
+			return errors.Errorf("the version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
 				kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag
 			if !force {
-				return errors.Errorf("the --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
+				return errors.Errorf("the version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
 					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
