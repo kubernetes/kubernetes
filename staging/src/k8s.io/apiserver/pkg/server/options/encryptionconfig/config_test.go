@@ -1424,7 +1424,15 @@ func TestWildcardStructure(t *testing.T) {
 			for resource, expectedTransformerName := range tc.expectedResourceTransformers {
 				transformer := transformerFromOverrides(transformers, schema.ParseGroupResource(resource))
 				transformerName := string(
-					reflect.ValueOf(transformer).Elem().FieldByName("transformers").Index(0).FieldByName("Prefix").Bytes(),
+					reflect.ValueOf(transformer).
+						Elem().
+						FieldByName("delegate").
+						Elem().
+						Elem().
+						FieldByName("transformers").
+						Index(0).
+						FieldByName("Prefix").
+						Bytes(),
 				)
 
 				if transformerName != expectedTransformerName {
