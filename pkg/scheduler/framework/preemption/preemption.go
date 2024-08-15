@@ -362,7 +362,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 					Reason:  v1.PodReasonPreemptionByScheduler,
 					Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", pod.Spec.SchedulerName),
 				}
-				newStatus := pod.Status.DeepCopy()
+				newStatus := victim.Status.DeepCopy()
 				updated := apipod.UpdatePodCondition(newStatus, condition)
 				if updated {
 					if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
