@@ -246,9 +246,9 @@
     version: ""
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
-    preRelease: Beta
+    preRelease: Deprecated
     version: ""
 - name: DRAControlPlaneController
   versionedSpecs:
