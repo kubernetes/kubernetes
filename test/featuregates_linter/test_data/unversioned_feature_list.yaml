@@ -376,18 +376,6 @@
     lockToDefault: false
     preRelease: Deprecated
     version: ""
-- name: KMSv2
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: KMSv2KDF
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: KubeletCgroupDriverFromCRI
   versionedSpecs:
   - default: true
