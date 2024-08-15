@@ -1000,6 +1000,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
 		case volume.VolumeSource.CSI != nil:
 			printCSIVolumeSource(volume.VolumeSource.CSI, w)
+		case volume.VolumeSource.Image != nil:
+			printImageVolumeSource(volume.VolumeSource.Image, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -1479,6 +1481,13 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 			w.Write(LEVEL_2, "%s\n", line)
 		}
 	}
+}
+
+func printImageVolumeSource(image *corev1.ImageVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tImage (a container image or OCI artifact)\n"+
+		"    Reference:\t%v\n"+
+		"    PullPolicy:\t%v\n",
+		image.Reference, image.PullPolicy)
 }
 
 type PersistentVolumeDescriber struct {

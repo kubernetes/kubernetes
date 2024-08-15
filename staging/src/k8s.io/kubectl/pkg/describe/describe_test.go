@@ -268,6 +268,53 @@ func TestDescribePodTolerations(t *testing.T) {
 	}
 }
 
+func TestDescribePodVolumes(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name:         "image",
+					VolumeSource: corev1.VolumeSource{Image: &corev1.ImageVolumeSource{Reference: "image", PullPolicy: corev1.PullIfNotPresent}},
+				},
+			},
+		},
+	}
+
+	expected := dedent.Dedent(`
+				Name:         bar
+				Namespace:    foo
+				Node:         <none>
+				Labels:       <none>
+				Annotations:  <none>
+				Status:       
+				IP:           
+				IPs:          <none>
+				Containers: <none>
+				Volumes:
+				  image:
+				    Type:        Image (a container image or OCI artifact)
+				    Reference:   image
+				    PullPolicy:  IfNotPresent
+				QoS Class:       BestEffort
+				Node-Selectors:  <none>
+				Tolerations:     <none>
+				Events:          <none>
+			`)[1:]
+
+	fakeClient := fake.NewSimpleClientset(pod)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	assert.Equal(t, expected, out)
+}
+
 func TestDescribeTopologySpreadConstraints(t *testing.T) {
 	fake := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
