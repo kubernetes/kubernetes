@@ -148,6 +148,58 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 			checkpointContent: `{`,
 			expectedError:     "unexpected end of JSON input",
 		},
+		{
+			// Emulate upgrade scenario by pretending that `Device.RequestNames` is a new field.
+			// The checkpoint content doesn't have it and that shouldn't prevent the checkpoint from being loaded.
+			description:       "upgraded-structure",
+			checkpointContent: `{"Data":"{\"kind\":\"DRACheckpoint\",\"apiVersion\":\"checkpoint.dra.kubelet.k8s.io/v1\",\"ClaimInfoStateList\":[{\"ClaimUID\":\"067798be-454e-4be4-9047-1aa06aea63f7\",\"ClaimName\":\"example\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-1\",\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]}]}}}]}","Checksum":1137250765}`,
+			expectedClaimInfoStateList: ClaimInfoStateList{
+				{
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: nil,
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+							},
+						},
+					},
+					ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+					ClaimName: "example",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
+				},
+			},
+		},
+		{
+			// Emulate upgrade scenario by pretending that `Device.RequestNames` is a new field and API version has changed from v0 to v1.
+			// These changes shouldn't prevent the checkpoint from being loaded.
+			description:       "upgraded-structure-and-version",
+			checkpointContent: `{"Data":"{\"kind\":\"DRACheckpoint\",\"apiVersion\":\"checkpoint.dra.kubelet.k8s.io/v0\",\"ClaimInfoStateList\":[{\"ClaimUID\":\"067798be-454e-4be4-9047-1aa06aea63f7\",\"ClaimName\":\"example\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-1\",\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]}]}}}]}","Checksum":1284376732}`,
+			expectedClaimInfoStateList: ClaimInfoStateList{
+				{
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: nil,
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+							},
+						},
+					},
+					ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+					ClaimName: "example",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
+				},
+			},
+		},
 	}
 
 	// create temp dir
