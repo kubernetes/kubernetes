@@ -5757,35 +5757,71 @@ func TestPrintLease(t *testing.T) {
 }
 
 func TestPrintPriorityClass(t *testing.T) {
+	preemptNever := api.PreemptNever
+	preemptLowerPriority := api.PreemptLowerPriority
 	tests := []struct {
+		name     string
+		options  printers.GenerateOptions
 		pc       scheduling.PriorityClass
 		expected []metav1.TableRow
 	}{
 		{
+			name: "Test case with PreemptNever policy",
 			pc: scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pc1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Value: 1,
+				Value:            1,
+				PreemptionPolicy: &preemptNever,
 			},
 			expected: []metav1.TableRow{{Cells: []interface{}{"pc1", int64(1), bool(false), "0s"}}},
 		},
 		{
+			name: "Test case with PreemptLowerPriority policy",
 			pc: scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pc2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				Value:         1000000000,
-				GlobalDefault: true,
+				Value:            1000000000,
+				GlobalDefault:    true,
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			expected: []metav1.TableRow{{Cells: []interface{}{"pc2", int64(1000000000), bool(true), "5m"}}},
+		},
+		{
+			name:    "Test case with PreemptLowerPriority policy and wide output",
+			options: printers.GenerateOptions{Wide: true},
+			pc: scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Value:            1000000000,
+				GlobalDefault:    true,
+				PreemptionPolicy: &preemptLowerPriority,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pc2", int64(1000000000), bool(true), "5m", string(api.PreemptLowerPriority)}}},
+		},
+		{
+			name:    "Test case without set PreemptLowerPriority policy",
+			options: printers.GenerateOptions{Wide: true},
+			pc: scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Value:            1000000000,
+				GlobalDefault:    true,
+				PreemptionPolicy: nil,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pc2", int64(1000000000), bool(true), "5m", string("")}}},
 		},
 	}
 
 	for i, test := range tests {
-		rows, err := printPriorityClass(&test.pc, printers.GenerateOptions{})
+		rows, err := printPriorityClass(&test.pc, test.options)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -5793,7 +5829,7 @@ func TestPrintPriorityClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("test case %s: %d mismatch: %s", test.name, i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
