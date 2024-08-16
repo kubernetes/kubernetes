@@ -26,7 +26,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/jsonreference"
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -36,6 +39,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -182,10 +186,6 @@ func TestAddRemoveGroupVersion(t *testing.T) {
 }
 
 func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
-	// The OpenAPI V3 proto library strips fields that are sibling elements to $ref
-	// See https://github.com/kubernetes/kubernetes/issues/106387 for more details
-	t.Skip("Skipping OpenAPI V3 Proto roundtrip test")
-
 	tCtx := ktesting.Init(t)
 	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{})
 	defer tearDownFn()
@@ -212,6 +212,15 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 	err = json.Unmarshal(bs, &firstSpec)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// OpenAPI v3 proto definitions have only three types of defaults: number, boolean, string. It doesn't have struct defaults.
+	// In the JSON/YAML OpenAPI definitions, however, there are cases with "default": {}, deserializing into JSON as map[string]any.
+	// From protobuf, however, these deserialize naturally into nil, as they are not expressed.
+	// We should probably patch the OpenAPI v3 spec to not include any empty struct defaults at all in JSON form, as proto doesn't support it.
+	// For now, however, we can ignore these differences.
+	for _, s := range firstSpec.Components.Schemas {
+		ignoreEmptyStructDefaults(s)
 	}
 
 	protoReq, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
@@ -248,7 +257,48 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(specFromProto, firstSpec) {
-		t.Fatalf("spec mismatch - specFromProto: %s\n", jsonBytes)
+	if diff := cmp.Diff(firstSpec, specFromProto, cmpopts.IgnoreUnexported(jsonreference.Ref{})); diff != "" {
+		t.Errorf("spec mismatch: -want json, +got proto: %s", diff)
+	}
+}
+
+func ignoreEmptyStructDefaults(x *spec.Schema) {
+	if x == nil {
+		return
+	}
+	m, isStringMap := x.Default.(map[string]any)
+	if isStringMap && len(m) == 0 {
+		x.Default = nil
+	}
+
+	if x.AdditionalItems != nil {
+		ignoreEmptyStructDefaults(x.AdditionalItems.Schema)
+	}
+	if x.AdditionalProperties != nil {
+		ignoreEmptyStructDefaults(x.AdditionalProperties.Schema)
+	}
+	for i := range x.AllOf {
+		ignoreEmptyStructDefaults(&x.AllOf[i])
+	}
+	for i := range x.AnyOf {
+		ignoreEmptyStructDefaults(&x.AnyOf[i])
+	}
+	if x.Items != nil {
+		ignoreEmptyStructDefaults(x.Items.Schema)
+		for i := range x.Items.Schemas {
+			ignoreEmptyStructDefaults(&x.Items.Schemas[i])
+		}
+	}
+	ignoreEmptyStructDefaults(x.Not)
+	for i := range x.OneOf {
+		ignoreEmptyStructDefaults(&x.OneOf[i])
+	}
+	for k, s := range x.PatternProperties {
+		ignoreEmptyStructDefaults(&s)
+		x.PatternProperties[k] = s
+	}
+	for k, s := range x.Properties {
+		ignoreEmptyStructDefaults(&s)
+		x.Properties[k] = s
 	}
 }
