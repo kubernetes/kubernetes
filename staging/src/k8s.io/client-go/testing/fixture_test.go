@@ -300,6 +300,27 @@ func TestApplyCreate(t *testing.T) {
 	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
 }
 
+func TestApplyNoMeta(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
+	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager"})
+	handled, configMap, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to create a resource with apply: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, "cm-1", cm.Name)
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+}
+
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
