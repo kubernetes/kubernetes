@@ -165,6 +165,7 @@ const (
 	CapVolumeMountGroup   Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec               Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
+	CapGroupSnapshot      Capability = "groupSnapshot"      // support group snapshot
 	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc
 
 	// multiple pods on a node can use the same volume concurrently;
