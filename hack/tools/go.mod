@@ -11,7 +11,7 @@ require (
 	github.com/vektra/mockery/v2 v2.40.3
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
-	honnef.co/go/tools v0.5.0-rc.1
+	honnef.co/go/tools v0.5.1
 	sigs.k8s.io/logtools v0.8.1
 )
 
