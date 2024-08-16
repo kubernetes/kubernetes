@@ -415,6 +415,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
+		// if old spec has referred one PVC multi times, we must allow it
+		opts.AllowDuplicatePVCNames = hasDuplicatePVCNames(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -423,6 +425,20 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	return opts
+}
+
+func hasDuplicatePVCNames(spec *api.PodSpec) bool {
+	referPVCs := make(map[string]struct{})
+	for _, vol := range spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			claimName := vol.PersistentVolumeClaim.ClaimName
+			if _, exists := referPVCs[claimName]; exists {
+				return true
+			}
+			referPVCs[claimName] = struct{}{}
+		}
+	}
+	return false
 }
 
 func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) bool {

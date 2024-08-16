@@ -410,6 +410,7 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 		}
 	}
 	vols := make(map[string]core.VolumeSource)
+	referPVCs := make(map[string]struct{})
 	for i, vol := range volumes {
 		idxPath := fldPath.Index(i)
 		namePath := idxPath.Child("name")
@@ -433,6 +434,13 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 		if vol.PersistentVolumeClaim != nil && allCreatedPVCs.Has(vol.PersistentVolumeClaim.ClaimName) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("persistentVolumeClaim").Child("claimName"), vol.PersistentVolumeClaim.ClaimName,
 				"must not reference a PVC that gets created for an ephemeral volume"))
+		}
+		if vol.PersistentVolumeClaim != nil && !opts.AllowDuplicatePVCNames {
+			claimName := vol.PersistentVolumeClaim.ClaimName
+			if _, exists := referPVCs[claimName]; exists {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("persistentVolumeClaim").Child("claimName"), vol.PersistentVolumeClaim.ClaimName))
+			}
+			referPVCs[claimName] = struct{}{}
 		}
 	}
 
@@ -4049,6 +4057,8 @@ type PodValidationOptions struct {
 	AllowRelaxedEnvironmentVariableValidation bool
 	// Allow the use of a relaxed DNS search
 	AllowRelaxedDNSSearchValidation bool
+	// Allow pod spec to refer one pvc multi times
+	AllowDuplicatePVCNames bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
