@@ -249,6 +249,21 @@ No changes
 - [Add image_id to CRI ContainerStatus message](https://github.com/kubernetes/kubernetes/pull/123583)
   - Added `image_id` field to type `ContainerStatus`
 
+### v1.31
+
+`git diff v1.30.0 v1.31.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [KEP-3619: Add NodeStatus.Features.SupplementalGroupsPolicy API and e2e](https://github.com/kubernetes/kubernetes/pull/125470)
+  - Added `features` field to the type `StatusResponse` for the runtime to kubelet handshake on what features are supported
+
+- [KEP-3619: Fine-grained SupplementalGroups control](https://github.com/kubernetes/kubernetes/pull/117842)
+  - Added `supplemental_groups_policy` field to types `LinuxContainerSecurityContext` and `LinuxSandboxSecurityContext`
+  - Added `user` field to the type `ContainerStatus` to represent actual user for the container 
+
+- [[KEP-4639] Add OCI VolumeSource CRI API](https://github.com/kubernetes/kubernetes/pull/125659)
+  - Added `image` field to the type `Mount` to represent the OCI VolumeSource 
+
+
 ## Community, discussion, contribution, and support
 
 Learn how to engage with the Kubernetes community on the [community
