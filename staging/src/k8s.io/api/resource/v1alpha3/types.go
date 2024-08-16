@@ -290,7 +290,7 @@ type ResourceSliceList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// +optional
-	metav1.ListMeta `json:"listMeta" protobuf:"bytes,1,opt,name=listMeta"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of resource ResourceSlices.
 	Items []ResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
