@@ -974,7 +974,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 			true,
 		},
 		{
-			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
+			"valid: using token-based discovery with .BootstrapToken.CACertHashes but skip ca verification",
 			&kubeadmapi.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
 				APIServerEndpoint:        "192.168.122.100:6443",

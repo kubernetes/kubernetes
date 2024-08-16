@@ -49,7 +49,7 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
 	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
 
-	// Note that querrying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
+	// Note that querying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
 	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
 	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
 	// and the FSCTL is issued in the host by the kubelet.
