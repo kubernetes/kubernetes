@@ -280,7 +280,7 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	done := make(chan error)
@@ -291,7 +291,7 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("timeout exceeded while checking the destination")
+		return ctx.Err()
 	case err := <-done:
 		return err
 	}
@@ -310,6 +310,10 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 		// If no error, dest.File was found to be a directory.
 		// Copy specified src into it
 		destFile = destFile.Join(srcFile.Base())
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		// we haven't decided destination is directory or not because context timeout is exceeded.
+		// That's why, we should shortcut the process in here.
+		return err
 	}
 
 	go func(src localPath, dest remotePath, writer io.WriteCloser) {
