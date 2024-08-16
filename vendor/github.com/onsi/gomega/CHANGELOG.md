@@ -1,3 +1,25 @@
+## 1.34.1
+
+### Maintenance
+- Use slices from exp/slices to keep golang 1.20 compat [5e71dcd]
+
+## 1.34.0
+
+### Features
+- Add RoundTripper method to ghttp.Server [c549e0d]
+
+### Fixes
+- fix incorrect handling of nil slices in HaveExactElements (fixes #771) [878940c]
+- issue_765 - fixed bug in Hopcroft-Karp algorithm [ebadb67]
+
+### Maintenance
+- bump ginkgo [8af2ece]
+- Fix typo in docs [123a071]
+- Bump github.com/onsi/ginkgo/v2 from 2.17.2 to 2.17.3 (#756) [0e69083]
+- Bump google.golang.org/protobuf from 1.33.0 to 1.34.1 (#755) [2675796]
+- Bump golang.org/x/net from 0.24.0 to 0.25.0 (#754) [4160c0f]
+- Bump github-pages from 230 to 231 in /docs (#748) [892c303]
+
 ## 1.33.1
 
 ### Fixes

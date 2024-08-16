@@ -52,8 +52,8 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results:    []*types.Type{},
+							Parameters: []*types.ParamResult{},
+							Results:    []*types.ParamResult{},
 						},
 					},
 				},
@@ -74,8 +74,8 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results:    []*types.Type{},
+							Parameters: []*types.ParamResult{},
+							Results:    []*types.ParamResult{},
 						},
 					},
 				},
@@ -97,11 +97,10 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Name: "int"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Name: "int"}},
 								},
 							},
 						},
@@ -125,11 +124,10 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Package: "pkgname", Name: "typename"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Package: "pkgname", Name: "typename"}},
 								},
 							},
 						},
@@ -150,11 +148,10 @@ func Test_deepCopyMethod(t *testing.T) {
 						Kind: types.Func,
 						Signature: &types.Signature{
 							Receiver:   &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Kind: types.Pointer,
-									Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+									Type: &types.Type{Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}}, Kind: types.Pointer},
 								},
 							},
 						},
@@ -175,11 +172,10 @@ func Test_deepCopyMethod(t *testing.T) {
 						Kind: types.Func,
 						Signature: &types.Signature{
 							Receiver:   &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Package: "pkgname", Name: "typename"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Package: "pkgname", Name: "typename"}},
 								},
 							},
 						},
@@ -202,11 +198,10 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Kind: types.Pointer,
-									Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+									Type: &types.Type{Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}}, Kind: types.Pointer},
 								},
 							},
 						},
@@ -229,16 +224,14 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{
+							Parameters: []*types.ParamResult{
 								{
-									Name: types.Name{Name: "int"},
-									Kind: types.Builtin,
+									Type: &types.Type{Name: types.Name{Name: "int"}, Kind: types.Builtin},
 								},
 							},
-							Results: []*types.Type{
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Package: "pkgname", Name: "typename"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Package: "pkgname", Name: "typename"}},
 								},
 							},
 						},
@@ -262,15 +255,13 @@ func Test_deepCopyMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results: []*types.Type{
+							Parameters: []*types.ParamResult{},
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Package: "pkgname", Name: "typename"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Package: "pkgname", Name: "typename"}},
 								},
 								{
-									Name: types.Name{Name: "int"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Name: "int"}},
 								},
 							},
 						},
@@ -323,8 +314,8 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results:    []*types.Type{},
+							Parameters: []*types.ParamResult{},
+							Results:    []*types.ParamResult{},
 						},
 					},
 				},
@@ -345,8 +336,8 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{},
-							Results:    []*types.Type{},
+							Parameters: []*types.ParamResult{},
+							Results:    []*types.ParamResult{},
 						},
 					},
 				},
@@ -368,16 +359,14 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{
+							Parameters: []*types.ParamResult{
 								{
-									Kind: types.Pointer,
-									Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+									Type: &types.Type{Kind: types.Pointer, Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}}},
 								},
 							},
-							Results: []*types.Type{
+							Results: []*types.ParamResult{
 								{
-									Name: types.Name{Name: "int"},
-									Kind: types.Builtin,
+									Type: &types.Type{Kind: types.Builtin, Name: types.Name{Name: "int"}},
 								},
 							},
 						},
@@ -401,10 +390,12 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{
-								{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+							Parameters: []*types.ParamResult{
+								{
+									Type: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+								},
 							},
-							Results: []*types.Type{},
+							Results: []*types.ParamResult{},
 						},
 					},
 				},
@@ -423,10 +414,12 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 						Kind: types.Func,
 						Signature: &types.Signature{
 							Receiver: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
-							Parameters: []*types.Type{
-								{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+							Parameters: []*types.ParamResult{
+								{
+									Type: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+								},
 							},
-							Results: []*types.Type{},
+							Results: []*types.ParamResult{},
 						},
 					},
 				},
@@ -445,13 +438,12 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 						Kind: types.Func,
 						Signature: &types.Signature{
 							Receiver: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
-							Parameters: []*types.Type{
+							Parameters: []*types.ParamResult{
 								{
-									Kind: types.Pointer,
-									Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+									Type: &types.Type{Kind: types.Pointer, Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}}},
 								},
 							},
-							Results: []*types.Type{},
+							Results: []*types.ParamResult{},
 						},
 					},
 				},
@@ -472,13 +464,12 @@ func Test_deepCopyIntoMethod(t *testing.T) {
 								Kind: types.Pointer,
 								Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
 							},
-							Parameters: []*types.Type{
+							Parameters: []*types.ParamResult{
 								{
-									Kind: types.Pointer,
-									Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}},
+									Type: &types.Type{Kind: types.Pointer, Elem: &types.Type{Kind: types.Struct, Name: types.Name{Package: "pkgname", Name: "typename"}}},
 								},
 							},
-							Results: []*types.Type{},
+							Results: []*types.ParamResult{},
 						},
 					},
 				},

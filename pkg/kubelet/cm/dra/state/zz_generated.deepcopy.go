@@ -30,7 +30,7 @@ func (in *ClaimInfoState) DeepCopyInto(out *ClaimInfoState) {
 	*out = *in
 	if in.PodUIDs != nil {
 		in, out := &in.PodUIDs, &out.PodUIDs
-		*out = make(sets.Set[string], len(*in))
+		*out = make(sets.Set, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

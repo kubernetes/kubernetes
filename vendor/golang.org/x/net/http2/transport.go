@@ -827,10 +827,6 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	cc.henc.SetMaxDynamicTableSizeLimit(t.maxEncoderHeaderTableSize())
 	cc.peerMaxHeaderTableSize = initialHeaderTableSize
 
-	if t.AllowHTTP {
-		cc.nextStreamID = 3
-	}
-
 	if cs, ok := c.(connectionStater); ok {
 		state := cs.ConnectionState()
 		cc.tlsState = &state
