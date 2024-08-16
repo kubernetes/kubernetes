@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
 	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -275,13 +276,7 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 		}
 
 		// The user is not authorized to perform this action, so we need to build the error response
-		gr := schema.GroupResource{
-			Group:    attributes.GetAPIGroup(),
-			Resource: attributes.GetResource(),
-		}
-		name := attributes.GetName()
-		err := fmt.Errorf("%v", authorizerReason)
-		return errors.NewForbidden(gr, name, err)
+		return responsewriters.ForbiddenStatusError(attributes, authorizerReason)
 	}
 }
 
