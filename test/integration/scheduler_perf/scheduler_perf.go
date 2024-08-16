@@ -777,8 +777,8 @@ func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePlugin
 	framework.GoleakCheck(t)
 
 	// Now that we are ready to run, start
-	// etcd.
-	framework.StartEtcd(t, output)
+	// a brand new etcd.
+	framework.StartEtcd(t, output, true)
 
 	for feature, flag := range tc.FeatureGates {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
