@@ -54,6 +54,9 @@ type Store interface {
 	// ListKeys returns a list of all the keys currently associated with non-empty accumulators
 	ListKeys() []string
 
+	// Count returns a count of all the keys currently associated with non-empty accumulators
+	Count() int64
+
 	// Get returns the accumulator associated with the given object's key
 	Get(obj interface{}) (item interface{}, exists bool, err error)
 
@@ -205,6 +208,12 @@ func (c *cache) List() []interface{} {
 // in the cache.
 func (c *cache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
+}
+
+// Count returns a count of all the keys of the objects currently
+// in the cache.
+func (c *cache) Count() int64 {
+	return c.cacheStorage.Count()
 }
 
 // GetIndexers returns the indexers of cache

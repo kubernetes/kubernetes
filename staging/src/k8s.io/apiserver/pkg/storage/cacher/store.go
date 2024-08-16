@@ -31,6 +31,7 @@ type storeIndexer interface {
 	Delete(obj interface{}) error
 	List() []interface{}
 	ListKeys() []string
+	Count() int64
 	Get(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error

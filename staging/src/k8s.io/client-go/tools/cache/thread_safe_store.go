@@ -45,6 +45,7 @@ type ThreadSafeStore interface {
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
+	Count() int64
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	IndexKeys(indexName, indexedValue string) ([]string, error)
@@ -277,6 +278,14 @@ func (c *threadSafeMap) ListKeys() []string {
 		list = append(list, key)
 	}
 	return list
+}
+
+// Count returns a count of all the keys of the objects currently
+// in the threadSafeMap.
+func (c *threadSafeMap) Count() int64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return int64(len(c.items))
 }
 
 func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {

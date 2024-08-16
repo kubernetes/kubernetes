@@ -250,6 +250,14 @@ func (f *FIFO) ListKeys() []string {
 	return list
 }
 
+// Count returns a count of all the keys of the objects currently
+// in the FIFO.
+func (f *FIFO) Count() int64 {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	return int64(len(f.items))
+}
+
 // Get returns the requested item, or sets exists=false.
 func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	key, err := f.keyFunc(obj)
