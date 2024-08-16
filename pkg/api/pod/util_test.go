@@ -2553,6 +2553,48 @@ func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 	}
 }
 
+func TestValidateAllowImageVolumeSourceOption(t *testing.T) {
+	testCases := []struct {
+		name           string
+		oldPodSpec     *api.PodSpec
+		featureEnabled bool
+		wantOption     bool
+	}{
+		{
+			name:           "CreateFeatureEnabled",
+			featureEnabled: true,
+			wantOption:     true,
+		},
+		{
+			name:           "CreateFeatureDisabled",
+			featureEnabled: false,
+			wantOption:     false,
+		},
+		{
+			name:           "UpdateFeatureDisabled",
+			oldPodSpec:     &api.PodSpec{Volumes: []api.Volume{{VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{Reference: "image"}}}}},
+			featureEnabled: false,
+			wantOption:     true,
+		},
+		{
+			name:           "UpdateFeatureEnabled",
+			oldPodSpec:     &api.PodSpec{Volumes: []api.Volume{{VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{Reference: "image"}}}}},
+			featureEnabled: true,
+			wantOption:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, tc.featureEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowImageVolumeSource {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantOption, gotOptions.AllowImageVolumeSource)
+			}
+		})
+	}
+}
+
 func TestDropInPlacePodVerticalScaling(t *testing.T) {
 	podWithInPlaceVerticalScaling := func() *api.Pod {
 		return &api.Pod{
