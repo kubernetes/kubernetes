@@ -18,6 +18,7 @@ package util
 
 import (
 	"os"
+	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -63,5 +64,8 @@ func MergeKubeadmEnvVars(envList ...[]kubeadmapi.EnvVar) []v1.EnvVar {
 	for _, v := range m {
 		merged = append(merged, v)
 	}
+	sort.Slice(merged, func(i, j int) bool {
+		return merged[i].Name < merged[j].Name
+	})
 	return merged
 }
