@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/btree"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -94,6 +96,12 @@ type storeElement struct {
 	Labels labels.Set
 	Fields fields.Set
 }
+
+func (t *storeElement) Less(than btree.Item) bool {
+	return t.Key < than.(*storeElement).Key
+}
+
+var _ btree.Item = (*storeElement)(nil)
 
 func storeElementKey(obj interface{}) (string, error) {
 	elem, ok := obj.(*storeElement)
@@ -173,7 +181,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store cache.Indexer
+	store *btreeStore
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -223,7 +231,7 @@ func newWatchCache(
 		upperBoundCapacity:  defaultUpperBoundCapacity,
 		startIndex:          0,
 		endIndex:            0,
-		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
+		store:               newBtreeStore(storeElementKey, storeElementIndexers(indexers), 32),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
