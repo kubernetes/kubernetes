@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
@@ -55,6 +56,7 @@ import (
 func TestUpdatePodInCache(t *testing.T) {
 	ttl := 10 * time.Second
 	nodeName := "node"
+	metrics.Register()
 
 	tests := []struct {
 		name   string

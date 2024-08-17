@@ -457,6 +457,7 @@ func newFrameworkWithQueueSortAndBind(ctx context.Context, r Registry, profile c
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
@@ -2900,7 +2901,7 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
-
+	metrics.Register()
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -3027,7 +3028,8 @@ func TestRecordingMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics.Register()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			metrics.FrameworkExtensionPointDuration.Reset()
 			metrics.PluginExecutionDuration.Reset()
 
@@ -3049,9 +3051,6 @@ func TestRecordingMetrics(t *testing.T) {
 				Bind:      pluginSet,
 				PostBind:  pluginSet,
 			}
-
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
 
 			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
 			profile := config.KubeSchedulerProfile{
@@ -3086,6 +3085,7 @@ func TestRecordingMetrics(t *testing.T) {
 }
 
 func TestRunBindPlugins(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name       string
 		injects    []framework.Code
@@ -3154,7 +3154,6 @@ func TestRunBindPlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics.Register()
 			metrics.FrameworkExtensionPointDuration.Reset()
 			metrics.PluginExecutionDuration.Reset()
 
@@ -3203,6 +3202,7 @@ func TestRunBindPlugins(t *testing.T) {
 }
 
 func TestPermitWaitDurationMetric(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name    string
 		inject  injectedResult
@@ -3221,7 +3221,6 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			metrics.Register()
 			metrics.PermitWaitDuration.Reset()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}

@@ -120,6 +120,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	metrics.Register()
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -2926,7 +2927,6 @@ func TestPodTimestamp(t *testing.T) {
 // TestPendingPodsMetric tests Prometheus metrics related with pending pods
 func TestPendingPodsMetric(t *testing.T) {
 	timestamp := time.Now()
-	metrics.Register()
 	total := 60
 	queueableNum := 50
 	queueable, failme := "queueable", "failme"
@@ -2951,6 +2951,7 @@ func TestPendingPodsMetric(t *testing.T) {
 			pInfosWithDelay[i].Attempts = 0
 		}
 	}
+	metrics.Register()
 
 	tests := []struct {
 		name                       string
@@ -3185,11 +3186,11 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			resetMetrics()
-			resetPodInfos()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			resetMetrics()
+			resetPodInfos()
 
 			m := map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{queueable}}}}
 			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
@@ -3326,8 +3327,8 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
 	unschedulablePlg := "unschedulable_plugin"
-	metrics.Register()
 	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
+	metrics.Register()
 	for i := 1; i <= 3; i++ {
 		p := &framework.QueuedPodInfo{
 			PodInfo: mustNewTestPodInfo(t,
@@ -3399,10 +3400,10 @@ func TestIncomingPodsMetrics(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metrics.SchedulerQueueIncomingPods.Reset()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			metrics.SchedulerQueueIncomingPods.Reset()
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			for _, op := range test.operations {
 				for _, pInfo := range pInfos {
