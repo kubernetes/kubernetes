@@ -834,8 +834,18 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		inactiveFileKeyName = "inactive_file"
 	}
 
+	activeFileKeyName := "total_active_file"
+	if cgroups.IsCgroup2UnifiedMode() {
+		activeFileKeyName = "active_file"
+	}
+
+	if v, ok := s.MemoryStats.Stats[activeFileKeyName]; ok {
+		ret.Memory.TotalActiveFile = v
+	}
+
 	workingSet := ret.Memory.Usage
 	if v, ok := s.MemoryStats.Stats[inactiveFileKeyName]; ok {
+		ret.Memory.TotalInactiveFile = v
 		if workingSet < v {
 			workingSet = 0
 		} else {

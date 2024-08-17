@@ -4,6 +4,8 @@ module k8s.io/csi-translation-lib
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.0.0

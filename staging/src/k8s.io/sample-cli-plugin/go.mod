@@ -4,6 +4,8 @@ module k8s.io/sample-cli-plugin
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5

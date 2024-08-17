@@ -4,6 +4,8 @@ module k8s.io/sample-controller
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	golang.org/x/time v0.3.0
 	k8s.io/api v0.0.0

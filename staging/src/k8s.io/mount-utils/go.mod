@@ -4,6 +4,8 @@ module k8s.io/mount-utils
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/moby/sys/mountinfo v0.7.1
 	github.com/opencontainers/runc v1.1.13
@@ -20,7 +22,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
-	github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 // indirect
+	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect

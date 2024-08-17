@@ -1,0 +1,51 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.types;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/api/types;types";
+
+// Sandbox represents a sandbox metadata object that keeps all info required by controller to
+// work with a particular instance.
+message Sandbox {
+	// SandboxID is a unique instance identifier within namespace
+	string sandbox_id = 1;
+	message Runtime {
+		// Name is the name of the runtime.
+		string name = 1;
+		// Options specify additional runtime initialization options for the shim (this data will be available in StartShim).
+		// Typically this data expected to be runtime shim implementation specific.
+		google.protobuf.Any options = 2;
+	}
+	// Runtime specifies which runtime to use for executing this container.
+	Runtime runtime = 2;
+	// Spec is sandbox configuration (kin of OCI runtime spec), spec's data will be written to a config.json file in the
+	// bundle directory (similary to OCI spec).
+	google.protobuf.Any spec = 3;
+	// Labels provides an area to include arbitrary data on containers.
+	map<string, string> labels  = 4;
+	// CreatedAt is the time the container was first created.
+	google.protobuf.Timestamp created_at = 5;
+	// UpdatedAt is the last time the container was mutated.
+	google.protobuf.Timestamp updated_at = 6;
+	// Extensions allow clients to provide optional blobs that can be handled by runtime.
+	map<string, google.protobuf.Any> extensions = 7;
+}

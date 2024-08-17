@@ -4,6 +4,8 @@ module k8s.io/endpointslice
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/google/go-cmp v0.6.0

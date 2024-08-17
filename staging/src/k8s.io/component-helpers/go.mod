@@ -4,6 +4,8 @@ module k8s.io/component-helpers
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/stretchr/testify v1.9.0

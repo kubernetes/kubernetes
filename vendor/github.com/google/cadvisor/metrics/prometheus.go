@@ -271,6 +271,13 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					return metricValues{{value: float64(s.Cpu.LoadAverage), timestamp: s.Timestamp}}
 				},
 			}, {
+				name:      "container_cpu_load_d_average_10s",
+				help:      "Value of container cpu load.d average over the last 10 seconds.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.LoadDAverage), timestamp: s.Timestamp}}
+				},
+			}, {
 				name:        "container_tasks_state",
 				help:        "Number of tasks in given state",
 				extraLabels: []string{"state"},
@@ -429,6 +436,22 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Memory.WorkingSet), timestamp: s.Timestamp}}
+				},
+			},
+			{
+				name:      "container_memory_total_active_file_bytes",
+				help:      "Current total active file in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.TotalActiveFile), timestamp: s.Timestamp}}
+				},
+			},
+			{
+				name:      "container_memory_total_inactive_file_bytes",
+				help:      "Current total inactive file in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.TotalInactiveFile), timestamp: s.Timestamp}}
 				},
 			},
 			{

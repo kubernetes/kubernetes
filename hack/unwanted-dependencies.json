@@ -90,13 +90,11 @@
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
-      "github.com/gogo/googleapis": [
-        "github.com/google/cadvisor"
-      ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/cgroups",
-        "github.com/containerd/ttrpc",
+        "github.com/containerd/containerd/api",
+	"github.com/containerd/ttrpc",
         "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
@@ -189,7 +187,6 @@
         "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
-        "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
         "go.etcd.io/etcd/api/v3",

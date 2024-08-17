@@ -4,6 +4,8 @@ module k8s.io/apiserver
 
 go 1.22.0
 
+exclude github.com/containerd/containerd v1.4.9
+
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/coreos/go-oidc v2.2.1+incompatible

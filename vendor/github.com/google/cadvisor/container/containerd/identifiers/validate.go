@@ -40,7 +40,7 @@ package identifiers
 import (
 	"regexp"
 
-	"github.com/google/cadvisor/container/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/pkg/errors"
 )
 
