@@ -2217,7 +2217,7 @@ type PodSandboxStatusResponse struct {
 	Info map[string]string `protobuf:"bytes,2,rep,name=info,proto3" json:"info,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Container statuses
 	ContainersStatuses []*ContainerStatus `protobuf:"bytes,3,rep,name=containers_statuses,json=containersStatuses,proto3" json:"containers_statuses,omitempty"`
-	// Timestamp at which container and pod statuses were recorded
+	// Timestamp in nanoseconds at which container and pod statuses were recorded
 	Timestamp            int64    `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -9600,7 +9600,7 @@ type ContainerEventResponse struct {
 	ContainerId string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 	// Type of the container event
 	ContainerEventType ContainerEventType `protobuf:"varint,2,opt,name=container_event_type,json=containerEventType,proto3,enum=runtime.v1.ContainerEventType" json:"container_event_type,omitempty"`
-	// Creation timestamp of this event
+	// Creation timestamp in nanoseconds of this event
 	CreatedAt int64 `protobuf:"varint,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Sandbox status
 	PodSandboxStatus *PodSandboxStatus `protobuf:"bytes,4,opt,name=pod_sandbox_status,json=podSandboxStatus,proto3" json:"pod_sandbox_status,omitempty"`
@@ -10027,7 +10027,7 @@ type Metric struct {
 	// otherwise, it will be ignored.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Timestamp should be 0 if the metric was gathered live.
-	// If it was cached, the Timestamp should reflect the time it was collected.
+	// If it was cached, the Timestamp should reflect the time in nanoseconds it was collected.
 	Timestamp  int64      `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	MetricType MetricType `protobuf:"varint,3,opt,name=metric_type,json=metricType,proto3,enum=runtime.v1.MetricType" json:"metric_type,omitempty"`
 	// The corresponding LabelValues to the LabelKeys defined in the MetricDescriptor.
