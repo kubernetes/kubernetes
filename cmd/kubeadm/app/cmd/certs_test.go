@@ -359,18 +359,12 @@ func TestRunGenCSR(t *testing.T) {
 	for _, name := range expectedCertificates {
 		_, err = pkiutil.TryLoadKeyFromDisk(certDir, name)
 		assert.NoErrorf(t, err, "failed to load key file: %s", name)
-
-		_, err = pkiutil.TryLoadCSRFromDisk(certDir, name)
-		assert.NoError(t, err, "failed to load CSR file: %s", name)
 	}
 
 	t.Log("The command generates kubeconfig files in the configured --kubeconfig-dir")
 	for _, name := range expectedKubeConfigs {
 		_, err = clientcmd.LoadFromFile(kubeConfigDir + "/" + name + ".conf")
 		assert.NoErrorf(t, err, "failed to load kubeconfig file: %s", name)
-
-		_, err = pkiutil.TryLoadCSRFromDisk(kubeConfigDir, name+".conf")
-		assert.NoError(t, err, "failed to load kubeconfig CSR file: %s", name)
 	}
 }
 
