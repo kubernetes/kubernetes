@@ -20,11 +20,12 @@ reviewers:
   - janetkuo
   - justinsb
   - pwittrock
-  - ncdc
   - mwielgus
   - soltysh
   - dims
   - enj
   - jpbetz
+  # - emeritus
+  # - ncdc
 emeritus_approvers:
   - lavalamp

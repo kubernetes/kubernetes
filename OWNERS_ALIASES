@@ -35,11 +35,12 @@ aliases:
     - enj
     - liggitt
     - mikedanese
-    - ncdc
     - smarterclayton
     - sttts
     - thockin
     - wojtek-t
+  # - emeritus
+  # - ncdc
   sig-auth-certificates-approvers:
     - liggitt
     - mikedanese
@@ -404,13 +405,14 @@ aliases:
     - janetkuo
     - justinsb
     - pwittrock
-    - ncdc
     - tallclair
     - mwielgus
     - soltysh
     - jsafrane
     - dims
     - cici37
+  # - emeritus
+  # - ncdc
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   sig-api-machinery-api-reviewers:

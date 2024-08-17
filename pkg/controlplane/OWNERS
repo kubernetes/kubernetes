@@ -24,11 +24,12 @@ reviewers:
   - luxas
   - janetkuo
   - justinsb
-  - ncdc
   - mwielgus
   - soltysh
   - enj
   - jpbetz
+  # - emeritus
+  # - ncdc
 labels:
   - sig/api-machinery
 emeritus_approvers:

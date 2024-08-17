@@ -10,11 +10,12 @@ reviewers:
   - caesarxuchao
   - mikedanese
   - liggitt
-  - ncdc
   - ingvagabund
   - enj
   - stevekuznetsov
   - MadhavJivrajani
+  # - emeritus
+  # - ncdc
 emeritus_approvers:
   - xiang90
   - timothysc

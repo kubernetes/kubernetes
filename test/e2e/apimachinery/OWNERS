@@ -18,9 +18,10 @@ reviewers:
   - mikedanese
   - liggitt
   - sttts
-  - ncdc
   - logicalhan
   - jpbetz
+  # - emeritus
+  # - ncdc
 labels:
   - sig/api-machinery
 emeritus_approvers:

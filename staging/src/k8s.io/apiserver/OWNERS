@@ -13,12 +13,13 @@ reviewers:
   - caesarxuchao
   - liggitt
   - sttts
-  - ncdc
   - enj
   - hzxuzhonghu
   - apelisse
   - jpbetz
   - tkashem
+  # - emeritus
+  # - ncdc
 labels:
   - sig/api-machinery
   - area/apiserver

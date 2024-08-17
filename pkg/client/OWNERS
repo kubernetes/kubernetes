@@ -22,12 +22,13 @@ reviewers:
   - luxas
   - janetkuo
   - justinsb
-  - ncdc
   - mwielgus
   - feiskyer
   - soltysh
   - jsafrane
   - jpbetz
+  # - emeritus
+  # - ncdc
 emeritus_approvers:
   - krousey
   - lavalamp

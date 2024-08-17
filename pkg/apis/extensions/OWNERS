@@ -13,11 +13,12 @@ reviewers:
   - saad-ali
   - janetkuo
   - justinsb
-  - ncdc
   - tallclair
   - mwielgus
   - soltysh
   - dims
   - jpbetz
+  # - emeritus
+  # - ncdc
 labels:
   - sig/apps
