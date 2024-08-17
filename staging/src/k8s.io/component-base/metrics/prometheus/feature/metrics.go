@@ -21,10 +21,15 @@ import (
 
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 var (
 	// featureInfo is a Prometheus Gauge metrics used for recording the enablement of a k8s feature.
+	featureInfo *k8smetrics.GaugeVec
+)
+
+func Init() {
 	featureInfo = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Namespace:      "kubernetes",
@@ -34,17 +39,22 @@ var (
 		},
 		[]string{"name", "stage"},
 	)
-)
-
-func init() {
 	legacyregistry.MustRegister(featureInfo)
 }
 
 func ResetFeatureInfoMetric() {
+	if featureInfo == nil {
+		return
+	}
 	featureInfo.Reset()
 }
 
 func RecordFeatureInfo(ctx context.Context, name string, stage string, enabled bool) {
+	if featureInfo == nil {
+		klog.Errorf("featureInfo is nil")
+		return
+	}
+
 	value := 0.0
 	if enabled {
 		value = 1.0
