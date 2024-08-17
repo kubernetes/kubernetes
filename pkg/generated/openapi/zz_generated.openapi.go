@@ -47311,7 +47311,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCa
 							Format:      "",
 						},
 					},
-					"listMeta": {
+					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata",
 							Default:     map[string]interface{}{},
