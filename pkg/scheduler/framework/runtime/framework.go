@@ -974,14 +974,14 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	var status *framework.Status
 
 	podsAdded := false
-	// We run filters twice in some cases. If the node has greater or equal priority
+	// We run filters twice in some cases. If the node has greater priority
 	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
 	// If all filters succeed in this pass, we run them again when these
 	// nominated pods are not added. This second pass is necessary because some
 	// filters such as inter-pod affinity may not pass without the nominated pods.
 	// If there are no nominated pods for the node or if the first run of the
 	// filters fail, we don't run the second pass.
-	// We consider only equal or higher priority pods in the first pass, because
+	// We consider only higher priority pods in the first pass, because
 	// those are the current "pod" must yield to them and not take a space opened
 	// for running them. It is ok if the current "pod" take resources freed for
 	// lower priority pods.
@@ -1017,7 +1017,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	return status
 }
 
-// addNominatedPods adds pods with equal or greater priority which are nominated
+// addNominatedPods adds pods with greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
 func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
@@ -1033,7 +1033,7 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
+		if corev1.PodPriority(pi.Pod) > corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
