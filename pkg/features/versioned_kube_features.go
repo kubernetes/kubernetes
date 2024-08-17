@@ -241,6 +241,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	genericfeatures.BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 	},

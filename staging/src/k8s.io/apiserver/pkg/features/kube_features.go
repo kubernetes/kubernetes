@@ -97,6 +97,11 @@ const (
 	TestOnlyCBORServingAndStorage featuregate.Feature = "TestOnlyCBORServingAndStorage"
 
 	// owner: @serathius
+	//
+	// Replaces watch cache hashmap implementation with a btree based one, bringing performance improvements.
+	BtreeWatchCache featuregate.Feature = "BtreeWatchCache"
+
+	// owner: @serathius
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
 
@@ -297,6 +302,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	AuthorizeWithSelectors: {
