@@ -1073,18 +1073,12 @@ func AddOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName
 	if len(taints) == 0 {
 		return nil
 	}
-	firstTry := true
-	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+
+	return clientretry.OnError(UpdateTaintBackoff, isError, func() error {
 		var err error
 		var oldNode *v1.Node
-		// First we try getting node from the API server cache, as it's cheaper. If it fails
-		// we get it from etcd to be sure to have fresh data.
-		option := metav1.GetOptions{}
-		if firstTry {
-			option.ResourceVersion = "0"
-			firstTry = false
-		}
-		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, option)
+
+		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -1130,18 +1124,11 @@ func RemoveTaintOffNode(ctx context.Context, c clientset.Interface, nodeName str
 		}
 	}
 
-	firstTry := true
-	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+	return clientretry.OnError(UpdateTaintBackoff, isError, func() error {
 		var err error
 		var oldNode *v1.Node
-		// First we try getting node from the API server cache, as it's cheaper. If it fails
-		// we get it from etcd to be sure to have fresh data.
-		option := metav1.GetOptions{}
-		if firstTry {
-			option.ResourceVersion = "0"
-			firstTry = false
-		}
-		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, option)
+
+		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -1254,4 +1241,8 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		}
 		return nil
 	})
+}
+
+func isError(err error) bool {
+	return err != nil && !apierrors.IsNotFound(err)
 }
