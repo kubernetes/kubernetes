@@ -43,6 +43,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +67,7 @@ import (
 
 func TestNewRequestSetsAccept(t *testing.T) {
 	r := NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{}, nil).Verb("get")
-	if r.headers.Get("Accept") != "" {
+	if r.headers.Get("Accept") != "application/json, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
@@ -112,9 +113,9 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	gvCopy := v1.SchemeGroupVersion
 	original := Request{
 		err: errors.New("test"),
-		c: &RESTClient{
-			content: ClientContentConfig{GroupVersion: gvCopy},
-		},
+		c:   &RESTClient{},
+
+		contentConfig: ClientContentConfig{GroupVersion: gvCopy},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -236,7 +237,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}).Param("foo", "a")
+	r := (&Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -252,7 +253,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}
+	r := &Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}
 	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
@@ -272,7 +273,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 
 func TestRequestVersionedParamsWithInvalidScheme(t *testing.T) {
 	parameterCodec := runtime.NewParameterCodec(runtime.NewScheme())
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}})
+	r := &Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}
 	r.VersionedParams(&v1.PodExecOptions{Stdin: false, Stdout: true},
 		parameterCodec)
 
@@ -336,7 +337,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{c: &RESTClient{content: defaultContentConfig()}}).Body(&NotAnAPIObject{})
+	r = (&Request{c: &RESTClient{}, contentConfig: defaultContentConfig()}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -901,11 +902,10 @@ func TestTransformUnstructuredError(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			r := &Request{
-				c: &RESTClient{
-					content: defaultContentConfig(),
-				},
-				resourceName: testCase.Name,
-				resource:     testCase.Resource,
+				contentConfig: defaultContentConfig(),
+				c:             &RESTClient{},
+				resourceName:  testCase.Name,
+				resource:      testCase.Resource,
 			}
 			result := r.transformResponse(ctx, testCase.Res, testCase.Req)
 			err := result.err
@@ -989,9 +989,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns forbidden with json content",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1018,9 +1018,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns forbidden without content",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1038,9 +1038,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns unauthorized",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1058,9 +1058,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns unauthorized",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1254,9 +1254,9 @@ func TestRequestStream(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1273,9 +1273,9 @@ func TestRequestStream(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -2957,12 +2957,12 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 			})
 
 			req := &Request{
-				verb:      test.verb,
-				body:      test.body,
-				bodyBytes: test.bodyBytes,
+				verb:          test.verb,
+				body:          test.body,
+				bodyBytes:     test.bodyBytes,
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					Client:  client,
+					Client: client,
 				},
 				backoff:    &noSleepBackOff{},
 				maxRetries: test.maxRetries,
@@ -3251,11 +3251,11 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
 					base:        base,
-					content:     defaultContentConfig(),
 					Client:      client,
 					rateLimiter: interceptor,
 				},
@@ -3387,12 +3387,12 @@ func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					base:    base,
-					content: defaultContentConfig(),
-					Client:  client,
+					base:   base,
+					Client: client,
 				},
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
@@ -3562,12 +3562,12 @@ func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r 
 				t.Fatalf("Failed to create new HTTP request - %v", err)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					base:    base,
-					content: defaultContentConfig(),
-					Client:  client,
+					base:   base,
+					Client: client,
 				},
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
@@ -3986,11 +3986,11 @@ func TestRetryableConditions(t *testing.T) {
 
 					u, _ := url.Parse("http://localhost:123" + "/apis")
 					req := &Request{
-						verb: verb,
+						verb:          verb,
+						contentConfig: defaultContentConfig(),
 						c: &RESTClient{
-							base:    u,
-							content: defaultContentConfig(),
-							Client:  client,
+							base:   u,
+							Client: client,
 						},
 						backoff:    &noSleepBackOff{},
 						maxRetries: 2,
@@ -4030,10 +4030,10 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	})
 
 	req := &Request{
-		verb: "POST",
+		verb:          "POST",
+		contentConfig: defaultContentConfig(),
 		c: &RESTClient{
-			content: defaultContentConfig(),
-			Client:  client,
+			Client: client,
 		},
 		backoff:    &noSleepBackOff{},
 		maxRetries: 9, // 10 attempts in total, including the first

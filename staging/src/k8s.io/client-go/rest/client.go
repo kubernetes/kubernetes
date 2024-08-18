@@ -105,10 +105,6 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
 func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
-	if len(config.ContentType) == 0 {
-		config.ContentType = "application/json"
-	}
-
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"

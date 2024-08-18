@@ -100,6 +100,9 @@ func defaultRequestRetryFn(maxRetries int) WithRetry {
 type Request struct {
 	c *RESTClient
 
+	contentConfig     ClientContentConfig
+	contentTypeNotSet bool
+
 	warningHandler WarningHandler
 
 	rateLimiter flowcontrol.RateLimiter
@@ -153,6 +156,12 @@ func NewRequest(c *RESTClient) *Request {
 		timeout = c.Client.Timeout
 	}
 
+	contentConfig := c.content
+	contentTypeNotSet := len(contentConfig.ContentType) == 0
+	if contentTypeNotSet {
+		contentConfig.ContentType = "application/json"
+	}
+
 	r := &Request{
 		c:              c,
 		rateLimiter:    c.rateLimiter,
@@ -162,6 +171,9 @@ func NewRequest(c *RESTClient) *Request {
 		maxRetries:     10,
 		retryFn:        defaultRequestRetryFn,
 		warningHandler: c.warningHandler,
+
+		contentConfig:     contentConfig,
+		contentTypeNotSet: contentTypeNotSet,
 	}
 
 	switch {
@@ -371,7 +383,7 @@ func (r *Request) Param(paramName, s string) *Request {
 // VersionedParams will not write query parameters that have omitempty set and are empty. If a
 // parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
-	return r.SpecificallyVersionedParams(obj, codec, r.c.content.GroupVersion)
+	return r.SpecificallyVersionedParams(obj, codec, r.contentConfig.GroupVersion)
 }
 
 func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.ParameterCodec, version schema.GroupVersion) *Request {
@@ -464,7 +476,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		encoder, err := r.c.content.Negotiator.Encoder(r.c.content.ContentType, nil)
+		encoder, err := r.contentConfig.Negotiator.Encoder(r.contentConfig.ContentType, nil)
 		if err != nil {
 			r.err = err
 			return r
@@ -476,7 +488,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		}
 		r.body = nil
 		r.bodyBytes = data
-		r.SetHeader("Content-Type", r.c.content.ContentType)
+		r.SetHeader("Content-Type", r.contentConfig.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
@@ -944,7 +956,7 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, runtim
 	if err != nil {
 		klog.V(4).Infof("Unexpected content type from the server: %q: %v", contentType, err)
 	}
-	objectDecoder, streamingSerializer, framer, err := r.c.content.Negotiator.StreamDecoder(mediaType, params)
+	objectDecoder, streamingSerializer, framer, err := r.contentConfig.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1310,7 +1322,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 	var decoder runtime.Decoder
 	contentType := resp.Header.Get("Content-Type")
 	if len(contentType) == 0 {
-		contentType = r.c.content.ContentType
+		contentType = r.contentConfig.ContentType
 	}
 	if len(contentType) > 0 {
 		var err error
@@ -1318,7 +1330,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 		if err != nil {
 			return Result{err: errors.NewInternalError(err)}
 		}
-		decoder, err = r.c.content.Negotiator.Decoder(mediaType, params)
+		decoder, err = r.contentConfig.Negotiator.Decoder(mediaType, params)
 		if err != nil {
 			// if we fail to negotiate a decoder, treat this as an unstructured error
 			switch {
@@ -1445,7 +1457,7 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	}
 	var groupResource schema.GroupResource
 	if len(r.resource) > 0 {
-		groupResource.Group = r.c.content.GroupVersion.Group
+		groupResource.Group = r.contentConfig.GroupVersion.Group
 		groupResource.Resource = r.resource
 	}
 	return errors.NewGenericServerResponse(
