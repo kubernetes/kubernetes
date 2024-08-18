@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server/routine"
 	"k8s.io/klog/v2"
 )
 
@@ -43,7 +42,7 @@ func TestPropogatingPanic(t *testing.T) {
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
-	ts := httptest.NewServer(routine.WithRoutine(WithPanicRecovery(handler, resolver), func(_ *http.Request, _ *request.RequestInfo) bool { return true }))
+	ts := httptest.NewServer(WithRoutine(WithPanicRecovery(handler, resolver), func(_ *http.Request, _ *request.RequestInfo) bool { return true }))
 	defer ts.Close()
 	_, err := http.Get(ts.URL)
 	if err == nil {
@@ -56,5 +55,25 @@ func TestPropogatingPanic(t *testing.T) {
 
 	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
 		t.Errorf("unexpected out captured actual = %v", capturedOutput)
+	}
+}
+
+func TestExecutionWithRoutine(t *testing.T) {
+	var executed bool
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t := TaskFrom(r.Context())
+		t.Func = func() {
+			executed = true
+		}
+	})
+	ts := httptest.NewServer(WithRoutine(handler, func(_ *http.Request, _ *request.RequestInfo) bool { return true }))
+	defer ts.Close()
+
+	_, err := http.Get(ts.URL)
+	if err != nil {
+		t.Errorf("got unexpected error on request: %v", err)
+	}
+	if !executed {
+		t.Error("expected to execute")
 	}
 }
