@@ -24,6 +24,6 @@ import (
 // - non-pointer struct fields are recursively merged
 // - maps are shallow merged with src keys taking priority over dst
 // - non-zero src fields encountered during recursion that are not maps or structs overwrite and recursion stops
-func merge(dst, src any) error {
+func merge[T any](dst, src *T) error {
 	return mergo.Merge(dst, src, mergo.WithOverride)
 }
