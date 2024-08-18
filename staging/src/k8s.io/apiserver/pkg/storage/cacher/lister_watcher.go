@@ -32,14 +32,14 @@ import (
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage         storage.Interface
+	storage         cacheStore
 	resourcePrefix  string
 	newListFunc     func() runtime.Object
 	contextMetadata metadata.MD
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
+func NewListerWatcher(storage cacheStore, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &listerWatcher{
 		storage:         storage,
 		resourcePrefix:  resourcePrefix,

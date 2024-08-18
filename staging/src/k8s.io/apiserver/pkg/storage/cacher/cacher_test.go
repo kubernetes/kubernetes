@@ -168,44 +168,44 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 
 func TestList(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
+	storagetesting.RunTestList(ctx, t, mux, compactStorage(mux.cache, server.V3Client), true)
 }
 
 func TestListWithConsistentListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
+	storagetesting.RunTestList(ctx, t, mux, compactStorage(mux.cache, server.V3Client), true)
 }
 
 func TestConsistentList(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, false)
+	storagetesting.RunTestConsistentList(ctx, t, mux, compactStorage(mux.cache, server.V3Client), true, false)
 }
 
 func TestConsistentListWithConsistentListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, true)
+	storagetesting.RunTestConsistentList(ctx, t, mux, compactStorage(mux.cache, server.V3Client), true, true)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(mux.cache, server.V3Client), mux)
 }
 
 func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(mux.cache, server.V3Client), mux)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -289,9 +289,9 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchFromZero(t *testing.T) {
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	ctx, mux, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactStorage(cacher, server.V3Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, mux, compactStorage(mux.cache, server.V3Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
@@ -421,12 +421,12 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 	}
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, storage.Interface, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
 }
 
-func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, CacheMux, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -477,32 +477,32 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 			t.Fatal(err)
 		}
 	}
-
-	return ctx, cacher, server, terminate
+	mux := NewCacheMultiplexer(wrappedStorage, cacher)
+	return ctx, mux, server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
-	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	_, mux, _, tearDown := testSetupWithEtcdServer(t, opts...)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.TODO()); err != nil {
+		if err := mux.WaitReady(context.TODO()); err != nil {
 			t.Fatalf("unexpected error waiting for the cache to be ready")
 		}
 	}
-	return &createWrapper{Cacher: cacher}, tearDown
+	return &createWrapper{CacheMux: mux}, tearDown
 }
 
 type createWrapper struct {
-	*Cacher
+	CacheMux
 }
 
 func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	if err := c.Cacher.Create(ctx, key, obj, out, ttl); err != nil {
+	if err := c.CacheMux.Create(ctx, key, obj, out, ttl); err != nil {
 		return err
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		currentObj := c.Cacher.newFunc()
-		err := c.Cacher.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
+		currentObj := c.CacheMux.cache.newFunc()
+		err := c.CacheMux.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
 			if storage.IsNotFound(err) {
 				return false, nil

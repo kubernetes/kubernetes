@@ -81,9 +81,13 @@ func (hwm *HighWaterMark) Update(current int64) bool {
 	}
 }
 
+type GetLister interface {
+	GetList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
+}
+
 // GetCurrentResourceVersionFromStorage gets the current resource version from the underlying storage engine.
 // This method issues an empty list request and reads only the ResourceVersion from the object metadata
-func GetCurrentResourceVersionFromStorage(ctx context.Context, storage Interface, newListFunc func() runtime.Object, resourcePrefix, objectType string) (uint64, error) {
+func GetCurrentResourceVersionFromStorage(ctx context.Context, storage GetLister, newListFunc func() runtime.Object, resourcePrefix, objectType string) (uint64, error) {
 	if storage == nil {
 		return 0, fmt.Errorf("storage wasn't provided for %s", objectType)
 	}

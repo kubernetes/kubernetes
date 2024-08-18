@@ -77,8 +77,9 @@ func StorageWithCacher() generic.StorageDecorator {
 				d()
 			})
 		}
+		mux := cacherstorage.NewCacheMultiplexer(s, cacher)
 
-		return cacher, destroyFunc, nil
+		return mux, destroyFunc, nil
 	}
 }
 
