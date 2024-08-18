@@ -426,7 +426,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 			le.setObservedRecord(&leaderElectionRecord)
 			return true
 		}
-		klog.Errorf("Failed to update lock optimitically: %v, falling back to slow path", err)
+		klog.Errorf("Failed to update lock optimistically: %v, falling back to slow path", err)
 	}
 
 	// 2. obtain or create the ElectionRecord
