@@ -668,6 +668,79 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-29,40-69,30,31,70,71"),
 		},
+		// Test cases for PreferAlignByUncoreCache
+		{
+			"take cpus from two full UncoreCaches and partial from a single UncoreCache",
+			topoUncoreSingleSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "1-15"),
+			10,
+			"",
+			cpuset.New(1, 2, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			"",
+			cpuset.New(2),
+		},
+		{
+			"take first available UncoreCache from first socket",
+			topoUncoreDualSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "0-15"),
+			4,
+			"",
+			cpuset.New(0, 1, 2, 3),
+		},
+		{
+			"take all available UncoreCache from first socket",
+			topoUncoreDualSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "2-15"),
+			6,
+			"",
+			cpuset.New(2, 3, 4, 5, 6, 7),
+		},
+		{
+			"take first available UncoreCache from second socket",
+			topoUncoreDualSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "8-15"),
+			4,
+			"",
+			cpuset.New(8, 9, 10, 11),
+		},
+		{
+			"take first available UncoreCache from available NUMA",
+			topoUncoreSingleSocketMultiNuma,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "3,4-8,12"),
+			2,
+			"",
+			cpuset.New(4, 5),
+		},
+		{
+			"take cpus from best available UncoreCache group of multi uncore cache single socket - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "2-3,10-11,4-7,12-15"),
+			6,
+			"",
+			cpuset.New(4, 5, 6, 12, 13, 14),
+		},
+		{
+			"take cpus from multiple UncoreCache of single socket - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "1-7,9-15"),
+			10,
+			"",
+			mustParseCPUSet(t, "4-7,12-15,1,9"),
+		},
 	}...)
 
 	for _, tc := range testCases {
@@ -677,7 +750,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 				strategy = CPUSortingStrategySpread
 			}
 
-			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy)
+			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
 			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
@@ -778,7 +851,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 		if tc.opts.DistributeCPUsAcrossCores {
 			strategy = CPUSortingStrategySpread
 		}
-		result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy)
+		result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
 		if tc.expErr != "" && err.Error() != tc.expErr {
 			t.Errorf("testCase %q failed, expected error to be [%v] but it was [%v]", tc.description, tc.expErr, err)
 		}
