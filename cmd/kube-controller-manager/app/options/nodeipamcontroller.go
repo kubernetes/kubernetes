@@ -35,7 +35,7 @@ func (o *NodeIPAMControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
-	fs.StringVar(&o.ServiceCIDR, "service-cluster-ip-range", o.ServiceCIDR, "CIDR Range for Services in cluster. Requires --allocate-node-cidrs to be true")
+	fs.StringVar(&o.ServiceCIDR, "service-cluster-ip-range", o.ServiceCIDR, "CIDR Range for Services in cluster. Only used when --allocate-node-cidrs=true; if false, this option will be ignored.")
 	fs.Int32Var(&o.NodeCIDRMaskSize, "node-cidr-mask-size", o.NodeCIDRMaskSize, "Mask size for node cidr in cluster. Default is 24 for IPv4 and 64 for IPv6.")
 	fs.Int32Var(&o.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", o.NodeCIDRMaskSizeIPv4, "Mask size for IPv4 node cidr in dual-stack cluster. Default is 24.")
 	fs.Int32Var(&o.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", o.NodeCIDRMaskSizeIPv6, "Mask size for IPv6 node cidr in dual-stack cluster. Default is 64.")
