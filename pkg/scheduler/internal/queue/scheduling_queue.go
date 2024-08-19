@@ -27,7 +27,6 @@ limitations under the License.
 package queue
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"math/rand"
@@ -159,8 +158,8 @@ type PriorityQueue struct {
 	clock clock.Clock
 
 	// lock takes precedence and should be taken first,
-	// before any other locks in the queue (activeQLock or nominator.nLock).
-	// Correct locking order is: lock > activeQLock > nominator.nLock.
+	// before any other locks in the queue (activeQueue.lock or nominator.nLock).
+	// Correct locking order is: lock > activeQueue.lock > nominator.nLock.
 	lock sync.RWMutex
 
 	// pod initial backoff duration.
@@ -170,58 +169,12 @@ type PriorityQueue struct {
 	// the maximum time a pod can stay in the unschedulablePods.
 	podMaxInUnschedulablePodsDuration time.Duration
 
-	// cond is a condition that is notified when the pod is added to activeQ.
-	// It is used with activeQLock.
-	cond sync.Cond
-
-	// activeQLock synchronizes all operations related to activeQ.
-	// It protects activeQ, inFlightPods, inFlightEvents, schedulingCycle and closed fields.
-	// Caution: DO NOT take "lock" after taking "activeQLock".
-	// You should always take "lock" first, otherwise the queue could end up in deadlock.
-	// "activeQLock" should not be taken after taking "nLock".
-	// Correct locking order is: lock > activeQLock > nominator.nLock.
-	activeQLock sync.RWMutex
-
-	// inFlightPods holds the UID of all pods which have been popped out for which Done
-	// hasn't been called yet - in other words, all pods that are currently being
-	// processed (being scheduled, in permit, or in the binding cycle).
-	//
-	// The values in the map are the entry of each pod in the inFlightEvents list.
-	// The value of that entry is the *v1.Pod at the time that scheduling of that
-	// pod started, which can be useful for logging or debugging.
-	//
-	// It should be protected by activeQLock.
-	inFlightPods map[types.UID]*list.Element
-
-	// inFlightEvents holds the events received by the scheduling queue
-	// (entry value is clusterEvent) together with in-flight pods (entry
-	// value is *v1.Pod). Entries get added at the end while the mutex is
-	// locked, so they get serialized.
-	//
-	// The pod entries are added in Pop and used to track which events
-	// occurred after the pod scheduling attempt for that pod started.
-	// They get removed when the scheduling attempt is done, at which
-	// point all events that occurred in the meantime are processed.
-	//
-	// After removal of a pod, events at the start of the list are no
-	// longer needed because all of the other in-flight pods started
-	// later. Those events can be removed.
-	//
-	// It should be protected by activeQLock.
-	inFlightEvents *list.List
-
-	// activeQ is heap structure that scheduler actively looks at to find pods to
-	// schedule. Head of heap is the highest priority pod. It should be protected by activeQLock.
-	activeQ *heap.Heap[*framework.QueuedPodInfo]
+	activeQ activeQueuer
 	// podBackoffQ is a heap ordered by backoff expiry. Pods which have completed backoff
 	// are popped from this heap before the scheduler looks at activeQ
 	podBackoffQ *heap.Heap[*framework.QueuedPodInfo]
 	// unschedulablePods holds pods that have been tried and determined unschedulable.
 	unschedulablePods *UnschedulablePods
-	// schedulingCycle represents sequence number of scheduling cycle and is incremented
-	// when a pod is popped.
-	// It should be protected by activeQLock.
-	schedulingCycle int64
 	// moveRequestCycle caches the sequence number of scheduling cycle when we
 	// received a move request. Unschedulable pods in and before this scheduling
 	// cycle will be put back to activeQueue if we were trying to schedule them
@@ -233,11 +186,6 @@ type PriorityQueue struct {
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
 	// queueingHintMap is keyed with profile name, valued with registered queueing hint functions.
 	queueingHintMap QueueingHintMapPerProfile
-
-	// closed indicates that the queue is closed.
-	// It is mainly used to let Pop() exit its control loop while waiting for an item.
-	// It should be protected by activeQLock.
-	closed bool
 
 	nsLister listersv1.NamespaceLister
 
@@ -382,24 +330,23 @@ func NewPriorityQueue(
 		opt(&options)
 	}
 
+	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
+
 	pq := &PriorityQueue{
 		clock:                             options.clock,
 		stop:                              make(chan struct{}),
 		podInitialBackoffDuration:         options.podInitialBackoffDuration,
 		podMaxBackoffDuration:             options.podMaxBackoffDuration,
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
-		activeQ:                           heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()),
+		activeQ:                           newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		inFlightPods:                      make(map[types.UID]*list.Element),
-		inFlightEvents:                    list.New(),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 		moveRequestCycle:                  -1,
-		isSchedulingQueueHintEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
+		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 	}
-	pq.cond.L = &pq.activeQLock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister, pq.nominatedPodsToInfo)
@@ -601,11 +548,11 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 	gatedBefore := pInfo.Gated
 	pInfo.Gated = !p.runPreEnqueuePlugins(context.Background(), pInfo)
 
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
+	p.activeQ.getLock().Lock()
+	defer p.activeQ.getLock().Unlock()
 	if pInfo.Gated {
 		// Add the Pod to unschedulablePods if it's not passing PreEnqueuePlugins.
-		if p.activeQ.Has(pInfo) {
+		if p.activeQ.unlocked().Has(pInfo) {
 			return false
 		}
 		if p.podBackoffQ.Has(pInfo) {
@@ -619,7 +566,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 		pInfo.InitialAttemptTimestamp = &now
 	}
 
-	p.activeQ.AddOrUpdate(pInfo)
+	p.activeQ.unlocked().AddOrUpdate(pInfo)
 
 	p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 	_ = p.podBackoffQ.Delete(pInfo) // Don't need to react when pInfo is not found.
@@ -640,7 +587,7 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
 
 	pInfo := p.newQueuedPodInfo(pod)
 	if added := p.moveToActiveQ(logger, pInfo, framework.PodAdd); added {
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
 }
 
@@ -657,14 +604,8 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	}
 
 	if activated {
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
-}
-
-func (p *PriorityQueue) existsInActiveQ(pInfo *framework.QueuedPodInfo) bool {
-	p.activeQLock.RLock()
-	defer p.activeQLock.RUnlock()
-	return p.activeQ.Has(pInfo)
 }
 
 func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
@@ -701,46 +642,13 @@ func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 
 // SchedulingCycle returns current scheduling cycle.
 func (p *PriorityQueue) SchedulingCycle() int64 {
-	p.activeQLock.RLock()
-	defer p.activeQLock.RUnlock()
-	return p.schedulingCycle
-}
-
-// clusterEventsSinceElementUnlocked gets all cluster events that have happened during this inFlightPod is being scheduled.
-// Note: this function assumes activeQLock to be locked by the caller.
-func (p *PriorityQueue) clusterEventsSinceElementUnlocked(inFlightPod *list.Element) []*clusterEvent {
-	var events []*clusterEvent
-	for event := inFlightPod.Next(); event != nil; event = event.Next() {
-		e, ok := event.Value.(*clusterEvent)
-		if !ok {
-			// Must be another in-flight Pod (*v1.Pod). Can be ignored.
-			continue
-		}
-		events = append(events, e)
-	}
-	return events
-}
-
-func (p *PriorityQueue) clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error) {
-	p.activeQLock.RLock()
-	defer p.activeQLock.RUnlock()
-	logger.V(5).Info("Checking events for in-flight pod", "pod", klog.KObj(pInfo.Pod), "unschedulablePlugins", pInfo.UnschedulablePlugins, "inFlightEventsSize", p.inFlightEvents.Len(), "inFlightPodsSize", len(p.inFlightPods))
-
-	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
-	// So, given pInfo should have been Pop()ed before,
-	// we can assume pInfo must be recorded in inFlightPods and thus inFlightEvents.
-	inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]
-	if !ok {
-		return nil, fmt.Errorf("in flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler")
-	}
-
-	return p.clusterEventsSinceElementUnlocked(inFlightPod), nil
+	return p.activeQ.schedulingCycle()
 }
 
 // determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
 // and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
 func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) queueingStrategy {
-	events, err := p.clusterEventsForPod(logger, pInfo)
+	events, err := p.activeQ.clusterEventsForPod(logger, pInfo)
 	if err != nil {
 		logger.Error(err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
@@ -834,7 +742,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
 
-	if p.existsInActiveQ(pInfo) {
+	if p.activeQ.has(pInfo) {
 		return fmt.Errorf("Pod %v is already present in the active queue", klog.KObj(pod))
 	}
 	if p.podBackoffQ.Has(pInfo) {
@@ -864,7 +772,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	logger.V(3).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
 	if queue == activeQ {
 		// When the Pod is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
 
 	return nil
@@ -895,7 +803,7 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	}
 
 	if activated {
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
 }
 
@@ -925,81 +833,18 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // Note: This method should NOT be locked by the p.lock at any moment,
 // as it would lead to scheduling throughput degradation.
 func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
-	for p.activeQ.Len() == 0 {
-		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
-		// When Close() is called, the p.closed is set and the condition is broadcast,
-		// which causes this loop to continue and return from the Pop().
-		if p.closed {
-			logger.V(2).Info("Scheduling queue is closed")
-			return nil, nil
-		}
-		p.cond.Wait()
-	}
-	pInfo, err := p.activeQ.Pop()
-	if err != nil {
-		return nil, err
-	}
-	pInfo.Attempts++
-	p.schedulingCycle++
-	// In flight, no concurrent events yet.
-	if p.isSchedulingQueueHintEnabled {
-		p.inFlightPods[pInfo.Pod.UID] = p.inFlightEvents.PushBack(pInfo.Pod)
-	}
-
-	// Update metrics and reset the set of unschedulable plugins for the next attempt.
-	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
-	}
-	pInfo.UnschedulablePlugins.Clear()
-	pInfo.PendingPlugins.Clear()
-
-	return pInfo, nil
+	return p.activeQ.pop(logger)
 }
 
 // Done must be called for pod returned by Pop. This allows the queue to
 // keep track of which pods are currently being processed.
 func (p *PriorityQueue) Done(pod types.UID) {
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
-
-	p.done(pod)
-}
-
-func (p *PriorityQueue) done(pod types.UID) {
 	if !p.isSchedulingQueueHintEnabled {
 		// do nothing if schedulingQueueHint is disabled.
 		// In that case, we don't have inFlightPods and inFlightEvents.
 		return
 	}
-	inFlightPod, ok := p.inFlightPods[pod]
-	if !ok {
-		// This Pod is already done()ed.
-		return
-	}
-	delete(p.inFlightPods, pod)
-
-	// Remove the pod from the list.
-	p.inFlightEvents.Remove(inFlightPod)
-
-	// Remove events which are only referred to by this Pod
-	// so that the inFlightEvents list doesn't grow infinitely.
-	// If the pod was at the head of the list, then all
-	// events between it and the next pod are no longer needed
-	// and can be removed.
-	for {
-		e := p.inFlightEvents.Front()
-		if e == nil {
-			// Empty list.
-			break
-		}
-		if _, ok := e.Value.(*clusterEvent); !ok {
-			// A pod, must stop pruning.
-			break
-		}
-		p.inFlightEvents.Remove(e)
-	}
+	p.activeQ.done(pod)
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
@@ -1022,12 +867,12 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 }
 
 func (p *PriorityQueue) updateInActiveQueue(logger klog.Logger, oldPod, newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) bool {
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
-	if pInfo, exists := p.activeQ.Get(oldPodInfo); exists {
+	p.activeQ.getLock().Lock()
+	defer p.activeQ.getLock().Unlock()
+	if pInfo, exists := p.activeQ.unlocked().Get(oldPodInfo); exists {
 		_ = pInfo.Update(newPod)
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-		p.activeQ.AddOrUpdate(pInfo)
+		p.activeQ.unlocked().AddOrUpdate(pInfo)
 		return true
 	}
 	return false
@@ -1042,25 +887,15 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	defer p.lock.Unlock()
 
 	if p.isSchedulingQueueHintEnabled {
-		p.activeQLock.Lock()
-		// the inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
-		if _, ok := p.inFlightPods[newPod.UID]; ok {
+		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
+		// Record this update as Pod/Update because
+		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
+		// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
+		// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
+		if exists := p.activeQ.addEventIfPodInFlight(oldPod, newPod, framework.UnscheduledPodUpdate); exists {
 			logger.V(6).Info("The pod doesn't be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
-
-			// Record this update as Pod/Update because
-			// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
-			// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
-			// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
-			p.inFlightEvents.PushBack(&clusterEvent{
-				event:  framework.UnscheduledPodUpdate,
-				oldObj: oldPod,
-				newObj: newPod,
-			})
-
-			p.activeQLock.Unlock()
 			return
 		}
-		p.activeQLock.Unlock()
 	}
 
 	if oldPod != nil {
@@ -1098,7 +933,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 					p.unschedulablePods.delete(pInfo.Pod, gated)
 				}
 				if queue == activeQ {
-					p.cond.Broadcast()
+					p.activeQ.broadcast()
 					break
 				}
 			}
@@ -1113,7 +948,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 			}
 
 			if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete); added {
-				p.cond.Broadcast()
+				p.activeQ.broadcast()
 			}
 			return
 		}
@@ -1125,7 +960,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	// If pod is not in any of the queues, we put it in the active queue.
 	pInfo := p.newQueuedPodInfo(newPod)
 	if added := p.moveToActiveQ(logger, pInfo, framework.PodUpdate); added {
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
 }
 
@@ -1136,9 +971,9 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	defer p.lock.Unlock()
 	p.DeleteNominatedPodIfExists(pod)
 	pInfo := newQueuedPodInfoForLookup(pod)
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
-	if err := p.activeQ.Delete(pInfo); err != nil {
+	p.activeQ.getLock().Lock()
+	defer p.activeQ.getLock().Unlock()
+	if err := p.activeQ.unlocked().Delete(pInfo); err != nil {
 		// The item was probably not found in the activeQ.
 		p.podBackoffQ.Delete(pInfo)
 		if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
@@ -1227,7 +1062,7 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 		return activeQ
 	}
 	if pInfo.Gated {
-		// In case the pod is gated, the Pod is pushed back to unschedulable Pods pool in addToActiveQ.
+		// In case the pod is gated, the Pod is pushed back to unschedulable Pods pool in moveToActiveQ.
 		return unschedulablePods
 	}
 
@@ -1279,24 +1114,19 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		}
 	}
 
-	p.activeQLock.Lock()
-	defer p.activeQLock.Unlock()
-	p.moveRequestCycle = p.schedulingCycle
+	p.moveRequestCycle = p.activeQ.schedulingCycle()
 
-	if p.isSchedulingQueueHintEnabled && len(p.inFlightPods) != 0 {
-		logger.V(5).Info("Event received while pods are in flight", "event", event.Label, "numPods", len(p.inFlightPods))
+	if p.isSchedulingQueueHintEnabled {
 		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 		// AddUnschedulableIfNotPresent we need to know whether events were
 		// observed while scheduling them.
-		p.inFlightEvents.PushBack(&clusterEvent{
-			event:  event,
-			oldObj: oldObj,
-			newObj: newObj,
-		})
+		if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+			logger.V(5).Info("Event received while pods are in flight", "event", event.Label)
+		}
 	}
 
 	if activated {
-		p.cond.Broadcast()
+		p.activeQ.broadcast()
 	}
 }
 
@@ -1328,13 +1158,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Lo
 
 // PodsInActiveQ returns all the Pods in the activeQ.
 func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
-	p.activeQLock.RLock()
-	defer p.activeQLock.RUnlock()
-	var result []*v1.Pod
-	for _, pInfo := range p.activeQ.List() {
-		result = append(result, pInfo.Pod)
-	}
-	return result
+	return p.activeQ.list()
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
@@ -1345,7 +1169,7 @@ var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
 func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	result := p.PodsInActiveQ()
+	result := p.activeQ.list()
 	activeQLen := len(result)
 	for _, pInfo := range p.podBackoffQ.List() {
 		result = append(result, pInfo.Pod)
@@ -1356,12 +1180,12 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	return result, fmt.Sprintf(pendingPodsSummary, activeQLen, p.podBackoffQ.Len(), len(p.unschedulablePods.podInfoMap))
 }
 
-// Note: this function assumes the caller locks p.lock.RLock.
+// Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
 func (p *PriorityQueue) nominatedPodToInfo(np PodRef) *framework.PodInfo {
 	pod := np.ToPod()
 	pInfoLookup := newQueuedPodInfoForLookup(pod)
 
-	queuedPodInfo, exists := p.activeQ.Get(pInfoLookup)
+	queuedPodInfo, exists := p.activeQ.unlocked().Get(pInfoLookup)
 	if exists {
 		return queuedPodInfo.PodInfo
 	}
@@ -1382,8 +1206,8 @@ func (p *PriorityQueue) nominatedPodToInfo(np PodRef) *framework.PodInfo {
 func (p *PriorityQueue) nominatedPodsToInfo(nominatedPods []PodRef) []*framework.PodInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	p.activeQLock.RLock()
-	defer p.activeQLock.RUnlock()
+	p.activeQ.getLock().RLock()
+	defer p.activeQ.getLock().RUnlock()
 	pods := make([]*framework.PodInfo, len(nominatedPods))
 	for i, np := range nominatedPods {
 		pods[i] = p.nominatedPodToInfo(np).DeepCopy()
@@ -1396,11 +1220,8 @@ func (p *PriorityQueue) Close() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	close(p.stop)
-	p.activeQLock.Lock()
-	// closed field is locked by activeQLock as it is checked in Pop() without p.lock set.
-	p.closed = true
-	p.activeQLock.Unlock()
-	p.cond.Broadcast()
+	p.activeQ.close()
+	p.activeQ.broadcast()
 }
 
 // DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
@@ -1571,10 +1392,10 @@ func (np PodRef) ToPod() *v1.Pod {
 // by their UID and update/delete them.
 type nominator struct {
 	// nLock synchronizes all operations related to nominator.
-	// Caution: DO NOT take ("SchedulingQueue.lock" or "SchedulingQueue.activeQLock") after taking "nLock".
-	// You should always take "SchedulingQueue.lock" and "SchedulingQueue.activeQLock" first,
+	// Caution: DO NOT take ("SchedulingQueue.lock" or "activeQueue.lock") after taking "nLock".
+	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" first,
 	// otherwise the nominator could end up in deadlock.
-	// Correct locking order is: SchedulingQueue.lock > SchedulingQueue.activeQLock > nLock.
+	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock > nLock.
 	nLock sync.RWMutex
 
 	// podLister is used to verify if the given pod is alive.
