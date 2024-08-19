@@ -40,7 +40,7 @@ var (
 		external bool
 		detail   string
 	}{
-		{"gce", false, "The GCE provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-gcp"},
+		{"gce", true, "The GCE built-in cloud provider was removed. Please use https://github.com/kubernetes/cloud-provider-gcp"},
 	}
 )
 

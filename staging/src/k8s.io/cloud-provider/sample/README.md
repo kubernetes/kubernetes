@@ -11,7 +11,7 @@ Begin with 1.20, all cloud providers should not copy over or vendor in `k8s.io/k
 1. Have your external repo under k8s.io. e.g. `k8s.io/cloud-provider-<provider>`
 2. Create `main.go` file under your external repo CCM directory. Please refer to `basic_main.go` for a minimum working sample.
 Note: If you have a requirement of adding/deleting controllers within CCM, please refer to `k8s.io/kubernetes/cmd/cloud-controller-manager/main.go` for extra details.
-3. Build/release CCM from your external repo. For existing cloud providers, the option to import legacy providers from `k8s.io/legacy-cloud-provider/<provider>` is still available.
+3. Build/release CCM from your external repo. For existing cloud providers, the option to import legacy providers from `k8s.io/legacy-cloud-provider/<provider>` is still available until 1.31.
 
 ## Things you should NOT do
 
