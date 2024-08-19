@@ -232,9 +232,8 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, jm.worker, time.Second)
+		go wait.UntilWithContext(ctx, jm.orphanWorker, time.Second)
 	}
-
-	go wait.UntilWithContext(ctx, jm.orphanWorker, time.Second)
 
 	<-ctx.Done()
 }

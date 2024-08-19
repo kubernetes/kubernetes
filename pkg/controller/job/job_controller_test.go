@@ -7627,6 +7627,8 @@ func TestFinalizerCleanup(t *testing.T) {
 	// Initialize the controller with 0 workers to make sure the
 	// pod finalizers are not removed by the "syncJob" function.
 	go manager.Run(ctx, 0)
+	// Make sure the pod finalizers are removed by the "orphanWorker" function.
+	go wait.UntilWithContext(ctx, manager.orphanWorker, time.Second)
 
 	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
