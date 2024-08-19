@@ -294,7 +294,7 @@ func TestApplyCreate(t *testing.T) {
 	handled, configMap, err := reaction(action)
 	assert.True(t, handled)
 	if err != nil {
-		t.Errorf("Failed to create a resource with apply: %v", err)
+		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
 	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
@@ -314,7 +314,7 @@ func TestApplyNoMeta(t *testing.T) {
 	handled, configMap, err := reaction(action)
 	assert.True(t, handled)
 	if err != nil {
-		t.Errorf("Failed to create a resource with apply: %v", err)
+		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
 	assert.Equal(t, "cm-1", cm.Name)
