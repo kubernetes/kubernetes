@@ -380,10 +380,11 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		klog.V(5).InfoS("Skip file system resize check for the volume, as the volume is mounted as readonly", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 		return
 	}
+
 	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
 	pvcStatusCap := pvc.Status.Capacity.Storage()
 	dswp.desiredStateOfWorld.UpdatePersistentVolumeSize(uniqueVolumeName, pvCap)
-
+	klog.V(5).InfoS("NodeExpandVolume updating size", "actualSize", pvcStatusCap.String(), "desiredSize", pvCap.String(), "volumeName", uniqueVolumeName)
 	// in case the actualStateOfWorld was rebuild after kubelet restart ensure that claimSize is set to accurate value
 	dswp.actualStateOfWorld.InitializeClaimSize(klog.TODO(), uniqueVolumeName, pvcStatusCap)
 }

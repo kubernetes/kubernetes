@@ -184,7 +184,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			_, err = ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
+			_, err = ExpandPVCSizeToError(ctx, l.resource.Pvc, newSize, f.ClientSet)
 			gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
 		})
 	} else {
@@ -318,15 +318,15 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 	// Retry the update on error, until we hit a timeout.
 	// TODO: Determine whether "retry with timeout" is appropriate here. Maybe we should only retry on version conflict.
 	var lastUpdateError error
-	waitErr := wait.PollImmediate(resizePollInterval, 30*time.Second, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, 30*time.Second, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(pollContext, pvcName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for resizing: %w", pvcName, err)
 		}
 
 		updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = size
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Update(ctx, updatedPVC, metav1.UpdateOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Update(pollContext, updatedPVC, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Logf("Error updating pvc %s: %v", pvcName, err)
 			lastUpdateError = err
@@ -341,6 +341,42 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 		return nil, fmt.Errorf("failed to expand PVC size (check logs for error): %v", waitErr)
 	}
 	return updatedPVC, nil
+}
+
+func ExpandPVCSizeToError(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	pvcName := origPVC.Name
+	updatedPVC := origPVC.DeepCopy()
+
+	var lastUpdateError error
+
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, 30*time.Second, true, func(pollContext context.Context) (bool, error) {
+		var err error
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(pollContext, pvcName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("error fetching pvc %q for resizing: %w", pvcName, err)
+		}
+
+		updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = size
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Update(pollContext, updatedPVC, metav1.UpdateOptions{})
+		if err == nil {
+			return false, fmt.Errorf("pvc %s should not be allowed to be updated", pvcName)
+		} else {
+			lastUpdateError = err
+			if apierrors.IsForbidden(err) {
+				return true, nil
+			}
+			framework.Logf("Error updating pvc %s: %v", pvcName, err)
+			return false, nil
+		}
+	})
+
+	if wait.Interrupted(waitErr) {
+		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %w", lastUpdateError)
+	}
+	if waitErr != nil {
+		return nil, fmt.Errorf("failed to expand PVC size (check logs for error): %w", waitErr)
+	}
+	return updatedPVC, lastUpdateError
 }
 
 // WaitForResizingCondition waits for the pvc condition to be PersistentVolumeClaimResizing
@@ -423,9 +459,9 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 // WaitForFSResize waits for the filesystem in the pv to be resized
 func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	var updatedPVC *v1.PersistentVolumeClaim
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, totalResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, totalResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %w", pvc.Name, err)
