@@ -645,6 +645,7 @@ function codegen::clients() {
         --input-base="k8s.io/api" \
         --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
+        --prefers-protobuf \
         $(printf -- " --input %s" "${gv_dirs[@]}") \
         "$@"
 

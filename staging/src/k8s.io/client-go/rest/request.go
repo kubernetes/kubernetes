@@ -176,12 +176,7 @@ func NewRequest(c *RESTClient) *Request {
 		contentTypeNotSet: contentTypeNotSet,
 	}
 
-	switch {
-	case len(c.content.AcceptContentTypes) > 0:
-		r.SetHeader("Accept", c.content.AcceptContentTypes)
-	case len(c.content.ContentType) > 0:
-		r.SetHeader("Accept", c.content.ContentType+", */*")
-	}
+	r.setAcceptHeader()
 	return r
 }
 
@@ -193,6 +188,31 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 		content:          content,
 		Client:           client,
 	})
+}
+
+func (r *Request) UseProtobufAsDefaultIfPreferred(prefersProtobuf bool) *Request {
+	if prefersProtobuf {
+		return r.UseProtobufAsDefault()
+	}
+	return r
+}
+
+func (r *Request) UseProtobufAsDefault() *Request {
+	if r.contentTypeNotSet && len(r.contentConfig.AcceptContentTypes) == 0 {
+		r.contentConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+		r.contentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+		r.setAcceptHeader()
+	}
+	return r
+}
+
+func (r *Request) setAcceptHeader() {
+	switch {
+	case len(r.contentConfig.AcceptContentTypes) > 0:
+		r.SetHeader("Accept", r.contentConfig.AcceptContentTypes)
+	case len(r.contentConfig.ContentType) > 0:
+		r.SetHeader("Accept", r.contentConfig.ContentType+", */*")
+	}
 }
 
 // Verb sets the verb this request will use.
