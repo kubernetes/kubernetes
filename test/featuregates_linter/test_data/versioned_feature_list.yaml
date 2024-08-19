@@ -1,18 +1,934 @@
-- name: AnonymousAuthConfigurableEndpoints
+- name: AnyVolumeDataSource
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.18"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.24"
+- name: AppArmor
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.4"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: AppArmorFields
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: AuthorizeNodeWithSelectors
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: ClusterTrustBundle
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+- name: ClusterTrustBundleProjection
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+- name: ContainerCheckpoint
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.32"
+    version: "1.30"
+- name: CPUCFSQuotaPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.12"
+- name: CPUManager
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.8"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.10"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.26"
+- name: CPUManagerPolicyAlphaOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+- name: CPUManagerPolicyBetaOptions
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.23"
+- name: CPUManagerPolicyOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.23"
+- name: CronJobsScheduledAnnotation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+- name: CrossNamespaceVolumeDataSource
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+- name: CSIMigrationPortworx
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: CSIVolumeHealth
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+- name: DevicePluginCDIDevices
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: DisableAllocatorDualWrite
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
+- name: DisableCloudProviders
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: DisableKubeletCloudCredentialProviders
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: DRAControlPlaneController
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+- name: DynamicResourceAllocation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+- name: ElasticIndexedJob
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: EventedPLEG
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+- name: ExecProbeTimeout
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.20"
+- name: GracefulNodeShutdown
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.21"
+- name: GracefulNodeShutdownBasedOnPodPriority
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.24"
+- name: HonorPVReclaimPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: HPAContainerMetrics
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: ImageMaximumGCAge
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: ImageVolume
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
+- name: InTreePluginPortworxUnregister
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+- name: JobBackoffLimitPerIndex
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: JobManagedBy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+- name: JobPodFailurePolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: JobPodReplacementPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: JobSuccessPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: KubeletCgroupDriverFromCRI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: KubeletInUserNamespace
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+- name: KubeletPodResourcesDynamicResources
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
+- name: KubeletPodResourcesGet
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
+- name: KubeletSeparateDiskGC
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: KubeletTracing
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: KubeProxyDrainingTerminatingNodes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: LoadBalancerIPMode
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: LocalStorageCapacityIsolationFSQuotaMonitoring
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.15"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: LogarithmicScaleDown
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.22"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: MatchLabelKeysInPodAffinity
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: MatchLabelKeysInPodTopologySpread
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: MaxUnavailableStatefulSet
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.24"
+- name: MemoryManager
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.22"
+- name: MemoryQoS
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+- name: MinDomainsInPodTopologySpread
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.24"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.25"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: MultiCIDRServiceAllocator
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: NewVolumeManagerReconstruction
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: NFTablesProxyMode
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: NodeInclusionPolicyInPodTopologySpread
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+- name: NodeLogQuery
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: NodeOutOfServiceVolumeDetach
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.24"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.28"
+- name: NodeSwap
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: PDBUnhealthyPodEvictionPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: PersistentVolumeLastPhaseTransitionTime
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: PodAndContainerStatsFromCRI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+- name: PodDeletionCost
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.22"
+- name: PodDisruptionConditions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: PodHostIPs
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: PodIndexLabel
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+- name: PodLifecycleSleepAction
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: PodReadyToStartContainersCondition
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: PodSchedulingReadiness
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: PortForwardWebsockets
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: ProcMountType
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.12"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: QOSReserved
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.11"
+- name: RecoverVolumeExpansionFailure
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
 - name: RelaxedEnvironmentVariableValidation
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
+    version: "1.30"
+- name: ReloadKubeletServerCertificateFile
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: ResourceHealthStatus
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
+- name: RotateKubeletServerCertificate
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.7"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.12"
+- name: RuntimeClassInImageCriAPI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+- name: SchedulerQueueingHints
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+- name: SELinuxMount
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+- name: SELinuxMountReadWriteOncePod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: SeparateTaintEvictionController
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: ServiceAccountTokenJTI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: ServiceAccountTokenNodeBinding
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: ServiceAccountTokenNodeBindingValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: ServiceAccountTokenPodNodeInfo
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: ServiceTrafficDistribution
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: SidecarContainers
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+- name: SizeMemoryBackedVolumes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.22"
+- name: StatefulSetAutoDeletePVC
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: StatefulSetStartOrdinal
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
+- name: StorageVersionMigrator
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+- name: SupplementalGroupsPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
+- name: TopologyAwareHints
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.23"
+- name: TopologyManagerPolicyAlphaOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+- name: TopologyManagerPolicyBetaOptions
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+- name: TopologyManagerPolicyOptions
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+- name: TranslateStreamCloseWebsocketRequests
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: UnknownVersionInteroperabilityProxy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+- name: UserNamespacesPodSecurityStandards
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+- name: UserNamespacesSupport
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.25"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
     version: "1.30"
 - name: VolumeAttributesClass
   versionedSpecs:
@@ -24,3 +940,31 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+- name: VolumeCapacityPriority
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.21"
+- name: WindowsHostNetwork
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+- name: WinDSR
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.14"
+- name: WinOverlay
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.14"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.20"
