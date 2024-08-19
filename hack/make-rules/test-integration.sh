@@ -81,13 +81,13 @@ runTests() {
   # empty here to ensure that we aren't unintentionally consuming them from the
   # previous make invocation.
   KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
+      KUBE_SKIP_TARGET_NORMALIZATION="${KUBE_SKIP_TARGET_NORMALIZATION:-$(if [ -z "${WHAT:-}" ]; then echo y; else echo n; fi)}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE="" \
       MAKEFLAGS="" \
       make -C "${KUBE_ROOT}" test
-
   cleanup
 }
 

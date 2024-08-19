@@ -82,6 +82,10 @@ fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+# Set to 'y' to skip normalizing the test targets. Normalization
+# is redundant for local paths starting with a . (./pkg/...) or Go package
+# names (k8s.io/kubernetes/pkg/...).
+KUBE_SKIP_TARGET_NORMALIZATION=${KUBE_SKIP_TARGET_NORMALIZATION:-n}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -156,6 +160,7 @@ for arg; do
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
   kube::util::read-array testcases < <(kube::test::find_dirs)
+  KUBE_SKIP_TARGET_NORMALIZATION=y
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
@@ -192,8 +197,12 @@ runTests() {
 
   # Try to normalize input names. This is slow!
   local -a targets
-  kube::log::status "Normalizing Go targets"
-  kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
+  if [[ ${KUBE_SKIP_TARGET_NORMALIZATION} =~ ^[yY]$ ]]; then
+    targets=("$@")
+  else
+    kube::log::status "Normalizing Go targets"
+    kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
+  fi
 
   # Enable coverage data collection?
   local cover_msg
