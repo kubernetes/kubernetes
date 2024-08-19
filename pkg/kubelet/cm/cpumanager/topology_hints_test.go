@@ -49,16 +49,16 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 		Topology: []cadvisorapi.Node{
 			{Id: 0,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 0, Id: 0, Threads: []int{0, 6}},
-					{SocketID: 0, Id: 1, Threads: []int{1, 7}},
-					{SocketID: 0, Id: 2, Threads: []int{2, 8}},
+					{SocketID: 0, Id: 0, Threads: []int{0, 6}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 1, Threads: []int{1, 7}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 2, Threads: []int{2, 8}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 			{Id: 1,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 1, Id: 0, Threads: []int{3, 9}},
-					{SocketID: 1, Id: 1, Threads: []int{4, 10}},
-					{SocketID: 1, Id: 2, Threads: []int{5, 11}},
+					{SocketID: 1, Id: 0, Threads: []int{3, 9}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 1, Threads: []int{4, 10}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 2, Threads: []int{5, 11}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 		},
