@@ -36,8 +36,10 @@ import (
 // and it is forbidden to call any other activeQueuer's method under this lock.
 type activeQueuer interface {
 	underLock(func(unlockedActiveQ unlockedActiveQueuer))
-	underRLock(func(unlockedActiveQ unlockedActiveQueuer))
+	underRLock(func(unlockedActiveQ unlockedActiveQueueReader))
 
+	update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
+	delete(pInfo *framework.QueuedPodInfo) error
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	list() []*v1.Pod
 	len() int
@@ -56,12 +58,17 @@ type activeQueuer interface {
 }
 
 // unlockedActiveQueuer defines activeQ methods that are not protected by the lock itself.
-// underLock() and underRLock() methods should be used to protect these methods.
+// underLock() method should be used to protect these methods.
 type unlockedActiveQueuer interface {
+	unlockedActiveQueueReader
+	AddOrUpdate(pInfo *framework.QueuedPodInfo)
+}
+
+// unlockedActiveQueueReader defines activeQ read-only methods that are not protected by the lock itself.
+// underLock() or underRLock() method should be used to protect these methods.
+type unlockedActiveQueueReader interface {
 	Get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
 	Has(pInfo *framework.QueuedPodInfo) bool
-	AddOrUpdate(pInfo *framework.QueuedPodInfo)
-	Delete(pInfo *framework.QueuedPodInfo) error
 }
 
 // activeQueue implements activeQueuer. All of the fields have to be protected using the lock.
@@ -140,12 +147,34 @@ func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) 
 }
 
 // underLock runs the fn function under the lock.RLock.
-// fn can run unlockedActiveQueuer methods but should NOT run any other activeQueue method,
+// fn can run unlockedActiveQueueReader methods but should NOT run any other activeQueue method,
 // as it would end up in deadlock.
-func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueuer)) {
+func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueReader)) {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	fn(aq.queue)
+}
+
+// update updates the pod in activeQ if oldPodInfo is already in the queue.
+// It returns new pod info if updated, nil otherwise.
+func (aq *activeQueue) update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	if pInfo, exists := aq.queue.Get(oldPodInfo); exists {
+		_ = pInfo.Update(newPod)
+		aq.queue.AddOrUpdate(pInfo)
+		return pInfo
+	}
+	return nil
+}
+
+// delete deletes the pod info from activeQ.
+func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	return aq.queue.Delete(pInfo)
 }
 
 // pop removes the head of the queue and returns it.

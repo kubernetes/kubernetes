@@ -1104,7 +1104,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 					pInfo = pInfoFromBackoff
 				}
 
-				q.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueuer) {
+				q.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 					if pInfoFromActive, exists := unlockedActiveQ.Get(newQueuedPodInfoForLookup(newPod)); exists {
 						if tt.wantQ != activeQ {
 							t.Errorf("expected pod %s not to be queued to activeQ, but it was", newPod.Name)
