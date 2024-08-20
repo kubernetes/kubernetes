@@ -52,25 +52,23 @@ func makeFakeContainer(sandbox *apitest.FakePodSandbox, name string, attempt uin
 	c := &apitest.FakeContainer{
 		SandboxID: sandboxID,
 		ContainerStatus: runtimeapi.ContainerStatus{
+			Id:        containerID,
 			Metadata:  &runtimeapi.ContainerMetadata{Name: name, Attempt: attempt},
 			Image:     &runtimeapi.ImageSpec{},
 			ImageRef:  "fake-image-ref",
-			CreatedAt: time.Now().UnixNano(),
+			CreatedAt: int64(createTime),
+			Labels: map[string]string{
+				"io.kubernetes.pod.name":       sandbox.Metadata.Name,
+				"io.kubernetes.pod.uid":        sandbox.Metadata.Uid,
+				"io.kubernetes.pod.namespace":  sandbox.Metadata.Namespace,
+				"io.kubernetes.container.name": name,
+			},
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 		},
 	}
-	c.ContainerStatus.Labels = map[string]string{
-		"io.kubernetes.pod.name":       sandbox.Metadata.Name,
-		"io.kubernetes.pod.uid":        sandbox.Metadata.Uid,
-		"io.kubernetes.pod.namespace":  sandbox.Metadata.Namespace,
-		"io.kubernetes.container.name": name,
-	}
 	if terminated {
-		c.ContainerStatus.State = runtimeapi.ContainerState_CONTAINER_EXITED
-	} else {
-		c.ContainerStatus.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+		c.State = runtimeapi.ContainerState_CONTAINER_EXITED
 	}
-	c.ContainerStatus.Id = containerID
-	c.CreatedAt = int64(createTime)
 	return c
 }
 func TestBuildContainerMapAndRunningSetFromRuntime(t *testing.T) {
