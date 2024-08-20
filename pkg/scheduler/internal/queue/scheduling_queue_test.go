@@ -675,6 +675,7 @@ func Test_InFlightPods(t *testing.T) {
 			}
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap), WithClock(fakeClock))
+			sortOpt := cmpopts.SortSlices(func(a, b string) bool { return a < b })
 
 			// When a Pod is added to the queue, the QueuedPodInfo will have a new timestamp.
 			// On Windows, time.Now() is not as precise, 2 consecutive calls may return the same timestamp.
@@ -734,7 +735,7 @@ func Test_InFlightPods(t *testing.T) {
 				for _, pod := range pods {
 					podNames = append(podNames, pod.Name)
 				}
-				if diff := cmp.Diff(test.wantActiveQPodNames, podNames); diff != "" {
+				if diff := cmp.Diff(test.wantActiveQPodNames, podNames, sortOpt); diff != "" {
 					t.Fatalf("Unexpected diff of activeQ pod names (-want, +got):\n%s", diff)
 				}
 
@@ -752,7 +753,7 @@ func Test_InFlightPods(t *testing.T) {
 				for _, pInfo := range podInfos {
 					podNames = append(podNames, pInfo.Pod.Name)
 				}
-				if diff := cmp.Diff(test.wantBackoffQPodNames, podNames); diff != "" {
+				if diff := cmp.Diff(test.wantBackoffQPodNames, podNames, sortOpt); diff != "" {
 					t.Fatalf("Unexpected diff of backoffQ pod names (-want, +got):\n%s", diff)
 				}
 
