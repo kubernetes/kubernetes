@@ -77,67 +77,79 @@ type Nodes struct {
 var pluginPermissions string
 
 // NewNodes selects nodes to run the test on.
+//
+// Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
 	ginkgo.BeforeEach(func(ctx context.Context) {
-
-		ginkgo.By("selecting nodes")
-		// The kubelet plugin is harder. We deploy the builtin manifest
-		// after patching in the driver name and all nodes on which we
-		// want the plugin to run.
-		//
-		// Only a subset of the nodes are picked to avoid causing
-		// unnecessary load on a big cluster.
-		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
-		framework.ExpectNoError(err, "get nodes")
-		numNodes := int32(len(nodeList.Items))
-		if int(numNodes) < minNodes {
-			e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes, numNodes)
-		}
-		nodes.NodeNames = nil
-		for _, node := range nodeList.Items {
-			nodes.NodeNames = append(nodes.NodeNames, node.Name)
-		}
-		sort.Strings(nodes.NodeNames)
-		framework.Logf("testing on nodes %v", nodes.NodeNames)
-
-		// Watch claims in the namespace. This is useful for monitoring a test
-		// and enables additional sanity checks.
-		claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
-		cancelCtx, cancel := context.WithCancelCause(context.Background())
-		var wg sync.WaitGroup
-		ginkgo.DeferCleanup(func() {
-			cancel(errors.New("test has completed"))
-			wg.Wait()
-		})
-		_, err = claimInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj any) {
-				defer ginkgo.GinkgoRecover()
-				claim := obj.(*resourceapi.ResourceClaim)
-				framework.Logf("New claim:\n%s", format.Object(claim, 1))
-				validateClaim(claim)
-			},
-			UpdateFunc: func(oldObj, newObj any) {
-				defer ginkgo.GinkgoRecover()
-				oldClaim := oldObj.(*resourceapi.ResourceClaim)
-				newClaim := newObj.(*resourceapi.ResourceClaim)
-				framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
-				validateClaim(newClaim)
-			},
-			DeleteFunc: func(obj any) {
-				defer ginkgo.GinkgoRecover()
-				claim := obj.(*resourceapi.ResourceClaim)
-				framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
-			},
-		})
-		framework.ExpectNoError(err, "AddEventHandler")
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			claimInformer.Run(cancelCtx.Done())
-		}()
+		nodes.init(ctx, f, minNodes, maxNodes)
 	})
 	return nodes
+}
+
+// NewNodesNow is a variant of NewNodes which can be used inside a ginkgo.It.
+func NewNodesNow(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) *Nodes {
+	nodes := &Nodes{}
+	nodes.init(ctx, f, minNodes, maxNodes)
+	return nodes
+}
+
+func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) {
+	ginkgo.By("selecting nodes")
+	// The kubelet plugin is harder. We deploy the builtin manifest
+	// after patching in the driver name and all nodes on which we
+	// want the plugin to run.
+	//
+	// Only a subset of the nodes are picked to avoid causing
+	// unnecessary load on a big cluster.
+	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
+	framework.ExpectNoError(err, "get nodes")
+	numNodes := int32(len(nodeList.Items))
+	if int(numNodes) < minNodes {
+		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes, numNodes)
+	}
+	nodes.NodeNames = nil
+	for _, node := range nodeList.Items {
+		nodes.NodeNames = append(nodes.NodeNames, node.Name)
+	}
+	sort.Strings(nodes.NodeNames)
+	framework.Logf("testing on nodes %v", nodes.NodeNames)
+
+	// Watch claims in the namespace. This is useful for monitoring a test
+	// and enables additional sanity checks.
+	claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
+	cancelCtx, cancel := context.WithCancelCause(context.Background())
+	var wg sync.WaitGroup
+	ginkgo.DeferCleanup(func() {
+		cancel(errors.New("test has completed"))
+		wg.Wait()
+	})
+	_, err = claimInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			defer ginkgo.GinkgoRecover()
+			claim := obj.(*resourceapi.ResourceClaim)
+			framework.Logf("New claim:\n%s", format.Object(claim, 1))
+			validateClaim(claim)
+		},
+		UpdateFunc: func(oldObj, newObj any) {
+			defer ginkgo.GinkgoRecover()
+			oldClaim := oldObj.(*resourceapi.ResourceClaim)
+			newClaim := newObj.(*resourceapi.ResourceClaim)
+			framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
+			validateClaim(newClaim)
+		},
+		DeleteFunc: func(obj any) {
+			defer ginkgo.GinkgoRecover()
+			claim := obj.(*resourceapi.ResourceClaim)
+			framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
+		},
+	})
+	framework.ExpectNoError(err, "AddEventHandler")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		claimInformer.Run(cancelCtx.Done())
+	}()
 }
 
 func validateClaim(claim *resourceapi.ResourceClaim) {
@@ -153,26 +165,41 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
+//
+// Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *Driver {
-	d := &Driver{
-		f:            f,
-		fail:         map[MethodInstance]bool{},
-		callCounts:   map[MethodInstance]int64{},
-		NodeV1alpha3: true,
-	}
+	d := NewDriverInstance(f)
 
 	ginkgo.BeforeEach(func() {
-		resources := configureResources()
-		if len(resources.Nodes) == 0 {
-			// This always has to be set because the driver might
-			// not run on all nodes.
-			resources.Nodes = nodes.NodeNames
-		}
-		ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
-		d.SetUp(nodes, resources, devicesPerNode...)
-		ginkgo.DeferCleanup(d.TearDown)
+		d.Run(nodes, configureResources, devicesPerNode...)
 	})
 	return d
+}
+
+// NewDriverInstance is a variant of NewDriver where the driver is inactive and must
+// be started explicitly with Run. May be used inside ginkgo.It.
+func NewDriverInstance(f *framework.Framework) *Driver {
+	d := &Driver{
+		f:             f,
+		fail:          map[MethodInstance]bool{},
+		callCounts:    map[MethodInstance]int64{},
+		NodeV1alpha3:  true,
+		parameterMode: parameterModeStructured,
+	}
+	d.initName()
+	return d
+}
+
+func (d *Driver) Run(nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+	resources := configureResources()
+	if len(resources.Nodes) == 0 {
+		// This always has to be set because the driver might
+		// not run on all nodes.
+		resources.Nodes = nodes.NodeNames
+	}
+	ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
+	d.SetUp(nodes, resources, devicesPerNode...)
+	ginkgo.DeferCleanup(d.TearDown)
 }
 
 type MethodInstance struct {
@@ -215,24 +242,22 @@ const (
 	parameterModeStructured parameterMode = "structured" // allocation through scheduler
 )
 
-func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
-	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
-	d.Nodes = make(map[string]KubeletPlugin)
+func (d *Driver) initName() {
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
+}
+
+func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+	d.initName()
+	ginkgo.By(fmt.Sprintf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames))
+	d.Nodes = make(map[string]KubeletPlugin)
 	resources.DriverName = d.Name
 
 	ctx, cancel := context.WithCancel(context.Background())
-	if d.NameSuffix != "" {
-		logger := klog.FromContext(ctx)
-		logger = klog.LoggerWithName(logger, "instance"+d.NameSuffix)
-		ctx = klog.NewContext(ctx, logger)
-	}
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "driverName", d.Name)
+	ctx = klog.NewContext(ctx, logger)
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
-
-	if d.parameterMode == "" {
-		d.parameterMode = parameterModeStructured
-	}
 
 	switch d.parameterMode {
 	case parameterModeClassicDRA:
@@ -387,7 +412,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...
 		// Here we merely use impersonation, which is faster.
 		driverClient := d.impersonateKubeletPlugin(&pod)
 
-		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
+		logger := klog.LoggerWithValues(klog.LoggerWithName(logger, "kubelet-plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
 		fileOps := app.FileOperations{
 			Create: func(name string, content []byte) error {

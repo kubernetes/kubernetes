@@ -125,6 +125,7 @@ const (
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
+	ResourceSlice         GVK = "ResourceSlice"
 	DeviceClass           GVK = "DeviceClass"
 
 	// WildCard is a special GVK to match all resources.
