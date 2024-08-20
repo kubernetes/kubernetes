@@ -445,7 +445,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
-		logger.V(4).Info("pod is not schedulable", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
+		logger.V(6).Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
 		return framework.QueueSkip, nil
 	}
 
