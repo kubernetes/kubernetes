@@ -1785,12 +1785,16 @@ function setup-easyrsa {
     mkdir -p easy-rsa && tar xzf easy-rsa.tar.gz -C easy-rsa --strip-components 1
     local -r files_to_copy=(easyrsa openssl-easyrsa.cnf  x509-types vars.example)
     mkdir easy-rsa/aggregator
+    # shellcheck disable=SC2145
     cp -r easy-rsa/"${files_to_copy[@]}" easy-rsa/aggregator
     mkdir easy-rsa/cloud-pvl-admission
+    # shellcheck disable=SC2145
     cp -r easy-rsa/"${files_to_copy[@]}" easy-rsa/cloud-pvl-admission
     mkdir easy-rsa/konnectivity-server
+    # shellcheck disable=SC2145
     cp -r easy-rsa/"${files_to_copy[@]}" easy-rsa/konnectivity-server
     mkdir easy-rsa/konnectivity-agent
+    # shellcheck disable=SC2145
     cp -r easy-rsa/"${files_to_copy[@]}" easy-rsa/konnectivity-agent) &>"${cert_create_debug_output}" || true
   CERT_DIR="${KUBE_TEMP}/easy-rsa"
   AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa/aggregator"
