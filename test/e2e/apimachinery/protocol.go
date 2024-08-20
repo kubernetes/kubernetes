@@ -72,7 +72,7 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			defer w.Stop()
 
 			evt, ok := <-w.ResultChan()
-			o.Expect(ok).To(o.BeTrue())
+			o.Expect(ok).To(o.BeTrueBecause("unexpected watch event: %v, %#v", evt.Type, evt.Object))
 			switch evt.Type {
 			case watch.Added, watch.Modified:
 				// this is allowed

@@ -178,7 +178,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).NotTo(gomega.BeNil())
 			allowVolumeExpansion := *l.resource.Sc.AllowVolumeExpansion
-			gomega.Expect(allowVolumeExpansion).To(gomega.BeFalse())
+			gomega.Expect(allowVolumeExpansion).To(gomega.BeFalseBecause("expected AllowVolumeExpansion value to be false"))
 			ginkgo.By("Expanding non-expandable pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
