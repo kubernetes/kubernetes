@@ -33,19 +33,18 @@ import (
 
 func makeFakePodSandbox(name, namespace string) *apitest.FakePodSandbox {
 	uid := fmt.Sprintf("pod-innerId-%s", strings.ReplaceAll(string(uuid.NewUUID()), "-", ""))
-	p := &apitest.FakePodSandbox{
+	return &apitest.FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
 			Metadata: &runtimeapi.PodSandboxMetadata{
 				Name:      name,
 				Uid:       uid,
 				Namespace: namespace,
 			},
+			Id:        uid,
 			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
 			CreatedAt: time.Now().UnixNano(),
 		},
 	}
-	p.PodSandboxStatus.Id = uid
-	return p
 }
 
 func makeFakeContainer(sandbox *apitest.FakePodSandbox, name string, attempt uint32, terminated bool, createTime int, containerID string) *apitest.FakeContainer {
