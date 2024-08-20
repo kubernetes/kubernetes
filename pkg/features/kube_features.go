@@ -275,6 +275,7 @@ const (
 
 	// owner: @jpbetz
 	// alpha: v1.30
+	// beta: v1.31
 	// Resource create requests using generateName are retried automatically by the apiserver
 	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
 	RetryGenerateName featuregate.Feature = "RetryGenerateName"
