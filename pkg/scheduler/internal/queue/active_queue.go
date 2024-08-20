@@ -35,8 +35,8 @@ import (
 // getLock() methods should be used only for unlocked() methods
 // and it is forbidden to call any other activeQueuer's method under this lock.
 type activeQueuer interface {
-	getLock() *sync.RWMutex
-	unlocked() unlockedActiveQueuer
+	underLock(func(unlockedActiveQ unlockedActiveQueuer))
+	underRLock(func(unlockedActiveQ unlockedActiveQueuer))
 
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	list() []*v1.Pod
@@ -56,7 +56,7 @@ type activeQueuer interface {
 }
 
 // unlockedActiveQueuer defines activeQ methods that are not protected by the lock itself.
-// getLock() methods should be used to protect these methods.
+// underLock() and underRLock() methods should be used to protect these methods.
 type unlockedActiveQueuer interface {
 	Get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
 	Has(pInfo *framework.QueuedPodInfo) bool
@@ -130,15 +130,22 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 	return aq
 }
 
-// getLock returns lock of activeQueue. Its methods should be used only to protect the unlocked() methods.
-func (aq *activeQueue) getLock() *sync.RWMutex {
-	return &aq.lock
+// underLock runs the fn function under the lock.Lock.
+// fn can run unlockedActiveQueuer methods but should NOT run any other activeQueue method,
+// as it would end up in deadlock.
+func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+	fn(aq.queue)
 }
 
-// unlocked returns queue methods, that are not protected by the lock itself.
-// getLock() methods should be used to protect queue methods.
-func (aq *activeQueue) unlocked() unlockedActiveQueuer {
-	return aq.queue
+// underLock runs the fn function under the lock.RLock.
+// fn can run unlockedActiveQueuer methods but should NOT run any other activeQueue method,
+// as it would end up in deadlock.
+func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueuer)) {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
+	fn(aq.queue)
 }
 
 // pop removes the head of the queue and returns it.
