@@ -308,7 +308,7 @@ main() {
 
   # debug kind version
   kind version
-
+  cp test/e2e/testing-manifests/storage-csi/external-snapshotter/volume-group-snapshots/csi-hostpath-plugin.yaml test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml || exit 1
   # build kubernetes
   build
   # in CI attempt to release some memory after building
@@ -317,7 +317,7 @@ main() {
     echo 1 > /proc/sys/vm/drop_caches || true
   fi
 
-  cp test/e2e/testing-manifests/storage-csi/external-snapshotter/volume-group-snapshots/csi-hostpath-plugin.yaml test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml || exit 1
+  
   # create the cluster and run tests
   res=0
   create_cluster || res=$?
