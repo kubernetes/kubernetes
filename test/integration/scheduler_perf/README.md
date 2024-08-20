@@ -110,6 +110,22 @@ make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_ARGS=-use
 ```
 
 Integration testing uses the same `config/performance-config.yaml` as
-benchmarking. By default, workloads labeled as `integration-test` are executed
-as part of integration testing. `-test-scheduling-label-filter` can be used to
-change that.
+benchmarking. By default, workloads labeled as `integration-test`
+are executed as part of integration testing (in ci-kubernetes-integration-master job).
+`-test-scheduling-label-filter` can be used to change that.
+All test cases should have at least one workload labeled as `integration-test`.
+
+Running the integration tests with command above will only execute the workloads labeled as `short`.
+`SHORT=--short=false` variable added to the command can be used to disable this filtering.
+
+We should make each test case with `short` label very small,
+so that all tests with the label should take less than 5 min to complete.
+The test cases labeled as `short` are executed in pull-kubernetes-integration job.
+
+### Labels used by CI jobs
+
+| CI Job                           | Labels                 |
+|----------------------------------|------------------------|
+| ci-kubernetes-integration-master | integration-test       |
+| pull-kubernetes-integration      | integration-test,short |
+| ci-benchmark-scheduler-perf      | performance            |

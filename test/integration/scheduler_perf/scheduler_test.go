@@ -29,6 +29,10 @@ func TestScheduling(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if testing.Short() {
+		*testSchedulingLabelFilter += ",+short"
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			for _, w := range tc.Workloads {
