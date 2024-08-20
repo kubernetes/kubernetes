@@ -1390,6 +1390,31 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	ginkgo.Context("multiple drivers", func() {
 		multipleDriversContext("using only drapbv1alpha3", true)
 	})
+
+	ginkgo.It("runs pod after driver starts", func(ctx context.Context) {
+		nodes := NewNodesNow(ctx, f, 1, 4)
+		driver := NewDriverInstance(f)
+		b := newBuilderNow(ctx, f, driver)
+
+		claim := b.externalClaim()
+		pod := b.podExternal()
+		b.create(ctx, claim, pod)
+
+		// Cannot run pod, no devices.
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+
+		// Set up driver, which makes devices available.
+		driver.Run(nodes, perNode(1, nodes))
+
+		// Now it should run.
+		b.testPod(ctx, f.ClientSet, pod)
+
+		// We need to clean up explicitly because the normal
+		// cleanup doesn't work (driver shuts down first).
+		// framework.ExpectNoError(f.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+	})
 })
 
 // builder contains a running counter to make objects unique within thir
@@ -1676,16 +1701,20 @@ func testContainerEnv(ctx context.Context, clientSet kubernetes.Interface, pod *
 
 func newBuilder(f *framework.Framework, driver *Driver) *builder {
 	b := &builder{f: f, driver: driver}
-
 	ginkgo.BeforeEach(b.setUp)
-
 	return b
 }
 
-func (b *builder) setUp() {
+func newBuilderNow(ctx context.Context, f *framework.Framework, driver *Driver) *builder {
+	b := &builder{f: f, driver: driver}
+	b.setUp(ctx)
+	return b
+}
+
+func (b *builder) setUp(ctx context.Context) {
 	b.podCounter = 0
 	b.claimCounter = 0
-	b.create(context.Background(), b.class())
+	b.create(ctx, b.class())
 	ginkgo.DeferCleanup(b.tearDown)
 }
 
