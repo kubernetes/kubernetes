@@ -183,7 +183,7 @@ func TestBuildContainerMapAndRunningSetFromRuntime(t *testing.T) {
 		}
 		fakeRuntimeService.Containers = containers
 
-		gotContainerMap, gotRunningSet := buildContainerMapAndRunningSetFromRuntime(context.TODO(), fakeRuntimeService)
+		gotContainerMap, gotRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, fakeRuntimeService)
 		if !reflect.DeepEqual(gotContainerMap, ts.expectContainerMap) {
 			t.Errorf("%s:ContainerMap is wrong, got:%v,expect:%v", ts.name, gotContainerMap, ts.expectContainerMap)
 		}
