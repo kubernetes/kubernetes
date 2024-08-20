@@ -17,7 +17,6 @@ limitations under the License.
 package cm
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func makeFakePodSandbox(name, namespace string) *apitest.FakePodSandbox {
@@ -72,6 +72,7 @@ func makeFakeContainer(sandbox *apitest.FakePodSandbox, name string, attempt uin
 	return c
 }
 func TestBuildContainerMapAndRunningSetFromRuntime(t *testing.T) {
+	ctx := ktesting.Init(t)
 	pod1 := makeFakePodSandbox("pod1", "default")
 	pod1container1 := makeFakeContainer(pod1, "test1", 0, true, time.Now().Add(-time.Second*50).Nanosecond(), fmt.Sprintf("containerId0-%s", strings.ReplaceAll(string(uuid.NewUUID()), "-", "")))
 	pod1container2 := makeFakeContainer(pod1, "test1", 1, true, time.Now().Add(-time.Second*40).Nanosecond(), fmt.Sprintf("containerId0-%s", strings.ReplaceAll(string(uuid.NewUUID()), "-", "")))
