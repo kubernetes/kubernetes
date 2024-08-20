@@ -1003,19 +1003,8 @@ func TestDeleteMessageOutput(t *testing.T) {
 	}
 	cmd.Run(cmd, []string{})
 
-	if !strings.Contains(buf.String(), "replicationcontroller") {
-		t.Errorf("message doesn't contain type (replicationcontroller): %s", buf.String())
+	if buf.String() != "replicationcontroller \"redis-master\" deleted from test-specific namespace\n" {
+		t.Errorf("unexpected output: %s", buf.String())
 	}
 
-	if !strings.Contains(buf.String(), "deleted") {
-		t.Errorf("message doesn't contain action (deleted): %s", buf.String())
-	}
-
-	if !strings.Contains(buf.String(), "redis-master") {
-		t.Errorf("message doesn't contain name (redis-master): %s", buf.String())
-	}
-
-	if !strings.Contains(buf.String(), "test-specific") {
-		t.Errorf("message doesn't contain namespace (test-specific): %s", buf.String())
-	}
 }
