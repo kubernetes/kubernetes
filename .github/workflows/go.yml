@@ -1,0 +1,176 @@
+git clone https://github.com/kubernetes/kubernetes
+cd kubernetes
+make quick-releasehttps://github.com/kubernetes/kubernetes4:55:55 PM: build-image version: ecdc8b770f4a0193fd3f258c1bc6029e681813a4 (focal)
+4:55:55 PM: buildbot version: 27ddd12d125e32c101b7b95386f9ea1973c1b709
+4:55:56 PM: Fetching cached dependencies
+4:55:56 PM: Failed to fetch cache, continuing with build
+4:55:56 PM: Starting to prepare the repo for build
+4:55:56 PM: No cached dependencies found. Cloning fresh repo
+4:55:56 PM: git clone --filter=blob:none https://github.com/kubernetes-sigs/prow
+4:55:57 PM: Preparing Git Reference pull/248/head
+4:55:59 PM: Custom build path detected. Proceeding with the specified path: 'site'
+4:55:59 PM: Custom publish path detected. Proceeding with the specified path: 'site/public'
+4:55:59 PM: Custom build command detected. Proceeding with the specified command: 'make netlify-deploy-preview'
+4:55:59 PM: Custom ignore command detected. Proceeding with the specified command: 'false'
+4:55:59 PM: manpath: warning: $PATH not set
+4:56:00 PM: Starting to install dependencies
+4:56:00 PM: Python version set to 3.8
+4:56:00 PM: Attempting Ruby version 2.7.2, read from environment
+4:56:01 PM: Using Ruby version 2.7.2
+4:56:02 PM: Started restoring cached go cache
+4:56:02 PM: Finished restoring cached go cache
+4:56:02 PM: Installing Go version 1.16.5 (requested 1.16.5)
+4:56:06 PM: go version go1.16.5 linux/amd64
+4:56:07 PM: Using PHP version 8.0
+4:56:07 PM: Installing Hugo 0.91.2
+4:56:08 PM: hugo v0.91.2-1798BD3F+extended linux/amd64 BuildDate=2021-12-23T15:33:34Z VendorInfo=gohugoio
+4:56:09 PM: Downloading and installing node v16.20.2...
+4:56:09 PM: Downloading https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-x64.tar.xz...
+4:56:09 PM: Computing checksum with sha256sum
+4:56:09 PM: Checksums matched!
+4:56:11 PM: Now using node v16.20.2 (npm v8.19.4)
+4:56:11 PM: Enabling Node.js Corepack
+4:56:11 PM: Started restoring cached build plugins
+4:56:11 PM: Finished restoring cached build plugins
+4:56:11 PM: Started restoring cached corepack dependencies
+4:56:11 PM: Finished restoring cached corepack dependencies
+4:56:11 PM: No npm workspaces detected
+4:56:11 PM: Started restoring cached node modules
+4:56:11 PM: Finished restoring cached node modules
+4:56:12 PM: Installing npm packages using npm version 8.19.4
+4:56:13 PM: added 74 packages, and audited 75 packages in 867ms
+4:56:13 PM: 18 packages are looking for funding
+4:56:13 PM:   run `npm fund` for details
+4:56:13 PM: 2 vulnerabilities (1 moderate, 1 high)
+4:56:13 PM: To address all issues, run:
+4:56:13 PM:   npm audit fix
+4:56:13 PM: Run `npm audit` for details.
+4:56:13 PM: npm packages installed
+4:56:13 PM: Successfully installed dependencies
+4:56:13 PM: Starting build script
+4:56:14 PM: Detected 2 framework(s)
+4:56:14 PM: "hugo" at version "unknown"
+4:56:14 PM: "zola" at version "unknown"
+4:56:14 PM: Section completed: initializing
+4:56:16 PM: 
+4:56:16 PM: Netlify Build                                                 
+4:56:16 PM: ────────────────────────────────────────────────────────────────
+4:56:16 PM: 
+4:56:16 PM: ❯ Version
+4:56:16 PM:   @netlify/build 29.53.0
+4:56:16 PM: 
+4:56:16 PM: ❯ Flags
+4:56:16 PM:   accountId: 595fccb76f4c5019236cda4d
+4:56:16 PM:   baseRelDir: true
+4:56:16 PM:   buildId: 66c502cf6735960008b90b52
+4:56:16 PM:   deployId: 66c502cf6735960008b90b54
+4:56:16 PM: 
+4:56:16 PM: ❯ Current directory
+4:56:16 PM:   /opt/build/repo/site
+4:56:16 PM: 
+4:56:16 PM: ❯ Config file
+4:56:16 PM:   /opt/build/repo/netlify.toml
+4:56:16 PM: 
+4:56:16 PM: ❯ Context
+4:56:16 PM:   deploy-preview
+4:56:16 PM: 
+4:56:16 PM: build.command from netlify.toml                               
+4:56:16 PM: ────────────────────────────────────────────────────────────────
+4:56:16 PM: 
+4:56:16 PM: $ make netlify-deploy-preview
+4:56:16 PM: hugo --enableGitInfo --buildFuture -b https://deploy-preview-248--k8s-prow.netlify.app
+4:56:18 PM: hugo: downloading modules …
+4:56:23 PM: hugo: collected modules in 7243 ms
+4:56:23 PM: Start building sites …
+4:56:23 PM: hugo v0.91.2-1798BD3F+extended linux/amd64 BuildDate=2021-12-23T15:33:34Z VendorInfo=gohugoio
+4:56:25 PM: WARN 2024/08/20 20:56:25 Outdated Hugo version 0.91.2, consider upgrading to make full use of all theme features
+4:56:25 PM:                    | EN
+4:56:25 PM: -------------------+------
+4:56:25 PM:   Pages            | 146
+4:56:25 PM:   Paginator pages  |   0
+4:56:25 PM:   Non-page files   |   9
+4:56:25 PM:   Static files     |  42
+4:56:25 PM:   Processed images |   0
+4:56:25 PM:   Aliases          |   0
+4:56:25 PM:   Sitemaps         |   1
+4:56:25 PM:   Cleaned          |   0
+4:56:25 PM: Total in 9540 ms
+4:56:25 PM: 
+4:56:25 PM: (build.command completed in 9.5s)
+4:56:25 PM: 
+4:56:25 PM: Deploy site                                                   
+4:56:25 PM: ────────────────────────────────────────────────────────────────
+4:56:25 PM: 
+4:56:25 PM: Starting to deploy site from 'site/public'
+4:56:25 PM: Calculating files to upload
+4:56:26 PM: Post processing done
+4:56:26 PM: Section completed: postprocessing
+4:56:26 PM: Starting post processing
+4:56:26 PM: Post processing - redirect rules
+4:56:26 PM: Skipping form detection
+4:56:26 PM: Post processing - header rules
+4:56:26 PM: 146 new files to upload
+4:56:26 PM: 0 new functions to upload
+4:56:26 PM: Section completed: deploying
+4:56:26 PM: Site deploy was successfully initiated
+4:56:26 PM: 
+4:56:26 PM: (Deploy site completed in 760ms)
+4:56:26 PM: 
+4:56:26 PM: Netlify Build Complete                                        
+4:56:26 PM: ────────────────────────────────────────────────────────────────
+4:56:26 PM: 
+4:56:26 PM: (Netlify Build completed in 10.4s)
+4:56:27 PM: Site is live ✨
+4:56:27 PM: Caching artifacts
+4:56:27 PM: Started saving node modules
+4:56:27 PM: Finished saving node modules
+4:56:27 PM: Started saving build plugins
+4:56:27 PM: Finished saving build plugins
+4:56:27 PM: Started saving corepack cache
+4:56:27 PM: Finished saving corepack cache
+4:56:27 PM: Started saving pip cache
+4:56:27 PM: Finished saving pip cache
+4:56:27 PM: Started saving emacs cask dependencies
+4:56:27 PM: Finished saving emacs cask dependencies
+4:56:27 PM: Started saving maven dependencies
+4:56:27 PM: Finished saving maven dependencies
+4:56:27 PM: Started saving boot dependencies
+4:56:27 PM: Finished saving boot dependencies
+4:56:27 PM: Started saving rust rustup cache
+4:56:27 PM: Finished saving rust rustup cache
+4:56:27 PM: Started saving go dependencies
+4:56:27 PM: Finished saving go dependencies
+4:56:58 PM: Build script success
+4:56:58 PM: Section completed: building
+4:57:00 PM: Uploading Cache of size 181.4MB
+4:57:01 PM: Section completed: cleanup
+4:57:01 PM: Finished processing build request in 1m5.5sgit clone https://github.com/kubernetes/kubernetes
+cd kubernetes
+make4:55:56 PM4:55:55 PM4:55:57 PMhttps://github.com/kubernetes-sigs/prow4:56:00 PM4:55:59 PM4:56:02 PM4:56:01 PM4:56:07 PM4:56:06 PM4:56:09 PM4:56:08 PM4:56:11 PMhttps://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-x64.tar.xz...Node.js4:56:12 PM4:56:13 PM747518214:56:14 PM4:56:16 PM6735960008build.commandnetlify.tomlhttps://deploy-preview-248--k8s-prow.netlify.app4:56:18 PM72434:56:23 PM2024/08/20 20:56:254:56:25 PM01464294:56:26 PM95404:56:58 PM4:56:27 PM4:57:01 PM4:57:00 PMijun111:patch-1ijun111:patch-2# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...
