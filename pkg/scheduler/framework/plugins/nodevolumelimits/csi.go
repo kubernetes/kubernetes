@@ -46,8 +46,8 @@ type InTreeToCSITranslator interface {
 	IsMigratableIntreePluginByName(inTreePluginName string) bool
 	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
 	GetCSINameFromInTreeName(pluginName string) (string, error)
-	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
+	TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+	TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 }
 
 // CSILimits is a plugin that checks node volume limits.
@@ -325,7 +325,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 		return nil
 	}
 	// Do translation for the in-tree volume.
-	translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(vol, pod.Namespace)
+	translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(logger, vol, pod.Namespace)
 	if err != nil || translatedPV == nil {
 		return fmt.Errorf("converting volume(%s) from inline to csi: %w", vol.Name, err)
 	}
@@ -382,7 +382,7 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 			return "", ""
 		}
 
-		csiPV, err := pl.translator.TranslateInTreePVToCSI(pv)
+		csiPV, err := pl.translator.TranslateInTreePVToCSI(logger, pv)
 		if err != nil {
 			logger.V(5).Info("Unable to translate in-tree volume to CSI", "err", err)
 			return "", ""

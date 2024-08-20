@@ -39,6 +39,8 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -188,6 +190,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 // Verifies there is are attach/mount/etc calls and no detach/unmount calls.
 func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 	// Arrange
+	logger, _ := ktesting.NewTestContext(t)
 	intreeToCSITranslator := csitrans.New()
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -254,7 +257,7 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	migratedSpec, err := csimigration.TranslateInTreeSpecToCSI(volumeSpec, pod.Namespace, intreeToCSITranslator)
+	migratedSpec, err := csimigration.TranslateInTreeSpecToCSI(logger, volumeSpec, pod.Namespace, intreeToCSITranslator)
 	if err != nil {
 		t.Fatalf("unexpected error while translating spec %v: %v", volumeSpec, err)
 	}

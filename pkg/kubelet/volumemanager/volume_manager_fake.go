@@ -44,7 +44,7 @@ func NewFakeVolumeManager(initialVolumes []v1.UniqueVolumeName) *FakeVolumeManag
 }
 
 // Run is not implemented
-func (f *FakeVolumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (f *FakeVolumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 }
 
 // WaitForAttachAndMount is not implemented

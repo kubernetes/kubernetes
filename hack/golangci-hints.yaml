@@ -136,6 +136,7 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/component-helpers/.*
           contextual k8s.io/cri-api/.*
           contextual k8s.io/cri-client/.*
+          contextual k8s.io/csi-translation-lib/.*
           contextual k8s.io/dynamic-resource-allocation/.*
           contextual k8s.io/endpointslice/.*
           contextual k8s.io/kms/.*

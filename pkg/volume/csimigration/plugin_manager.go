@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -123,20 +124,20 @@ func (pm PluginManager) IsMigratable(spec *volume.Spec) (bool, error) {
 // InTreeToCSITranslator performs translation of Volume sources for PV and Volume objects
 // from references to in-tree plugins to migrated CSI plugins
 type InTreeToCSITranslator interface {
-	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
+	TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+	TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 }
 
 // TranslateInTreeSpecToCSI translates a volume spec (either PV or inline volume)
 // supported by an in-tree plugin to CSI
-func TranslateInTreeSpecToCSI(spec *volume.Spec, podNamespace string, translator InTreeToCSITranslator) (*volume.Spec, error) {
+func TranslateInTreeSpecToCSI(logger klog.Logger, spec *volume.Spec, podNamespace string, translator InTreeToCSITranslator) (*volume.Spec, error) {
 	var csiPV *v1.PersistentVolume
 	var err error
 	inlineVolume := false
 	if spec.PersistentVolume != nil {
-		csiPV, err = translator.TranslateInTreePVToCSI(spec.PersistentVolume)
+		csiPV, err = translator.TranslateInTreePVToCSI(logger, spec.PersistentVolume)
 	} else if spec.Volume != nil {
-		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(spec.Volume, podNamespace)
+		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(logger, spec.Volume, podNamespace)
 		inlineVolume = true
 	} else {
 		err = errors.New("not a valid volume spec")
