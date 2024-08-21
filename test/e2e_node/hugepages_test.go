@@ -225,12 +225,12 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		restartKubelet(true)
 
 		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
-		gomega.Eventually(ctx, func() resource.Quantity {
+		gomega.Eventually(ctx, func() bool {
 			node, err = f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "while getting node status")
-			// abc, error := node.Status.Capacity["hugepages-3Mi"]
-			return node.Status.Capacity["hugepages-3Mi"]
-		}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("hugepages resource should not be present"))
 	})
 
 	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
@@ -245,11 +245,12 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		startKubelet()
 
 		ginkgo.By("verifying that the hugepages-2Mi resource is present")
-		gomega.Eventually(ctx, func() resource.Quantity {
+		gomega.Eventually(ctx, func() bool {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "while getting node status")
-			return node.Status.Capacity["hugepages-2Mi"]
-		}, 30*time.Second, framework.Poll).ShouldNot(gomega.BeNil())
+			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("hugepages resource should be present"))
 	})
 
 	ginkgo.When("start the pod", func() {
