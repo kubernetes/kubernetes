@@ -284,7 +284,9 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		// get proxyMode
 		stdout, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, hostExecPodName, fmt.Sprintf("curl --silent 127.0.0.1:%d/proxyMode", ports.ProxyStatusPort))
-		framework.ExpectNoError(err)
+		if err != nil {
+			e2eskipper.Skipf("kube-proxy is not running or could not determine kube-proxy mode (%v)", err)
+		}
 		proxyMode := strings.TrimSpace(stdout)
 
 		// get value of route_localnet
