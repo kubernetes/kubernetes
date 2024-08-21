@@ -537,7 +537,13 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := config.NewServiceConfig(ctx, informerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
+	// don't watch headless services for kube-proxy, they are proxied by DNS.
+	serviceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
+			options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()
+		}))
+	serviceConfig := config.NewServiceConfig(ctx, serviceInformerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(ctx.Done())
 
@@ -553,6 +559,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
+	serviceInformerFactory.Start(wait.NeverStop)
 
 	// Make an informer that selects for our nodename.
 	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
