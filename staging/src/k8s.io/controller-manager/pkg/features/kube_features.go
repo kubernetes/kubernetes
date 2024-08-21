@@ -37,15 +37,6 @@ const (
 	// alpha: v1.27
 	// Enable webhook in cloud controller manager
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
-
-	// owner: @alexanderConstantinescu
-	// kep: http://kep.k8s.io/3458
-	// beta: v1.27
-	// GA: v1.30
-	//
-	// Enables less load balancer re-configurations by the service controller
-	// (KCCM) as an effect of changing node state.
-	StableLoadBalancerNodeSet featuregate.Feature = "StableLoadBalancerNodeSet"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -56,5 +47,4 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
-	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
 }
