@@ -770,9 +770,15 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
+		if kubeReserved != nil && !isExactMilli(kubeReserved[v1.ResourceCPU]) {
+			klog.Warningf("kubeReserved cpu %s is not a integer(in millicores), which may cause frequent node updates", s.KubeReserved[v1.ResourceCPU.String()])
+		}
 		systemReserved, err := parseResourceList(s.SystemReserved)
 		if err != nil {
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
+		}
+		if systemReserved != nil && !isExactMilli(systemReserved[v1.ResourceCPU]) {
+			klog.Warningf("systemReserved cpu %s is not a integer(in millicores), which may cause frequent node updates", s.SystemReserved[v1.ResourceCPU.String()])
 		}
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
@@ -1330,6 +1336,12 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	k.StartGarbageCollection()
 
 	return k, nil
+}
+
+// isExactMilli checks if a given resource.Quantity represents an integer value(in milli)
+func isExactMilli(q resource.Quantity) bool {
+	_, exact := q.AsScale(resource.Milli)
+	return exact
 }
 
 // parseResourceList parses the given configuration map into an API
