@@ -22,12 +22,6 @@
     lockToDefault: false
     preRelease: Deprecated
     version: ""
-- name: AllowServiceLBStatusOnNonLB
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
 - name: AnonymousAuthConfigurableEndpoints
   versionedSpecs:
   - default: false

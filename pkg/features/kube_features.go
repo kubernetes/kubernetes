@@ -52,13 +52,6 @@ const (
 	// with DNS names.
 	AllowDNSOnlyNodeCSR featuregate.Feature = "AllowDNSOnlyNodeCSR"
 
-	// owner: @thockin
-	// deprecated: v1.29
-	//
-	// Enables Service.status.ingress.loadBanace to be set on
-	// services of types other than LoadBalancer.
-	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
-
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -1013,8 +1006,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
 
 	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
-
-	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
