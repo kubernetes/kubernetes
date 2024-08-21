@@ -100,12 +100,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: ""
-- name: CloudDualStackNodeIPs
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: ClusterTrustBundle
   versionedSpecs:
   - default: false

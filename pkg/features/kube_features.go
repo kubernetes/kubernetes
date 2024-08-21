@@ -84,14 +84,6 @@ const (
 	// Requires AuthorizeWithSelectors to be enabled.
 	AuthorizeNodeWithSelectors featuregate.Feature = "AuthorizeNodeWithSelectors"
 
-	// owner: @danwinship
-	// alpha: v1.27
-	// beta: v1.29
-	// GA: v1.30
-	//
-	// Enables dual-stack --node-ip in kubelet with external cloud providers
-	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
-
 	// owner: @ahmedtd
 	// alpha: v1.26
 	//
@@ -1024,8 +1016,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmorFields: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	AuthorizeNodeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
-
-	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
 
