@@ -418,12 +418,6 @@
     lockToDefault: true
     preRelease: GA
     version: ""
-- name: LegacyServiceAccountTokenCleanUp
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: LoadBalancerIPMode
   versionedSpecs:
   - default: true
