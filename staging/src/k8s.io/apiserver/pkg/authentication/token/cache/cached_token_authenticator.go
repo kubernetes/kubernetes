@@ -178,6 +178,9 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 				buf = buf[:runtime.Stack(buf, false)]
 				klog.Errorf("%v\n%s", r, buf)
 			}
+			if record.err != nil {
+				klog.Errorf("error authenticating token: %v", record.err)
+			}
 			doneFetching(record.err == nil)
 		}()
 
