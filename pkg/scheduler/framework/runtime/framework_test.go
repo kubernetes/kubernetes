@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -2385,7 +2387,20 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 
-			podNominator := internalqueue.NewTestPodNominator(nil)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			err := podInformer.GetStore().Add(tt.pod)
+			if err != nil {
+				t.Fatalf("Error adding pod to podInformer: %s", err)
+			}
+			if tt.nominatedPod != nil {
+				err = podInformer.GetStore().Add(tt.nominatedPod)
+				if err != nil {
+					t.Fatalf("Error adding nominated pod to podInformer: %s", err)
+				}
+			}
+
+			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(
 					logger,
