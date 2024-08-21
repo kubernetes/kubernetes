@@ -208,7 +208,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 }
 
 func mustBuildEnv() *environment.EnvSet {
-	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
+	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}
