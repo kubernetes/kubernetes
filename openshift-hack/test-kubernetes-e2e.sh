@@ -25,7 +25,7 @@ esac
 # openshift-tests will check the cluster's network configuration and
 # automatically skip any incompatible tests. We have to do that manually
 # here.
-NETWORK_SKIPS="\[Skipped:Network/OpenShiftSDN\]|\[Feature:Networking-IPv6\]|\[Feature:IPv6DualStack.*\]|\[Feature:SCTPConnectivity\]"
+NETWORK_SKIPS="\[Skipped:Network/OVNKubernetes\]|\[Feature:Networking-IPv6\]|\[Feature:IPv6DualStack.*\]|\[Feature:SCTPConnectivity\]"
 
 # Support serial and parallel test suites
 TEST_SUITE="${TEST_SUITE:-parallel}"
