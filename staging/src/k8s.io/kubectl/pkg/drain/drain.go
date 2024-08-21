@@ -159,7 +159,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersi
 			},
 			DeleteOptions: &delOpts,
 		}
-		return d.Client.PolicyV1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+		return d.Client.PolicyV1().Evictions(eviction.Namespace).Evict(d.getContext(), eviction)
 
 	default:
 		// otherwise, fall back to policy/v1beta1, supported by all servers that support the eviction subresource
@@ -170,7 +170,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersi
 			},
 			DeleteOptions: &delOpts,
 		}
-		return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+		return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(d.getContext(), eviction)
 	}
 }
 
