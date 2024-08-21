@@ -1068,7 +1068,16 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		}
 		for {
 			select {
-			case event := <-w.ResultChan():
+			case event, ok := <-w.ResultChan():
+				if !ok {
+					klog.Info("Event watch channel closed")
+					w, err = testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
+					if err != nil {
+						klog.ErrorS(err, "Failed to restart event watch")
+						return
+					}
+					continue
+				}
 				reportToArtifacts(t.Name()+"-events.text", event.Object)
 			case <-tCtx.Done():
 				w.Stop()
