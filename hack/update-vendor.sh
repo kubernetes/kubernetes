@@ -430,4 +430,8 @@ reviewers:
 - dep-reviewers
 __EOF__
 
+# TODO simplify update-vendor and eliminate this
+kube::log::status "vendor: running 'hack/update-go-workspaces.sh'" >&11
+hack/update-go-workspaces.sh
+
 kube::log::status "NOTE: don't forget to handle vendor/* and LICENSE/* files that were added or removed" >&11
