@@ -18,7 +18,9 @@ package prober
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,8 +29,14 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
+
+// suspendContainerLivenessProbeAnnotation can be added to pod.annotation to specify which container's liveness prober should be suspended
+// e.g. kubernetes.io/suspend-container-liveness-prober: "container-1,container-2"
+// multiple containers can be split by comma
+const suspendContainerLivenessProberAnnotation = "kubernetes.io/suspend-container-liveness-prober"
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
 // associated with it which runs the probe loop until the container permanently terminates, or the
@@ -70,6 +78,8 @@ type worker struct {
 	// If set, skip probing.
 	onHold bool
 
+	// previous suspend status is used to decrease suspended event
+	prevSuspendStatus bool
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
 	proberResultsSuccessfulMetricLabels metrics.Labels
@@ -223,6 +233,31 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 			return true // Wait for more information.
 		}
+	}
+
+	suspendStr := w.pod.Annotations[suspendContainerLivenessProberAnnotation]
+	suspendProbe := false
+	if len(suspendStr) != 0 && w.probeType == liveness {
+		suspendContainers := strings.Split(suspendStr, ",")
+		for _, name := range suspendContainers {
+			if name == w.container.Name {
+				suspendProbe = true
+				break
+			}
+		}
+	}
+	if w.prevSuspendStatus != suspendProbe {
+		if suspendProbe {
+			klog.InfoS("liveness prober of container has been suspended manually", "container name", w.container.Name, "pod", w.pod.Namespace+"/"+w.pod.Name)
+			w.probeManager.prober.recorder.Eventf(w.pod, v1.EventTypeNormal, events.LivenessProbeSuspend, fmt.Sprintf("liveness prober of container %s in pod %s has been suspended manually", w.container.Name, w.pod.Name))
+		} else {
+			klog.InfoS("liveness prober of container keeps going", "container name", w.container.Name, "pod", w.pod.Namespace+"/"+w.pod.Name)
+			w.probeManager.prober.recorder.Eventf(w.pod, v1.EventTypeNormal, events.LivenessProbeKeepGoing, fmt.Sprintf("liveness prober of container %s in pod %s keeps going", w.container.Name, w.pod.Name))
+		}
+		w.prevSuspendStatus = suspendProbe
+	}
+	if suspendProbe {
+		return true
 	}
 
 	if w.containerID.String() != c.ContainerID {
