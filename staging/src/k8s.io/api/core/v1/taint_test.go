@@ -133,3 +133,71 @@ func TestMatchTaint(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchTaintByKey(t *testing.T) {
+	testCases := []struct {
+		description  string
+		taint        *Taint
+		taintToMatch Taint
+		expectMatch  bool
+	}{
+		{
+			description: "two taints with the same key should match",
+			taint: &Taint{
+				Key: "foo",
+			},
+			taintToMatch: Taint{
+				Key: "foo",
+			},
+			expectMatch: true,
+		},
+		{
+			description: "two taints with the same key but different value should match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "foo",
+				Value:  "different-value",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectMatch: true,
+		},
+		{
+			description: "two taints with the different key cannot match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "different-key",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectMatch: false,
+		},
+		{
+			description: "two taints with the same key but different effect should match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectPreferNoSchedule,
+			},
+			expectMatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectMatch != tc.taint.MatchTaintByKey(&tc.taintToMatch) {
+			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
+		}
+	}
+}
