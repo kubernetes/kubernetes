@@ -28,6 +28,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -145,11 +146,7 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	return newNode, true, nil
 }
 
-// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
-// won't fail if target taint doesn't exist or has been removed.
-// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
-// any API calls.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+func removeTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, fn matchTaintFunc, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -157,7 +154,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 	if node != nil {
 		match := false
 		for _, taint := range taints {
-			if taintExists(node.Spec.Taints, taint) {
+			if taintExists(node.Spec.Taints, taint, fn) {
 				match = true
 				break
 			}
@@ -187,7 +184,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := removeTaint(oldNodeCopy, taint)
+			curNewNode, ok, err := removeMatchingTaint(oldNodeCopy, taint, fn)
 			if err != nil {
 				return fmt.Errorf("failed to remove taint of node")
 			}
@@ -202,44 +199,92 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 	})
 }
 
-// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
-func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	return removeTaintOffNode(c, nodeName, node, (*v1.Taint).MatchTaint, taints...)
+}
+
+// RemoveTaintOffNodeByKey is for cleaning up taints temporarily added to node matching by key only,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNodeByKey(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	return removeTaintOffNode(c, nodeName, node, (*v1.Taint).MatchTaintByKey, taints...)
+}
+
+type matchTaintFunc func(taint *v1.Taint, taintToMatch *v1.Taint) bool
+
+// taintExists checks if matchFn evaluates to true on the list of taints. Returns true if there's a match, false otherwise
+func taintExists(taints []v1.Taint, taintToFind *v1.Taint, matchFn matchTaintFunc) bool {
 	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
+		if matchFn(&taint, taintToFind) {
 			return true
 		}
 	}
 	return false
 }
 
-// removeTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// removeTaint tries to remove a taint from annotations list that satisfies matchFn predicate. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func removeMatchingTaint(node *v1.Node, taint *v1.Taint, matchFn matchTaintFunc) (*v1.Node, bool, error) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil
 	}
 
-	if !taintExists(nodeTaints, taint) {
+	if !taintExists(nodeTaints, taint, matchFn) {
 		return newNode, false, nil
 	}
 
-	newTaints, _ := deleteTaint(nodeTaints, taint)
+	newTaints, _ := deleteMatchingTaint(nodeTaints, taint, matchFn)
 	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
 }
 
-// deleteTaint removes all the taints that have the same key and effect to given taintToDelete.
-func deleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
+// deleteTaint removes all the taints that match using matchFn
+func deleteMatchingTaint(taints []v1.Taint, taintToDelete *v1.Taint, matchFn matchTaintFunc) ([]v1.Taint, bool) {
 	newTaints := []v1.Taint{}
 	deleted := false
 	for i := range taints {
-		if taintToDelete.MatchTaint(&taints[i]) {
+		if matchFn(taintToDelete, &taints[i]) {
 			deleted = true
 			continue
 		}
 		newTaints = append(newTaints, taints[i])
 	}
 	return newTaints, deleted
+}
+
+type ComponentReadyFunc func(ctx context.Context, c clientset.Interface, nodeName, driverName string) error
+
+// RemoveNotReadyTaint removes the taint componentName/agent-not-ready from the local node
+// This taint can be optionally applied by users to prevent startup race conditions such as
+// https://github.com/kubernetes/kubernetes/issues/95911
+func RemoveNotReadyTaint(c clientset.Interface, nodeName, componentName string, readyFn ComponentReadyFunc) error {
+	ctx := context.Background()
+	node, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if err := readyFn(ctx, c, nodeName, componentName); err != nil {
+		return err
+	}
+
+	const AgentNotReadyNodeTaintKeySuffix = "/agent-not-ready"
+
+	taintKeyToRemove := componentName + AgentNotReadyNodeTaintKeySuffix
+	klog.V(2).Infof("removing taint with key %s from local node %s", taintKeyToRemove, nodeName)
+
+	err = RemoveTaintOffNodeByKey(c, nodeName, node, &v1.Taint{Key: taintKeyToRemove})
+	if err != nil {
+		return err
+	}
+
+	klog.V(2).Infof("removed taint with key %s from local node %s successfully", taintKeyToRemove, nodeName)
+	return nil
 }
