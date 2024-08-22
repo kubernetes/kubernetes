@@ -880,12 +880,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: ValidatingAdmissionPolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: VolumeAttributesClass
   versionedSpecs:
   - default: false
