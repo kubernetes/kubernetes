@@ -809,6 +809,18 @@ func WaitForPodContainerStarted(ctx context.Context, c clientset.Interface, name
 	})
 }
 
+// WaitForPodInitContainerStarted waits for the given Pod init container to start.
+func WaitForPodInitContainerStarted(ctx context.Context, c clientset.Interface, namespace, podName string, initContainerIndex int, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("init container %d started", initContainerIndex)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if initContainerIndex > len(pod.Status.InitContainerStatuses)-1 {
+			return false, nil
+		}
+		initContainerStatus := pod.Status.InitContainerStatuses[initContainerIndex]
+		return *initContainerStatus.Started, nil
+	})
+}
+
 // WaitForPodFailedReason wait for pod failed reason in status, for example "SysctlForbidden".
 func WaitForPodFailedReason(ctx context.Context, c clientset.Interface, pod *v1.Pod, reason string, timeout time.Duration) error {
 	conditionDesc := fmt.Sprintf("failed with reason %s", reason)
