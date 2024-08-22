@@ -204,7 +204,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	return ex, nil
 }
 
-// stop ensures that all servers are stopped and resources freed.
+// Stop ensures that all servers are stopped and resources freed.
 func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()
 }
