@@ -2802,10 +2802,14 @@
         "description": "HostIP represents a single IP address allocated to the host.",
         "properties": {
           "ip": {
+            "default": "",
             "description": "IP is the IP address assigned to the host",
             "type": "string"
           }
         },
+        "required": [
+          "ip"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.HostPathVolumeSource": {
@@ -5119,10 +5123,14 @@
         "description": "PodIP represents a single IP address allocated to the pod.",
         "properties": {
           "ip": {
+            "default": "",
             "description": "IP is the IP address assigned to the pod",
             "type": "string"
           }
         },
+        "required": [
+          "ip"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PodList": {
