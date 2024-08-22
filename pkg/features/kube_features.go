@@ -1144,8 +1144,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
 
-	RelaxedEnvironmentVariableValidation: {Default: false, PreRelease: featuregate.Alpha},
-
 	ReloadKubeletServerCertificateFile: {Default: true, PreRelease: featuregate.Beta},
 
 	ResourceHealthStatus: {Default: false, PreRelease: featuregate.Alpha},

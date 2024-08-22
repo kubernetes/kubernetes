@@ -1,1 +1,6 @@
-[]
+- name: RelaxedEnvironmentVariableValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
