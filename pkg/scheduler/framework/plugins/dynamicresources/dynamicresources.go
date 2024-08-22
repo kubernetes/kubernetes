@@ -398,6 +398,8 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.DeviceClass, ActionType: framework.Add | framework.Update}},
+		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
+		{Event: framework.ClusterEvent{Resource: framework.ResourceSlice, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterResourceSliceChange},
 	}
 
 	if pl.podSchedulingContextLister != nil {
@@ -445,7 +447,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
-		logger.V(4).Info("pod is not schedulable", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
+		logger.V(6).Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
 		return framework.QueueSkip, nil
 	}
 
@@ -488,6 +490,38 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	return framework.Queue, nil
+}
+
+// isSchedulableAfterResourceSliceChange is invoked for add and update slice events reported by
+// an informer. Such changes can make an unschedulable pod schedulable when the pod requests a device
+// and the change adds a suitable device.
+//
+// For the sake of faster execution and avoiding code duplication, isSchedulableAfterResourceSliceChange
+// only checks whether the pod uses claims. All of the more detailed checks are done in the scheduling
+// attempt.
+//
+// The delete claim event will not invoke it, so newObj will never be nil.
+func (pl *dynamicResources) isSchedulableAfterResourceSliceChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedSlice, err := schedutil.As[*resourceapi.ResourceSlice](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterResourceSliceChange: %w", err)
+	}
+
+	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
+		// This is not an unexpected error: we know that
+		// foreachPodResourceClaim only returns errors for "not
+		// schedulable".
+		logger.V(6).Info("pod is not schedulable after resource slice change", "pod", klog.KObj(pod), "resourceSlice", klog.KObj(modifiedSlice), "reason", err.Error())
+		return framework.QueueSkip, nil
+	}
+
+	// We could check what got changed in the slice, but right now that's likely to be
+	// about the spec (there's no status yet...).
+	// We could check whether all claims use classic DRA, but that doesn't seem worth it.
+	// Let's assume that changing the slice may make the pod schedulable.
+	logger.V(5).Info("ResourceSlice change might make pod schedulable", "pod", klog.KObj(pod), "resourceSlice", klog.KObj(modifiedSlice))
 	return framework.Queue, nil
 }
 
