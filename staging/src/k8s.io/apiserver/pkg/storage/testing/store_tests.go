@@ -2707,3 +2707,55 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 		t.Fatalf("store.Count for resource %s: expected %d but got %d", resourceA, resourceACountExpected, resourceACountGot)
 	}
 }
+
+func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interface) {
+	out := &example.Pod{}
+	for i := 0; i < 4; i++ {
+		name := fmt.Sprintf("test-%d", i)
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "paging"}}
+		key := computePodKey(pod)
+		if err := store.Create(ctx, key, pod, out, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var names []string
+	opts := storage.ListOptions{
+		Recursive: true,
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+			Limit: 1,
+		},
+	}
+	calls := 0
+	for {
+		calls++
+		listOut := &example.PodList{}
+		err := store.GetList(ctx, "/pods", opts, listOut)
+		if err != nil {
+			t.Fatalf("Unexpected error %s", err)
+		}
+		for _, item := range listOut.Items {
+			names = append(names, item.Name)
+		}
+		if listOut.Continue == "" {
+			break
+		}
+		if calls == 2 {
+			name := "test-5"
+			pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "paging"}}
+			key := computePodKey(pod)
+			if err := store.Create(ctx, key, pod, out, 0); err != nil {
+				t.Fatal(err)
+			}
+		}
+		opts.Predicate.Continue = listOut.Continue
+	}
+	if calls != 4 {
+		t.Errorf("unexpected list invocations: %d", calls)
+	}
+	if !reflect.DeepEqual(names, []string{"test-0", "test-1", "test-2", "test-3"}) {
+		t.Errorf("unexpected items: %#v", names)
+	}
+}

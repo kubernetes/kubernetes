@@ -166,6 +166,12 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
 }
 
+func TestListPaging(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListPaging(ctx, t, cacher)
+}
+
 func TestList(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
