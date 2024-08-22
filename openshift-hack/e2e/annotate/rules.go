@@ -163,6 +163,10 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-38838
+			`\[sig-cli\] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from all pods based on default container`,
+			`\[sig-cli\] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from each pod and each container in Deployment`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
