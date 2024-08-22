@@ -146,6 +146,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 			decision.Message = fmt.Sprintf("failed messageExpression: %s", err)
 		} else if evalResult.EvalResult != celtypes.True {
 			decision.Action = ActionDeny
+			decision.Evaluation = EvalDeny
 			if validation.Reason == nil {
 				decision.Reason = metav1.StatusReasonInvalid
 			} else {
