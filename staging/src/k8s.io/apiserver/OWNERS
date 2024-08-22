@@ -18,10 +18,10 @@ reviewers:
   - apelisse
   - jpbetz
   - tkashem
-  # - emeritus
-  # - ncdc
 labels:
   - sig/api-machinery
   - area/apiserver
 emeritus_approvers:
   - lavalamp
+emeritus_reviewers:
+  - ncdc

@@ -8,5 +8,5 @@ reviewers:
   - caesarxuchao
   - sttts
   - dims
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc

@@ -27,8 +27,8 @@ reviewers:
   - soltysh
   - jsafrane
   - jpbetz
-  # - emeritus
-  # - ncdc
 emeritus_approvers:
   - krousey
   - lavalamp
+emeritus_reviewers:
+  - ncdc

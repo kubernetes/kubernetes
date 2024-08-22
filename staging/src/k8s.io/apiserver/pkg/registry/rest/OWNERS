@@ -13,5 +13,5 @@ reviewers:
   - dims
   - ingvagabund
   - enj
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc

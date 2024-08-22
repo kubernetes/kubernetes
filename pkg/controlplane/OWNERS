@@ -28,10 +28,10 @@ reviewers:
   - soltysh
   - enj
   - jpbetz
-  # - emeritus
-  # - ncdc
 labels:
   - sig/api-machinery
 emeritus_approvers:
   - nikhiljindal
   - lavalamp
+emeritus_reviewers:
+  - ncdc

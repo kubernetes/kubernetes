@@ -14,9 +14,9 @@ reviewers:
   - enj
   - stevekuznetsov
   - MadhavJivrajani
-  # - emeritus
-  # - ncdc
 emeritus_approvers:
   - xiang90
   - timothysc
   - lavalamp
+emeritus_reviewers:
+  - ncdc

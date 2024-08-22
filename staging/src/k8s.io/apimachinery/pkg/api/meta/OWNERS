@@ -11,5 +11,5 @@ reviewers:
   - liggitt
   - janetkuo
   - dims
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc

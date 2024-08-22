@@ -25,7 +25,7 @@ reviewers:
   - dims
   - enj
   - jpbetz
-  # - emeritus
-  # - ncdc
 emeritus_approvers:
   - lavalamp
+emeritus_reviewers:
+  - ncdc

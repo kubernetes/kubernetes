@@ -13,5 +13,5 @@ reviewers:
   - justinsb
   - soltysh
   - dims
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc

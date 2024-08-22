@@ -20,5 +20,5 @@ reviewers:
   - jsafrane
   - dims
   - jayunit100
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc

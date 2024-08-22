@@ -15,5 +15,5 @@ reviewers:
   - pwittrock
   - dims
   - enj
-# - emeritus
-# - ncdc
+emeritus_reviewers:
+  - ncdc
