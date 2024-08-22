@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -47,6 +49,10 @@ import (
 
 const (
 	maxConfigLength = 10 * 1 << 20 // 10MB
+)
+
+var (
+	hostUsersUnsupportedErr = fmt.Errorf("invalid pod: requested `hostUsers: false`, but kubelet does not support user namespaces")
 )
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
@@ -132,6 +138,9 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
+	if err = validatePodFeatures(newPod); err != nil {
+		return true, pod, err
+	}
 	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
@@ -178,6 +187,9 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
+		if err = validatePodFeatures(newPod); err != nil {
+			return true, pods, err
+		}
 		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
@@ -188,4 +200,25 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		return true, pods, err
 	}
 	return true, *v1Pods, err
+}
+
+// validatePodFeatures validates an incoming pod, verifying all of the used features are enabled in the kubelet.
+// Specifically, it checks for a user requesting a pod level user namespace when the kubelet doesn't have it enabled.
+// If the kubelet allowed validation.ValidatePodCreate to check this, the field would be filtered from the pod spec,
+// and admitted. This could cause situations where a cluster admin relaxed validation for pods with a user namespace,
+// but the pods won't actually be confined by a user namespace.
+func validatePodFeatures(pod *api.Pod) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(pod) {
+		return hostUsersUnsupportedErr
+	}
+	return nil
+}
+
+// hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
+func hostUsersInUse(pod *api.Pod) bool {
+	if pod == nil || pod.Spec.SecurityContext == nil || pod.Spec.SecurityContext.HostUsers == nil {
+		return true
+	}
+
+	return *pod.Spec.SecurityContext.HostUsers
 }

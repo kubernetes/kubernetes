@@ -27,11 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
 )
@@ -180,6 +183,75 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 	}
 }
 
+func TestDecodeSinglePodRejectsHostUsersWithoutSupport(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, false)
+	grace := int64(30)
+	falseBool := false
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+			}},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+			HostUsers:          &falseBool,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	parsed, _, err := tryDecodeSinglePod(json, noDefault)
+	if !parsed {
+		t.Errorf("expected to have parsed file: (%s)", string(json))
+	}
+	if !errors.Is(err, hostUsersUnsupportedErr) {
+		t.Errorf("expected error %v, got %v: (%s)", hostUsersUnsupportedErr, err, string(json))
+	}
+
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(v1.GroupName) {
+		info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), "application/yaml")
+		encoder := legacyscheme.Codecs.EncoderForVersion(info.Serializer, gv)
+		yaml, err := runtime.Encode(encoder, pod)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		parsed, _, err = tryDecodeSinglePod(yaml, noDefault)
+		if !parsed {
+			t.Errorf("expected to have parsed file: (%s)", string(yaml))
+		}
+		if !errors.Is(err, hostUsersUnsupportedErr) {
+			t.Errorf("expected error %v, got %v: (%s)", hostUsersUnsupportedErr, err, string(json))
+		}
+	}
+}
+
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
@@ -255,6 +327,81 @@ func TestDecodePodList(t *testing.T) {
 		}
 		if !reflect.DeepEqual(podList, &podListOut) {
 			t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, &podListOut, string(yaml))
+		}
+	}
+}
+
+func TestDecodePodListRejectsHostUsersWithoutSupport(t *testing.T) {
+	grace := int64(30)
+	falseBool := false
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+
+				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+			}},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+			HostUsers:          &falseBool,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	podList := &v1.PodList{
+		Items: []v1.Pod{*pod},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), podList)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	parsed, _, err := tryDecodePodList(json, noDefault)
+	if !parsed {
+		t.Errorf("expected to have parsed file: (%s)", string(json))
+	}
+	if !errors.Is(err, hostUsersUnsupportedErr) {
+		t.Errorf("expected error %v, got %v: (%s)", hostUsersUnsupportedErr, err, string(json))
+	}
+
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(v1.GroupName) {
+		info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), "application/yaml")
+		encoder := legacyscheme.Codecs.EncoderForVersion(info.Serializer, gv)
+		yaml, err := runtime.Encode(encoder, podList)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		parsed, _, err = tryDecodePodList(yaml, noDefault)
+		if !parsed {
+			t.Errorf("expected to have parsed file: (%s): %v", string(yaml), err)
+			continue
+		}
+		if !errors.Is(err, hostUsersUnsupportedErr) {
+			t.Errorf("expected error %v, got %v: (%s)", hostUsersUnsupportedErr, err, string(json))
+			continue
 		}
 	}
 }
