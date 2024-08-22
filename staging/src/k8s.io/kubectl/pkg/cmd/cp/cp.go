@@ -66,6 +66,8 @@ var (
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 )
 
+const maxAllowedFileSize = 5 * 1024 * 1024 * 1024 // 5GB
+
 // CopyOptions have the data required to perform the copy operation
 type CopyOptions struct {
 	Container  string
@@ -560,11 +562,37 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 			return err
 		}
 		defer outFile.Close()
-		if _, err := io.Copy(outFile, tarReader); err != nil {
-			return err
-		}
-		if err := outFile.Close(); err != nil {
-			return err
+
+		done := make(chan error)
+		go func() {
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				done <- err
+			}
+			if err := outFile.Close(); err != nil {
+				done <- err
+			}
+			done <- nil
+		}()
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+	check:
+		for {
+			select {
+			case err = <-done:
+				if err != nil {
+					return err
+				}
+				break check
+			case <-ticker.C:
+				fi, err := outFile.Stat()
+				if err != nil {
+					return err
+				}
+				if fi.Size() >= maxAllowedFileSize {
+					return fmt.Errorf("copied file exceeds the allowed limit")
+				}
+			}
 		}
 	}
 
