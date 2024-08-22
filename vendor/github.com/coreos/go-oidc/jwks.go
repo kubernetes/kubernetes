@@ -11,6 +11,7 @@ import (
 
 	"github.com/pquerna/cachecontrol"
 	jose "gopkg.in/square/go-jose.v2"
+	"k8s.io/klog/v2"
 )
 
 // keysExpiryDelta is the allowed clock skew between a client and the OpenID Connect
@@ -112,6 +113,16 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 	keys, expiry := r.keysFromCache()
 
 	// Don't check expiry yet. This optimizes for when the provider is unavailable.
+	kids := make([]string, len(keys))
+	for i, k := range keys {
+		kids[i] = k.KeyID
+	}
+	klog.Infof(
+		"verifying jwt with kid %s, available kids: %+v, expiry: %s",
+		keyID,
+		kids,
+		expiry.Format(time.RFC3339),
+	)
 	for _, key := range keys {
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
@@ -125,19 +136,22 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 		return nil, errors.New("failed to verify id token signature")
 	}
 
+	klog.Infof("cached JWKS keyset does not contain kid %s, fetching new keyset", keyID)
 	keys, err := r.keysFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching keys %v", err)
 	}
 
-	for _, key := range keys {
+	kids = make([]string, len(keys))
+	for i, key := range keys {
+		kids[i] = key.KeyID
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
 				return payload, nil
 			}
 		}
 	}
-	return nil, errors.New("failed to verify id token signature")
+	return nil, fmt.Errorf("failed to verify id token signature for kid %s, available kids %v", keyID, kids)
 }
 
 func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey, expiry time.Time) {
@@ -215,6 +229,11 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)
 	}
+	kids := make([]string, len(keySet.Keys))
+	for i, k := range keySet.Keys {
+		kids[i] = k.KeyID
+	}
+	klog.Infof("got %d keys from %s. kids: %+v", len(kids), r.jwksURL, kids)
 
 	// If the server doesn't provide cache control headers, assume the
 	// keys expire immediately.
