@@ -33,10 +33,12 @@ import (
 
 func TestValidateKubeProxyConfiguration(t *testing.T) {
 	baseConfig := &kubeproxyconfig.KubeProxyConfiguration{
-		BindAddress:        "192.168.59.103",
-		HealthzBindAddress: "0.0.0.0:10256",
-		MetricsBindAddress: "127.0.0.1:10249",
-		DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
+		BindAddress:            "192.168.59.103",
+		HealthzServerAddresses: []string{"0.0.0.0/0"},
+		HealthzServerPort:      10256,
+		MetricsServerAddresses: []string{"127.0.0.0/8"},
+		MetricsServerPort:      10249,
+		DetectLocalMode:        kubeproxyconfig.LocalModeClusterCIDR,
 		DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 			ClusterCIDRs: []string{"192.168.59.0/24"},
 		},
@@ -75,22 +77,22 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				}
 			},
 		},
-		"empty HealthzBindAddress": {
+		"empty HealthzServerAddresses": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
-				config.HealthzBindAddress = ""
+				config.HealthzServerAddresses = []string{}
 			},
 		},
 		"IPv6": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.BindAddress = "fd00:192:168:59::103"
-				config.HealthzBindAddress = ""
-				config.MetricsBindAddress = "[::1]:10249"
+				config.HealthzServerAddresses = []string{}
+				config.MetricsServerAddresses = []string{"::1/128"}
 				config.DetectLocal.ClusterCIDRs = []string{"fd00:192:168:59::/64"}
 			},
 		},
-		"alternate healthz port": {
+		"alternate HealthzServerPort": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
-				config.HealthzBindAddress = "0.0.0.0:12345"
+				config.HealthzServerPort = 12345
 			},
 		},
 		"ClusterCIDR is wrong IP family": {
@@ -125,17 +127,29 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("BindAddress"), "10.10.12.11:2000", "not a valid textual representation of an IP address")},
 		},
-		"invalid HealthzBindAddress": {
+		"invalid HealthzServerAddresses": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
-				config.HealthzBindAddress = "0.0.0.0"
+				config.HealthzServerAddresses = []string{"0.0.0.0"}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "0.0.0.0", "must be IP:port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzServerAddresses").Index(0), "0.0.0.0", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
 		},
-		"invalid MetricsBindAddress": {
+		"invalid HealthzServerPort": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
-				config.MetricsBindAddress = "127.0.0.1"
+				config.HealthzServerPort = 1234567
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("MetricsBindAddress"), "127.0.0.1", "must be IP:port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzServerPort"), int32(1234567), "must be a valid port")},
+		},
+		"invalid MetricsServerAddresses": {
+			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
+				config.MetricsServerAddresses = []string{"127.0.0.1"}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("MetricsServerAddresses").Index(0), "127.0.0.1", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
+		},
+		"invalid MetricsServerPort": {
+			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
+				config.MetricsServerPort = 5432100
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("MetricsServerPort"), int32(5432100), "must be a valid port")},
 		},
 		"ConfigSyncPeriod must be > 0": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {

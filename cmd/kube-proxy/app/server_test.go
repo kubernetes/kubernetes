@@ -548,10 +548,11 @@ func Test_checkBadIPConfig(t *testing.T) {
 		},
 
 		{
-			name: "ok IPv4 metricsBindAddress",
+			name: "ok IPv4 metricsServerAddresses",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					MetricsBindAddress: "10.0.0.1:9999",
+					MetricsServerAddresses: []string{"10.0.0.0/24"},
+					MetricsServerPort:      9999,
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
@@ -559,10 +560,11 @@ func Test_checkBadIPConfig(t *testing.T) {
 			dsErr: false,
 		},
 		{
-			name: "ok IPv6 metricsBindAddress",
+			name: "ok IPv6 metricsServerAddresses",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					MetricsBindAddress: "[fd01:2345::1]:9999",
+					MetricsServerAddresses: []string{"fd01:2345::/64"},
+					MetricsServerPort:      9999,
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
@@ -570,10 +572,11 @@ func Test_checkBadIPConfig(t *testing.T) {
 			dsErr: false,
 		},
 		{
-			name: "ok unspecified wrong-family metricsBindAddress",
+			name: "ok unspecified wrong-family metricsServerAddresses",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					MetricsBindAddress: "0.0.0.0:9999",
+					MetricsServerAddresses: []string{"0.0.0.0/0"},
+					MetricsServerPort:      9999,
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
@@ -581,10 +584,11 @@ func Test_checkBadIPConfig(t *testing.T) {
 			dsErr: false,
 		},
 		{
-			name: "wrong family metricsBindAddress",
+			name: "wrong family metricsServerAddresses",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					MetricsBindAddress: "10.0.0.1:9999",
+					MetricsServerAddresses: []string{"10.0.0.0/24"},
+					MetricsServerPort:      9999,
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},

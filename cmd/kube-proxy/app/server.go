@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -223,8 +224,8 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		Namespace: "",
 	}
 
-	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+	if len(config.HealthzServerAddresses) > 0 {
+		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzServerAddresses, config.HealthzServerPort, 2*config.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup(ctx)
@@ -315,7 +316,7 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		clusterType = fmt.Sprintf("%s-only", s.PrimaryIPFamily)
 	}
 
-	if badCIDRs(s.Config.DetectLocal.ClusterCIDRs, badFamily) {
+	if badCIDRs(s.Config.DetectLocal.ClusterCIDRs, badFamily, false) {
 		errors = append(errors, fmt.Errorf("cluster is %s but clusterCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR && !dualStackSupported {
 			// This has always been a fatal error
@@ -323,7 +324,7 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		}
 	}
 
-	if badCIDRs(s.podCIDRs, badFamily) {
+	if badCIDRs(s.podCIDRs, badFamily, false) {
 		errors = append(errors, fmt.Errorf("cluster is %s but node.spec.podCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 			// This has always been a fatal error
@@ -338,15 +339,15 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 	// In some cases, wrong-IP-family is only a problem when the secondary IP family
 	// isn't present at all.
 	if !dualStackSupported {
-		if badCIDRs(s.Config.IPVS.ExcludeCIDRs, badFamily) {
+		if badCIDRs(s.Config.IPVS.ExcludeCIDRs, badFamily, false) {
 			errors = append(errors, fmt.Errorf("cluster is %s but ipvs.excludeCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		}
 
-		if badBindAddress(s.Config.HealthzBindAddress, badFamily) {
-			errors = append(errors, fmt.Errorf("cluster is %s but healthzBindAddress is IPv%s", clusterType, badFamily))
+		if badCIDRs(s.Config.HealthzServerAddresses, badFamily, true) {
+			errors = append(errors, fmt.Errorf("cluster is %s but healthzServerAddresses doesn't contain IPv%s cidr", clusterType, badFamily))
 		}
-		if badBindAddress(s.Config.MetricsBindAddress, badFamily) {
-			errors = append(errors, fmt.Errorf("cluster is %s but metricsBindAddress is IPv%s", clusterType, badFamily))
+		if badCIDRs(s.Config.MetricsServerAddresses, badFamily, true) {
+			errors = append(errors, fmt.Errorf("cluster is %s but metricsServerAddresses doesn't contain IPv%s cidr", clusterType, badFamily))
 		}
 	}
 
@@ -357,28 +358,20 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 }
 
 // badCIDRs returns true if cidrs is a non-empty list of CIDRs, all of wrongFamily.
-func badCIDRs(cidrs []string, wrongFamily netutils.IPFamily) bool {
-	if len(cidrs) == 0 {
+// If allowUnspecified is false, unspecified addresses '0.0.0.0' and '::' will not be treated
+// as part of either family.
+func badCIDRs(cidrStrings []string, wrongFamily netutils.IPFamily, allowUnspecified bool) bool {
+	if len(cidrStrings) == 0 {
 		return false
 	}
-	for _, cidr := range cidrs {
-		if netutils.IPFamilyOfCIDRString(cidr) != wrongFamily {
+	for _, cidrString := range cidrStrings {
+		ip, cidr, _ := netutils.ParseCIDRSloppy(cidrString)
+		maskSize, _ := cidr.Mask.Size()
+		if netutils.IPFamilyOf(ip) != wrongFamily || (allowUnspecified && (ip.IsUnspecified() && maskSize == 0)) {
 			return false
 		}
 	}
 	return true
-}
-
-// badBindAddress returns true if bindAddress is an "IP:port" string where IP is a
-// non-zero IP of wrongFamily.
-func badBindAddress(bindAddress string, wrongFamily netutils.IPFamily) bool {
-	if host, _, _ := net.SplitHostPort(bindAddress); host != "" {
-		ip := netutils.ParseIPSloppy(host)
-		if ip != nil && netutils.IPFamilyOf(ip) == wrongFamily && !ip.IsUnspecified() {
-			return true
-		}
-	}
-	return false
 }
 
 // createClient creates a kube client from the given config and masterOverride.
@@ -438,8 +431,9 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 	go wait.Until(fn, 5*time.Second, ctx.Done())
 }
 
-func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, flagzReader flagz.Reader, errCh chan error) {
-	if len(bindAddress) == 0 {
+func serveMetrics(ctx context.Context, cidrStrings []string, port int32, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, flagzReader flagz.Reader, errCh chan error) {
+	logger := klog.FromContext(ctx)
+	if len(cidrStrings) == 0 {
 		return
 	}
 
@@ -466,6 +460,36 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		flagz.Install(proxyMux, "kube-proxy", flagzReader)
 	}
 
+	var nodeIPs []net.IP
+	for _, ipFamily := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
+		nah := proxyutil.NewNodeAddressHandler(ipFamily, cidrStrings)
+		if nah.MatchAll() {
+			// Some cloud-providers may assign IPs to a node after kube-proxy
+			// startup. The only way to listen on those IPs is to bind the server
+			// on 0.0.0.0. To handle this case we skip filtering NodeIPs by CIDRs
+			// and listen on 0.0.0.0 if any of the given CIDRs is a zero-cidr.
+			// (ref: https://github.com/kubernetes/kubernetes/pull/126889)
+			nodeIPs = []net.IP{net.IPv4zero}
+			break
+		} else {
+			ips, err := nah.GetNodeIPs(proxyutil.RealNetwork{})
+			nodeIPs = append(nodeIPs, ips...)
+			if err != nil {
+				logger.Error(err, "failed to get node IPs for metrics server", "ipFamily", ipFamily)
+			}
+		}
+		if len(nodeIPs) == 0 {
+			logger.Info("failed to get any node ip matching metricsBindAddresses", "metricsBindAddresses", cidrStrings)
+		}
+	}
+	var addrs []string
+	for _, nodeIP := range nodeIPs {
+		if nodeIP.IsLinkLocalUnicast() || nodeIP.IsLinkLocalMulticast() {
+			continue
+		}
+		addrs = append(addrs, net.JoinHostPort(nodeIP.String(), strconv.Itoa(int(port))))
+	}
+
 	fn := func() {
 		var err error
 		defer func() {
@@ -481,7 +505,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 			}
 		}()
 
-		listener, err := netutils.MultiListen(ctx, "tcp", bindAddress)
+		listener, err := netutils.MultiListen(ctx, "tcp", addrs...)
 		if err != nil {
 			return
 		}
@@ -533,7 +557,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serveHealthz(ctx, s.HealthzServer, healthzErrCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(ctx, s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, s.flagz, metricsErrCh)
+	serveMetrics(ctx, s.Config.MetricsServerAddresses, s.Config.MetricsServerPort, s.Config.Mode, s.Config.EnableProfiling, s.flagz, metricsErrCh)
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {

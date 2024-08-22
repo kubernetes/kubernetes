@@ -27,19 +27,21 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 type fakeListener struct {
@@ -459,13 +461,60 @@ type serverTest struct {
 	tracking503 int
 }
 
+func TestProxierHealthServer_NodeAddresses(t *testing.T) {
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{
+		&net.IPNet{IP: netutils.ParseIPSloppy("172.18.0.2"), Mask: net.CIDRMask(24, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
+	}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+
+	testCases := []struct {
+		name          string
+		cidrStrings   []string
+		expectedAddrs []string
+	}{
+		{
+			name:          "ipv4 zero cidr",
+			cidrStrings:   []string{"0.0.0.0/0", "2001:db8::/64"},
+			expectedAddrs: []string{"0.0.0.0:10256"},
+		},
+		{
+			name:          "ipv6 zero cidr",
+			cidrStrings:   []string{"172.18.0.0/24", "::/0"},
+			expectedAddrs: []string{"0.0.0.0:10256"},
+		},
+		{
+			name:          "non zero cidrs",
+			cidrStrings:   []string{"172.18.0.0/16", "2001:db8::/64"},
+			expectedAddrs: []string{"172.18.0.2:10256", "[2001:db8::1]:10256"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			listener := newFakeListener()
+			httpFactory := newFakeHTTPServerFactory()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+
+			hs := newProxyHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, tc.cidrStrings, 10256, 10*time.Second)
+			require.Equal(t, tc.expectedAddrs, hs.addrs)
+		})
+	}
+}
+
 func TestHealthzServer(t *testing.T) {
 	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
 	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -543,7 +592,11 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
 	server := hs.httpFactory.New(livezHandler{hs: hs})
 
 	hsTest := &serverTest{
