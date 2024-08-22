@@ -592,12 +592,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: PodSchedulingReadiness
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: PortForwardWebsockets
   versionedSpecs:
   - default: true

@@ -613,15 +613,6 @@ const (
 	// Enables SleepAction in container lifecycle hooks
 	PodLifecycleSleepAction featuregate.Feature = "PodLifecycleSleepAction"
 
-	// owner: @Huang-Wei
-	// kep: https://kep.k8s.io/3521
-	// alpha: v1.26
-	// beta: v1.27
-	// stable: v1.30
-	//
-	// Enable users to specify when a Pod is ready for scheduling.
-	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
-
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	// alpha: v1.30
@@ -1133,8 +1124,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodHostIPs: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	PodLifecycleSleepAction: {Default: true, PreRelease: featuregate.Beta},
-
-	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
 
 	PortForwardWebsockets: {Default: true, PreRelease: featuregate.Beta},
 
