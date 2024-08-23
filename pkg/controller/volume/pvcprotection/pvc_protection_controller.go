@@ -222,7 +222,7 @@ func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
 			c.queue.Forget(pvcKey)
 		} else {
 			c.queue.AddRateLimited(pvcKey)
-			utilruntime.HandleError(fmt.Errorf("PVC %v in namespace %v failed with: %w", pvcName, namespace, err))
+			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", pvcName, namespace, err))
 		}
 		c.queue.Done(pvcKey)
 	}
@@ -310,9 +310,11 @@ func (c *Controller) isBeingUsed(ctx context.Context, pvc *v1.PersistentVolumeCl
 	// Even if no Pod using pvc was found in the Informer's cache it doesn't
 	// mean such a Pod doesn't exist: it might just not be in the cache yet. To
 	// be 100% confident that it is safe to delete pvc make sure no Pod is using
-	// it among those returned by a live list.
+	// it among those returned by a "lazy" live list.
 
-	// Use lazy live pod list instead of directly calling API server
+	// Use a "lazy" live pod list: lazyLivePodList caches the first successful live pod list response,
+	// so for a large number of PVC deletions in a short duration, subsequent requests can use the cached pod list
+	// instead of issuing a lot of API requests. The cache is refreshed for each run of processNextWorkItem().
 	return c.askAPIServer(ctx, pvc, lazyLivePodList)
 }
 
