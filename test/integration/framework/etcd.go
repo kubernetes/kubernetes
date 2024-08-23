@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -146,7 +147,10 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 		// try to exit etcd gracefully
 		defer cancel()
 		cmd.Process.Signal(syscall.SIGTERM)
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			select {
 			case <-ctx.Done():
 				klog.Infof("etcd exited gracefully, context cancelled")
@@ -156,6 +160,7 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 			}
 		}()
 		err := cmd.Wait()
+		wg.Wait()
 		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
