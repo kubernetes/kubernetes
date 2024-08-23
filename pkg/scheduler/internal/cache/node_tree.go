@@ -62,7 +62,7 @@ func (nt *nodeTree) addNode(logger klog.Logger, n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = []string{n.Name}
 	}
-	logger.V(2).Info("Added node in listed group to NodeTree", "node", klog.KObj(n), "zone", zone)
+	logger.V(2).Info("Added node to NodeTree", "node", klog.KObj(n), "zone", zone)
 	nt.numNodes++
 }
 
@@ -76,7 +76,7 @@ func (nt *nodeTree) removeNode(logger klog.Logger, n *v1.Node) error {
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
 				}
-				logger.V(2).Info("Removed node in listed group from NodeTree", "node", klog.KObj(n), "zone", zone)
+				logger.V(2).Info("Removed node from NodeTree", "node", klog.KObj(n), "zone", zone)
 				nt.numNodes--
 				return nil
 			}
