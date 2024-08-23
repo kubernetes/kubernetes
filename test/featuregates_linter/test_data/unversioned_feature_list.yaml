@@ -622,12 +622,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: RelaxedEnvironmentVariableValidation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
