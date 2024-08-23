@@ -48,6 +48,7 @@
       measurePods: 1000
   - name: 5000Nodes_10000Pods
     labels: [performance]
+    threshold: 270
     params:
       initNodes: 5000
       initPods: 1000
@@ -89,6 +90,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 70
     params:
       initNodes: 5000
       initPods: 1000
@@ -125,6 +127,7 @@
       measurePods: 1000
   - name: 5000Nodes_10000Pods
     labels: [performance]
+    threshold: 260
     params:
       initNodes: 5000
       initPods: 1000
@@ -164,6 +167,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPods: 1000
@@ -212,6 +216,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 35
     params:
       initNodes: 5000
       initPods: 5000
@@ -258,6 +263,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 48
     params:
       initNodes: 5000
       initPods: 5000
@@ -303,6 +309,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 35
     params:
       initNodes: 5000
       initPods: 5000
@@ -344,6 +351,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPods: 5000
@@ -385,6 +393,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPods: 5000
@@ -418,6 +427,7 @@
       measurePods: 10
   - name: 15000Nodes
     labels: [performance, fast]
+    threshold: 390
     params:
       initNodes: 15000
       measurePods: 30000
@@ -457,6 +467,7 @@
       measurePods: 1000
   - name: 5000Nodes_10000Pods
     labels: [performance]
+    threshold: 220
     params:
       initNodes: 5000
       initPods: 5000
@@ -498,6 +509,7 @@
       measurePods: 2000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 85
     params:
       initNodes: 5000
       initPods: 5000
@@ -539,6 +551,7 @@
       measurePods: 2000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 125
     params:
       initNodes: 5000
       initPods: 5000
@@ -599,6 +612,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 140
     params:
       initNodes: 5000
       initPods: 2000
@@ -624,6 +638,7 @@
       measurePods: 5
   - name: 500Nodes
     labels: [performance, fast]
+    threshold: 18
     params:
       initNodes: 500
       initPods: 2000
@@ -659,6 +674,7 @@
       measurePods: 5
   - name: 500Nodes
     labels: [performance, fast]
+    threshold: 18
     params:
       initNodes: 500
       initPods: 2000
@@ -705,6 +721,7 @@
       measurePods: 5000
   - name: 5000Nodes/200InitPods/10000Pods
     labels: [performance]
+    threshold: 300
     params:
       initNodes: 5000
       initPods: 200
@@ -749,6 +766,7 @@
       measurePods: 2000
   - name: 5000Nodes_10000Pods
     labels: [performance]
+    threshold: 265
     params:
       initNodes: 5000
       measurePods: 10000
@@ -800,6 +818,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 35
     params:
       initNodes: 6000
       initPodsPerNamespace: 40
@@ -853,6 +872,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 55
     params:
       initNodes: 5000
       initPodsPerNamespace: 40
@@ -909,6 +929,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 35
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -962,6 +983,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
@@ -996,6 +1018,7 @@
       measurePods: 400
   - name: 5000Nodes
     labels: [performance, fast]
+    threshold: 68
     params:
       taintNodes: 1000
       normalNodes: 4000
@@ -1326,6 +1349,7 @@
       measurePods: 100
   - name: 1Node_10000GatedPods
     labels: [performance, fast]
+    threshold: 130
     params:
       gatedPods: 10000
       deletingPods: 20000
@@ -1358,6 +1382,7 @@
       measurePods: 10
   - name: 1Node_10000GatedPods
     labels: [performance, fast]
+    threshold: 110
     params:
       gatedPods: 10000
       measurePods: 20000

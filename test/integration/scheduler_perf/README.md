@@ -129,3 +129,38 @@ The test cases labeled as `short` are executed in pull-kubernetes-integration jo
 | ci-kubernetes-integration-master | integration-test       |
 | pull-kubernetes-integration      | integration-test,short |
 | ci-benchmark-scheduler-perf      | performance            |
+
+## Scheduling throughput thresholds
+
+Thresholds are used to capture scheduler performance regressions in a periodic ci-benchmark-scheduler-perf job. 
+Most test cases have a threshold set for the largest `performance` workloads. 
+By default, these are defined for the `Average` statistic of the `SchedulingThroughput` metric. 
+It is possible to use other metric by configuring `thresholdMetricSelector` per test case or workload. 
+
+### How to calculate the threshold
+
+The initial values for scheduling throughput thresholds were calculated through an analysis of historical data, 
+specifically focusing on the minimum, average, and standard deviation values for each workload 
+(see [#126871](https://github.com/kubernetes/kubernetes/pull/126871)). 
+Our goal is to set the thresholds somewhat pessimistically to minimize flakiness, 
+so it's recommended to set the threshold slightly below the observed historical minimum. 
+Depending on variability of data, the threshold can be lowered more. 
+
+Thresholds should be adjusted based on the flakiness level and minima observed in the future. 
+Remember to set the value for newly added test cases as well, 
+but after collecting some data on workload characteristics.
+
+### How to determine the failed workload
+
+When the workload's scheduling throughput doesn't exceed the threshold, 
+the ci-benchmark-scheduler-perf periodic job will fail with an error log such as:
+
+```
+--- FAIL: BenchmarkPerfScheduling/SchedulingBasic/5000Nodes_10000Pods
+    ...
+    scheduler_perf.go:1098: ERROR: op 2: expected SchedulingThroughput Average to be higher: got 256.12, want 270
+```
+
+This allows to analyze which workload failed. Make sure that the failure is not an outlier 
+by checking multiple runs of the job. If the failures are not related to any regression, 
+but to an incorrect threshold setting, it is reasonable to decrease it.
