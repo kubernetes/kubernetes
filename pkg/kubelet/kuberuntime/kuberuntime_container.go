@@ -46,6 +46,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -618,7 +619,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
 	}

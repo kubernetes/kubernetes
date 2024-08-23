@@ -19,9 +19,9 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -131,7 +131,7 @@ type podChangeExtractor func(newNode *v1.Pod, oldNode *v1.Pod) *ClusterEvent
 // extractPodScaleDown interprets the update of a pod and returns PodRequestScaledDown event if any pod's resource request(s) is scaled down.
 func extractPodScaleDown(newPod, oldPod *v1.Pod) *ClusterEvent {
 	opt := resource.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)

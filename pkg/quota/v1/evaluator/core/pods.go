@@ -33,12 +33,12 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/utils/clock"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // the name used for object count quota
@@ -159,7 +159,7 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
+	if feature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) && op == admission.Update {
 		return true
 	}
 	return false
@@ -365,7 +365,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

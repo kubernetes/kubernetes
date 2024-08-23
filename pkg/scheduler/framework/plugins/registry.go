@@ -17,6 +17,7 @@ limitations under the License.
 package plugins
 
 import (
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -51,7 +52,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableVolumeCapacityPriority:                 feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling),
 		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 		EnableSchedulingQueueHint:                    feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
 	}

@@ -32,9 +32,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -919,7 +919,7 @@ func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	var non0InitCPU, non0InitMem int64
 	var non0CPU, non0Mem int64
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling),
 		ContainerFn: func(requests v1.ResourceList, containerType podutil.ContainerType) {
 			non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&requests)
 			switch containerType {

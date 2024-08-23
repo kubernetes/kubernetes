@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
@@ -5163,7 +5164,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		// When the feature-gate is turned off, any new requests attempting to update CPU or memory
 		// resource values will result in validation failure.
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
 			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
@@ -5267,7 +5268,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
 		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFieldsNoResources, ","), specDiff))
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 			errs = field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFields, ","), specDiff))
 		}
 		allErrs = append(allErrs, errs)

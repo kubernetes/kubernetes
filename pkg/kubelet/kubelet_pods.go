@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/version"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -1778,7 +1779,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		s.Resize = kl.determinePodResizeStatus(pod, s)
 	}
 	// calculate the next phase and preserve reason
@@ -2300,7 +2301,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatusPtr = &oldStatus
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 			if status.State.Running != nil {
 				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
 			}

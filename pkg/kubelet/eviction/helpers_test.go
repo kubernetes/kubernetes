@@ -34,7 +34,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
-	"k8s.io/kubernetes/pkg/features"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -3245,7 +3245,7 @@ func TestEvictonMessageWithResourceResize(t *testing.T) {
 
 	for _, enabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodVerticalScaling enabled=%v", enabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, enabled)
 			msg, _ := evictionMessage(v1.ResourceMemory, testpod, statsFn, threshold, observations)
 			if enabled {
 				if !strings.Contains(msg, "testcontainer was using 150Mi, request is 100Mi") {

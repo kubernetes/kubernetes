@@ -40,8 +40,8 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/lru"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -524,7 +524,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)

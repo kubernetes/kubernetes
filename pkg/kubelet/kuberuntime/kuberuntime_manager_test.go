@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -2120,7 +2121,7 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 }
 
 func TestComputePodActionsForPodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -2465,7 +2466,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)

@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
@@ -180,7 +181,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) &&
 			obj.Spec.Containers[i].Resources.Requests != nil {
 			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
 			resizePolicySpecified := make(map[v1.ResourceName]bool)

@@ -18,10 +18,10 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -63,7 +63,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// targets for OOM kills.
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
 			memoryRequest = cs.AllocatedResources.Memory().Value()
 		}

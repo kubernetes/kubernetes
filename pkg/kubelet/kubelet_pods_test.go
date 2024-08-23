@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
@@ -3728,7 +3729,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 }
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -4542,7 +4543,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 	nowTime := time.Now()
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}

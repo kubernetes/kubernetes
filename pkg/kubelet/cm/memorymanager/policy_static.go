@@ -25,12 +25,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
@@ -441,7 +441,7 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
 			resources = cs.AllocatedResources
 		}

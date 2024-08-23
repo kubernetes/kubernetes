@@ -37,6 +37,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -936,7 +937,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer setSwapControllerAvailableDuringTest(false)()
 			if tc.scalingFg {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 			}
 
 			setCgroupVersionDuringTest(cgroupV1)

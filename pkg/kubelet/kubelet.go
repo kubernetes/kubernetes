@@ -53,6 +53,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -1940,7 +1941,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		// Handle pod resize here instead of doing it in HandlePodUpdates because
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
@@ -1972,7 +1973,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
 		// While resize is in progress, periodically call PLEG to update pod cache
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
@@ -2289,7 +2290,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		// Use allocated resources values from checkpoint store (source of truth) to determine fit
 		otherPods := make([]*v1.Pod, 0, len(pods))
 		for _, p := range pods {
@@ -2534,7 +2535,7 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		kl.podResizeMutex.Lock()
 		defer kl.podResizeMutex.Unlock()
 	}
@@ -2573,7 +2574,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			// pods that are alive.
 			activePods := kl.filterOutInactivePods(existingPods)
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				podCopy := pod.DeepCopy()

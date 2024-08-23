@@ -37,6 +37,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -102,7 +103,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		// With support for in-place pod resizing, container resources are now mutable.
 		// If container resources are updated with new resource requests values, a pod resize is
 		// desired. The status of this request is reflected by setting Resize field to "Proposed"

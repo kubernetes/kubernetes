@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -119,7 +120,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
+	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,

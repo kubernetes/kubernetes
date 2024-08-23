@@ -39,6 +39,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -237,7 +238,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.InPlacePodVerticalScaling, true)
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}

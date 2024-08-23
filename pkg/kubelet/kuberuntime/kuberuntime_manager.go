@@ -46,6 +46,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -541,7 +542,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		return false
 	}
 	if types.IsStaticPod(pod) {

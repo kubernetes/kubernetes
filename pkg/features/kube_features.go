@@ -894,13 +894,6 @@ const (
 	// Initial implementation focused on ReadWriteOncePod volumes.
 	SELinuxMountReadWriteOncePod featuregate.Feature = "SELinuxMountReadWriteOncePod"
 
-	// owner: @vinaykul
-	// kep: http://kep.k8s.io/1287
-	// alpha: v1.27
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @Sh4d1,@RyanAoh,@rikatz
 	// kep: http://kep.k8s.io/1860
 	// alpha: v1.29
@@ -1197,8 +1190,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SELinuxMountReadWriteOncePod: {Default: true, PreRelease: featuregate.Beta},
 
-	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	LoadBalancerIPMode: {Default: true, PreRelease: featuregate.Beta},
@@ -1239,6 +1230,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	genericfeatures.InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 

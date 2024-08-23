@@ -34,10 +34,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
@@ -196,7 +196,7 @@ func (m *manager) Start() {
 	m.state = state.NewNoopStateCheckpoint()
 
 	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of AllocatedResources & Resize
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
 		if err != nil {
 			// This is a crictical, non-recoverable failure.
@@ -739,7 +739,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 		m.state.Delete(string(uid), "")
 	}
 }
@@ -752,7 +752,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 		if _, ok := podUIDs[key]; !ok {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.InPlacePodVerticalScaling) {
 				m.state.Delete(string(key), "")
 			}
 		}
