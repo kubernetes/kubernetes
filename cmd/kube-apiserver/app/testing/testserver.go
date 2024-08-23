@@ -150,7 +150,11 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
-	tCtx := ktesting.Init(t)
+	// Some callers may have initialize ktesting already.
+	tCtx, ok := t.(ktesting.TContext)
+	if !ok {
+		tCtx = ktesting.Init(t)
+	}
 
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
