@@ -23,9 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -226,11 +228,35 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	if w.containerID.String() != c.ContainerID {
+		probeResult := w.initialValue
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnreadyOnKubeletRestart) && w.containerID.IsEmpty() {
+			// Inherit previous state if kubelet has restarted.
+			if c.State.Running != nil {
+				containerStartTime := (*c.State.Running).StartedAt.Time
+				if !containerStartTime.IsZero() && containerStartTime.Before(w.probeManager.start) {
+					switch w.probeType {
+					case readiness:
+						if c.Ready {
+							probeResult = results.Success
+						} else {
+							probeResult = results.Failure
+						}
+					case startup:
+						if c.Started != nil && *c.Started {
+							probeResult = results.Success
+						}
+					default:
+					}
+					klog.V(3).InfoS("Pod has started before, set probeResult",
+						"probeType", w.probeType, "pod", klog.KObj(w.pod), "containerName", w.container.Name, "probeResult", probeResult)
+				}
+			}
+		}
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		w.resultsManager.Set(w.containerID, probeResult, w.pod)
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}

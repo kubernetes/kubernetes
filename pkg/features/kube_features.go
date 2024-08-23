@@ -938,6 +938,13 @@ const (
 	//
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
+
+	// owner: @pololowww
+	// kep: https://kep.k8s.io/4784
+	// alpha: v1.32
+	//
+	// Set pod states as Unready when kubelet restarts.
+	PodUnreadyOnKubeletRestart featuregate.Feature = "PodUnreadyOnKubeletRestart"
 )
 
 func init() {
