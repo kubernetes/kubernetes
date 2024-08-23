@@ -106,16 +106,6 @@ const (
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
 
-	// owner: @cici37 @jpbetz
-	// kep: http://kep.k8s.io/3488
-	// alpha: v1.26
-	// beta: v1.28
-	// stable: v1.30
-	//
-	// Note: the feature gate can be removed in 1.32
-	// Enables expression validation in Admission Control
-	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
-
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
 	// alpha: v1.31
@@ -354,8 +344,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConcurrentWatchObjectDecode: {Default: false, PreRelease: featuregate.Beta},
-
-	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
 

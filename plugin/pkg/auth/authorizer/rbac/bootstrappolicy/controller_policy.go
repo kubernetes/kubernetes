@@ -446,18 +446,17 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
-		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(admissionRegistrationGroup).
-					Resources("validatingadmissionpolicies").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "patch", "update").Groups(admissionRegistrationGroup).
-					Resources("validatingadmissionpolicies/status").RuleOrDie(),
-				eventsRule(),
-			},
-		})
-	}
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(admissionRegistrationGroup).
+				Resources("validatingadmissionpolicies").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "patch", "update").Groups(admissionRegistrationGroup).
+				Resources("validatingadmissionpolicies/status").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
