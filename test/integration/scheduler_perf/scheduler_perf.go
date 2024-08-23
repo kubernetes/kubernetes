@@ -26,6 +26,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -48,6 +50,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -93,6 +96,29 @@ const (
 	resultLabelName          = "result"
 	pluginLabelName          = "plugin"
 )
+
+// Run with -v=2, this is the default log level in production.
+//
+// In a PR this can be bumped up temporarily to run pull-kubernetes-scheduler-perf
+// with more log output.
+const DefaultLoggingVerbosity = 2
+
+var LoggingFeatureGate FeatureGateFlag
+var LoggingConfig *logsapi.LoggingConfiguration
+
+type FeatureGateFlag interface {
+	featuregate.FeatureGate
+	flag.Value
+}
+
+func init() {
+	f := featuregate.NewFeatureGate()
+	runtime.Must(logsapi.AddFeatureGates(f))
+	LoggingFeatureGate = f
+
+	LoggingConfig = logsapi.NewLoggingConfiguration()
+	LoggingConfig.Verbosity = DefaultLoggingVerbosity
+}
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
@@ -764,8 +790,62 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 
+var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
+
 func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(*useTestingLog))
+	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
+	if !*useTestingLog && doArtifacts {
+		// Reconfigure logging so that it goes to a separate file per
+		// test instead of stderr. If the test passes, the file gets
+		// deleted. The overall output can be very large (> 200 MB for
+		// ci-benchmark-scheduler-perf-master). With this approach, we
+		// have log output for failures without having to store large
+		// amounts of data that no-one is looking at. The performance
+		// is the same as writing to stderr.
+		if err := logsapi.ResetForTest(LoggingFeatureGate); err != nil {
+			t.Fatalf("Failed to reset the logging configuration: %v", err)
+		}
+		logfileName := path.Join(artifacts, specialFilenameChars.ReplaceAllString(t.Name(), "_")+".log")
+		out, err := os.Create(logfileName)
+		if err != nil {
+			t.Fatalf("Failed to create per-test log output file: %v", err)
+		}
+		t.Cleanup(func() {
+			// Everything should have stopped by now, checked below
+			// by GoleakCheck (which runs first during test
+			// shutdown!). Therefore we can clean up. Errors get logged
+			// and fail the test, but cleanup tries to continue.
+			//
+			// Note that the race detector will flag any goroutine
+			// as causing a race if there is no explicit wait for
+			// that goroutine to stop.  We know that they must have
+			// stopped (GoLeakCheck!) but the race detector
+			// doesn't.
+			//
+			// This is a major issue because many Kubernetes goroutines get
+			// started without waiting for them to stop :-(
+			if err := logsapi.ResetForTest(LoggingFeatureGate); err != nil {
+				t.Errorf("Failed to reset the logging configuration: %v", err)
+			}
+			if err := out.Close(); err != nil {
+				t.Errorf("Failed to close the per-test log output file: %s: %v", logfileName, err)
+			}
+			if !t.Failed() {
+				if err := os.Remove(logfileName); err != nil {
+					t.Errorf("Failed to remove the per-test log output file: %v", err)
+				}
+			}
+		})
+		opts := &logsapi.LoggingOptions{
+			ErrorStream: out,
+			InfoStream:  out,
+		}
+		if err := logsapi.ValidateAndApplyWithOptions(LoggingConfig, opts, LoggingFeatureGate); err != nil {
+			t.Fatalf("Failed to apply the per-test logging configuration: %v", err)
+		}
+
+	}
 
 	// Ensure that there are no leaked
 	// goroutines.  They could influence
