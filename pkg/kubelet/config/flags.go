@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 )
 
@@ -54,6 +52,16 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.
-	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
-	fs.StringVar(&s.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", s.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
+	fs.StringVar(
+		&s.ImageCredentialProviderConfigFile,
+		"image-credential-provider-config",
+		s.ImageCredentialProviderConfigFile,
+		"The path to the credential provider plugin config file.",
+	)
+	fs.StringVar(
+		&s.ImageCredentialProviderBinDir,
+		"image-credential-provider-bin-dir",
+		s.ImageCredentialProviderBinDir,
+		"The path to the directory where credential provider plugin binaries are located.",
+	)
 }
