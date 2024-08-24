@@ -34,11 +34,20 @@ import (
 	utilio "k8s.io/utils/io"
 )
 
+type podEventType int
+
 const (
+	podAdd podEventType = iota
+	podModify
+	podDelete
+
 	eventBufferLen = 10
 )
 
-type watchEvent struct{}
+type watchEvent struct {
+	fileName  string
+	eventType podEventType
+}
 
 type sourceFile struct {
 	path           string
