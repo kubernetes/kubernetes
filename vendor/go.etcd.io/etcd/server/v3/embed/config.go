@@ -151,7 +151,7 @@ type Config struct {
 	// follower to catch up.
 	// WARNING: only change this for tests.
 	// Always use "DefaultSnapshotCatchUpEntries"
-	SnapshotCatchUpEntries uint64
+	SnapshotCatchUpEntries uint64 `json:"experimental-snapshot-catch-up-entries"`
 
 	MaxSnapFiles uint `json:"max-snapshots"`
 	MaxWalFiles  uint `json:"max-wals"`
@@ -414,6 +414,9 @@ type Config struct {
 	// ExperimentalTxnModeWriteWithSharedBuffer enables write transaction to use a shared buffer in its readonly check operations.
 	ExperimentalTxnModeWriteWithSharedBuffer bool `json:"experimental-txn-mode-write-with-shared-buffer"`
 
+	// ExperimentalStopGRPCServiceOnDefrag enables etcd gRPC service to stop serving client requests on defragmentation.
+	ExperimentalStopGRPCServiceOnDefrag bool `json:"experimental-stop-grpc-service-on-defrag"`
+
 	// V2Deprecation describes phase of API & Storage V2 support
 	V2Deprecation config.V2DeprecationEnum `json:"v2-deprecation"`
 }
@@ -440,13 +443,15 @@ type configJSON struct {
 }
 
 type securityConfig struct {
-	CertFile       string `json:"cert-file"`
-	KeyFile        string `json:"key-file"`
-	ClientCertFile string `json:"client-cert-file"`
-	ClientKeyFile  string `json:"client-key-file"`
-	CertAuth       bool   `json:"client-cert-auth"`
-	TrustedCAFile  string `json:"trusted-ca-file"`
-	AutoTLS        bool   `json:"auto-tls"`
+	CertFile         string   `json:"cert-file"`
+	KeyFile          string   `json:"key-file"`
+	ClientCertFile   string   `json:"client-cert-file"`
+	ClientKeyFile    string   `json:"client-key-file"`
+	CertAuth         bool     `json:"client-cert-auth"`
+	TrustedCAFile    string   `json:"trusted-ca-file"`
+	AutoTLS          bool     `json:"auto-tls"`
+	AllowedCNs       []string `json:"allowed-cn"`
+	AllowedHostnames []string `json:"allowed-hostname"`
 }
 
 // NewConfig creates a new Config populated with default values.
@@ -515,6 +520,7 @@ func NewConfig() *Config {
 		ExperimentalDowngradeCheckTime:           DefaultDowngradeCheckTime,
 		ExperimentalMemoryMlock:                  false,
 		ExperimentalTxnModeWriteWithSharedBuffer: true,
+		ExperimentalStopGRPCServiceOnDefrag:      false,
 
 		ExperimentalCompactHashCheckEnabled: false,
 		ExperimentalCompactHashCheckTime:    time.Minute,
@@ -625,6 +631,8 @@ func (cfg *configYAML) configFromFile(path string) error {
 		tls.ClientKeyFile = ysc.ClientKeyFile
 		tls.ClientCertAuth = ysc.CertAuth
 		tls.TrustedCAFile = ysc.TrustedCAFile
+		tls.AllowedCNs = ysc.AllowedCNs
+		tls.AllowedHostnames = ysc.AllowedHostnames
 	}
 	copySecurityDetails(&cfg.ClientTLSInfo, &cfg.ClientSecurityJSON)
 	copySecurityDetails(&cfg.PeerTLSInfo, &cfg.PeerSecurityJSON)

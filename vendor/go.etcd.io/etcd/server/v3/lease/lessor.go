@@ -900,6 +900,13 @@ func (l *Lease) forever() {
 	l.expiry = forever
 }
 
+// Demoted returns true if the lease's expiry has been reset to forever.
+func (l *Lease) Demoted() bool {
+	l.expiryMu.Lock()
+	defer l.expiryMu.Unlock()
+	return l.expiry == forever
+}
+
 // Keys returns all the keys attached to the lease.
 func (l *Lease) Keys() []string {
 	l.mu.RLock()

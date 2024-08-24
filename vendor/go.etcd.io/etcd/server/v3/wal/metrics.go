@@ -28,6 +28,15 @@ var (
 		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
 	})
 
+	walWriteSec = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "disk",
+		Name:      "wal_write_duration_seconds",
+		Help:      "The latency distributions of write called by WAL.",
+
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+	})
+
 	walWriteBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
 		Subsystem: "disk",
@@ -38,5 +47,6 @@ var (
 
 func init() {
 	prometheus.MustRegister(walFsyncSec)
+	prometheus.MustRegister(walWriteSec)
 	prometheus.MustRegister(walWriteBytes)
 }

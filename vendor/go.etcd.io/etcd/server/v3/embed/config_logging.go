@@ -147,35 +147,38 @@ func (cfg *Config) setupLogging() error {
 			return err
 		}
 
-		logTLSHandshakeFailure := func(conn *tls.Conn, err error) {
-			state := conn.ConnectionState()
-			remoteAddr := conn.RemoteAddr().String()
-			serverName := state.ServerName
-			if len(state.PeerCertificates) > 0 {
-				cert := state.PeerCertificates[0]
-				ips := make([]string, len(cert.IPAddresses))
-				for i := range cert.IPAddresses {
-					ips[i] = cert.IPAddresses[i].String()
+		logTLSHandshakeFailureFunc := func(msg string) func(conn *tls.Conn, err error) {
+			return func(conn *tls.Conn, err error) {
+				state := conn.ConnectionState()
+				remoteAddr := conn.RemoteAddr().String()
+				serverName := state.ServerName
+				if len(state.PeerCertificates) > 0 {
+					cert := state.PeerCertificates[0]
+					ips := make([]string, len(cert.IPAddresses))
+					for i := range cert.IPAddresses {
+						ips[i] = cert.IPAddresses[i].String()
+					}
+					cfg.logger.Warn(
+						msg,
+						zap.String("remote-addr", remoteAddr),
+						zap.String("server-name", serverName),
+						zap.Strings("ip-addresses", ips),
+						zap.Strings("dns-names", cert.DNSNames),
+						zap.Error(err),
+					)
+				} else {
+					cfg.logger.Warn(
+						msg,
+						zap.String("remote-addr", remoteAddr),
+						zap.String("server-name", serverName),
+						zap.Error(err),
+					)
 				}
-				cfg.logger.Warn(
-					"rejected connection",
-					zap.String("remote-addr", remoteAddr),
-					zap.String("server-name", serverName),
-					zap.Strings("ip-addresses", ips),
-					zap.Strings("dns-names", cert.DNSNames),
-					zap.Error(err),
-				)
-			} else {
-				cfg.logger.Warn(
-					"rejected connection",
-					zap.String("remote-addr", remoteAddr),
-					zap.String("server-name", serverName),
-					zap.Error(err),
-				)
 			}
 		}
-		cfg.ClientTLSInfo.HandshakeFailure = logTLSHandshakeFailure
-		cfg.PeerTLSInfo.HandshakeFailure = logTLSHandshakeFailure
+
+		cfg.ClientTLSInfo.HandshakeFailure = logTLSHandshakeFailureFunc("rejected connection on client endpoint")
+		cfg.PeerTLSInfo.HandshakeFailure = logTLSHandshakeFailureFunc("rejected connection on peer endpoint")
 
 	default:
 		return fmt.Errorf("unknown logger option %q", cfg.Logger)

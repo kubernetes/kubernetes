@@ -74,9 +74,8 @@ func (p *page) leafPageElements() []leafPageElement {
 	if p.count == 0 {
 		return nil
 	}
-	var elems []leafPageElement
 	data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
-	unsafeSlice(unsafe.Pointer(&elems), data, int(p.count))
+	elems := unsafe.Slice((*leafPageElement)(data), int(p.count))
 	return elems
 }
 
@@ -91,9 +90,8 @@ func (p *page) branchPageElements() []branchPageElement {
 	if p.count == 0 {
 		return nil
 	}
-	var elems []branchPageElement
 	data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
-	unsafeSlice(unsafe.Pointer(&elems), data, int(p.count))
+	elems := unsafe.Slice((*branchPageElement)(data), int(p.count))
 	return elems
 }
 
