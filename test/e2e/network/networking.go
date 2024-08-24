@@ -371,7 +371,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
 			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
 			// if the service doesn't answer after 10 tries.
-			err = config.DialFromNode(ctx, "http", config.NodeIP, config.NodeHTTPPort, 10, 10, sets.NewString())
+			err = config.DialFromNode(ctx, "http", config.NodeIP, config.NodeHTTPPort, 10, 10, sets.New[string]())
 			if err != nil {
 				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
@@ -403,7 +403,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
 			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
 			// if the service doesn't answer after 10 tries.
-			err = config.DialFromNode(ctx, "udp", config.NodeIP, config.NodeUDPPort, 10, 10, sets.NewString())
+			err = config.DialFromNode(ctx, "udp", config.NodeIP, config.NodeUDPPort, 10, 10, sets.New[string]())
 			if err != nil {
 				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
