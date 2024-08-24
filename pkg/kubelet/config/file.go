@@ -51,12 +51,7 @@ type sourceFile struct {
 }
 
 // NewSourceFile watches a config file for changes.
-func NewSourceFile(
-	path string,
-	nodeName types.NodeName,
-	period time.Duration,
-	updates chan<- interface{},
-) {
+func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
@@ -65,12 +60,7 @@ func NewSourceFile(
 	config.run()
 }
 
-func newSourceFile(
-	path string,
-	nodeName types.NodeName,
-	period time.Duration,
-	updates chan<- interface{},
-) *sourceFile {
+func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
@@ -180,12 +170,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 
 		switch {
 		case statInfo.Mode().IsDir():
-			klog.ErrorS(
-				nil,
-				"Provided manifest path is a directory, not recursing into manifest path",
-				"path",
-				path,
-			)
+			klog.ErrorS(nil, "Provided manifest path is a directory, not recursing into manifest path", "path", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
@@ -196,14 +181,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 				pods = append(pods, pod)
 			}
 		default:
-			klog.ErrorS(
-				nil,
-				"Manifest path is not a directory or file",
-				"path",
-				path,
-				"mode",
-				statInfo.Mode(),
-			)
+			klog.ErrorS(nil, "Manifest path is not a directory or file", "path", path, "mode", statInfo.Mode())
 		}
 	}
 	return pods, nil
@@ -246,11 +224,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf(
-		"%v: couldn't parse as pod(%v), please check config file",
-		filename,
-		podErr,
-	)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {
