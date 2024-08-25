@@ -23,8 +23,8 @@ import (
 
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 )
 
 // CacheDebugger provides ways to check and write cache information for debugging.

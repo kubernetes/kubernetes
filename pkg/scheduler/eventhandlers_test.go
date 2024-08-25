@@ -41,13 +41,13 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )

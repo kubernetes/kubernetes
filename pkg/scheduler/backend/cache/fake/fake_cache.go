@@ -19,8 +19,8 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 // Cache is used for testing
