@@ -259,17 +259,17 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 						// test.
 						framework.Logf("PVC watch delivered incomplete data, cannot check annotation")
 					case test.lateBinding:
-						gomega.Expect(nodeAnnotationSet).To(gomega.BeTrue(), "selected-node should have been set")
+						gomega.Expect(nodeAnnotationSet).To(gomega.BeTrueBecause("selected-node should have been set"))
 						// Whether it gets reset depends on whether we have topology enabled. Without
 						// it, rescheduling is unnecessary.
 						if test.topology {
-							gomega.Expect(nodeAnnotationReset).To(gomega.BeTrue(), "selected-node should have been set")
+							gomega.Expect(nodeAnnotationReset).To(gomega.BeTrueBecause("selected-node should have been set"))
 						} else {
-							gomega.Expect(nodeAnnotationReset).To(gomega.BeFalse(), "selected-node should not have been reset")
+							gomega.Expect(nodeAnnotationReset).To(gomega.BeFalseBecause("selected-node should not have been reset"))
 						}
 					default:
-						gomega.Expect(nodeAnnotationSet).To(gomega.BeFalse(), "selected-node should not have been set")
-						gomega.Expect(nodeAnnotationReset).To(gomega.BeFalse(), "selected-node should not have been reset")
+						gomega.Expect(nodeAnnotationSet).To(gomega.BeFalseBecause("selected-node should not have been set"))
+						gomega.Expect(nodeAnnotationReset).To(gomega.BeFalseBecause("selected-node should not have been reset"))
 					}
 				}
 			})
