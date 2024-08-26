@@ -291,7 +291,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 		logger.Error(err, "Error removing protection finalizer from PVC", "PVC", klog.KObj(pvc))
 		return err
 	}
-	logger.Info("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
+	logger.V(3).Info("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
 	return nil
 }
 
