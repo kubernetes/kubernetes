@@ -939,9 +939,9 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 	for _, item := range items {
 		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("expected %s Average to be lower: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+				return fmt.Errorf("%s: expected %s Average to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
 			}
-			return fmt.Errorf("expected %s Average to be higher: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+			return fmt.Errorf("%s: expected %s Average to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
 		}
 	}
 	return nil

@@ -158,7 +158,7 @@ the ci-benchmark-scheduler-perf periodic job will fail with an error log such as
 ```
 --- FAIL: BenchmarkPerfScheduling/SchedulingBasic/5000Nodes_10000Pods
     ...
-    scheduler_perf.go:1098: ERROR: op 2: expected SchedulingThroughput Average to be higher: got 256.12, want 270
+    scheduler_perf.go:1098: ERROR: op 2: SchedulingBasic/5000Nodes_10000Pods/namespace-2: expected SchedulingThroughput Average to be higher: got 256.12, want 270
 ```
 
 This allows to analyze which workload failed. Make sure that the failure is not an outlier 

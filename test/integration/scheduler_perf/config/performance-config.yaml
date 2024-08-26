@@ -818,7 +818,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
-    threshold: 35
+    threshold: 24
     params:
       initNodes: 6000
       initPodsPerNamespace: 40
@@ -1070,7 +1070,6 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_100nodes
-    labels: [performance, fast]
     params:
       # In this testcase, the number of nodes is smaller
       # than the limit for the PodScheduling slices.
@@ -1214,7 +1213,6 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_100nodes
-    labels: [performance, fast]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
@@ -1289,7 +1287,6 @@
       measureClaims: 2 # must be measurePods / 5
       maxClaimsPerNode: 2
   - name: 2000pods_100nodes
-    labels: [performance, fast]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
