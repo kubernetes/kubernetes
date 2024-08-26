@@ -609,6 +609,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
+		kubeadmcmdoptions.PrintManifest,
 		kubeadmcmdoptions.FeatureGatesString,                                       // TODO: remove this line when --feature-gates flag is deprecated and dropped from "kubeadm upgrade apply/plan"
 		"api-server-manifest", "controller-manager-manifest", "scheduler-manifest", // TODO: remove this line when these flags are deprecated and dropped from "kubeadm upgrade diff"
 		"allow-missing-template-keys", "output", "show-managed-fields",
