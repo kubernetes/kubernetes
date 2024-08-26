@@ -129,7 +129,7 @@ while true; do sleep 1; done
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete", testContainer.Name))
 					gomega.Expect(terminateContainer.Delete(ctx)).To(gomega.Succeed())
-					gomega.Eventually(ctx, terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalse())
+					gomega.Eventually(ctx, terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalseBecause("container '%s': should have been terminated by now.", testContainer.Name))
 				}
 			})
 		})
