@@ -285,7 +285,10 @@ func (o *openAPI) buildOpenAPISpec(webServices []common.RouteContainer) error {
 			sortParameters(pathItem.Parameters)
 
 			for _, route := range routes {
-				op, _ := o.buildOperations(route, inPathCommonParamsMap)
+				op, err := o.buildOperations(route, inPathCommonParamsMap)
+				if err != nil {
+					return err
+				}
 				sortParameters(op.Parameters)
 
 				switch strings.ToUpper(route.Method()) {
