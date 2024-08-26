@@ -69,7 +69,9 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 	addr := filepath.Join(p, "server.sock")
 	teardown := func() {
 		close(closeCh)
-		os.RemoveAll(addr)
+		if err := os.RemoveAll(addr); err != nil {
+			panic(err)
+		}
 	}
 
 	listener, err := net.Listen("unix", addr)
@@ -88,7 +90,11 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 	}
 
 	go func() {
-		go s.Serve(listener)
+		go func() {
+			if err := s.Serve(listener); err != nil {
+				panic(err)
+			}
+		}()
 		<-closeCh
 		s.GracefulStop()
 	}()
