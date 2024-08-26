@@ -495,6 +495,16 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 	return false
 }
 
+// GetNodeHeartbeatTime returns the timestamp of the last status update of the node.
+func GetNodeHeartbeatTime(node *v1.Node) metav1.Time {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady {
+			return condition.LastHeartbeatTime
+		}
+	}
+	return metav1.Time{}
+}
+
 // PodNodePairs return podNode pairs for all pods in a namespace
 func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodNode, error) {
 	var result []PodNode
