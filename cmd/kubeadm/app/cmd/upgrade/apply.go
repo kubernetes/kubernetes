@@ -112,8 +112,8 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			}
 
 			fmt.Println("")
-			fmt.Printf("[upgrade/successful] SUCCESS! A control plane node of your cluster was upgraded to %q.\n\n", applyData.InitCfg().KubernetesVersion)
-			fmt.Println("[upgrade/kubelet] Now please proceed with upgrading the rest of the nodes by following the right order.")
+			fmt.Printf("[upgrade] SUCCESS! A control plane node of your cluster was upgraded to %q.\n\n", applyData.InitCfg().KubernetesVersion)
+			fmt.Println("[upgrade] Now please proceed with upgrading the rest of the nodes by following the right order.")
 
 			return nil
 		},
@@ -137,6 +137,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	applyRunner.AppendPhase(phases.NewKubeletConfigPhase())
 	applyRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	applyRunner.AppendPhase(phases.NewAddonPhase())
+	applyRunner.AppendPhase(phases.NewPostUpgradePhase())
 
 	// Sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -229,12 +230,12 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	printer := &output.TextPrinter{}
 
 	// Fetches the cluster configuration
-	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
+	klog.V(1).Infoln("[upgrade] retrieving configuration from cluster")
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", false, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			_, _ = printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
+			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			_, _ = printer.Printf("[upgrade] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
 			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, errors.Wrap(err, "[upgrade/init config] FATAL")

@@ -60,13 +60,13 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 	initCfg, dryRun := data.InitCfg(), data.DryRun()
 
 	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
-	// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
+	// If not dry-running, the kubelet config file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
 	// recovered if anything goes wrong.
 	err := upgrade.WriteKubeletConfigFiles(initCfg, data.PatchesDir(), dryRun, data.OutputWriter())
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("[upgrade] The kubelet configuration for this node was successfully updated!")
+	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully updated!")
 	return nil
 }

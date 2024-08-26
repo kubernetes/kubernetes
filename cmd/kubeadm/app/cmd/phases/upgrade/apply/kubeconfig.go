@@ -59,7 +59,7 @@ func runKubeconfig() func(c workflow.RunData) error {
 			}
 		}
 
-		fmt.Println("[upgrade] The kubeconfig files for this node were successfully updated!")
+		fmt.Println("[upgrad/kubeconfig] The kubeconfig files for this node were successfully upgraded!")
 
 		return nil
 	}

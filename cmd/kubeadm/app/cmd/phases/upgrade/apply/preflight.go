@@ -42,8 +42,7 @@ import (
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "preflight",
-		Short: "Run upgrade apply preflight checks",
-		Long:  "Run preflight checks for kubeadm upgrade apply.",
+		Short: "Run preflight checks before upgrade",
 		Run:   runPreflight,
 		InheritFlags: []string{
 			options.CfgPath,
@@ -63,7 +62,7 @@ func runPreflight(c workflow.RunData) error {
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
-	fmt.Println("[preflight] Running preflight checks")
+	fmt.Println("[upgrade/preflight] Running preflight checks")
 
 	printer := &output.TextPrinter{}
 
@@ -80,7 +79,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Run healthchecks against the cluster
-	klog.V(1).Infoln("[upgrade/apply] Verifying the cluster health")
+	klog.V(1).Infoln("[upgrade/preflight] Verifying the cluster health")
 	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, printer); err != nil {
 		return err
 	}
@@ -88,12 +87,12 @@ func runPreflight(c workflow.RunData) error {
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, initCfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			_, _ = printer.Printf("[upgrade/config] %s\n", m)
+			_, _ = printer.Printf("[upgrade/preflight] %s\n", m)
 		}
 	}
 
 	// Validate requested and validate actual version
-	klog.V(1).Infoln("[upgrade/apply] Validating requested and actual version")
+	klog.V(1).Infoln("[upgrade/preflight] Validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&initCfg.ClusterConfiguration); err != nil {
 		return err
 	}
@@ -120,14 +119,14 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	if !data.DryRun() {
-		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
+		fmt.Println("[upgrade/preflight] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[upgrade/preflight] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[upgrade/preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
 		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
 			return err
 		}
 	} else {
-		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+		fmt.Println("[dryrun] Would pull the required images (like 'kubeadm config images pull')")
 	}
 
 	return nil
@@ -136,7 +135,7 @@ func runPreflight(c workflow.RunData) error {
 // enforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
 func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
-	fmt.Printf("[upgrade/version] You have chosen to upgrade the cluster version to %q\n", newK8sVersionStr)
+	fmt.Printf("[upgrade/preflight] You have chosen to upgrade the cluster version to %q\n", newK8sVersionStr)
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, newK8sVersionStr, newK8sVersion, allowExperimentalUpgrades, allowRCUpgrades)
 	if versionSkewErrs != nil {
@@ -153,7 +152,7 @@ func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
-			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+			fmt.Printf("[upgrade/preflight] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 		}
 	}
 	return nil

@@ -34,12 +34,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 )
 
-// NewUploadConfigPhase returns the phase to uploadConfig
+// NewUploadConfigPhase returns a new upload-config phase.
 func NewUploadConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "upload-config",
 		Aliases: []string{"uploadconfig"},
-		Short:   "Upload the kubeadm and kubelet configurations to a ConfigMaps",
+		Short:   "Upload the kubeadm and kubelet configurations to ConfigMaps",
 		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
@@ -56,7 +56,7 @@ func NewUploadConfigPhase() workflow.Phase {
 			},
 			{
 				Name:         "kubelet",
-				Short:        "Upload the kubelet configuration config to a ConfigMap",
+				Short:        "Upload the kubelet configuration to a ConfigMap",
 				Run:          runUploadKubeletConfig,
 				InheritFlags: getUploadConfigPhaseFlags(),
 			},
@@ -84,7 +84,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 		return nil
 	}
 
-	klog.V(1).Infoln("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
+	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
 		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
 	}
@@ -104,12 +104,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return nil
 	}
 
-	klog.V(1).Infoln("[upload-config] Uploading the kubelet configuration to a ConfigMap")
+	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubelet configuration to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
+	klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for the control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "error writing Crisocket information for the control-plane node")
 	}

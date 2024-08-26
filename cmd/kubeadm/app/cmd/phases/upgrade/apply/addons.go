@@ -38,24 +38,24 @@ import (
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
-		Short: "Install the default kubeadm addons",
+		Short: "Upgrade the default kubeadm addons",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Install all the addons",
+				Short:          "Upgrade all the addons",
 				InheritFlags:   getAddonPhaseFlags("all"),
 				RunAllSiblings: true,
 			},
 			{
 				Name:         "coredns",
-				Short:        "Install the CoreDNS addon",
+				Short:        "Upgrade the CoreDNS addon",
 				InheritFlags: getAddonPhaseFlags("coredns"),
 				Run:          runCoreDNSAddon,
 			},
 			{
 				Name:         "kube-proxy",
-				Short:        "Install the kube-proxy addon",
+				Short:        "Upgrade the kube-proxy addon",
 				InheritFlags: getAddonPhaseFlags("kube-proxy"),
 				Run:          runKubeProxyAddon,
 			},
@@ -69,7 +69,7 @@ func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfigu
 		return false, errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
 	}
 	if len(unupgradedControlPlanes) > 0 {
-		fmt.Fprintf(out, "[upgrade/addons] Skipping upgrade of addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
+		fmt.Fprintf(out, "[upgrade/addon] Skipping upgrade of addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
 		return false, nil
 	}
 	return true, nil
@@ -83,7 +83,7 @@ func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.I
 	return data.InitCfg(), data.Client(), data.PatchesDir(), data.OutputWriter(), data.DryRun(), nil
 }
 
-// runCoreDNSAddon installs the CoreDNS addon.
+// runCoreDNSAddon upgrades the CoreDNS addon.
 func runCoreDNSAddon(c workflow.RunData) error {
 	cfg, client, patchesDir, out, dryRun, err := getInitData(c)
 	if err != nil {
@@ -106,7 +106,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 	return nil
 }
 
-// runKubeProxyAddon installs the KubeProxy addon.
+// runKubeProxyAddon upgrades the KubeProxy addon.
 func runKubeProxyAddon(c workflow.RunData) error {
 	cfg, client, _, out, dryRun, err := getInitData(c)
 	if err != nil {

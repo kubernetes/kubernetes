@@ -28,48 +28,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestSessionIsInteractive(t *testing.T) {
-	var tcases = []struct {
-		name     string
-		data     *applyData
-		expected bool
-	}{
-		{
-			name: "Explicitly non-interactive",
-			data: &applyData{
-				nonInteractiveMode: true,
-			},
-			expected: false,
-		},
-		{
-			name: "Implicitly non-interactive since --dryRun is used",
-			data: &applyData{
-				dryRun: true,
-			},
-			expected: false,
-		},
-		{
-			name: "Implicitly non-interactive since --force is used",
-			data: &applyData{
-				force: true,
-			},
-			expected: false,
-		},
-		{
-			name:     "Interactive session",
-			data:     &applyData{},
-			expected: true,
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.data.SessionIsInteractive() != tt.expected {
-				t.Error("unexpected result")
-			}
-		})
-	}
-}
-
 var testApplyConfig = fmt.Sprintf(`---
 apiVersion: %s
 apply:

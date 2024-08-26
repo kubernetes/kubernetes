@@ -51,11 +51,11 @@ func runBootstrapToken(c workflow.RunData) error {
 	}
 
 	if data.DryRun() {
-		fmt.Println("[dryrun] Would config cluster-info ConfigMap, RBAC Roles")
+		fmt.Println("[dryrun] Would configure bootstrap token and cluster-info RBAC rules")
 		return nil
 	}
 
-	fmt.Println("[bootstrap-token] Configuring the cluster-info ConfigMap and RBAC roles")
+	fmt.Println("[upgrade/bootstrap-token] Configuring bootstrap token and cluster-info RBAC rules")
 
 	client := data.Client()
 
