@@ -60,6 +60,9 @@ var (
 		# Return snapshot logs from pod nginx with multi containers
 		kubectl logs nginx --all-containers=true
 
+		# Return snapshot logs from all pods in the deployment nginx.
+		kubectl logs deployment/nginx --all-pods=true
+
 		# Return snapshot logs from all containers in pods defined by label app=nginx
 		kubectl logs -l app=nginx --all-containers=true
 
