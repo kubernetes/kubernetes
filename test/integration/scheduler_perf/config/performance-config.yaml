@@ -818,7 +818,7 @@
       measurePods: 1000
   - name: 5000Nodes_2000Pods
     labels: [performance]
-    threshold: 35
+    threshold: 24
     params:
       initNodes: 6000
       initPodsPerNamespace: 40
