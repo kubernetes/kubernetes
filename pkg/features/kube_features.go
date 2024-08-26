@@ -1179,8 +1179,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	UnknownVersionInteroperabilityProxy: {Default: false, PreRelease: featuregate.Alpha},
 
-	VolumeAttributesClass: {Default: false, PreRelease: featuregate.Beta},
-
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 
 	UserNamespacesSupport: {Default: false, PreRelease: featuregate.Beta},
