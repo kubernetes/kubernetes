@@ -1561,7 +1561,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		os.Exit(1)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
+	if err := kl.containerManager.Start(context.TODO(), node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.ErrorS(err, "Failed to start ContainerManager")
 		os.Exit(1)
@@ -2075,7 +2075,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// and BEFORE the pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if err := kl.UnprepareDynamicResources(pod); err != nil {
+		if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
 			return err
 		}
 	}
@@ -3058,14 +3058,14 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 
 // PrepareDynamicResources calls the container Manager PrepareDynamicResources API
 // This method implements the RuntimeHelper interface
-func (kl *Kubelet) PrepareDynamicResources(pod *v1.Pod) error {
-	return kl.containerManager.PrepareDynamicResources(pod)
+func (kl *Kubelet) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+	return kl.containerManager.PrepareDynamicResources(ctx, pod)
 }
 
 // UnprepareDynamicResources calls the container Manager UnprepareDynamicResources API
 // This method implements the RuntimeHelper interface
-func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
-	return kl.containerManager.UnprepareDynamicResources(pod)
+func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+	return kl.containerManager.UnprepareDynamicResources(ctx, pod)
 }
 
 func (kl *Kubelet) warnCgroupV1Usage() {

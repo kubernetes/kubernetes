@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -226,8 +225,6 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by DRA plugin.
 func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.InfoS("Validate DRA plugin", "name", pluginName, "endpoint", endpoint, "versions", strings.Join(versions, ","))
-
 	_, err := h.validateVersions(pluginName, versions)
 	if err != nil {
 		return fmt.Errorf("invalid versions of plugin %s: %w", pluginName, err)
