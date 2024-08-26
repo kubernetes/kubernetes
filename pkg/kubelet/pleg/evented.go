@@ -31,11 +31,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-// The frequency with which global timestamp of the cache is to
-// is to be updated periodically. If pod workers get stuck at cache.GetNewerThan
-// call, after this period it will be unblocked.
-const globalCacheUpdatePeriod = 1 * time.Second
-
 var (
 	eventedPLEGUsage   = false
 	eventedPLEGUsageMu = sync.RWMutex{}
@@ -76,6 +71,10 @@ type EventedPLEG struct {
 	eventedPlegMaxStreamRetries int
 	// Indicates relisting related parameters
 	relistDuration *RelistDuration
+	// The frequency with which global timestamp of the cache is to
+	// is to be updated periodically. If pod workers get stuck at cache.GetNewerThan
+	// call, after this period it will be unblocked.
+	globalCacheUpdatePeriod time.Duration
 	// Stop the Evented PLEG by closing the channel.
 	stopCh chan struct{}
 	// Stops the periodic update of the cache global timestamp.
@@ -87,7 +86,7 @@ type EventedPLEG struct {
 // NewEventedPLEG instantiates a new EventedPLEG object and return it.
 func NewEventedPLEG(runtime kubecontainer.Runtime, runtimeService internalapi.RuntimeService, eventChannel chan *PodLifecycleEvent,
 	cache kubecontainer.Cache, genericPleg PodLifecycleEventGenerator, eventedPlegMaxStreamRetries int,
-	relistDuration *RelistDuration, clock clock.Clock) (PodLifecycleEventGenerator, error) {
+	relistDuration *RelistDuration, clock clock.Clock, cacheUpdatePeriod time.Duration) (PodLifecycleEventGenerator, error) {
 	handler, ok := genericPleg.(podLifecycleEventGeneratorHandler)
 	if !ok {
 		return nil, fmt.Errorf("%v doesn't implement podLifecycleEventGeneratorHandler interface", genericPleg)
@@ -101,6 +100,7 @@ func NewEventedPLEG(runtime kubecontainer.Runtime, runtimeService internalapi.Ru
 		eventedPlegMaxStreamRetries: eventedPlegMaxStreamRetries,
 		relistDuration:              relistDuration,
 		clock:                       clock,
+		globalCacheUpdatePeriod:     cacheUpdatePeriod,
 	}, nil
 }
 
@@ -125,7 +125,7 @@ func (e *EventedPLEG) Start() {
 	e.stopCh = make(chan struct{})
 	e.stopCacheUpdateCh = make(chan struct{})
 	go wait.Until(e.watchEventsChannel, 0, e.stopCh)
-	go wait.Until(e.updateGlobalCache, globalCacheUpdatePeriod, e.stopCacheUpdateCh)
+	go wait.Until(e.updateGlobalCache, e.globalCacheUpdatePeriod, e.stopCacheUpdateCh)
 }
 
 // Stop stops the Evented PLEG
