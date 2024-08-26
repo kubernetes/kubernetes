@@ -52,7 +52,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 	if proxyEnvs == nil {
-		proxyEnvs = kubeadmutil.GetProxyEnvVars()
+		proxyEnvs = kubeadmutil.GetProxyEnvVars(nil)
 	}
 	componentHealthCheckTimeout := kubeadmapi.GetActiveTimeouts().ControlPlaneComponentHealthCheck
 
