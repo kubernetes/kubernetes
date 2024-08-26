@@ -803,13 +803,10 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Wait for node to be ready")
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				_, err := e2enode.TotalReady(ctx, f.ClientSet)
-				if err != nil {
-					return err
-				}
-				return nil
-			}, time.Minute, time.Second).Should(gomega.Equal(1), "one node should be ready")
+			gomega.Eventually(ctx, e2enode.TotalReady).
+				WithArguments(f.ClientSet).
+				WithTimeout(time.Minute).
+				Should(gomega.BeEquivalentTo(1))
 
 			// Before we run the device plugin test, we need to ensure
 			// that the cluster is in a clean state and there are no
