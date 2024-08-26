@@ -626,7 +626,7 @@ func TestCoreDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
@@ -645,7 +645,7 @@ func TestCoreDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
@@ -699,7 +699,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -892,7 +892,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
@@ -910,7 +910,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
@@ -964,7 +964,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -1392,13 +1392,13 @@ func TestDeployedDNSAddon(t *testing.T) {
 	}{
 		{
 			name:        "default",
-			image:       "registry.k8s.io/coredns/coredns:v1.11.1",
-			wantVersion: "v1.11.1",
+			image:       "registry.k8s.io/coredns/coredns:v1.11.3",
+			wantVersion: "v1.11.3",
 		},
 		{
 			name:        "with digest",
-			image:       "registry.k8s.io/coredns/coredns:v1.11.1@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
-			wantVersion: "v1.11.1",
+			image:       "registry.k8s.io/coredns/coredns:v1.11.3@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			wantVersion: "v1.11.3",
 		},
 		{
 			name:        "without registry",
@@ -1441,7 +1441,7 @@ func TestDeployedDNSAddon(t *testing.T) {
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string) *clientsetfake.Clientset {
 	if image == "" {
-		image = "registry.k8s.io/coredns/coredns:v1.11.1"
+		image = "registry.k8s.io/coredns/coredns:v1.11.3"
 	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {
