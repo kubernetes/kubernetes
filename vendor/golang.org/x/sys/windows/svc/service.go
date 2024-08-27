@@ -199,9 +199,8 @@ var (
 )
 
 func ctlHandler(ctl, evtype, evdata, context uintptr) uintptr {
-	s := (*service)(unsafe.Pointer(context))
 	e := ctlEvent{cmd: Cmd(ctl), eventType: uint32(evtype), eventData: evdata, context: 123456} // Set context to 123456 to test issue #25660.
-	s.c <- e
+	theService.c <- e
 	return 0
 }
 
@@ -210,7 +209,7 @@ var theService service // This is, unfortunately, a global, which means only one
 // serviceMain is the entry point called by the service manager, registered earlier by
 // the call to StartServiceCtrlDispatcher.
 func serviceMain(argc uint32, argv **uint16) uintptr {
-	handle, err := windows.RegisterServiceCtrlHandlerEx(windows.StringToUTF16Ptr(theService.name), ctlHandlerCallback, uintptr(unsafe.Pointer(&theService)))
+	handle, err := windows.RegisterServiceCtrlHandlerEx(windows.StringToUTF16Ptr(theService.name), ctlHandlerCallback, 0)
 	if sysErr, ok := err.(windows.Errno); ok {
 		return uintptr(sysErr)
 	} else if err != nil {
