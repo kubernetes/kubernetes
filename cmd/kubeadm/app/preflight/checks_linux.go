@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -72,9 +73,16 @@ func addSwapCheck(checks []Checker) []Checker {
 }
 
 // addExecChecks adds checks that verify if certain binaries are in PATH
-func addExecChecks(checks []Checker, execer utilsexec.Interface) []Checker {
+func addExecChecks(checks []Checker, execer utilsexec.Interface, k8sVersion string) []Checker {
+	// For k8s >= 1.32.0, kube-proxy no longer depends on conntrack to be present in PATH
+	// (ref: https://github.com/kubernetes/kubernetes/pull/126952)
+	if v, err := utilversion.ParseSemantic(k8sVersion); err == nil {
+		if v.LessThan(utilversion.MustParseSemantic("1.32.0")) {
+			checks = append(checks, InPathCheck{executable: "conntrack", mandatory: true, exec: execer})
+		}
+	}
+
 	checks = append(checks,
-		InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 		InPathCheck{executable: "ip", mandatory: true, exec: execer},
 		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 		InPathCheck{executable: "mount", mandatory: true, exec: execer},

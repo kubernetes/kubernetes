@@ -50,6 +50,6 @@ func addSwapCheck(checks []Checker) []Checker {
 
 // addExecChecks adds checks that verify if certain binaries are in PATH
 // No-op for Darwin (MacOS), Windows.
-func addExecChecks(checks []Checker, _ utilsexec.Interface) []Checker {
+func addExecChecks(checks []Checker, _ utilsexec.Interface, _ string) []Checker {
 	return checks
 }
