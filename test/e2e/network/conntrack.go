@@ -24,10 +24,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -35,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -45,6 +49,7 @@ const (
 	podClient   = "pod-client"
 	podBackend1 = "pod-server-1"
 	podBackend2 = "pod-server-2"
+	podBackend3 = "pod-server-3"
 	srcPort     = 12345
 )
 
@@ -280,6 +285,101 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
 			framework.Failf("Failed to connect to backend 2")
+		}
+	})
+
+	// Regression test for https://issues.k8s.io/126934
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service with InternalTrafficPolicy set to Local", func(ctx context.Context) {
+
+		// Create a ClusterIP service with InternalTrafficPolicy local
+		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in " + ns)
+		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
+			}
+			svc.Spec.InternalTrafficPolicy = ptr.To(v1.ServiceInternalTrafficPolicyLocal)
+		})
+		framework.ExpectNoError(err)
+
+		// Create a pod in one node to create the UDP traffic against the ClusterIP service every second
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
+		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 1 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
+
+		// Read the client pod logs
+		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod client logs: %s", logs)
+
+		// Create a daemonset for the Service with InternalTrafficPolicy Local so there is one Server in each Pod
+		// and all pods in the node sends the traffic to the local server.
+		ginkgo.By("creating a daemonset pod for the service " + serviceName)
+		dsName := "ds-conntrack"
+		ds := e2edaemonset.NewDaemonSet(dsName, imageutils.GetE2EImage(imageutils.Agnhost), udpJig.Labels, nil, nil, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--udp-port=80", "--delay-shutdown=10")
+		ginkgo.By("Creating a DaemonSet")
+		ds, err = fr.ClientSet.AppsV1().DaemonSets(ns).Create(ctx, ds, metav1.CreateOptions{})
+		if err != nil {
+			framework.Failf("unable to create test DaemonSet %s: %v", dsName, err)
+		}
+		ginkgo.By("Waiting for DaemonSet pods to become ready")
+		err = wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+			return e2edaemonset.CheckRunningOnAllNodes(ctx, fr, ds)
+		})
+		framework.ExpectNoError(err)
+		// Get name of the pod running on the same node than the client
+		labelSelector := labels.SelectorFromSet(udpJig.Labels).String()
+		fieldSelector := fields.OneTermEqualSelector("spec.nodeName", clientNodeInfo.name).String()
+		listOpts := metav1.ListOptions{LabelSelector: labelSelector, FieldSelector: fieldSelector}
+		pods, err := fr.ClientSet.CoreV1().Pods(ns).List(ctx, listOpts)
+		framework.ExpectNoError(err)
+		if len(pods.Items) != 1 {
+			framework.Failf("expected 1 pod, got %d pods", len(pods.Items))
+		}
+		podBackend1 := pods.Items[0].Name
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Additionally take into account that UDP conntract entries timeout is
+		// 30 seconds by default.
+		// Based on the above check if the pod receives the traffic.
+		ginkgo.By("checking client pod connected to " + podBackend1 + " on Node " + clientNodeInfo.name)
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 1")
+		}
+
+		// Now recreate the first backend pod
+		framework.Logf("Cleaning up %s pod", podBackend1)
+		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+
+		ginkgo.By("Waiting for DaemonSet pods to become ready")
+		err = wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+			return e2edaemonset.CheckRunningOnAllNodes(ctx, fr, ds)
+		})
+		framework.ExpectNoError(err)
+
+		pods, err = fr.ClientSet.CoreV1().Pods(ns).List(ctx, listOpts)
+		framework.ExpectNoError(err)
+		if len(pods.Items) != 1 {
+			framework.Failf("expected 1 pod, got %d pods", len(pods.Items))
+		}
+		podBackend2 := pods.Items[0].Name
+		// Check that the new pod keeps receiving traffic after is recreated
+		// UDP conntrack entries timeout is 30 sec by default
+		ginkgo.By("checking client pod connected to " + podBackend2 + " on Node " + clientNodeInfo.name)
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend2, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 3")
 		}
 	})
 
