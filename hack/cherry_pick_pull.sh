@@ -133,6 +133,7 @@ function return_to_kansas {
 trap return_to_kansas EXIT
 
 SUBJECTS=()
+RELEASE_NOTES=()
 function make-a-pr() {
   local rel
   rel="$(basename "${BRANCH}")"
@@ -149,7 +150,7 @@ ${numandtitle}
 For details on the cherry pick process, see the [cherry pick requests](https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md) page.
 
 \`\`\`release-note
-
+$(printf '%s\n' "${RELEASE_NOTES[@]}")
 \`\`\`
 EOF
 )
@@ -195,8 +196,12 @@ for pull in "${PULLS[@]}"; do
   }
 
   # set the subject
-  subject=$(grep -m 1 "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
+  subject=$(gh pr view "$pull" --json title --jq '.["title"]')
   SUBJECTS+=("#${pull}: ${subject}")
+
+  # set the release note
+  release_note=$(gh pr view "$pull" --json body --jq '.["body"]' | awk '/```release-note/{f=1;next} /```/{f=0} f')
+  RELEASE_NOTES+=("${release_note}")
 
   # remove the patch file from /tmp
   rm -f "/tmp/${pull}.patch"
