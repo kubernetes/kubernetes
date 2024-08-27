@@ -362,6 +362,12 @@ type DeviceClaim struct {
 	// +optional
 	// +listType=atomic
 	Config []DeviceClaimConfiguration
+
+	// Potential future extension, ignored by older schedulers. This is
+	// fine because scoring allows users to define a preference, without
+	// making it a hard requirement.
+	//
+	// Score *SomeScoringStruct
 }
 
 const (
@@ -552,6 +558,16 @@ type DeviceConstraint struct {
 	// +optional
 	// +oneOf=ConstraintType
 	MatchAttribute *FullyQualifiedName
+
+	// Potential future extension, not part of the current design:
+	// A CEL expression which compares different devices and returns
+	// true if they match.
+	//
+	// Because it would be part of a one-of, old schedulers will not
+	// accidentally ignore this additional, for them unknown match
+	// criteria.
+	//
+	// MatchExpression string
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.

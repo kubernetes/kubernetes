@@ -150,7 +150,7 @@ type NodePrepareResourceResponse struct {
 	// may have zero or more devices.
 	Devices []*Device `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
 	// If non-empty, preparing the ResourceClaim failed.
-	// cdi_devices is ignored in that case.
+	// Devices are ignored in that case.
 	Error                string   `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
