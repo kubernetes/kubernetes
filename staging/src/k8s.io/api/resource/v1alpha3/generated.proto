@@ -843,7 +843,7 @@ message ResourceSlice {
 message ResourceSliceList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta listMeta = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource ResourceSlices.
   repeated ResourceSlice items = 2;
