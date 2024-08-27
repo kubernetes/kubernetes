@@ -233,6 +233,16 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 	for i, k := range keySet.Keys {
 		kids[i] = k.KeyID
 	}
+
+	klog.Infof(
+		"http response header",
+		logHeaders(resp.Header),
+		"kids: %+v",
+		kids,
+		"url: %s",
+		r.jwksURL,
+	)
+
 	klog.Infof("got %d keys from %s. kids: %+v", len(kids), r.jwksURL, kids)
 
 	// If the server doesn't provide cache control headers, assume the
@@ -244,4 +254,14 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 		expiry = e
 	}
 	return keySet.Keys, expiry, nil
+}
+
+func logHeaders(r http.Header) string {
+	multiline := ""
+	for name, values := range r.Clone() {
+		for _, value := range values {
+			multiline = fmt.Sprintf("%s\n%s: %s", multiline, name, value)
+		}
+	}
+	return multiline
 }
