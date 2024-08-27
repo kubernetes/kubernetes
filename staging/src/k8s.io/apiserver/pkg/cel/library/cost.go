@@ -18,17 +18,15 @@ package library
 
 import (
 	"fmt"
-	"math"
-	"reflect"
-
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"math"
+	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/cel"
 )
 
@@ -49,22 +47,6 @@ var knownUnhandledFunctions = map[string]bool{
 	"!_":            true,
 	"strings.quote": true,
 }
-
-// TODO: Replace this with a utility that extracts types from libraries.
-var knownKubernetesRuntimeTypes = sets.New[reflect.Type](
-	reflect.ValueOf(cel.URL{}).Type(),
-	reflect.ValueOf(cel.IP{}).Type(),
-	reflect.ValueOf(cel.CIDR{}).Type(),
-	reflect.ValueOf(&cel.Format{}).Type(),
-	reflect.ValueOf(cel.Quantity{}).Type(),
-)
-var knownKubernetesCompilerTypes = sets.New[ref.Type](
-	cel.CIDRType,
-	cel.IPType,
-	cel.FormatType,
-	cel.QuantityType,
-	cel.URLType,
-)
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
 type CostEstimator struct {
@@ -258,18 +240,16 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			unitCost := uint64(1)
 			lhs := args[0]
 			switch lhs.(type) {
-			case cel.Quantity:
-				return &unitCost
-			case cel.IP:
-				return &unitCost
-			case cel.CIDR:
-				return &unitCost
-			case *cel.Format: // Formats have a small max size.
-				return &unitCost
-			case cel.URL: // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
+			case *cel.Quantity, cel.Quantity,
+				*cel.IP, cel.IP,
+				*cel.CIDR, cel.CIDR,
+				*cel.Format,       // Formats have a small max size. Format takes pointer receiver.
+				*cel.URL, cel.URL, // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
+				*authorizerVal, authorizerVal, *pathCheckVal, pathCheckVal, *groupCheckVal, groupCheckVal,
+				*resourceCheckVal, resourceCheckVal, *decisionVal, decisionVal:
 				return &unitCost
 			default:
-				if panicOnUnknown && knownKubernetesRuntimeTypes.Has(reflect.ValueOf(lhs).Type()) {
+				if panicOnUnknown && isKubernetesType(lhs.Type()) {
 					panic(fmt.Errorf("CallCost: unhandled equality for Kubernetes type %T", lhs))
 				}
 			}
@@ -528,7 +508,8 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				}
 				if t.Kind() == types.StructKind {
 					switch t {
-					case cel.QuantityType: // O(1) cost equality checks
+					case cel.QuantityType, AuthorizerType, PathCheckType, // O(1) cost equality checks
+						GroupCheckType, ResourceCheckType, DecisionType:
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 					case cel.FormatType:
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
@@ -542,7 +523,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 					}
 				}
-				if panicOnUnknown && knownKubernetesCompilerTypes.Has(t) {
+				if panicOnUnknown && isKubernetesType(t) {
 					panic(fmt.Errorf("EstimateCallCost: unhandled equality for Kubernetes type %v", t))
 				}
 			}
@@ -650,4 +631,18 @@ func traversalCost(v ref.Val) uint64 {
 	default:
 		return 1
 	}
+}
+
+// isKubernetesType returns ture if a  type is type defined by Kubernetes,
+// as identified by opaque or struct types with a "kubernetes." prefix.
+func isKubernetesType(t ref.Type) bool {
+	if tt, ok := t.(*types.Type); ok {
+		switch tt.Kind() {
+		case types.OpaqueKind, types.StructKind:
+			return strings.HasPrefix(tt.TypeName(), "kubernetes.")
+		default:
+			return false
+		}
+	}
+	return false
 }

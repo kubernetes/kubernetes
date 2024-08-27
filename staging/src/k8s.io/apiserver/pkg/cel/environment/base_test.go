@@ -115,6 +115,8 @@ func TestLibraryCoverage(t *testing.T) {
 	}
 }
 
+// TestKnownLibraries ensures that all libraries used in the base environment are also registered with
+// KnownLibraries.  Other tests rely on KnownLibraries to provide an up-to-date list of CEL libraries.
 func TestKnownLibraries(t *testing.T) {
 	known := sets.New[string]()
 	used := sets.New[string]()
@@ -132,9 +134,8 @@ func TestKnownLibraries(t *testing.T) {
 	unexpected := used.Difference(known)
 
 	if len(unexpected) != 0 {
-		t.Errorf("Expected all libraries in the base environment to be included k8s.io/apiserver/pkg/cel/library's KnownLibraries, but found missing libraries: %v", unexpected)
+		t.Errorf("Expected all libraries in the base environment to be included in k8s.io/apiserver/pkg/cel/library's KnownLibraries, but found missing libraries: %v", unexpected)
 	}
-
 }
 
 func librariesInVersions(t *testing.T, vops ...VersionedOptions) []string {

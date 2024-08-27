@@ -66,21 +66,29 @@ func TestLibraryCompatibility(t *testing.T) {
 	}
 }
 
+// TestTypeRegistration ensures that all custom types defined and used by Kubernetes CEL libraries
+// are returned by library.Types().  Other tests depend on Types() to provide an up-to-date list of
+// types declared in a library.
 func TestTypeRegistration(t *testing.T) {
 	for _, lib := range KnownLibraries() {
 		registeredTypes := sets.New[*cel.Type]()
 		usedTypes := sets.New[*cel.Type]()
-		// scan all registered functions
+		// scan all registered function declarations for the library
 		for _, fn := range lib.declarations() {
-			testFn, err := decls.NewFunction("test", fn...)
+			fn, err := decls.NewFunction("placeholder-not-used", fn...)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, o := range testFn.OverloadDecls() {
+			for _, o := range fn.OverloadDecls() {
+				// ArgTypes include both the receiver type (if present) and
+				// all function argument types.
 				for _, at := range o.ArgTypes() {
 					switch at.Kind() {
+					// User defined types are either Opaque or Struct.
 					case types.OpaqueKind, types.StructKind:
 						usedTypes.Insert(at)
+					default:
+						// skip
 					}
 				}
 			}

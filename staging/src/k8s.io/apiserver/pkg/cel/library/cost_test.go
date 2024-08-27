@@ -19,6 +19,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"github.com/google/cel-go/common/types/ref"
 	"testing"
 
 	"github.com/google/cel-go/cel"
@@ -30,6 +31,7 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 const (
@@ -1231,10 +1233,10 @@ func TestSize(t *testing.T) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var targetNode checker.AstNode = testSizeNode{size: tc.targetSize}
+			var targetNode checker.AstNode = testNode{size: tc.targetSize}
 			argNodes := make([]checker.AstNode, len(tc.argSizes))
 			for i, arg := range tc.argSizes {
-				argNodes[i] = testSizeNode{size: arg}
+				argNodes[i] = testNode{size: arg}
 			}
 			result := est.EstimateCallCost(tc.function, tc.overload, &targetNode, argNodes)
 			if result.ResultSize == nil {
@@ -1247,25 +1249,62 @@ func TestSize(t *testing.T) {
 	}
 }
 
-type testSizeNode struct {
+// TestTypeEquality ensures that cost is tested for all custom types used by Kubernetes libraries.
+func TestTypeEquality(t *testing.T) {
+	examples := map[string]ref.Val{
+		// Add example ref.Val's for custom types in Kubernetes here:
+		"kubernetes.authorization.Authorizer":    authorizerVal{},
+		"kubernetes.authorization.PathCheck":     pathCheckVal{},
+		"kubernetes.authorization.GroupCheck":    groupCheckVal{},
+		"kubernetes.authorization.ResourceCheck": resourceCheckVal{},
+		"kubernetes.authorization.Decision":      decisionVal{},
+		"kubernetes.URL":                         apiservercel.URL{},
+		"kubernetes.Quantity":                    apiservercel.Quantity{},
+		"net.IP":                                 apiservercel.IP{},
+		"net.CIDR":                               apiservercel.CIDR{},
+		"kubernetes.NamedFormat":                 &apiservercel.Format{},
+	}
+
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
+
+	for _, lib := range KnownLibraries() {
+		for _, kt := range lib.Types() {
+			t.Run(kt.TypeName(), func(t *testing.T) {
+				typeNode := testNode{size: checker.SizeEstimate{Min: 10, Max: 100}, typ: kt}
+				est.EstimateCallCost("_==_", "", nil, []checker.AstNode{typeNode, typeNode})
+				ex, ok := examples[kt.TypeName()]
+				if !ok {
+					t.Errorf("missing example for type: %s", kt.TypeName())
+				}
+				est.CallCost("_==_", "", []ref.Val{ex, ex}, nil)
+			})
+		}
+	}
+}
+
+type testNode struct {
 	size checker.SizeEstimate
+	typ  *types.Type
 }
 
-var _ checker.AstNode = (*testSizeNode)(nil)
+var _ checker.AstNode = (*testNode)(nil)
 
-func (t testSizeNode) Path() []string {
+func (t testNode) Path() []string {
 	return nil // not needed
 }
 
-func (t testSizeNode) Type() *types.Type {
+func (t testNode) Type() *types.Type {
+	return t.typ // not needed
+}
+
+func (t testNode) Expr() ast.Expr {
 	return nil // not needed
 }
 
-func (t testSizeNode) Expr() ast.Expr {
-	return nil // not needed
-}
-
-func (t testSizeNode) ComputedSize() *checker.SizeEstimate {
+func (t testNode) ComputedSize() *checker.SizeEstimate {
 	return &t.size
 }
 
