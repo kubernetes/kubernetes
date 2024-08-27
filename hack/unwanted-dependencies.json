@@ -156,6 +156,7 @@
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
       "github.com/mailru/easyjson": [
+        "github.com/go-openapi/jsonpointer",
         "github.com/go-openapi/swag",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
