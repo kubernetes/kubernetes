@@ -19,6 +19,7 @@ package library
 import (
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
@@ -27,6 +28,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/cel"
 )
 
@@ -47,6 +49,22 @@ var knownUnhandledFunctions = map[string]bool{
 	"!_":            true,
 	"strings.quote": true,
 }
+
+// TODO: Replace this with a utility that extracts types from libraries.
+var knownKubernetesRuntimeTypes = sets.New[reflect.Type](
+	reflect.ValueOf(cel.URL{}).Type(),
+	reflect.ValueOf(cel.IP{}).Type(),
+	reflect.ValueOf(cel.CIDR{}).Type(),
+	reflect.ValueOf(&cel.Format{}).Type(),
+	reflect.ValueOf(cel.Quantity{}).Type(),
+)
+var knownKubernetesCompilerTypes = sets.New[ref.Type](
+	cel.CIDRType,
+	cel.IPType,
+	cel.FormatType,
+	cel.QuantityType,
+	cel.URLType,
+)
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
 type CostEstimator struct {
@@ -235,6 +253,27 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// url accessors
 		cost := uint64(1)
 		return &cost
+	case "_==_":
+		if len(args) == 2 {
+			unitCost := uint64(1)
+			lhs := args[0]
+			switch lhs.(type) {
+			case cel.Quantity:
+				return &unitCost
+			case cel.IP:
+				return &unitCost
+			case cel.CIDR:
+				return &unitCost
+			case *cel.Format: // Formats have a small max size.
+				return &unitCost
+			case cel.URL: // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
+				return &unitCost
+			default:
+				if panicOnUnknown && knownKubernetesRuntimeTypes.Has(reflect.ValueOf(lhs).Type()) {
+					panic(fmt.Errorf("CallCost: unhandled equality for Kubernetes type %T", lhs))
+				}
+			}
+		}
 	}
 	if panicOnUnknown && !knownUnhandledFunctions[function] {
 		panic(fmt.Errorf("CallCost: unhandled function %q or args %v", function, args))
@@ -278,7 +317,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "url":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
 		}
 	case "lowerAscii", "upperAscii", "substring", "trim":
 		if target != nil {
@@ -475,6 +514,39 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// url accessors
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+	case "_==_":
+		if len(args) == 2 {
+			lhs := args[0]
+			rhs := args[1]
+			if lhs.Type().Equal(rhs.Type()) == types.True {
+				t := lhs.Type()
+				if t.Kind() == types.OpaqueKind {
+					switch t.TypeName() {
+					case cel.IPType.TypeName(), cel.CIDRType.TypeName():
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+					}
+				}
+				if t.Kind() == types.StructKind {
+					switch t {
+					case cel.QuantityType: // O(1) cost equality checks
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+					case cel.FormatType:
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+					case cel.URLType:
+						size := checker.SizeEstimate{Min: 1, Max: 1}
+						rhSize := rhs.ComputedSize()
+						lhSize := rhs.ComputedSize()
+						if rhSize != nil && lhSize != nil {
+							size = rhSize.Union(*lhSize)
+						}
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+					}
+				}
+				if panicOnUnknown && knownKubernetesCompilerTypes.Has(t) {
+					panic(fmt.Errorf("EstimateCallCost: unhandled equality for Kubernetes type %v", t))
+				}
+			}
+		}
 	}
 	if panicOnUnknown && !knownUnhandledFunctions[function] {
 		panic(fmt.Errorf("EstimateCallCost: unhandled function %q, target %v, args %v", function, target, args))
