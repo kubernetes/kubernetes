@@ -8,8 +8,8 @@ require (
 	github.com/moby/sys/mountinfo v0.7.1
 	github.com/opencontainers/runc v1.1.13
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc
-	golang.org/x/sys v0.21.0
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/sys v0.23.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )

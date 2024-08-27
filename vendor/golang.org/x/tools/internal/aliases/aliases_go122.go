@@ -28,6 +28,42 @@ func Rhs(alias *Alias) types.Type {
 	return Unalias(alias)
 }
 
+// TypeParams returns the type parameter list of the alias.
+func TypeParams(alias *Alias) *types.TypeParamList {
+	if alias, ok := any(alias).(interface{ TypeParams() *types.TypeParamList }); ok {
+		return alias.TypeParams() // go1.23+
+	}
+	return nil
+}
+
+// SetTypeParams sets the type parameters of the alias type.
+func SetTypeParams(alias *Alias, tparams []*types.TypeParam) {
+	if alias, ok := any(alias).(interface {
+		SetTypeParams(tparams []*types.TypeParam)
+	}); ok {
+		alias.SetTypeParams(tparams) // go1.23+
+	} else if len(tparams) > 0 {
+		panic("cannot set type parameters of an Alias type in go1.22")
+	}
+}
+
+// TypeArgs returns the type arguments used to instantiate the Alias type.
+func TypeArgs(alias *Alias) *types.TypeList {
+	if alias, ok := any(alias).(interface{ TypeArgs() *types.TypeList }); ok {
+		return alias.TypeArgs() // go1.23+
+	}
+	return nil // empty (go1.22)
+}
+
+// Origin returns the generic Alias type of which alias is an instance.
+// If alias is not an instance of a generic alias, Origin returns alias.
+func Origin(alias *Alias) *Alias {
+	if alias, ok := any(alias).(interface{ Origin() *types.Alias }); ok {
+		return alias.Origin() // go1.23+
+	}
+	return alias // not an instance of a generic alias (go1.22)
+}
+
 // Unalias is a wrapper of types.Unalias.
 func Unalias(t types.Type) types.Type { return types.Unalias(t) }
 

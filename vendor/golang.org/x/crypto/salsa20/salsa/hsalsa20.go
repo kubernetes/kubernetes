@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package salsa provides low-level access to functions in the Salsa family.
-package salsa // import "golang.org/x/crypto/salsa20/salsa"
+package salsa
 
 import "math/bits"
 
