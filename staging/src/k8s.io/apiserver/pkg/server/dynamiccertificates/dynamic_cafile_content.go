@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -210,7 +211,7 @@ func (c *DynamicFileCAContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Wa
 	if !e.Has(fsnotify.Remove) && !e.Has(fsnotify.Rename) {
 		return nil
 	}
-	if err := w.Remove(c.filename); err != nil {
+	if err := w.Remove(c.filename); err != nil && !errors.Is(err, fsnotify.ErrNonExistentWatch) {
 		klog.InfoS("Failed to remove file watch, it may have been deleted", "file", c.filename, "err", err)
 	}
 	if err := w.Add(c.filename); err != nil {
