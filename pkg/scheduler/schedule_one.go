@@ -87,9 +87,12 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
 		logger.Error(err, "Error occurred")
+		sched.SchedulingQueue.Done(pod.UID)
 		return
 	}
 	if sched.skipPodSchedule(ctx, fwk, pod) {
+		// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
+		sched.SchedulingQueue.Done(pod.UID)
 		return
 	}
 

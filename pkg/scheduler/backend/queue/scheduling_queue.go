@@ -120,6 +120,7 @@ type SchedulingQueue interface {
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent)
 	PendingPods() ([]*v1.Pod, string)
 	PodsInActiveQ() []*v1.Pod
+	InFlightPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -835,6 +836,15 @@ func (p *PriorityQueue) Done(pod types.UID) {
 		return
 	}
 	p.activeQ.done(pod)
+}
+
+func (p *PriorityQueue) InFlightPods() []*v1.Pod {
+	if !p.isSchedulingQueueHintEnabled {
+		// do nothing if schedulingQueueHint is disabled.
+		// In that case, we don't have inFlightPods and inFlightEvents.
+		return nil
+	}
+	return p.activeQ.listInFlightPods()
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
