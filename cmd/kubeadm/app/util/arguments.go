@@ -19,12 +19,8 @@ package util
 import (
 	"fmt"
 	"sort"
-	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -65,53 +61,3 @@ func ArgumentsToCommand(base []kubeadmapi.Arg, overrides []kubeadmapi.Arg) []str
 	return command
 }
 
-// ArgumentsFromCommand parses a CLI command in the form "--foo=bar" to an Arg slice
-func ArgumentsFromCommand(command []string) []kubeadmapi.Arg {
-	args := []kubeadmapi.Arg{}
-	for i, arg := range command {
-		key, val, err := parseArgument(arg)
-
-		// Ignore if the first argument doesn't satisfy the criteria, it's most often the binary name
-		// Warn in all other cases, but don't error out. This can happen only if the user has edited the argument list by hand, so they might know what they are doing
-		if err != nil {
-			if i != 0 {
-				klog.Warningf("[kubeadm] WARNING: The component argument %q could not be parsed correctly. The argument must be of the form %q. Skipping...\n", arg, "--")
-			}
-			continue
-		}
-
-		args = append(args, kubeadmapi.Arg{Name: key, Value: val})
-	}
-
-	sort.Slice(args, func(i, j int) bool {
-		if args[i].Name == args[j].Name {
-			return args[i].Value < args[j].Value
-		}
-		return args[i].Name < args[j].Name
-	})
-	return args
-}
-
-// parseArgument parses the argument "--foo=bar" to "foo" and "bar"
-func parseArgument(arg string) (string, string, error) {
-	if !strings.HasPrefix(arg, "--") {
-		return "", "", errors.New("the argument should start with '--'")
-	}
-	if !strings.Contains(arg, "=") {
-		return "", "", errors.New("the argument should have a '=' between the flag and the value")
-	}
-	// Remove the starting --
-	arg = strings.TrimPrefix(arg, "--")
-	// Split the string on =. Return only two substrings, since we want only key/value, but the value can include '=' as well
-	keyvalSlice := strings.SplitN(arg, "=", 2)
-
-	// Make sure both a key and value is present
-	if len(keyvalSlice) != 2 {
-		return "", "", errors.New("the argument must have both a key and a value")
-	}
-	if len(keyvalSlice[0]) == 0 {
-		return "", "", errors.New("the argument must have a key")
-	}
-
-	return keyvalSlice[0], keyvalSlice[1], nil
-}
