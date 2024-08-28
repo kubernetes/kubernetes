@@ -743,9 +743,9 @@ const (
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	// beta: v1.22
-	//
+	// GA: v1.32
 	// Enables kubelet support to size memory backed volumes
-	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
+	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes" // remove in 1.34
 
 	// owner: @mattcary
 	// alpha: v1.23
