@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -210,8 +211,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
-		l.pvNames, err = waitForAllPVCsBound(ctx, l.cs, testSlowMultiplier*f.Timeouts.PVBound, l.ns.Name, l.pvcNames)
-		framework.ExpectNoError(err)
+		l.pvNames = waitForAllPVCsBound(ctx, l.cs, testSlowMultiplier*f.Timeouts.PVBound, l.ns.Name, l.pvcNames)
 
 		ginkgo.By("Waiting for the pod(s) running")
 		for _, podName := range l.podNames {
@@ -296,7 +296,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 	// Wait for the PVs to be deleted. It includes also pod and PVC deletion because of PVC protection.
 	// We use PVs to make sure that the test does not leave orphan PVs when a CSI driver is destroyed
 	// just after the test ends.
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		existing := 0
 		for _, pvName := range pvNames.UnsortedList() {
 			_, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
@@ -326,14 +326,14 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 }
 
 // waitForAllPVCsBound waits until the given PVCs are all bound. It then returns the bound PVC names as a set.
-func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout time.Duration, ns string, pvcNames []string) (sets.Set[string], error) {
+func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout time.Duration, ns string, pvcNames []string) sets.Set[string] {
 	pvNames := sets.New[string]()
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+	gomega.Eventually(ctx, func() (int, error) {
 		unbound := 0
 		for _, pvcName := range pvcNames {
 			pvc, err := cs.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvcName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				gomega.StopTrying("failed to fetch PVCs").Wrap(err).Now()
 			}
 			if pvc.Status.Phase != v1.ClaimBound {
 				unbound++
@@ -341,16 +341,10 @@ func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout ti
 				pvNames.Insert(pvc.Spec.VolumeName)
 			}
 		}
-		if unbound > 0 {
-			framework.Logf("%d/%d of PVCs are Bound", pvNames.Len(), len(pvcNames))
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error waiting for all PVCs to be bound: %w", err)
-	}
-	return pvNames, nil
+		framework.Logf("%d/%d of PVCs are Bound", pvNames.Len(), len(pvcNames))
+		return unbound, nil
+	}).WithPolling(5*time.Second).WithTimeout(timeout).Should(gomega.BeZero(), "error waiting for all PVCs to be bound")
+	return pvNames
 }
 
 func getNodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName string, driver storageframework.DynamicPVTestDriver) (int, error) {
@@ -393,7 +387,7 @@ func getInTreeNodeLimits(ctx context.Context, cs clientset.Interface, nodeName, 
 func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName, driverName string) (int, error) {
 	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
-	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, csiNodeInfoTimeout, true, func(ctx context.Context) (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)
