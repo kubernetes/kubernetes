@@ -868,12 +868,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: VolumeAttributesClass
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: VolumeCapacityPriority
   versionedSpecs:
   - default: false
