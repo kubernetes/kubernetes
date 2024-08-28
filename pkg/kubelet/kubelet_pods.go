@@ -2122,6 +2122,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
 				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
+			if storage, found := container.Resources.Limits[v1.ResourceStorage]; found {
+				limits[v1.ResourceStorage] = storage.DeepCopy()
+			}
 
 			convertCustomResources(container.Resources.Limits, limits)
 		}
@@ -2138,6 +2141,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 			if ephemeralStorage, found := status.AllocatedResources[v1.ResourceEphemeralStorage]; found {
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+			}
+			if storage, found := status.AllocatedResources[v1.ResourceStorage]; found {
+				requests[v1.ResourceStorage] = storage.DeepCopy()
 			}
 
 			convertCustomResources(status.AllocatedResources, requests)
