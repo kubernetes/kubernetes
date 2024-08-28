@@ -506,19 +506,10 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	if err != nil {
 		return nil, 0, "", err
 	}
-
-	var result []interface{}
-	for _, item := range items {
-		elem, ok := item.(*storeElement)
-		if !ok {
-			return nil, 0, "", fmt.Errorf("non *storeElement returned from storage: %v", item)
-		}
-		if !hasPathPrefix(elem.Key, key) {
-			continue
-		}
-		result = append(result, item)
+	result, err := filterPrefix(key, items)
+	if err != nil {
+		return nil, 0, "", err
 	}
-
 	sort.Sort(sortableStoreElements(result))
 	return result, rv, index, nil
 }
@@ -552,6 +543,21 @@ func (w *watchCache) waitUntilFreshAndListItems(ctx context.Context, resourceVer
 	}()
 
 	return result, rv, index, err
+}
+
+func filterPrefix(prefix string, items []interface{}) ([]interface{}, error) {
+	var result []interface{}
+	for _, item := range items {
+		elem, ok := item.(*storeElement)
+		if !ok {
+			return nil, fmt.Errorf("non *storeElement returned from storage: %v", item)
+		}
+		if !hasPathPrefix(elem.Key, prefix) {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
