@@ -1143,7 +1143,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return false
 		}
 		// For connection errors and apiserver shutdown errors retry.
-		if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) {
 			return true
 		}
 		return false
