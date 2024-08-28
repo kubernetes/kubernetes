@@ -238,7 +238,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 				}
 			}
 			if pod.Status.Phase != v1.PodPending {
-				return true, fmt.Errorf("Expected pod to be in phase Pending, but got phase: %v", pod.Status.Phase)
+				return true, fmt.Errorf("expected pod to be in phase Pending, but got phase: %v", pod.Status.Phase)
 			}
 			return false, nil
 		})
@@ -380,12 +380,12 @@ func getInTreeNodeLimits(ctx context.Context, cs clientset.Interface, nodeName, 
 	case migrationplugins.AzureDiskInTreePluginName:
 		allocatableKey = volumeutil.AzureVolumeLimitKey
 	default:
-		return 0, fmt.Errorf("Unknown in-tree volume plugin name: %s", driverName)
+		return 0, fmt.Errorf("unknown in-tree volume plugin name: %s", driverName)
 	}
 
 	limit, ok := node.Status.Allocatable[v1.ResourceName(allocatableKey)]
 	if !ok {
-		return 0, fmt.Errorf("Node %s does not contain status.allocatable[%s] for volume plugin %s", nodeName, allocatableKey, driverName)
+		return 0, fmt.Errorf("node %s does not contain status.allocatable[%s] for volume plugin %s", nodeName, allocatableKey, driverName)
 	}
 	return int(limit.Value()), nil
 }
