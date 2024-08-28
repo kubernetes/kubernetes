@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -147,6 +148,46 @@ func TestUpdateThreshold(t *testing.T) {
 			} else if err == nil && tc.expectErr {
 				t.Errorf("Expected error updating threshold, but got nil")
 			}
+		})
+	}
+}
+
+func TestUpdateThresholdWithInvalidSummary(t *testing.T) {
+	testCases := []struct {
+		description                  string
+		summary                      *statsapi.Summary
+		allocatableEvictionThreshold bool
+	}{
+		{
+			description: "incomplete summary",
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					Memory: &statsapi.MemoryStats{},
+				},
+			},
+		},
+		{
+			description:                  "system container not found in metrics",
+			allocatableEvictionThreshold: true,
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					SystemContainers: []statsapi.ContainerStats{
+						{
+							Name: "invalid",
+						},
+					},
+					Memory: &statsapi.MemoryStats{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			m := newTestMemoryThresholdNotifier(evictionapi.Threshold{}, nil, nil)
+			if tc.allocatableEvictionThreshold {
+				m.threshold.Signal = evictionapi.SignalAllocatableMemoryAvailable
+			}
+			assert.Error(t, m.UpdateThreshold(tc.summary))
 		})
 	}
 }
