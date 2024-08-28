@@ -33,14 +33,15 @@ var (
 )
 
 func init() {
-	AddToScheme(Scheme)
+	utilruntime.Must(AddToScheme(Scheme))
 }
 
 // AddToScheme builds the kubescheduler scheme using all known versions of the kubescheduler api.
-func AddToScheme(scheme *runtime.Scheme) {
+func AddToScheme(scheme *runtime.Scheme) error {
 	utilruntime.Must(config.AddToScheme(scheme))
 	utilruntime.Must(configv1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(
 		configv1.SchemeGroupVersion,
 	))
+	return nil
 }
