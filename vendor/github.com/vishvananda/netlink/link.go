@@ -22,31 +22,41 @@ type (
 
 // LinkAttrs represents data shared by most link types
 type LinkAttrs struct {
-	Index        int
-	MTU          int
-	TxQLen       int // Transmit Queue Length
-	Name         string
-	HardwareAddr net.HardwareAddr
-	Flags        net.Flags
-	RawFlags     uint32
-	ParentIndex  int         // index of the parent link device
-	MasterIndex  int         // must be the index of a bridge
-	Namespace    interface{} // nil | NsPid | NsFd
-	Alias        string
-	Statistics   *LinkStatistics
-	Promisc      int
-	Xdp          *LinkXdp
-	EncapType    string
-	Protinfo     *Protinfo
-	OperState    LinkOperState
-	NetNsID      int
-	NumTxQueues  int
-	NumRxQueues  int
-	GSOMaxSize   uint32
-	GSOMaxSegs   uint32
-	Vfs          []VfInfo // virtual functions available on link
-	Group        uint32
-	Slave        LinkSlave
+	Index          int
+	MTU            int
+	TxQLen         int // Transmit Queue Length
+	Name           string
+	HardwareAddr   net.HardwareAddr
+	Flags          net.Flags
+	RawFlags       uint32
+	ParentIndex    int         // index of the parent link device
+	MasterIndex    int         // must be the index of a bridge
+	Namespace      interface{} // nil | NsPid | NsFd
+	Alias          string
+	AltNames       []string
+	Statistics     *LinkStatistics
+	Promisc        int
+	Allmulti       int
+	Multi          int
+	Xdp            *LinkXdp
+	EncapType      string
+	Protinfo       *Protinfo
+	OperState      LinkOperState
+	PhysSwitchID   int
+	NetNsID        int
+	NumTxQueues    int
+	NumRxQueues    int
+	TSOMaxSegs     uint32
+	TSOMaxSize     uint32
+	GSOMaxSegs     uint32
+	GSOMaxSize     uint32
+	GROMaxSize     uint32
+	GSOIPv4MaxSize uint32
+	GROIPv4MaxSize uint32
+	Vfs            []VfInfo // virtual functions available on link
+	Group          uint32
+	PermHWAddr     net.HardwareAddr
+	Slave          LinkSlave
 }
 
 // LinkSlave represents a slave device.
@@ -60,11 +70,23 @@ type VfInfo struct {
 	Mac       net.HardwareAddr
 	Vlan      int
 	Qos       int
+	VlanProto int
 	TxRate    int // IFLA_VF_TX_RATE  Max TxRate
 	Spoofchk  bool
 	LinkState uint32
 	MaxTxRate uint32 // IFLA_VF_RATE Max TxRate
 	MinTxRate uint32 // IFLA_VF_RATE Min TxRate
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
+	Multicast uint64
+	Broadcast uint64
+	RxDropped uint64
+	TxDropped uint64
+
+	RssQuery uint32
+	Trust    uint32
 }
 
 // LinkOperState represents the values of the IFLA_OPERSTATE link
@@ -103,7 +125,8 @@ func (s LinkOperState) String() string {
 // NewLinkAttrs returns LinkAttrs structure filled with default values
 func NewLinkAttrs() LinkAttrs {
 	return LinkAttrs{
-		TxQLen: -1,
+		NetNsID: -1,
+		TxQLen:  -1,
 	}
 }
 
@@ -196,10 +219,11 @@ type LinkStatistics64 struct {
 }
 
 type LinkXdp struct {
-	Fd       int
-	Attached bool
-	Flags    uint32
-	ProgId   uint32
+	Fd         int
+	Attached   bool
+	AttachMode uint32
+	Flags      uint32
+	ProgId     uint32
 }
 
 // Device links cannot be created via netlink. These links
@@ -246,8 +270,11 @@ func (ifb *Ifb) Type() string {
 type Bridge struct {
 	LinkAttrs
 	MulticastSnooping *bool
+	AgeingTime        *uint32
 	HelloTime         *uint32
 	VlanFiltering     *bool
+	VlanDefaultPVID   *uint16
+	GroupFwdMask      *uint16
 }
 
 func (bridge *Bridge) Attrs() *LinkAttrs {
@@ -291,6 +318,9 @@ type Macvlan struct {
 
 	// MACAddrs is only populated for Macvlan SOURCE links
 	MACAddrs []net.HardwareAddr
+
+	BCQueueLen     uint32
+	UsedBCQueueLen uint32
 }
 
 func (macvlan *Macvlan) Attrs() *LinkAttrs {
@@ -333,11 +363,52 @@ func (tuntap *Tuntap) Type() string {
 	return "tuntap"
 }
 
+type NetkitMode uint32
+
+const (
+	NETKIT_MODE_L2 NetkitMode = iota
+	NETKIT_MODE_L3
+)
+
+type NetkitPolicy int
+
+const (
+	NETKIT_POLICY_FORWARD   NetkitPolicy = 0
+	NETKIT_POLICY_BLACKHOLE NetkitPolicy = 2
+)
+
+func (n *Netkit) IsPrimary() bool {
+	return n.isPrimary
+}
+
+// SetPeerAttrs will not take effect if trying to modify an existing netkit device
+func (n *Netkit) SetPeerAttrs(Attrs *LinkAttrs) {
+	n.peerLinkAttrs = *Attrs
+}
+
+type Netkit struct {
+	LinkAttrs
+	Mode          NetkitMode
+	Policy        NetkitPolicy
+	PeerPolicy    NetkitPolicy
+	isPrimary     bool
+	peerLinkAttrs LinkAttrs
+}
+
+func (n *Netkit) Attrs() *LinkAttrs {
+	return &n.LinkAttrs
+}
+
+func (n *Netkit) Type() string {
+	return "netkit"
+}
+
 // Veth devices must specify PeerName on create
 type Veth struct {
 	LinkAttrs
 	PeerName         string // veth on create only
 	PeerHardwareAddr net.HardwareAddr
+	PeerNamespace    interface{}
 }
 
 func (veth *Veth) Attrs() *LinkAttrs {
@@ -346,6 +417,19 @@ func (veth *Veth) Attrs() *LinkAttrs {
 
 func (veth *Veth) Type() string {
 	return "veth"
+}
+
+// Wireguard represent links of type "wireguard", see https://www.wireguard.com/
+type Wireguard struct {
+	LinkAttrs
+}
+
+func (wg *Wireguard) Attrs() *LinkAttrs {
+	return &wg.LinkAttrs
+}
+
+func (wg *Wireguard) Type() string {
+	return "wireguard"
 }
 
 // GenericLink links represent types that are not currently understood
@@ -426,6 +510,19 @@ func (ipvlan *IPVlan) Attrs() *LinkAttrs {
 
 func (ipvlan *IPVlan) Type() string {
 	return "ipvlan"
+}
+
+// IPVtap - IPVtap is a virtual interfaces based on ipvlan
+type IPVtap struct {
+	IPVlan
+}
+
+func (ipvtap *IPVtap) Attrs() *LinkAttrs {
+	return &ipvtap.LinkAttrs
+}
+
+func (ipvtap IPVtap) Type() string {
+	return "ipvtap"
 }
 
 // VlanProtocol type
@@ -527,6 +624,27 @@ const (
 	BOND_ARP_VALIDATE_ALL
 )
 
+var bondArpValidateToString = map[BondArpValidate]string{
+	BOND_ARP_VALIDATE_NONE:   "none",
+	BOND_ARP_VALIDATE_ACTIVE: "active",
+	BOND_ARP_VALIDATE_BACKUP: "backup",
+	BOND_ARP_VALIDATE_ALL:    "none",
+}
+var StringToBondArpValidateMap = map[string]BondArpValidate{
+	"none":   BOND_ARP_VALIDATE_NONE,
+	"active": BOND_ARP_VALIDATE_ACTIVE,
+	"backup": BOND_ARP_VALIDATE_BACKUP,
+	"all":    BOND_ARP_VALIDATE_ALL,
+}
+
+func (b BondArpValidate) String() string {
+	s, ok := bondArpValidateToString[b]
+	if !ok {
+		return fmt.Sprintf("BondArpValidate(%d)", b)
+	}
+	return s
+}
+
 // BondPrimaryReselect type
 type BondPrimaryReselect int
 
@@ -537,6 +655,25 @@ const (
 	BOND_PRIMARY_RESELECT_FAILURE
 )
 
+var bondPrimaryReselectToString = map[BondPrimaryReselect]string{
+	BOND_PRIMARY_RESELECT_ALWAYS:  "always",
+	BOND_PRIMARY_RESELECT_BETTER:  "better",
+	BOND_PRIMARY_RESELECT_FAILURE: "failure",
+}
+var StringToBondPrimaryReselectMap = map[string]BondPrimaryReselect{
+	"always":  BOND_PRIMARY_RESELECT_ALWAYS,
+	"better":  BOND_PRIMARY_RESELECT_BETTER,
+	"failure": BOND_PRIMARY_RESELECT_FAILURE,
+}
+
+func (b BondPrimaryReselect) String() string {
+	s, ok := bondPrimaryReselectToString[b]
+	if !ok {
+		return fmt.Sprintf("BondPrimaryReselect(%d)", b)
+	}
+	return s
+}
+
 // BondArpAllTargets type
 type BondArpAllTargets int
 
@@ -545,6 +682,23 @@ const (
 	BOND_ARP_ALL_TARGETS_ANY BondArpAllTargets = iota
 	BOND_ARP_ALL_TARGETS_ALL
 )
+
+var bondArpAllTargetsToString = map[BondArpAllTargets]string{
+	BOND_ARP_ALL_TARGETS_ANY: "any",
+	BOND_ARP_ALL_TARGETS_ALL: "all",
+}
+var StringToBondArpAllTargetsMap = map[string]BondArpAllTargets{
+	"any": BOND_ARP_ALL_TARGETS_ANY,
+	"all": BOND_ARP_ALL_TARGETS_ALL,
+}
+
+func (b BondArpAllTargets) String() string {
+	s, ok := bondArpAllTargetsToString[b]
+	if !ok {
+		return fmt.Sprintf("BondArpAllTargets(%d)", b)
+	}
+	return s
+}
 
 // BondFailOverMac type
 type BondFailOverMac int
@@ -555,6 +709,25 @@ const (
 	BOND_FAIL_OVER_MAC_ACTIVE
 	BOND_FAIL_OVER_MAC_FOLLOW
 )
+
+var bondFailOverMacToString = map[BondFailOverMac]string{
+	BOND_FAIL_OVER_MAC_NONE:   "none",
+	BOND_FAIL_OVER_MAC_ACTIVE: "active",
+	BOND_FAIL_OVER_MAC_FOLLOW: "follow",
+}
+var StringToBondFailOverMacMap = map[string]BondFailOverMac{
+	"none":   BOND_FAIL_OVER_MAC_NONE,
+	"active": BOND_FAIL_OVER_MAC_ACTIVE,
+	"follow": BOND_FAIL_OVER_MAC_FOLLOW,
+}
+
+func (b BondFailOverMac) String() string {
+	s, ok := bondFailOverMacToString[b]
+	if !ok {
+		return fmt.Sprintf("BondFailOverMac(%d)", b)
+	}
+	return s
+}
 
 // BondXmitHashPolicy type
 type BondXmitHashPolicy int
@@ -583,6 +756,7 @@ const (
 	BOND_XMIT_HASH_POLICY_LAYER2_3
 	BOND_XMIT_HASH_POLICY_ENCAP2_3
 	BOND_XMIT_HASH_POLICY_ENCAP3_4
+	BOND_XMIT_HASH_POLICY_VLAN_SRCMAC
 	BOND_XMIT_HASH_POLICY_UNKNOWN
 )
 
@@ -592,6 +766,7 @@ var bondXmitHashPolicyToString = map[BondXmitHashPolicy]string{
 	BOND_XMIT_HASH_POLICY_LAYER2_3: "layer2+3",
 	BOND_XMIT_HASH_POLICY_ENCAP2_3: "encap2+3",
 	BOND_XMIT_HASH_POLICY_ENCAP3_4: "encap3+4",
+	BOND_XMIT_HASH_POLICY_VLAN_SRCMAC: "vlan+srcmac",
 }
 var StringToBondXmitHashPolicyMap = map[string]BondXmitHashPolicy{
 	"layer2":   BOND_XMIT_HASH_POLICY_LAYER2,
@@ -599,6 +774,7 @@ var StringToBondXmitHashPolicyMap = map[string]BondXmitHashPolicy{
 	"layer2+3": BOND_XMIT_HASH_POLICY_LAYER2_3,
 	"encap2+3": BOND_XMIT_HASH_POLICY_ENCAP2_3,
 	"encap3+4": BOND_XMIT_HASH_POLICY_ENCAP3_4,
+	"vlan+srcmac": BOND_XMIT_HASH_POLICY_VLAN_SRCMAC,
 }
 
 // BondLacpRate type
@@ -647,6 +823,25 @@ const (
 	BOND_AD_SELECT_COUNT
 )
 
+var bondAdSelectToString = map[BondAdSelect]string{
+	BOND_AD_SELECT_STABLE:    "stable",
+	BOND_AD_SELECT_BANDWIDTH: "bandwidth",
+	BOND_AD_SELECT_COUNT:     "count",
+}
+var StringToBondAdSelectMap = map[string]BondAdSelect{
+	"stable":    BOND_AD_SELECT_STABLE,
+	"bandwidth": BOND_AD_SELECT_BANDWIDTH,
+	"count":     BOND_AD_SELECT_COUNT,
+}
+
+func (b BondAdSelect) String() string {
+	s, ok := bondAdSelectToString[b]
+	if !ok {
+		return fmt.Sprintf("BondAdSelect(%d)", b)
+	}
+	return s
+}
+
 // BondAdInfo represents ad info for bond
 type BondAdInfo struct {
 	AggregatorId int
@@ -678,7 +873,7 @@ type Bond struct {
 	AllSlavesActive int
 	MinLinks        int
 	LpInterval      int
-	PackersPerSlave int
+	PacketsPerSlave int
 	LacpRate        BondLacpRate
 	AdSelect        BondAdSelect
 	// looking at iproute tool AdInfo can only be retrived. It can't be set.
@@ -711,7 +906,7 @@ func NewLinkBond(atr LinkAttrs) *Bond {
 		AllSlavesActive: -1,
 		MinLinks:        -1,
 		LpInterval:      -1,
-		PackersPerSlave: -1,
+		PacketsPerSlave: -1,
 		LacpRate:        -1,
 		AdSelect:        -1,
 		AdActorSysPrio:  -1,
@@ -761,8 +956,10 @@ func (bond *Bond) Type() string {
 type BondSlaveState uint8
 
 const (
-	BondStateActive = iota // Link is active.
-	BondStateBackup        // Link is backup.
+	//BondStateActive Link is active.
+	BondStateActive BondSlaveState = iota
+	//BondStateBackup Link is backup.
+	BondStateBackup
 )
 
 func (s BondSlaveState) String() string {
@@ -776,15 +973,19 @@ func (s BondSlaveState) String() string {
 	}
 }
 
-// BondSlaveState represents the values of the IFLA_BOND_SLAVE_MII_STATUS bond slave
+// BondSlaveMiiStatus represents the values of the IFLA_BOND_SLAVE_MII_STATUS bond slave
 // attribute, which contains the status of MII link monitoring
 type BondSlaveMiiStatus uint8
 
 const (
-	BondLinkUp   = iota // link is up and running.
-	BondLinkFail        // link has just gone down.
-	BondLinkDown        // link has been down for too long time.
-	BondLinkBack        // link is going back.
+	//BondLinkUp link is up and running.
+	BondLinkUp BondSlaveMiiStatus = iota
+	//BondLinkFail link has just gone down.
+	BondLinkFail
+	//BondLinkDown link has been down for too long time.
+	BondLinkDown
+	//BondLinkBack link is going back.
+	BondLinkBack
 )
 
 func (s BondSlaveMiiStatus) String() string {
@@ -816,6 +1017,49 @@ type BondSlave struct {
 func (b *BondSlave) SlaveType() string {
 	return "bond"
 }
+
+type VrfSlave struct {
+	Table uint32
+}
+
+func (v *VrfSlave) SlaveType() string {
+	return "vrf"
+}
+
+// Geneve devices must specify RemoteIP and ID (VNI) on create
+// https://github.com/torvalds/linux/blob/47ec5303d73ea344e84f46660fff693c57641386/drivers/net/geneve.c#L1209-L1223
+type Geneve struct {
+	LinkAttrs
+	ID                uint32 // vni
+	Remote            net.IP
+	Ttl               uint8
+	Tos               uint8
+	Dport             uint16
+	UdpCsum           uint8
+	UdpZeroCsum6Tx    uint8
+	UdpZeroCsum6Rx    uint8
+	Link              uint32
+	FlowBased         bool
+	InnerProtoInherit bool
+	Df                GeneveDf
+}
+
+func (geneve *Geneve) Attrs() *LinkAttrs {
+	return &geneve.LinkAttrs
+}
+
+func (geneve *Geneve) Type() string {
+	return "geneve"
+}
+
+type GeneveDf uint8
+
+const (
+	GENEVE_DF_UNSET GeneveDf = iota
+	GENEVE_DF_SET
+	GENEVE_DF_INHERIT
+	GENEVE_DF_MAX
+)
 
 // Gretap devices must specify LocalIP and RemoteIP on create
 type Gretap struct {
@@ -861,6 +1105,7 @@ type Iptun struct {
 	EncapType  uint16
 	EncapFlags uint16
 	FlowBased  bool
+	Proto      uint8
 }
 
 func (iptun *Iptun) Attrs() *LinkAttrs {
@@ -878,10 +1123,15 @@ type Ip6tnl struct {
 	Remote     net.IP
 	Ttl        uint8
 	Tos        uint8
-	EncapLimit uint8
 	Flags      uint32
 	Proto      uint8
 	FlowInfo   uint32
+	EncapLimit uint8
+	EncapType  uint16
+	EncapFlags uint16
+	EncapSport uint16
+	EncapDport uint16
+	FlowBased  bool
 }
 
 func (ip6tnl *Ip6tnl) Attrs() *LinkAttrs {
@@ -892,14 +1142,47 @@ func (ip6tnl *Ip6tnl) Type() string {
 	return "ip6tnl"
 }
 
+// from https://elixir.bootlin.com/linux/v5.15.4/source/include/uapi/linux/if_tunnel.h#L84
+type TunnelEncapType uint16
+
+const (
+	None TunnelEncapType = iota
+	FOU
+	GUE
+)
+
+// from https://elixir.bootlin.com/linux/v5.15.4/source/include/uapi/linux/if_tunnel.h#L91
+type TunnelEncapFlag uint16
+
+const (
+	CSum    TunnelEncapFlag = 1 << 0
+	CSum6                   = 1 << 1
+	RemCSum                 = 1 << 2
+)
+
+// from https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/ip6_tunnel.h#L12
+type IP6TunnelFlag uint16
+
+const (
+	IP6_TNL_F_IGN_ENCAP_LIMIT    IP6TunnelFlag = 1  // don't add encapsulation limit if one isn't present in inner packet
+	IP6_TNL_F_USE_ORIG_TCLASS                  = 2  // copy the traffic class field from the inner packet
+	IP6_TNL_F_USE_ORIG_FLOWLABEL               = 4  // copy the flowlabel from the inner packet
+	IP6_TNL_F_MIP6_DEV                         = 8  // being used for Mobile IPv6
+	IP6_TNL_F_RCV_DSCP_COPY                    = 10 // copy DSCP from the outer packet
+	IP6_TNL_F_USE_ORIG_FWMARK                  = 20 // copy fwmark from inner packet
+	IP6_TNL_F_ALLOW_LOCAL_REMOTE               = 40 // allow remote endpoint on the local node
+)
+
 type Sittun struct {
 	LinkAttrs
 	Link       uint32
-	Local      net.IP
-	Remote     net.IP
 	Ttl        uint8
 	Tos        uint8
 	PMtuDisc   uint8
+	Proto      uint8
+	Local      net.IP
+	Remote     net.IP
+	EncapLimit uint8
 	EncapType  uint16
 	EncapFlags uint16
 	EncapSport uint16
@@ -950,6 +1233,7 @@ type Gretun struct {
 	EncapFlags uint16
 	EncapSport uint16
 	EncapDport uint16
+	FlowBased  bool
 }
 
 func (gretun *Gretun) Attrs() *LinkAttrs {
@@ -993,6 +1277,7 @@ func (gtp *GTP) Type() string {
 }
 
 // Virtual XFRM Interfaces
+//
 //	Named "xfrmi" to prevent confusion with XFRM objects
 type Xfrmi struct {
 	LinkAttrs
@@ -1034,6 +1319,58 @@ var StringToIPoIBMode = map[string]IPoIBMode{
 	"connected": IPOIB_MODE_CONNECTED,
 }
 
+const (
+	CAN_STATE_ERROR_ACTIVE = iota
+	CAN_STATE_ERROR_WARNING
+	CAN_STATE_ERROR_PASSIVE
+	CAN_STATE_BUS_OFF
+	CAN_STATE_STOPPED
+	CAN_STATE_SLEEPING
+)
+
+type Can struct {
+	LinkAttrs
+
+	BitRate            uint32
+	SamplePoint        uint32
+	TimeQuanta         uint32
+	PropagationSegment uint32
+	PhaseSegment1      uint32
+	PhaseSegment2      uint32
+	SyncJumpWidth      uint32
+	BitRatePreScaler   uint32
+
+	Name                string
+	TimeSegment1Min     uint32
+	TimeSegment1Max     uint32
+	TimeSegment2Min     uint32
+	TimeSegment2Max     uint32
+	SyncJumpWidthMax    uint32
+	BitRatePreScalerMin uint32
+	BitRatePreScalerMax uint32
+	BitRatePreScalerInc uint32
+
+	ClockFrequency uint32
+
+	State uint32
+
+	Mask  uint32
+	Flags uint32
+
+	TxError uint16
+	RxError uint16
+
+	RestartMs uint32
+}
+
+func (can *Can) Attrs() *LinkAttrs {
+	return &can.LinkAttrs
+}
+
+func (can *Can) Type() string {
+	return "can"
+}
+
 type IPoIB struct {
 	LinkAttrs
 	Pkey   uint16
@@ -1049,11 +1386,27 @@ func (ipoib *IPoIB) Type() string {
 	return "ipoib"
 }
 
+type BareUDP struct {
+	LinkAttrs
+	Port       uint16
+	EtherType  uint16
+	SrcPortMin uint16
+	MultiProto bool
+}
+
+func (bareudp *BareUDP) Attrs() *LinkAttrs {
+	return &bareudp.LinkAttrs
+}
+
+func (bareudp *BareUDP) Type() string {
+	return "bareudp"
+}
+
 // iproute2 supported devices;
 // vlan | veth | vcan | dummy | ifb | macvlan | macvtap |
 // bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan |
 // gre | gretap | ip6gre | ip6gretap | vti | vti6 | nlmon |
-// bond_slave | ipvlan | xfrm
+// bond_slave | ipvlan | xfrm | bareudp
 
 // LinkNotFoundError wraps the various not found errors when
 // getting/reading links. This is intended for better error

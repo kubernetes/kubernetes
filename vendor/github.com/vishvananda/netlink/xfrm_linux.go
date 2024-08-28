@@ -14,7 +14,7 @@ const (
 	XFRM_PROTO_ESP       Proto = unix.IPPROTO_ESP
 	XFRM_PROTO_AH        Proto = unix.IPPROTO_AH
 	XFRM_PROTO_HAO       Proto = unix.IPPROTO_DSTOPTS
-	XFRM_PROTO_COMP      Proto = 0x6c // NOTE not defined on darwin
+	XFRM_PROTO_COMP      Proto = unix.IPPROTO_COMP
 	XFRM_PROTO_IPSEC_ANY Proto = unix.IPPROTO_RAW
 )
 
