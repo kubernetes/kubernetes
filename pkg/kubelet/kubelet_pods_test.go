@@ -4585,8 +4585,10 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	CPU2AndMem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
 	CPU1AndMem1GAndStorage2G := CPU1AndMem1G.DeepCopy()
 	CPU1AndMem1GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
+	CPU1AndMem1GAndStorage2G[v1.ResourceStorage] = resource.MustParse("2Gi")
 	CPU2AndMem2GAndStorage2G := CPU2AndMem2G.DeepCopy()
 	CPU2AndMem2GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
+	CPU2AndMem2GAndStorage2G[v1.ResourceStorage] = resource.MustParse("2Gi")
 
 	addExtendedResource := func(list v1.ResourceList) v1.ResourceList {
 		const stubCustomResource = v1.ResourceName("dummy.io/dummy")
@@ -4791,6 +4793,29 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: addExtendedResource(CPU1AndMem1G),
 					Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1G)},
+				},
+			},
+		},
+		"BurstableQoSPod with storage, ephemeral storage and extended resources": {
+			Resources: []v1.ResourceRequirements{{Requests: addExtendedResource(CPU1AndMem1GAndStorage2G)}},
+			OldStatus: []v1.ContainerStatus{
+				{
+					Name:      testContainerName,
+					Image:     "img",
+					ImageID:   "img1234",
+					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					Resources: &v1.ResourceRequirements{},
+				},
+			},
+			Expected: []v1.ContainerStatus{
+				{
+					Name:               testContainerName,
+					ContainerID:        testContainerID.String(),
+					Image:              "img",
+					ImageID:            "img1234",
+					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+					AllocatedResources: addExtendedResource(CPU1AndMem1GAndStorage2G),
+					Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1GAndStorage2G)},
 				},
 			},
 		},
