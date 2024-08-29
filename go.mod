@@ -52,7 +52,7 @@ require (
 	github.com/opencontainers/runc v1.1.12
 	github.com/opencontainers/selinux v1.11.0
 	github.com/openshift/api v0.0.0-20240527133614-ba11c1587003
-	github.com/openshift/apiserver-library-go v0.0.0-20240716092710-e88385a79b17
+	github.com/openshift/apiserver-library-go v0.0.0-20240828192036-4d55b6dd978f
 	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 	github.com/openshift/library-go v0.0.0-20240528102242-9c194599a149
 	github.com/pkg/errors v0.9.1
