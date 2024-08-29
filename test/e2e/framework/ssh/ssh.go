@@ -58,6 +58,7 @@ const (
 func GetSigner(provider string) (ssh.Signer, error) {
 	// honor a consistent SSH key across all providers
 	if path := os.Getenv("KUBE_SSH_KEY_PATH"); len(path) > 0 {
+		fmt.Printf("\nFound KUBE_SSH_KEY_PATH: %s\n", path)
 		return makePrivateKeySignerFromFile(path)
 	}
 
@@ -102,6 +103,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		keyfile = filepath.Join(keydir, keyfile)
 	}
 
+	fmt.Printf("\nusing keyfile: %s\n", keyfile)
 	return makePrivateKeySignerFromFile(keyfile)
 }
 
@@ -244,6 +246,7 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
+	fmt.Printf("\ndialing %s@%s\n", user, host)
 	client, err := ssh.Dial("tcp", host, config)
 	if err != nil {
 		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 20*time.Second, false, func(ctx context.Context) (bool, error) {
@@ -268,7 +271,9 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 	code := 0
 	var bout, berr bytes.Buffer
 	session.Stdout, session.Stderr = &bout, &berr
+	fmt.Printf("running command: %s", cmd)
 	if err = session.Run(cmd); err != nil {
+		fmt.Printf("running command returns err: %#v", err)
 		// Check whether the command failed to run or didn't complete.
 		if exiterr, ok := err.(*ssh.ExitError); ok {
 			// If we got an ExitError and the exit code is nonzero, we'll
@@ -283,6 +288,8 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
+	fmt.Printf("running command returns stdout: %#v", bout.String())
+	fmt.Printf("running command returns stderr: %#v", berr.String())
 	return bout.String(), berr.String(), code, err
 }
 

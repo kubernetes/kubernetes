@@ -113,8 +113,10 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 
 	}
 	err := wait.PollUntilContextTimeout(ctx, r.pollInterval, r.pollTimeout, false, func(ctx context.Context) (bool, error) {
+		framework.Logf("NodeExec for node: %s", r.nodeName)
 		result, err := e2essh.NodeExec(ctx, r.nodeName, healthzCheck, framework.TestContext.Provider)
 		if err != nil {
+			framework.Logf("NodeExec returns error: %v", err)
 			return false, err
 		}
 		if result.Code == 0 {
@@ -145,8 +147,11 @@ func (r *RestartDaemonConfig) kill(ctx context.Context) {
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up
 func (r *RestartDaemonConfig) restart(ctx context.Context) {
+	framework.Logf("before waitUp - take 1 %v", r)
 	r.waitUp(ctx)
+	framework.Logf("before kill %v", r)
 	r.kill(ctx)
+	framework.Logf("before waitUp - take 2 %v", r)
 	r.waitUp(ctx)
 }
 
