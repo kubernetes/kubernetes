@@ -49,7 +49,7 @@ type controller struct {
 
 // IsDeprecated return true if the resource is deprecated.
 func (c *controller) IsDeprecated(resource, version, group string) bool {
-	_, ok := deprecatedApiRemovedRelease[schema.GroupVersionResource{
+	_, ok := DeprecatedAPIRemovedRelease[schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
 		Resource: resource,
