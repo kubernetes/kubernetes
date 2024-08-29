@@ -28,13 +28,19 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"reflect"
+	"regexp"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -54,6 +60,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -553,6 +560,7 @@ func TestURLTemplate(t *testing.T) {
 }
 
 func TestTransformResponse(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -601,7 +609,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -652,6 +660,7 @@ func (r *renegotiator) StreamDecoder(contentType string, params map[string]strin
 }
 
 func TestTransformResponseNegotiate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -765,7 +774,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		_, err := result.body, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -890,6 +899,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			r := &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),
@@ -897,7 +907,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 				resourceName: testCase.Name,
 				resource:     testCase.Resource,
 			}
-			result := r.transformResponse(testCase.Res, testCase.Req)
+			result := r.transformResponse(ctx, testCase.Res, testCase.Req)
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
@@ -2331,7 +2341,7 @@ func TestTruncateBody(t *testing.T) {
 	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
 		flag.Set("v", test.level)
-		got := truncateBody(test.body)
+		got := truncateBody(klog.Background(), test.body)
 		if got != test.want {
 			t.Errorf("truncateBody(%v) = %v, want %v", test.body, got, test.want)
 		}
@@ -4049,5 +4059,80 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	expected := concurrency * (req.maxRetries + 1)
 	if atomic.LoadInt32(&attempts) != int32(expected) {
 		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
+	}
+}
+
+func TestRequestLogging(t *testing.T) {
+	testcases := map[string]struct {
+		v              int
+		body           any
+		expectedOutput string
+	}{
+		"no-output": {
+			v:    7,
+			body: []byte("ping"),
+		},
+		"output": {
+			v:    8,
+			body: []byte("ping"),
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"io-reader": {
+			v:    8,
+			body: strings.NewReader("ping"),
+			// Cannot log the request body!
+			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"truncate": {
+			v:    8,
+			body: []byte(strings.Repeat("a", 2000)),
+			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`, strings.Repeat("a", 1024)),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			state := klog.CaptureState()
+			defer state.Restore()
+
+			var buffer bytes.Buffer
+			klog.SetOutput(&buffer)
+			klog.LogToStderr(false)
+			var fs flag.FlagSet
+			klog.InitFlags(&fs)
+			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("pong")),
+				}, nil
+			})
+
+			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
+				Body(tc.body)
+
+			logger := klog.Background()
+			logger = klog.LoggerWithName(logger, "TestLogger")
+			ctx := klog.NewContext(context.Background(), logger)
+
+			_, file, line, _ := goruntime.Caller(0)
+			result := req.Do(ctx)
+			require.NoError(t, result.Error(), "request.Do")
+
+			// Compare log output:
+			// - strip date/time/pid from each line (fixed length header)
+			// - replace <location> with the actual call location
+			state.Restore()
+			expectedOutput := strings.ReplaceAll(tc.expectedOutput, "<location>", fmt.Sprintf("%s:%d", path.Base(file), line+1))
+			actualOutput := buffer.String()
+			actualOutput = regexp.MustCompile(`(?m)^.{30}`).ReplaceAllString(actualOutput, "")
+			assert.Equal(t, expectedOutput, actualOutput)
+		})
 	}
 }
