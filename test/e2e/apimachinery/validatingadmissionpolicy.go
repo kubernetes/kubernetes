@@ -370,7 +370,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 							"touched": time.Now().String(),
 							"random":  fmt.Sprintf("%d", rand.Int()),
 						})
-						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{})
+						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: "validatingadmissionpolicy-e2e"})
 						return false, err
 					}
 					return true, nil
