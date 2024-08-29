@@ -18,6 +18,7 @@ package filters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -128,20 +130,20 @@ func newApfServerWithSingleRequest(t *testing.T, decision mockDecision) *httptes
 			t.Errorf("execute should not be invoked")
 		}
 		// atomicReadOnlyExecuting can be either 0 or 1 as we test one request at a time.
-		if decision != decisionSkipFilter && atomicReadOnlyExecuting != 1 {
-			t.Errorf("Wanted %d requests executing, got %d", 1, atomicReadOnlyExecuting)
+		if want, got := int32(1), atomic.LoadInt32(&atomicReadOnlyExecuting); decision != decisionSkipFilter && want != got {
+			t.Errorf("Wanted %d requests executing, got %d", want, got)
 		}
 	}
 	postExecuteFunc := func() {}
 	// atomicReadOnlyWaiting can be either 0 or 1 as we test one request at a time.
 	postEnqueueFunc := func() {
-		if atomicReadOnlyWaiting != 1 {
-			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
+		if want, got := int32(1), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 	}
 	postDequeueFunc := func() {
-		if atomicReadOnlyWaiting != 0 {
-			t.Errorf("Wanted %d requests in queue, got %d", 0, atomicReadOnlyWaiting)
+		if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 	}
 	return newApfServerWithHooks(t, decision, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc)
@@ -177,11 +179,19 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
 			Groups: []string{user.AllUnauthenticated},
 		}))
-		apfHandler.ServeHTTP(w, r)
-		postExecute()
-		if atomicReadOnlyExecuting != 0 {
-			t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
-		}
+		func() {
+			// the defer ensures that the following assertion is
+			// executed, even if the APF handler panics
+			// TODO: all test(s) using this filter must run serially to each other
+			defer func() {
+				t.Logf("the APF handler has finished, checking atomicReadOnlyExecuting")
+				if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyExecuting); want != got {
+					t.Errorf("Wanted %d requests executing, got %d", want, got)
+				}
+			}()
+			apfHandler.ServeHTTP(w, r)
+			postExecute()
+		}()
 	}), requestInfoFactory)
 
 	return handler
@@ -270,8 +280,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	onExecuteFunc := func() {
 		preStartExecute.Done()
 		preStartExecute.Wait()
-		if int(atomicReadOnlyExecuting) != concurrentRequests {
-			t.Errorf("Wanted %d requests executing, got %d", concurrentRequests, atomicReadOnlyExecuting)
+		if want, got := int32(concurrentRequests), atomic.LoadInt32(&atomicReadOnlyExecuting); want != got {
+			t.Errorf("Wanted %d requests executing, got %d", want, got)
 		}
 		postStartExecute.Done()
 		postStartExecute.Wait()
@@ -280,8 +290,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	postEnqueueFunc := func() {
 		preEnqueue.Done()
 		preEnqueue.Wait()
-		if int(atomicReadOnlyWaiting) != concurrentRequests {
-			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
+		if want, got := int32(concurrentRequests), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 
 		}
 		postEnqueue.Done()
@@ -291,8 +301,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	postDequeueFunc := func() {
 		preDequeue.Done()
 		preDequeue.Wait()
-		if atomicReadOnlyWaiting != 0 {
-			t.Errorf("Wanted %d requests in queue, got %d", 0, atomicReadOnlyWaiting)
+		if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 		postDequeue.Done()
 		postDequeue.Wait()
@@ -345,19 +355,21 @@ func TestApfCancelWaitRequest(t *testing.T) {
 }
 
 type fakeWatchApfFilter struct {
+	t        *testing.T
 	lock     sync.Mutex
 	inflight int
 	capacity int
 
-	postExecutePanic bool
-	preExecutePanic  bool
+	postExecutePanic error
+	preExecutePanic  error
 
 	utilflowcontrol.WatchTracker
 	utilflowcontrol.MaxSeatsTracker
 }
 
-func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
+func newFakeWatchApfFilter(t *testing.T, capacity int) *fakeWatchApfFilter {
 	return &fakeWatchApfFilter{
+		t:               t,
 		capacity:        capacity,
 		WatchTracker:    utilflowcontrol.NewWatchTracker(),
 		MaxSeatsTracker: utilflowcontrol.NewMaxSeatsTracker(),
@@ -385,17 +397,23 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 		return
 	}
 
-	if f.preExecutePanic {
-		panic("pre-exec-panic")
-	}
-	execFn()
-	if f.postExecutePanic {
-		panic("post-exec-panic")
-	}
+	func() {
+		defer func() {
+			f.lock.Lock()
+			defer f.lock.Unlock()
+			f.inflight--
+		}()
 
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.inflight--
+		if f.preExecutePanic != nil {
+			f.t.Logf("going to panic (pre-exec) as expected with error: %v, fakeWatchApfFilter: %#v", f.preExecutePanic, f)
+			panic(f.preExecutePanic)
+		}
+		execFn()
+		if f.postExecutePanic != nil {
+			f.t.Logf("going to panic (post-exec) as expected with error: %v, fakeWatchApfFilter: %#v", f.postExecutePanic, f)
+			panic(f.postExecutePanic)
+		}
+	}()
 }
 
 func (f *fakeWatchApfFilter) Run(stopCh <-chan struct{}) error {
@@ -447,7 +465,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	allRunning := sync.WaitGroup{}
 	allRunning.Add(2 * concurrentRequests)
 
-	fakeFilter := newFakeWatchApfFilter(concurrentRequests)
+	fakeFilter := newFakeWatchApfFilter(t, concurrentRequests)
 
 	onExecuteFunc := func() {
 		firstRunning.Done()
@@ -493,7 +511,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
-	fakeFilter := newFakeWatchApfFilter(0)
+	fakeFilter := newFakeWatchApfFilter(t, 0)
 
 	onExecuteFunc := func() {
 		t.Errorf("Request unexepectedly executing")
@@ -512,7 +530,7 @@ func TestApfWatchPanic(t *testing.T) {
 	epmetrics.Register()
 	fcmetrics.Register()
 
-	fakeFilter := newFakeWatchApfFilter(1)
+	fakeFilter := newFakeWatchApfFilter(t, 1)
 
 	onExecuteFunc := func() {
 		panic("test panic")
@@ -539,11 +557,11 @@ func TestApfWatchPanic(t *testing.T) {
 func TestApfWatchHandlePanic(t *testing.T) {
 	epmetrics.Register()
 	fcmetrics.Register()
-	preExecutePanicingFilter := newFakeWatchApfFilter(1)
-	preExecutePanicingFilter.preExecutePanic = true
+	preExecutePanicingFilter := newFakeWatchApfFilter(t, 1)
+	preExecutePanicingFilter.preExecutePanic = http.ErrAbortHandler
 
-	postExecutePanicingFilter := newFakeWatchApfFilter(1)
-	postExecutePanicingFilter.postExecutePanic = true
+	postExecutePanicingFilter := newFakeWatchApfFilter(t, 1)
+	postExecutePanicingFilter.postExecutePanic = http.ErrAbortHandler
 
 	testCases := []struct {
 		name   string
@@ -559,18 +577,31 @@ func TestApfWatchHandlePanic(t *testing.T) {
 		},
 	}
 
-	onExecuteFunc := func() {
-		time.Sleep(5 * time.Second)
-	}
-	postExecuteFunc := func() {}
-
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			onExecuteFunc := func() {
+				time.Sleep(5 * time.Second)
+
+				// this function should not be executed if
+				// pre-execute panic is set
+				if test.filter.preExecutePanic != nil {
+					t.Errorf("did not expect the execute function to be executed")
+				}
+				t.Logf("on-execute function invoked")
+			}
+
+			// we either panic before the execute function, or after,
+			// so the following function should never be executed.
+			postExecuteFunc := func() {
+				t.Errorf("did not expect the post-execute function to be invoked")
+			}
+
 			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 			handler := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
-					if err := recover(); err == nil {
-						t.Errorf("expected panic, got %v", err)
+					recovered := recover()
+					if err, ok := recovered.(error); !ok || !errors.Is(err, http.ErrAbortHandler) {
+						t.Errorf("expected panic with error: %v, but got: %v", http.ErrAbortHandler, err)
 					}
 				}()
 				apfHandler.ServeHTTP(w, r)
