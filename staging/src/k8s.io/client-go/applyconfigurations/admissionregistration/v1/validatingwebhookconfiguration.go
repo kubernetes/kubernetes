@@ -84,7 +84,7 @@ func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiad
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithKind(value string) *ValidatingWebhookConfigurationApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +92,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithKind(value string
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithAPIVersion(value string) *ValidatingWebhookConfigurationApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +101,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithAPIVersion(value 
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithName(value string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +110,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithName(value string
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithGenerateName(value string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +119,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithGenerateName(valu
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithNamespace(value string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +128,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithNamespace(value s
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithUID(value types.UID) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +137,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithUID(value types.U
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithResourceVersion(value string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,7 +146,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithResourceVersion(v
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithGeneration(value int64) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -155,7 +155,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithGeneration(value 
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -164,7 +164,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithCreationTimestamp
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +173,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithDeletionTimestamp
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +183,11 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithDeletionGracePeri
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithLabels(entries map[string]string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +198,11 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithLabels(entries ma
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithAnnotations(entries map[string]string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -216,7 +216,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithOwnerReferences(v
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,7 +227,7 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithOwnerReferences(v
 func (b *ValidatingWebhookConfigurationApplyConfiguration) WithFinalizers(values ...string) *ValidatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -254,5 +254,5 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithWebhooks(values .
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

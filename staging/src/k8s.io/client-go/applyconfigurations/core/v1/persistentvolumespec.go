@@ -55,7 +55,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithCapacity(value v1.ResourceL
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GCEPersistentDisk field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithGCEPersistentDisk(value *GCEPersistentDiskVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.GCEPersistentDisk = value
+	b.PersistentVolumeSourceApplyConfiguration.GCEPersistentDisk = value
 	return b
 }
 
@@ -63,7 +63,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithGCEPersistentDisk(value *GC
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AWSElasticBlockStore field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithAWSElasticBlockStore(value *AWSElasticBlockStoreVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.AWSElasticBlockStore = value
+	b.PersistentVolumeSourceApplyConfiguration.AWSElasticBlockStore = value
 	return b
 }
 
@@ -71,7 +71,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithAWSElasticBlockStore(value 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HostPath field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithHostPath(value *HostPathVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.HostPath = value
+	b.PersistentVolumeSourceApplyConfiguration.HostPath = value
 	return b
 }
 
@@ -79,7 +79,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithHostPath(value *HostPathVol
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Glusterfs field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithGlusterfs(value *GlusterfsPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.Glusterfs = value
+	b.PersistentVolumeSourceApplyConfiguration.Glusterfs = value
 	return b
 }
 
@@ -87,7 +87,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithGlusterfs(value *GlusterfsP
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NFS field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithNFS(value *NFSVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.NFS = value
+	b.PersistentVolumeSourceApplyConfiguration.NFS = value
 	return b
 }
 
@@ -95,7 +95,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithNFS(value *NFSVolumeSourceA
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RBD field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithRBD(value *RBDPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.RBD = value
+	b.PersistentVolumeSourceApplyConfiguration.RBD = value
 	return b
 }
 
@@ -103,7 +103,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithRBD(value *RBDPersistentVol
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ISCSI field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithISCSI(value *ISCSIPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.ISCSI = value
+	b.PersistentVolumeSourceApplyConfiguration.ISCSI = value
 	return b
 }
 
@@ -111,7 +111,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithISCSI(value *ISCSIPersisten
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Cinder field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithCinder(value *CinderPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.Cinder = value
+	b.PersistentVolumeSourceApplyConfiguration.Cinder = value
 	return b
 }
 
@@ -119,7 +119,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithCinder(value *CinderPersist
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CephFS field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithCephFS(value *CephFSPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.CephFS = value
+	b.PersistentVolumeSourceApplyConfiguration.CephFS = value
 	return b
 }
 
@@ -127,7 +127,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithCephFS(value *CephFSPersist
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FC field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithFC(value *FCVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.FC = value
+	b.PersistentVolumeSourceApplyConfiguration.FC = value
 	return b
 }
 
@@ -135,7 +135,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithFC(value *FCVolumeSourceApp
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Flocker field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithFlocker(value *FlockerVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.Flocker = value
+	b.PersistentVolumeSourceApplyConfiguration.Flocker = value
 	return b
 }
 
@@ -143,7 +143,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithFlocker(value *FlockerVolum
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FlexVolume field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithFlexVolume(value *FlexPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.FlexVolume = value
+	b.PersistentVolumeSourceApplyConfiguration.FlexVolume = value
 	return b
 }
 
@@ -151,7 +151,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithFlexVolume(value *FlexPersi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AzureFile field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithAzureFile(value *AzureFilePersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.AzureFile = value
+	b.PersistentVolumeSourceApplyConfiguration.AzureFile = value
 	return b
 }
 
@@ -159,7 +159,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithAzureFile(value *AzureFileP
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VsphereVolume field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithVsphereVolume(value *VsphereVirtualDiskVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.VsphereVolume = value
+	b.PersistentVolumeSourceApplyConfiguration.VsphereVolume = value
 	return b
 }
 
@@ -167,7 +167,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithVsphereVolume(value *Vspher
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Quobyte field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithQuobyte(value *QuobyteVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.Quobyte = value
+	b.PersistentVolumeSourceApplyConfiguration.Quobyte = value
 	return b
 }
 
@@ -175,7 +175,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithQuobyte(value *QuobyteVolum
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AzureDisk field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithAzureDisk(value *AzureDiskVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.AzureDisk = value
+	b.PersistentVolumeSourceApplyConfiguration.AzureDisk = value
 	return b
 }
 
@@ -183,7 +183,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithAzureDisk(value *AzureDiskV
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PhotonPersistentDisk field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithPhotonPersistentDisk(value *PhotonPersistentDiskVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.PhotonPersistentDisk = value
+	b.PersistentVolumeSourceApplyConfiguration.PhotonPersistentDisk = value
 	return b
 }
 
@@ -191,7 +191,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithPhotonPersistentDisk(value 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PortworxVolume field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithPortworxVolume(value *PortworxVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.PortworxVolume = value
+	b.PersistentVolumeSourceApplyConfiguration.PortworxVolume = value
 	return b
 }
 
@@ -199,7 +199,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithPortworxVolume(value *Portw
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ScaleIO field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithScaleIO(value *ScaleIOPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.ScaleIO = value
+	b.PersistentVolumeSourceApplyConfiguration.ScaleIO = value
 	return b
 }
 
@@ -207,7 +207,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithScaleIO(value *ScaleIOPersi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Local field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithLocal(value *LocalVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.Local = value
+	b.PersistentVolumeSourceApplyConfiguration.Local = value
 	return b
 }
 
@@ -215,7 +215,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithLocal(value *LocalVolumeSou
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StorageOS field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithStorageOS(value *StorageOSPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.StorageOS = value
+	b.PersistentVolumeSourceApplyConfiguration.StorageOS = value
 	return b
 }
 
@@ -223,7 +223,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithStorageOS(value *StorageOSP
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CSI field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithCSI(value *CSIPersistentVolumeSourceApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
-	b.CSI = value
+	b.PersistentVolumeSourceApplyConfiguration.CSI = value
 	return b
 }
 

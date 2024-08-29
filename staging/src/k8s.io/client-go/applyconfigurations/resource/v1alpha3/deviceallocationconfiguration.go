@@ -58,6 +58,6 @@ func (b *DeviceAllocationConfigurationApplyConfiguration) WithRequests(values ..
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Opaque field is set to the value of the last call.
 func (b *DeviceAllocationConfigurationApplyConfiguration) WithOpaque(value *OpaqueDeviceConfigurationApplyConfiguration) *DeviceAllocationConfigurationApplyConfiguration {
-	b.Opaque = value
+	b.DeviceConfigurationApplyConfiguration.Opaque = value
 	return b
 }

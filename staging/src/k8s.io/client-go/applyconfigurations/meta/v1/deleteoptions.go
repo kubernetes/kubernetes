@@ -46,7 +46,7 @@ func DeleteOptions() *DeleteOptionsApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *DeleteOptionsApplyConfiguration) WithKind(value string) *DeleteOptionsApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -54,7 +54,7 @@ func (b *DeleteOptionsApplyConfiguration) WithKind(value string) *DeleteOptionsA
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *DeleteOptionsApplyConfiguration) WithAPIVersion(value string) *DeleteOptionsApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
