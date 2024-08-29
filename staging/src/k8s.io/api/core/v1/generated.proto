@@ -4747,7 +4747,7 @@ message QuobyteVolumeSource {
   optional bool readOnly = 3;
 
   // user to map volume access to
-  // Defaults to serivceaccount user
+  // Defaults to serviceaccount user
   // +optional
   optional string user = 4;
 

@@ -2842,7 +2842,7 @@
           "type": "string"
         },
         "user": {
-          "description": "User to map volume access to Defaults to serivceaccount user",
+          "description": "User to map volume access to Defaults to serviceaccount user",
           "type": "string"
         },
         "volume": {

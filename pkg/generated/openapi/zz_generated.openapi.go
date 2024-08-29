@@ -28874,7 +28874,7 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "user to map volume access to Defaults to serivceaccount user",
+							Description: "user to map volume access to Defaults to serviceaccount user",
 							Type:        []string{"string"},
 							Format:      "",
 						},
