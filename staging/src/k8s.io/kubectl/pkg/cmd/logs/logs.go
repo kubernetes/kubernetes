@@ -57,18 +57,33 @@ var (
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
+  		# Return snapshot logs from pod nginx, prefixing each line with the source pod and container name
+		kubectl logs nginx --prefix 
+  
+		# Return snapshot logs from pod nginx, limiting output to 500 bytes
+   		kubectl logs nginx --limit-bytes=500
+
+		# Return snapshot logs from pod nginx, waiting up to 20 seconds for it to start running.
+  		kubectl logs nginx --pod-running-timeout=20s
+    
 		# Return snapshot logs from pod nginx with multi containers
 		kubectl logs nginx --all-containers=true
 
-		# Return snapshot logs from all pods in the deployment nginx.
+		# Return snapshot logs from all pods in the deployment nginx
 		kubectl logs deployment/nginx --all-pods=true
 
 		# Return snapshot logs from all containers in pods defined by label app=nginx
 		kubectl logs -l app=nginx --all-containers=true
 
+  		# Return snapshot logs from all pods defined by label app=nginx, limiting concurrent log requests to 10 pods
+    		kubectl logs -l app=nginx --max-log-requests=10
+
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
 
+		# Begin streaming the logs from pod nginx, continuing even if errors occur
+  		kubectl logs nginx -f --ignore-errors=true
+    
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
 
@@ -80,6 +95,9 @@ var (
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx
+		
+  		# Show all logs with timestamps from pod nginx starting from August 30, 2024, at 06:00:00 UTC
+  		kubectl logs nginx --since-time=2024-08-30T06:00:00Z --timestamps=true
 
 		# Show logs from a kubelet with an expired serving certificate
 		kubectl logs --insecure-skip-tls-verify-backend nginx
