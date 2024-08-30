@@ -70,6 +70,9 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	case "gce", "gke", "kubemark":
 		keyfile = os.Getenv("GCE_SSH_KEY")
 		if keyfile == "" {
+			keyfile = os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
+		}
+		if keyfile == "" {
 			keyfile = "google_compute_engine"
 		}
 	case "aws", "eks":
@@ -103,7 +106,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		keyfile = filepath.Join(keydir, keyfile)
 	}
 
-	fmt.Printf("\nusing keyfile: %s\n", keyfile)
+	fmt.Printf("\nusing keyfile: %s", keyfile)
 	return makePrivateKeySignerFromFile(keyfile)
 }
 
@@ -271,9 +274,9 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 	code := 0
 	var bout, berr bytes.Buffer
 	session.Stdout, session.Stderr = &bout, &berr
-	fmt.Printf("running command: %s", cmd)
+	fmt.Printf("\nrunning command: %s", cmd)
 	if err = session.Run(cmd); err != nil {
-		fmt.Printf("running command returns err: %#v", err)
+		fmt.Printf("\nrunning command returns err1: %#v", err)
 		// Check whether the command failed to run or didn't complete.
 		if exiterr, ok := err.(*ssh.ExitError); ok {
 			// If we got an ExitError and the exit code is nonzero, we'll
@@ -288,8 +291,9 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
-	fmt.Printf("running command returns stdout: %#v", bout.String())
-	fmt.Printf("running command returns stderr: %#v", berr.String())
+	fmt.Printf("\nrunning command returns stdout: %#v", bout.String())
+	fmt.Printf("\nrunning command returns stderr: %#v", berr.String())
+	fmt.Printf("\nrunning command returns err2: %#v", err)
 	return bout.String(), berr.String(), code, err
 }
 

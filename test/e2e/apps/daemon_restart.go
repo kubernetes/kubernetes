@@ -106,10 +106,10 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 	var healthzCheck string
 	if r.enableHTTPS {
 		healthzCheck = fmt.Sprintf(
-			"curl -sk -o %v -I -w \"%%{http_code}\" https://localhost:%v/healthz", nullDev, r.healthzPort)
+			"curl -sk -o %v -I -w \"%%{http_code}\" https://127.0.0.1:%v/healthz", nullDev, r.healthzPort)
 	} else {
 		healthzCheck = fmt.Sprintf(
-			"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
+			"curl -s -o %v -I -w \"%%{http_code}\" http://127.0.0.1:%v/healthz", nullDev, r.healthzPort)
 
 	}
 	err := wait.PollUntilContextTimeout(ctx, r.pollInterval, r.pollTimeout, false, func(ctx context.Context) (bool, error) {
@@ -119,6 +119,7 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 			framework.Logf("NodeExec returns error: %v", err)
 			return false, err
 		}
+		e2essh.LogResult(result)
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
