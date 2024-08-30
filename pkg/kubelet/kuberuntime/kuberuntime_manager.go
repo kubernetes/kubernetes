@@ -1033,7 +1033,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			// when Evented PLEG is in use, don't restart
+			// when Evented PLEG is in use, don't restart immediately
 			// for Generic PLEG, restart as is
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus, !pleg.IsEventedPLEGInUse()) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))

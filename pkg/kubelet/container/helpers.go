@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -73,7 +74,7 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus, restartOnCreatedState bool) bool {
+func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus, restartOnCreatedStateImediately bool) bool {
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -94,10 +95,11 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 		return true
 	}
 	if status.State == ContainerStateCreated {
-		klog.V(4).InfoS("Container state is Created, and it will be decided whether to restart based on the specific situation.", "pod", klog.KObj(pod), "containerName", container.Name, "restartOnCreatedState", restartOnCreatedState)
+		klog.V(4).InfoS("Container state is Created, and it will be decided whether to restart based on the specific situation.", "pod", klog.KObj(pod), "containerName", container.Name, "restartOnCreatedStateImediately", restartOnCreatedStateImediately)
 		// we don't retart the container directly as the CREATED event will always be triggered
 		// but for next syncpod, we should handle the containers failed to be started which is in CREATED state.
-		return restartOnCreatedState
+		// If a pod hangs for more than 1m, we should trigger the restart then.
+		return restartOnCreatedStateImediately || time.Since(status.CreatedAt).Seconds() > 60
 	}
 
 	// Check RestartPolicy for dead container
