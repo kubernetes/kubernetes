@@ -72,7 +72,7 @@ func getUploadConfigPhaseFlags() []string {
 	}
 }
 
-// runUploadKubeadmConfig uploads the kubeadm configuration to a ConfigMap
+// runUploadKubeadmConfig uploads the kubeadm configuration to a ConfigMap.
 func runUploadKubeadmConfig(c workflow.RunData) error {
 	cfg, client, dryRun, err := getUploadConfigData(c)
 	if err != nil {
@@ -91,7 +91,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 	return nil
 }
 
-// runUploadKubeletConfig uploads the kubelet configuration to a ConfigMap
+// runUploadKubeletConfig uploads the kubelet configuration to a ConfigMap.
 func runUploadKubeletConfig(c workflow.RunData) error {
 	cfg, client, dryRun, err := getUploadConfigData(c)
 	if err != nil {
@@ -109,7 +109,7 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for the control-plane node")
+	klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for this control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "error writing Crisocket information for the control-plane node")
 	}

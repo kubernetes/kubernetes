@@ -68,30 +68,30 @@ func runPreflight(c workflow.RunData) error {
 
 	initCfg, client, ignorePreflightErrors := data.InitCfg(), data.Client(), data.IgnorePreflightErrors()
 
-	// First, check if we're root separately from the other preflight checks and fail fast
+	// First, check if we're root separately from the other preflight checks and fail fast.
 	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
 	}
 
-	// Run CoreDNS migration check
+	// Run CoreDNS migration check.
 	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors); err != nil {
 		return err
 	}
 
-	// Run healthchecks against the cluster
+	// Run healthchecks against the cluster.
 	klog.V(1).Infoln("[upgrade/preflight] Verifying the cluster health")
 	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, printer); err != nil {
 		return err
 	}
 
-	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
+	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm.
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, initCfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
 			_, _ = printer.Printf("[upgrade/preflight] %s\n", m)
 		}
 	}
 
-	// Validate requested and validate actual version
+	// Validate requested and validate actual version.
 	klog.V(1).Infoln("[upgrade/preflight] Validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&initCfg.ClusterConfiguration); err != nil {
 		return err
@@ -132,8 +132,8 @@ func runPreflight(c workflow.RunData) error {
 	return nil
 }
 
-// enforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
-// There are both fatal and skippable (with --force) errors
+// enforceVersionPolicies makes sure that the version the user specified is valid to upgrade to.
+// It handles both fatal and skippable (with --force) errors.
 func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
 	fmt.Printf("[upgrade/preflight] You have chosen to upgrade the cluster version to %q\n", newK8sVersionStr)
 
@@ -146,12 +146,12 @@ func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
-			// Return the error if the user hasn't specified the --force flag
+			// Return the error if the user hasn't specified the --force flag.
 			if !force {
 				return errors.Errorf("the version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
 					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
-			// Soft errors found, but --force was specified
+			// Soft errors found, but --force was specified.
 			fmt.Printf("[upgrade/preflight] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 		}
 	}

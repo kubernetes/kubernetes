@@ -106,7 +106,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 	return nil
 }
 
-// runKubeProxyAddon upgrades the KubeProxy addon.
+// runKubeProxyAddon upgrades the kube-proxy addon.
 func runKubeProxyAddon(c workflow.RunData) error {
 	cfg, client, _, out, dryRun, err := getInitData(c)
 	if err != nil {

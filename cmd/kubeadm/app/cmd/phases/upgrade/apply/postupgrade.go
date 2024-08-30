@@ -28,7 +28,7 @@ import (
 func NewPostUpgradePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "post-upgrade",
-		Short: "Run the post upgrade tasks",
+		Short: "Run post upgrade tasks",
 		Run:   runPostUpgrade,
 		InheritFlags: []string{
 			options.CfgPath,
@@ -43,7 +43,7 @@ func runPostUpgrade(c workflow.RunData) error {
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
-	// TODO: add the post upgrade tasks here when needed
+	// PLACEHOLDER: this phase should contain any release specific post-upgrade tasks.
 
 	return nil
 }

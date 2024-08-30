@@ -139,8 +139,8 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	applyRunner.AppendPhase(phases.NewAddonPhase())
 	applyRunner.AppendPhase(phases.NewPostUpgradePhase())
 
-	// Sets the data builder function, that will be used by the runner
-	// both when running the entire workflow or single phases
+	// Sets the data builder function, that will be used by the runner,
+	// both when running the entire workflow or single phases.
 	applyRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		data, err := newApplyData(cmd, args, flags)
 		if err != nil {
@@ -154,7 +154,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	})
 
 	// Binds the Runner to kubeadm upgrade apply command by altering
-	// command help, adding --skip-phases flag and by adding phases subcommands
+	// command help, adding --skip-phases flag and by adding phases subcommands.
 	applyRunner.BindToCommand(cmd)
 
 	return cmd
@@ -170,7 +170,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	}
 
 	upgradeVersion := upgradeCfg.Apply.KubernetesVersion
-	// The version arg is mandatory, unless it's specified in the config file
+	// The version arg is mandatory, unless it's specified in the config file.
 	if upgradeVersion == "" {
 		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
 			return nil, err
@@ -229,7 +229,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 
 	printer := &output.TextPrinter{}
 
-	// Fetches the cluster configuration
+	// Fetches the cluster configuration.
 	klog.V(1).Infoln("[upgrade] retrieving configuration from cluster")
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", false, false)
 	if err != nil {
@@ -238,7 +238,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 			_, _ = printer.Printf("[upgrade] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
 			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, errors.Wrap(err, "[upgrade/init config] FATAL")
+		return nil, errors.Wrap(err, "[upgrade] FATAL")
 	}
 
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:

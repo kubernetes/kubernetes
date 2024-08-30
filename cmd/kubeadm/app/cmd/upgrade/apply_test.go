@@ -112,7 +112,7 @@ func TestNewApplyData(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// initialize an external apply flags and inject it to the apply cmd
+			// Initialize an external apply flags and inject it to the apply cmd.
 			apf := &applyPlanFlags{
 				kubeConfigPath:            kubeadmconstants.GetAdminKubeConfigPath(),
 				cfgPath:                   "",
@@ -125,7 +125,7 @@ func TestNewApplyData(t *testing.T) {
 
 			cmd := newCmdApply(apf)
 
-			// sets cmd flags (that will be reflected on the init options)
+			// Sets cmd flags (that will be reflected on the init options).
 			for f, v := range tc.flags {
 				_ = cmd.Flags().Set(f, v)
 			}
@@ -136,7 +136,7 @@ func TestNewApplyData(t *testing.T) {
 				renewCerts:     true,
 			}
 
-			// test newApplyData method
+			// Test newApplyData method.
 			data, err := newApplyData(cmd, tc.args, flags)
 			if err == nil && len(tc.expectedError) != 0 {
 				t.Error("Expected error, but got success")
@@ -145,7 +145,7 @@ func TestNewApplyData(t *testing.T) {
 				t.Fatalf("newApplyData returned unexpected error, expected: %s, got %v", tc.expectedError, err)
 			}
 
-			// exec additional validation on the returned value
+			// Exec additional validation on the returned value.
 			if tc.validate != nil {
 				tc.validate(t, data)
 			}

@@ -109,7 +109,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 	return errorsutil.NewAggregate(errs)
 }
 
-// UnupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+// UnupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
 //
 // NB. This function can only be called after the current control plane instance has been upgraded already.
 // Because it determines whether the other control plane instances have been upgraded by checking whether

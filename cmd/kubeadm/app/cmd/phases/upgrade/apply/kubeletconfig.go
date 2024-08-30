@@ -30,7 +30,7 @@ import (
 
 var (
 	kubeletConfigLongDesc = cmdutil.LongDesc(`
-		Download the kubelet configuration from the kubelet-config ConfigMap stored in the cluster
+		Upgrade the kubelet configuration for this node by downloading it from the kubelet-config ConfigMap stored in the cluster
 		`)
 )
 
