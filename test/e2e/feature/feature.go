@@ -255,6 +255,14 @@ var (
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
 
+	// Owner: sig-auth
+	// Marks tests that require the PodCertificateRequest feature gate to be on.
+	PodCertificateRequest = framework.WithFeature(framework.ValidFeatures.Add("PodCertificateRequest"))
+
+	// Owner: sig-auth
+	// Marks tests that require the PodCertificateProjection feature gate to be on.
+	PodCertificateProjection = framework.WithFeature(framework.ValidFeatures.Add("PodCertificateProjection"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
