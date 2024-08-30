@@ -752,8 +752,9 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// the server must have sent us an error in 'err'
 				return true, nil
 			}
-			if result := r.transformResponse(resp, req); result.err != nil {
-				return true, result.err
+			result := r.transformResponse(resp, req)
+			if err := result.Error(); err != nil {
+				return true, err
 			}
 			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 		}()
