@@ -629,6 +629,7 @@ jwt:
 						"sub": defaultOIDCClaimedUsername,
 						"aud": defaultOIDCClientID,
 						"exp": time.Now().Add(idTokenLifetime).Unix(),
+						"jti": "0123456789",
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
@@ -641,6 +642,10 @@ jwt:
 			wantUser: &authenticationv1.UserInfo{
 				Username: "k8s-john_doe",
 				Groups:   []string{"system:authenticated"},
+				Extra: map[string]authenticationv1.ExtraValue{
+					// validates credential id is set correctly when jti claim is present
+					"authentication.kubernetes.io/credential-id": {"JTI=0123456789"},
+				},
 			},
 		},
 		{
@@ -777,6 +782,7 @@ jwt:
 						"aud": defaultOIDCClientID,
 						"exp": time.Now().Add(idTokenLifetime).Unix(),
 						"baz": "qux",
+						"jti": "0123456789",
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
@@ -790,6 +796,8 @@ jwt:
 				Username: "k8s-john_doe",
 				Groups:   []string{"system:authenticated"},
 				Extra: map[string]authenticationv1.ExtraValue{
+					// validates credential id is set correctly and other extra fields are set
+					"authentication.kubernetes.io/credential-id": {"JTI=0123456789"},
 					"example.org/foo": {"bar"},
 					"example.org/baz": {"qux"},
 				},
@@ -943,6 +951,52 @@ jwt:
 				Username: "k8s-john_doe",
 				Groups:   []string{"system:authenticated"},
 				UID:      "1234",
+			},
+		},
+		{
+			name: "non-string jti claim doesn't result in authentication error",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
+			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
+				idTokenLifetime := time.Second * 1200
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(idTokenLifetime).Unix(),
+						"jti": 1234,
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				)).Times(1)
+			},
+			configureClient: configureClientFetchingOIDCCredentials,
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
 			},
 		},
 	}
