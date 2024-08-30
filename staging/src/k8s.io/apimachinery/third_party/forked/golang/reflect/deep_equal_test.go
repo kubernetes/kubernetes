@@ -110,6 +110,10 @@ func TestPublicEqualities(t *testing.T) {
 		y int
 	}
 
+	type PointingPrivateFoo struct {
+		X *PrivateFoo
+	}
+
 	type NestedFoo struct {
 		X Foo
 	}
@@ -124,6 +128,34 @@ func TestPublicEqualities(t *testing.T) {
 
 	type NestedMapFoo struct {
 		X MapFoo
+	}
+
+	type packagePrivate struct {
+		X int
+	}
+
+	type PublicWrapperOfPackagePrivate struct {
+		X packagePrivate
+	}
+
+	type ExportedStruct struct {
+		X int
+	}
+
+	type unexportedStruct struct {
+		x int
+	}
+
+	type EmbeddingExportedStruct struct {
+		ExportedStruct
+	}
+
+	type EmbeddingUnexportedStruct struct {
+		unexportedStruct
+	}
+
+	type unexportedEmbeddedTypeWithExportedField struct {
+		ExportedStruct
 	}
 
 	type Case struct {
@@ -242,6 +274,104 @@ func TestPublicEqualities(t *testing.T) {
 			[]NestedPrivateFoo{{PrivateFoo{2, 1}}},
 			[]NestedPrivateFoo{{PrivateFoo{2, 2}}},
 			&DeepEqualOptions{IgnoreUnexportedFields: true}, true, false,
+		},
+
+		{
+			"structs exposing private structs does not panic, and considers equality",
+			PublicWrapperOfPackagePrivate{packagePrivate{1}},
+			PublicWrapperOfPackagePrivate{packagePrivate{1}},
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"structs exposing private structs does not panic, and considers inequality",
+			PublicWrapperOfPackagePrivate{packagePrivate{1}},
+			PublicWrapperOfPackagePrivate{packagePrivate{2}},
+			&DeepEqualOptions{}, false, false,
+		},
+
+		{
+			"struct with pointer to unexported struct containers panic",
+			PointingPrivateFoo{&PrivateFoo{1, 1}},
+			PointingPrivateFoo{&PrivateFoo{1, 1}},
+			&DeepEqualOptions{}, true, true,
+		},
+		{
+			"struct with pointer to unexported struct containers do not panic when ignore unexported fields",
+			PointingPrivateFoo{&PrivateFoo{1, 1}},
+			PointingPrivateFoo{&PrivateFoo{1, 1}},
+			&DeepEqualOptions{IgnoreUnexportedFields: true}, true, false,
+		},
+
+		{
+			"embedding exported structs are considered equal",
+			func() EmbeddingExportedStruct {
+				ret := EmbeddingExportedStruct{}
+				ret.X = 1
+				return ret
+			}(),
+			func() EmbeddingExportedStruct {
+				ret := EmbeddingExportedStruct{}
+				ret.X = 1
+				return ret
+			}(),
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"embedding exported structs are considered unequal",
+			func() EmbeddingExportedStruct {
+				ret := EmbeddingExportedStruct{}
+				ret.X = 1
+				return ret
+			}(),
+			func() EmbeddingExportedStruct {
+				ret := EmbeddingExportedStruct{}
+				ret.X = 2
+				return ret
+			}(),
+			&DeepEqualOptions{}, false, false,
+		},
+		{
+			"embedding unexported structs panics",
+			func() EmbeddingUnexportedStruct {
+				ret := EmbeddingUnexportedStruct{}
+				ret.x = 1
+				return ret
+			}(),
+			func() EmbeddingUnexportedStruct {
+				ret := EmbeddingUnexportedStruct{}
+				ret.x = 1
+				return ret
+			}(),
+			&DeepEqualOptions{}, true, true,
+		},
+		{
+			"embedding unexported structs do not panic when ignoring unexported fields",
+			func() EmbeddingUnexportedStruct {
+				ret := EmbeddingUnexportedStruct{}
+				ret.x = 1
+				return ret
+			}(),
+			func() EmbeddingUnexportedStruct {
+				ret := EmbeddingUnexportedStruct{}
+				ret.x = 1
+				return ret
+			}(),
+			&DeepEqualOptions{IgnoreUnexportedFields: true}, true, false,
+		},
+
+		{
+			"unexported embedded structs consisting of exported field do not panic",
+			func() unexportedEmbeddedTypeWithExportedField {
+				ret := unexportedEmbeddedTypeWithExportedField{}
+				ret.X = 1
+				return ret
+			}(),
+			func() unexportedEmbeddedTypeWithExportedField {
+				ret := unexportedEmbeddedTypeWithExportedField{}
+				ret.X = 1
+				return ret
+			}(),
+			&DeepEqualOptions{}, true, false,
 		},
 	}
 
