@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -372,7 +373,16 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
-			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			isInitContainerCompleted := false
+			if !types.IsRestartableInitContainer(container) {
+				if status, ok := podutil.GetContainerStatus(pod.Status.InitContainerStatuses, container.Name); ok {
+					if status.State.Terminated != nil && status.State.Terminated.ExitCode == 0 {
+						isInitContainerCompleted = true
+					}
+				}
+			}
+
+			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)], isInitContainerCompleted); err != nil {
 				return err
 			}
 			if !types.IsRestartableInitContainer(&initContainer) {
@@ -386,7 +396,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)], false); err != nil {
 		return err
 	}
 	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
@@ -565,7 +575,7 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.Set[string]) (sets.Set[string], error) {
+func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.Set[string], isInitContainerCompleted bool) (sets.Set[string], error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -592,9 +602,15 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
-		klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
-		return nil, nil
+	if !m.sourcesReady.AllReady() {
+		if m.isContainerAlreadyRunning(podUID, contName) {
+			klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+			return nil, nil
+		}
+		if isInitContainerCompleted {
+			klog.V(3).InfoS("skip completed initContainer, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+			return nil, nil
+		}
 	}
 
 	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
@@ -821,7 +837,7 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string]) error {
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string], isInitContainerCompleted bool) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -843,7 +859,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.UpdateAllocatedDevices()
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
+		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource], isInitContainerCompleted)
 		if err != nil {
 			return err
 		}

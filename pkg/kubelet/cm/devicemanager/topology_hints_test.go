@@ -441,7 +441,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			}
 		}
 
-		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string]())
+		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](), false)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -639,7 +639,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 		}
 
-		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
+		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...), false)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

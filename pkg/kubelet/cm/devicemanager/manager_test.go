@@ -1172,7 +1172,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices, false)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1240,7 +1240,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 		waitUpdateAllocatedDevicesChan <- struct{}{}
 	}()
 
-	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
+	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string](), false)
 	assert.NoError(t, err)
 	assert.Equal(t, set, sets.New[string](deviceID))
 }
@@ -1952,4 +1952,235 @@ func sortContainerStatuses(statuses []v1.ContainerStatus) {
 			sortResourceHealth(statuses[i].AllocatedResourcesStatus[j].Resources)
 		}
 	}
+}
+
+type fakeSourcesReadyStub struct{}
+
+func (s *fakeSourcesReadyStub) AddSource(source string) {}
+func (s *fakeSourcesReadyStub) AllReady() bool          { return false }
+func TestCompletedInitContainerDeviceAllocation(t *testing.T) {
+	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
+	// should succeed with devices allocated to init containers reallocated to normal containers.
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         false,
+	}
+	res2 := TestResource{
+		resourceName:     "domain2.com/resource2",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		topology:         true,
+	}
+	testResources := make([]TestResource, 2)
+	testResources = append(testResources, res1)
+	testResources = append(testResources, res2)
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	as.Nil(err)
+	testManager.ManagerImpl.sourcesReady = &fakeSourcesReadyStub{}
+	initContainer1 := string(uuid.NewUUID())
+	initContainer2 := string(uuid.NewUUID())
+	podWithPluginResourcesInInitContainers := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: initContainer1,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+				{
+					Name: initContainer2,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			InitContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: initContainer1,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							ExitCode: 0,
+						},
+					},
+				},
+				{
+					Name: initContainer2,
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
+	}
+	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
+	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+	}
+	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+	}
+	as.Nil(err)
+	podUID := string(podWithPluginResourcesInInitContainers.UID)
+	initCont1 := podWithPluginResourcesInInitContainers.Spec.InitContainers[0].Name
+	initCont2 := podWithPluginResourcesInInitContainers.Spec.InitContainers[1].Name
+	normalCont1 := podWithPluginResourcesInInitContainers.Spec.Containers[0].Name
+	normalCont2 := podWithPluginResourcesInInitContainers.Spec.Containers[1].Name
+	initCont1Devices := testManager.podDevices.containerDevices(podUID, initCont1, res1.resourceName)
+	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
+	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
+	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	as.Equal(0, initCont1Devices.Len())
+	as.Equal(2, initCont2Devices.Len())
+	as.Equal(1, normalCont1Devices.Len())
+	as.Equal(1, normalCont2Devices.Len())
+	as.True(initCont2Devices.IsSuperset(initCont1Devices))
+	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
+	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
+	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
+}
+
+func TestCompletedInitContainerPodContainerDeviceToAllocate(t *testing.T) {
+	resourceName1 := "domain1.com/resource1"
+	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
+	as := require.New(t)
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager := &ManagerImpl{
+		endpoints:        make(map[string]endpointInfo),
+		healthyDevices:   make(map[string]sets.Set[string]),
+		unhealthyDevices: make(map[string]sets.Set[string]),
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		activePods:       func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:     &fakeSourcesReadyStub{},
+	}
+
+	testManager.podDevices.insert("pod1", "con1", resourceName1,
+		constructDevices([]string{"dev1", "dev2"}),
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"}),
+			withMounts(map[string]string{"/home/r2lib1": "/usr/r2lib1"}),
+			withEnvs(map[string]string{"r2devices": "dev1 dev2"}),
+		),
+	)
+	testManager.podDevices.insert("pod2", "con2", resourceName2,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
+
+	// no healthy devices for resourceName1 and devices corresponding to
+	// resource2 are intentionally omitted to simulate that the resource
+	// hasn't been registered.
+	testManager.healthyDevices[resourceName1] = sets.New[string]()
+	testManager.healthyDevices[resourceName3] = sets.New[string]()
+	// dev5 is no longer in the list of healthy devices
+	testManager.healthyDevices[resourceName3].Insert("dev7")
+	testManager.healthyDevices[resourceName3].Insert("dev8")
+
+	testCases := []struct {
+		description              string
+		podUID                   string
+		contName                 string
+		resource                 string
+		required                 int
+		reusableDevices          sets.Set[string]
+		expectedAllocatedDevices sets.Set[string]
+		expErr                   error
+	}{
+		{
+			description:              "Admission error in case no healthy devices to allocate present",
+			podUID:                   "pod1",
+			contName:                 "con1",
+			resource:                 resourceName1,
+			required:                 2,
+			reusableDevices:          sets.New[string](),
+			expectedAllocatedDevices: nil,
+			expErr:                   nil,
+		},
+		{
+			description:              "Admission error in case resource is not registered",
+			podUID:                   "pod2",
+			contName:                 "con2",
+			resource:                 resourceName2,
+			required:                 1,
+			reusableDevices:          sets.New[string](),
+			expectedAllocatedDevices: nil,
+			expErr:                   nil,
+		},
+		{
+			description:              "Admission error in case resource not devices previously allocated no longer healthy",
+			podUID:                   "pod3",
+			contName:                 "con3",
+			resource:                 resourceName3,
+			required:                 1,
+			reusableDevices:          sets.New[string](),
+			expectedAllocatedDevices: nil,
+			expErr:                   nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices, true)
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		if !reflect.DeepEqual(allocDevices, testCase.expectedAllocatedDevices) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expectedAllocatedDevices, allocDevices)
+		}
+	}
+
 }
