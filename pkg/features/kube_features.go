@@ -549,6 +549,24 @@ const (
 	// Requires the CRI implementation supports supplying the required stats.
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
+	// owner: @ahmedtd
+	// alpha: v1.32
+	//
+	// Enable PodCertificateRequest objects.
+	PodCertificateRequest featuregate.Feature = "PodCertificateRequest"
+
+	// owner: @ahmedtd
+	// alpha: v1.32
+	//
+	// Issue and accept API client certificates.
+	PodCertificateAPIClientCertificates featuregate.Feature = "PodCertificateAPIClientCertificates"
+
+	// owner: @ahmedtd
+	// alpha: v1.32
+	//
+	// Enable podCertificate Kubelet projected volumes.  Depends on PodCertificateRequest.
+	PodCertificateProjection featuregate.Feature = "PodCertificateProjection"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	// beta: v1.22
@@ -983,6 +1001,12 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
 
 	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Deprecated}, // default on in 1.33
+
+	PodCertificateRequest: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodCertificateAPIClientCertificates: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodCertificateProjection: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
