@@ -158,6 +158,14 @@ func TestPublicEqualities(t *testing.T) {
 		ExportedStruct
 	}
 
+	type doublyNestedUnexportedTypeInner struct {
+		x PrivateFoo
+	}
+
+	type doublyNestedUnexportedTypeOuter struct {
+		x doublyNestedUnexportedTypeInner
+	}
+
 	type Case struct {
 		name          string
 		a, b          interface{}
@@ -165,6 +173,17 @@ func TestPublicEqualities(t *testing.T) {
 		shouldBeEqual bool
 		shouldPanic   bool
 	}
+
+	concreteFoo := Foo{1}
+	concretePrivateFoo := PrivateFoo{1, 1}
+	concretePrivateFooIdentical := PrivateFoo{1, 1}
+	concreteHard := map[string]string{"foo": "bar"}
+	concreteHardVariant := map[string]string{"foo": "bar"}
+
+	var pointerToInterface interface{}
+	var anotherInterface interface{} // nil == nil without same address
+	var pointerToFunc func()
+	var anotherFunc func()
 
 	table := []Case{
 		{"equal values are considered equal", 1, 1, &DeepEqualOptions{}, true, false},
@@ -195,6 +214,18 @@ func TestPublicEqualities(t *testing.T) {
 			NestedPrivateFoo{PrivateFoo{1, 1}}, NestedPrivateFoo{PrivateFoo{1, 1}},
 			&DeepEqualOptions{IgnoreUnexportedFields: true},
 			true, false,
+		},
+		{
+			"doubly nested unexported fields panic",
+			doublyNestedUnexportedTypeOuter{doublyNestedUnexportedTypeInner{PrivateFoo{1, 1}}},
+			doublyNestedUnexportedTypeOuter{doublyNestedUnexportedTypeInner{PrivateFoo{1, 1}}},
+			&DeepEqualOptions{}, false, true,
+		},
+		{
+			"doubly nested unexported fields do not panic when ignoring unexported fields",
+			doublyNestedUnexportedTypeOuter{doublyNestedUnexportedTypeInner{PrivateFoo{1, 1}}},
+			struct{}{},
+			&DeepEqualOptions{IgnoreUnexportedFields: true}, false, false,
 		},
 
 		{
@@ -371,6 +402,58 @@ func TestPublicEqualities(t *testing.T) {
 				ret.X = 1
 				return ret
 			}(),
+			&DeepEqualOptions{}, true, false,
+		},
+
+		{"nil equals nil", nil, nil, &DeepEqualOptions{}, true, false},
+		{"pointer to nil equals pointer to nil", pointerToInterface, pointerToInterface, &DeepEqualOptions{}, true, false},
+		{"pointer to nil equals pointer to nil", pointerToInterface, anotherInterface, &DeepEqualOptions{}, true, false},
+		{
+			"pointer to same object is equal",
+			&concreteFoo, &concreteFoo,
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"pointer to similar objects with unexported fields panics", // not same object because then addr equality
+			&concretePrivateFoo, &concretePrivateFooIdentical,
+			&DeepEqualOptions{}, true, true,
+		},
+		{
+			"pointer to same hard object is equal",
+			concreteHard, concreteHard,
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"pointer to similar hard object is equal",
+			concreteHard, concreteHardVariant,
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"nil pointer to func is considered equal",
+			pointerToFunc, pointerToFunc,
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"nil pointer to another func is considered equal",
+			pointerToFunc, anotherFunc,
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"pointer to interface is considered equal",
+			func() interface{} {
+				var ret interface{}
+				return &ret
+			}(),
+			func() interface{} {
+				var ret interface{}
+				return &ret
+			}(),
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"slice of concrete types is equal",
+			[]map[string]string{{"foo": "bar"}, {"bar": "foo"}},
+			[]map[string]string{{"foo": "bar"}, {"bar": "foo"}},
 			&DeepEqualOptions{}, true, false,
 		},
 	}
