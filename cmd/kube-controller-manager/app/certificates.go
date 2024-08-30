@@ -201,6 +201,26 @@ func startCertificateSigningRequestCleanerController(ctx context.Context, contro
 	return nil, true, nil
 }
 
+func newPodCertificateRequestCleanerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.PodCertificateRequestCleanerController,
+		aliases:  []string{"pcrcleaner"},
+		initFunc: startPodCertificateRequestCleanerController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.PodCertificateRequest,
+		},
+	}
+}
+
+func startPodCertificateRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	cleaner := cleaner.NewPCRCleanerController(
+		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
+		controllerContext.InformerFactory.Certificates().V1alpha1().PodCertificateRequests(),
+	)
+	go cleaner.Run(ctx, 1)
+	return nil, true, nil
+}
+
 func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.RootCACertificatePublisherController,

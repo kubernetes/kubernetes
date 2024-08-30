@@ -78,6 +78,13 @@ func validateNodeSelectorAuthorizationFeature() []error {
 	return nil
 }
 
+func validatePodCertificateRequestFeature() []error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) && !utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeNodeWithSelectors) {
+		return []error{fmt.Errorf("PodCertificateRequest feature requires AuthorizeNodeWithSelectors feature to b enabled")}
+	}
+	return nil
+}
+
 func validateUnknownVersionInteroperabilityProxyFeature() []error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
@@ -145,6 +152,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
+	errs = append(errs, validatePodCertificateRequestFeature()...)
 	errs = append(errs, validateServiceAccountTokenSigningConfig(s)...)
 
 	return errs

@@ -28,7 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates"
 )
 
@@ -46,11 +48,25 @@ func Register(plugins *admission.Plugins) {
 type Plugin struct {
 	*admission.Handler
 	authz authorizer.Authorizer
+
+	inspectedFeatureGates  bool
+	podCertificatesEnabled bool
 }
+
+var _ admission.ValidationInterface = &Plugin{}
+var _ admission.InitializationValidator = &Plugin{}
+var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
+var _ genericadmissioninit.WantsFeatures = &Plugin{}
 
 // SetAuthorizer sets the authorizer.
 func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
 	p.authz = authz
+}
+
+// InspectFeatureGates implements WantsFeatures.
+func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	p.podCertificatesEnabled = featureGates.Enabled(features.PodCertificateRequest)
+	p.inspectedFeatureGates = true
 }
 
 // ValidateInitialization ensures an authorizer is set.
@@ -58,11 +74,11 @@ func (p *Plugin) ValidateInitialization() error {
 	if p.authz == nil {
 		return fmt.Errorf("%s requires an authorizer", PluginName)
 	}
+	if !p.inspectedFeatureGates {
+		return fmt.Errorf("%s did not see feature gates", PluginName)
+	}
 	return nil
 }
-
-var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
 
 // NewPlugin creates a new CSR approval admission plugin
 func NewPlugin() *Plugin {
@@ -72,34 +88,58 @@ func NewPlugin() *Plugin {
 }
 
 var csrGroupResource = api.Resource("certificatesigningrequests")
+var pcrGroupResource = api.Resource("podcertificaterequests")
 
 // Validate verifies that the requesting user has permission to sign
 // CertificateSigningRequests for the specified signerName.
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	// Ignore all calls to anything other than 'certificatesigningrequests/status'.
 	// Ignore all operations other than UPDATE.
-	if a.GetSubresource() != "status" ||
-		a.GetResource().GroupResource() != csrGroupResource {
+	if a.GetSubresource() != "status" {
 		return nil
 	}
 
-	oldCSR, ok := a.GetOldObject().(*api.CertificateSigningRequest)
-	if !ok {
-		return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetOldObject()))
-	}
-	csr, ok := a.GetObject().(*api.CertificateSigningRequest)
-	if !ok {
-		return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetObject()))
-	}
+	// Only pay attention to CSRs and PCRs
+	switch {
+	case a.GetResource().GroupResource() == csrGroupResource:
+		oldCSR, ok := a.GetOldObject().(*api.CertificateSigningRequest)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetOldObject()))
+		}
+		csr, ok := a.GetObject().(*api.CertificateSigningRequest)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetObject()))
+		}
 
-	// only run if the status.certificate or status.conditions field has been changed
-	if reflect.DeepEqual(oldCSR.Status.Certificate, csr.Status.Certificate) && apiequality.Semantic.DeepEqual(oldCSR.Status.Conditions, csr.Status.Conditions) {
+		// only run if the status.certificate or status.conditions field has been changed
+		if reflect.DeepEqual(oldCSR.Status.Certificate, csr.Status.Certificate) && apiequality.Semantic.DeepEqual(oldCSR.Status.Conditions, csr.Status.Conditions) {
+			return nil
+		}
+
+		if !certificates.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "sign", oldCSR.Spec.SignerName) {
+			klog.V(4).Infof("user not permitted to sign CertificateSigningRequest %q with signerName %q", oldCSR.Name, oldCSR.Spec.SignerName)
+			return admission.NewForbidden(a, fmt.Errorf("user not permitted to sign requests with signerName %q", oldCSR.Spec.SignerName))
+		}
+	case p.podCertificatesEnabled && a.GetResource().GroupResource() == pcrGroupResource:
+		oldPCR, ok := a.GetOldObject().(*api.PodCertificateRequest)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected type PodCertificateRequest, got: %T", a.GetOldObject()))
+		}
+		pcr, ok := a.GetObject().(*api.PodCertificateRequest)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected type PodCertificateRequest, got: %T", a.GetObject()))
+		}
+
+		// only run if the certificate or conditions field has been changed
+		if reflect.DeepEqual(oldPCR.Status.CertificateChain, pcr.Status.CertificateChain) && apiequality.Semantic.DeepEqual(oldPCR.Status.Conditions, pcr.Status.Conditions) {
+			return nil
+		}
+
+		if !certificates.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "sign", oldPCR.Spec.SignerName) {
+			klog.V(4).Infof("user not permitted to sign PodCertificateRequest %q with signerName %q", oldPCR.Name, oldPCR.Spec.SignerName)
+			return admission.NewForbidden(a, fmt.Errorf("user not permitted to sign requests with signerName %q", oldPCR.Spec.SignerName))
+		}
+	default:
 		return nil
-	}
-
-	if !certificates.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "sign", oldCSR.Spec.SignerName) {
-		klog.V(4).Infof("user not permitted to sign CertificateSigningRequest %q with signerName %q", oldCSR.Name, oldCSR.Spec.SignerName)
-		return admission.NewForbidden(a, fmt.Errorf("user not permitted to sign requests with signerName %q", oldCSR.Spec.SignerName))
 	}
 
 	return nil

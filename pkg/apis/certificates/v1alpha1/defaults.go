@@ -16,8 +16,18 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_PodCertificateRequest(obj *certsv1alpha1.PodCertificateRequest) {
+	if obj.Spec.MaxExpirationSeconds == nil {
+		obj.Spec.MaxExpirationSeconds = ptr.To[int32](86400)
+	}
 }

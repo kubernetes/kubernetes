@@ -271,6 +271,11 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie())
 	}
+	// Kubelet needs to create arbitrary PodCertificateRequests to implement
+	// podCertificate volumes.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie())
+	}
 
 	return nodePolicyRules
 }
