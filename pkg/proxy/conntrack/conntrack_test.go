@@ -26,51 +26,63 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	v1 "k8s.io/api/core/v1"
 	netutils "k8s.io/utils/net"
 )
 
 type fakeHandler struct {
 	tableType netlink.ConntrackTableType
-	family    netlink.InetFamily
-	filter    *conntrackFilter
+	ipFamily  netlink.InetFamily
+	filters   []*conntrackFilter
 }
 
-func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, filters ...netlink.CustomConntrackFilter) (uint, error) {
+func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
 	f.tableType = tableType
-	f.family = family
-	f.filter = filters[0].(*conntrackFilter)
-	return 1, nil
+	f.ipFamily = family
+	f.filters = make([]*conntrackFilter, 0, len(netlinkFilters))
+	for _, netlinkFilter := range netlinkFilters {
+		f.filters = append(f.filters, netlinkFilter.(*conntrackFilter))
+	}
+	return uint(len(f.filters)), nil
 }
 
 var _ netlinkHandler = (*fakeHandler)(nil)
 
-func TestConntracker_ClearEntriesForIP(t *testing.T) {
+func TestConntracker_ClearEntries(t *testing.T) {
+
 	testCases := []struct {
-		name           string
-		ip             string
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
+		name     string
+		ipFamily uint8
+		filters  []netlink.CustomConntrackFilter
 	}{
 		{
-			name:           "ipv4 + UDP",
-			ip:             "10.96.0.10",
-			protocol:       v1.ProtocolUDP,
-			expectedFamily: unix.AF_INET,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
+			name:     "single IPv6 filter",
+			ipFamily: unix.AF_INET6,
+			filters: []netlink.CustomConntrackFilter{
+				&conntrackFilter{
+					protocol: 17,
+					original: &connectionTuple{dstPort: 8000},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+				},
 			},
 		},
 		{
-			name:           "ipv6 + TCP",
-			ip:             "2001:db8:1::2",
-			protocol:       v1.ProtocolTCP,
-			expectedFamily: unix.AF_INET6,
-			expectedFilter: &conntrackFilter{
-				protocol: 6,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+			name:     "multiple IPv4 filters",
+			ipFamily: unix.AF_INET,
+			filters: []netlink.CustomConntrackFilter{
+				&conntrackFilter{
+					protocol: 6,
+					original: &connectionTuple{dstPort: 3000},
+				},
+				&conntrackFilter{
+					protocol: 17,
+					original: &connectionTuple{dstPort: 5000},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				},
+				&conntrackFilter{
+					protocol: 132,
+					original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				},
 			},
 		},
 	}
@@ -79,149 +91,13 @@ func TestConntracker_ClearEntriesForIP(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := &fakeHandler{}
 			ct := newConntracker(handler)
-			require.NoError(t, ct.ClearEntriesForIP(tc.ip, tc.protocol))
+			require.NoError(t, ct.ClearEntries(tc.ipFamily, tc.filters...))
 			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
-			require.Equal(t, tc.expectedFamily, handler.family)
-			require.Equal(t, tc.expectedFilter, handler.filter)
-		})
-	}
-}
-
-func TestConntracker_ClearEntriesForPort(t *testing.T) {
-	testCases := []struct {
-		name           string
-		port           int
-		isIPv6         bool
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:           "ipv4 + UDP",
-			port:           5000,
-			isIPv6:         false,
-			protocol:       v1.ProtocolUDP,
-			expectedFamily: unix.AF_INET,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstPort: 5000},
-			},
-		},
-		{
-			name:           "ipv6 + SCTP",
-			port:           3000,
-			isIPv6:         true,
-			protocol:       v1.ProtocolSCTP,
-			expectedFamily: unix.AF_INET6,
-			expectedFilter: &conntrackFilter{
-				protocol: 132,
-				original: &connectionTuple{dstPort: 3000},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			handler := &fakeHandler{}
-			ct := newConntracker(handler)
-			require.NoError(t, ct.ClearEntriesForPort(tc.port, tc.isIPv6, tc.protocol))
-			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
-			require.Equal(t, tc.expectedFamily, handler.family)
-			require.Equal(t, tc.expectedFilter, handler.filter)
-		})
-	}
-}
-
-func TestConntracker_ClearEntriesForNAT(t *testing.T) {
-	testCases := []struct {
-		name           string
-		src            string
-		dest           string
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:           "ipv4 + SCTP",
-			src:            "10.96.0.10",
-			dest:           "10.244.0.3",
-			protocol:       v1.ProtocolSCTP,
-			expectedFamily: unix.AF_INET,
-			expectedFilter: &conntrackFilter{
-				protocol: 132,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
-			},
-		},
-		{
-			name:           "ipv6 + UDP",
-			src:            "2001:db8:1::2",
-			dest:           "4001:ab8::2",
-			protocol:       v1.ProtocolUDP,
-			expectedFamily: unix.AF_INET6,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("4001:ab8::2")},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			handler := &fakeHandler{}
-			ct := newConntracker(handler)
-			require.NoError(t, ct.ClearEntriesForNAT(tc.src, tc.dest, tc.protocol))
-			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
-			require.Equal(t, tc.expectedFamily, handler.family)
-			require.Equal(t, tc.expectedFilter, handler.filter)
-		})
-	}
-}
-
-func TestConntracker_ClearEntriesForPortNAT(t *testing.T) {
-	testCases := []struct {
-		name           string
-		ip             string
-		port           int
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:           "ipv4 + TCP",
-			ip:             "10.96.0.10",
-			port:           80,
-			protocol:       v1.ProtocolTCP,
-			expectedFamily: unix.AF_INET,
-			expectedFilter: &conntrackFilter{
-				protocol: 6,
-				original: &connectionTuple{dstPort: 80},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.96.0.10")},
-			},
-		},
-		{
-			name:           "ipv6 + UDP",
-			ip:             "2001:db8:1::2",
-			port:           8000,
-			protocol:       v1.ProtocolUDP,
-			expectedFamily: unix.AF_INET6,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstPort: 8000},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			handler := &fakeHandler{}
-			ct := newConntracker(handler)
-			require.NoError(t, ct.ClearEntriesForPortNAT(tc.ip, tc.port, tc.protocol))
-			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
-			require.Equal(t, tc.expectedFamily, handler.family)
-			require.Equal(t, tc.expectedFilter, handler.filter)
+			require.Equal(t, netlink.InetFamily(tc.ipFamily), handler.ipFamily)
+			require.Equal(t, len(tc.filters), len(handler.filters))
+			for i := 0; i < len(tc.filters); i++ {
+				require.Equal(t, tc.filters[i], handler.filters[i])
+			}
 		})
 	}
 }
