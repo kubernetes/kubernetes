@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -841,8 +842,10 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	}
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
+			metrics.Goroutines.WithLabelValues(metrics.KillContainerOperation).Inc()
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
+			defer metrics.Goroutines.WithLabelValues(metrics.KillContainerOperation).Dec()
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(ctx, pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride, termOrdering); err != nil {

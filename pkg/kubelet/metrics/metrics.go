@@ -73,6 +73,7 @@ const (
 	RestartedPodTotalKey               = "restarted_pods_total"
 	ImagePullDurationKey               = "image_pull_duration_seconds"
 	CgroupVersionKey                   = "cgroup_version"
+	GoroutinesKey                      = "goroutines"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -131,6 +132,11 @@ const (
 	Container          = "container"
 	InitContainer      = "init_container"
 	EphemeralContainer = "ephemeral_container"
+
+	// Operation types for tracking the number of goroutines
+	PullImageOperation     = "pull_image"
+	KillContainerOperation = "kill_container"
+	AddPodOperation        = "add_pod"
 )
 
 type imageSizeBucket struct {
@@ -673,7 +679,7 @@ var (
 		},
 		[]string{"container_type"},
 	)
-	// StartedContainersTotal is a counter that tracks the number of errors creating containers
+	// StartedContainersErrorsTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -821,7 +827,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// OrphanPodCleanedVolumes is number of times that removeOrphanedPodVolumeDirs failed.
+	// OrphanPodCleanedVolumesErrors is number of times that removeOrphanedPodVolumeDirs failed.
 	OrphanPodCleanedVolumesErrors = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -830,6 +836,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	// Goroutines is the number of goroutines that the kubelet is running.
+	Goroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           GoroutinesKey,
+			Help:           "Number of running goroutines split by the work they do such as binding.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"operation"})
 
 	NodeStartupPreKubeletDuration = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -1007,6 +1021,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+		legacyregistry.MustRegister(Goroutines)
 	})
 }
 

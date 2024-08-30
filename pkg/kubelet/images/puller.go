@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 type pullResult struct {
@@ -53,6 +54,8 @@ func newParallelImagePuller(imageService kubecontainer.ImageService, maxParallel
 
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
+		metrics.Goroutines.WithLabelValues(metrics.PullImageOperation).Inc()
+		defer metrics.Goroutines.WithLabelValues(metrics.PullImageOperation).Dec()
 		if pip.tokens != nil {
 			pip.tokens <- struct{}{}
 			defer func() { <-pip.tokens }()

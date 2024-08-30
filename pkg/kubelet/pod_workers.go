@@ -943,10 +943,12 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 
 		// spawn a pod worker
 		go func() {
+			metrics.Goroutines.WithLabelValues(metrics.AddPodOperation).Inc()
 			// TODO: this should be a wait.Until with backoff to handle panics, and
 			// accept a context for shutdown
 			defer runtime.HandleCrash()
 			defer klog.V(3).InfoS("Pod worker has stopped", "podUID", uid)
+			defer metrics.Goroutines.WithLabelValues(metrics.AddPodOperation).Dec()
 			p.podWorkerLoop(uid, outCh)
 		}()
 	}
