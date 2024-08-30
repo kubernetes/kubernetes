@@ -48,6 +48,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -199,7 +200,11 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	certStorageProvider := certificatesrest.RESTStorageProvider{}
+	certStorageProvider := certificatesrest.RESTStorageProvider{
+		Authorizer: &fakeAuthorizer{
+			decision: authorizer.DecisionAllow,
+		},
+	}
 	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ControlPlane.APIResourceConfigSource, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
@@ -210,6 +215,16 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	for _, err := range strategyErrors {
 		t.Error(err)
 	}
+}
+
+type fakeAuthorizer struct {
+	decision authorizer.Decision
+	reason   string
+	err      error
+}
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return f.decision, f.reason, f.err
 }
 
 func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, CompletedConfig, *assert.Assertions) {

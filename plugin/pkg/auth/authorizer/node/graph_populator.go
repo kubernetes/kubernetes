@@ -21,10 +21,12 @@ import (
 
 	"k8s.io/klog/v2"
 
+	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	certsv1alpha1informers "k8s.io/client-go/informers/certificates/v1alpha1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
@@ -43,6 +45,7 @@ func AddGraphEventHandlers(
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 	slices resourceinformers.ResourceSliceInformer,
+	pcrs certsv1alpha1informers.PodCertificateRequestInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -77,6 +80,15 @@ func AddGraphEventHandlers(
 			DeleteFunc: g.deleteResourceSlice,
 		})
 		synced = append(synced, sliceHandler.HasSynced)
+	}
+
+	if pcrs != nil {
+		pcrHandler, _ := pcrs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addPCR,
+			UpdateFunc: nil, // Not needed, spec fields are immutable.
+			DeleteFunc: g.deletePCR,
+		})
+		synced = append(synced, pcrHandler.HasSynced)
 	}
 
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
@@ -200,4 +212,25 @@ func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
 		return
 	}
 	g.graph.DeleteResourceSlice(slice.Name)
+}
+
+func (g *graphPopulator) addPCR(obj any) {
+	pcr, ok := obj.(*certsv1alpha1.PodCertificateRequest)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.AddPodCertificateRequest(pcr)
+}
+
+func (g *graphPopulator) deletePCR(obj any) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	pcr, ok := obj.(*certsv1alpha1.PodCertificateRequest)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.DeletePodCertificateRequest(pcr)
 }

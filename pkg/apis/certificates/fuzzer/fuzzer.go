@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 )
 
 // Funcs returns the fuzzer functions for the certificates api group.
@@ -40,6 +41,17 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if len(obj.Status) == 0 {
 				obj.Status = api.ConditionTrue
+			}
+		},
+		func(obj *certificates.PodCertificateRequestSpec, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
+
+			// MaxExpirationSeconds has a field defaulter, so we should make
+			// sure it's non-nil.  Otherwise,
+			// pkg/api/testing/serialization_test.go TestRoundTripTypes will
+			// fail with diffs due to the defaulting.
+			if obj.MaxExpirationSeconds == nil {
+				obj.MaxExpirationSeconds = ptr.To[int32](86400)
 			}
 		},
 	}

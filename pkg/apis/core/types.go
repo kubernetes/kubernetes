@@ -1856,6 +1856,54 @@ type ClusterTrustBundleProjection struct {
 	Path string
 }
 
+// PodCertificateProjection provides a private key and X.509 certificate in
+// a combined file.
+type PodCertificateProjection struct {
+	// Kubelet's generated CSRs will be addressed to this signer.
+	SignerName string
+
+	// The type of keypair Kubelet will generate for the pod.
+	//
+	// Valid values are "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", and
+	// "ED25519".  If left empty, Kubelet defaults to "ECDSAP256".
+	KeyType string
+
+	// What is the maximum lifetime of the cert that should be issued?  The
+	// actual issued certificate may have any lifetime *less* than
+	// maxExpirationSeconds.
+	//
+	// This value is copied into the PodCertificateRequest that kubelet creates
+	// to request the certificate.  See the documentation of
+	// PodCertificateRequest.spec.maxExpirationSeconds for information on how
+	// kube-apiserver and admission plugins process this value.
+	MaxExpirationSeconds *int32
+
+	// Write the credential bundle at this path in the projected volume.
+	//
+	// The credential bundle is a single file that contains multiple PEM blocks.
+	// The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private
+	// key.
+	//
+	// The remaining blocks are CERTIFICATE blocks, containing the issued
+	// certificate chain from the signer (leaf and any intermediates).
+	//
+	// Using credentialBundlePath lets your Pod's application code make a single
+	// atomic read that retrieves a consistent key and certificate chain.  If you
+	// project them to separate files, your application code will need to
+	// additionally check that the leaf certificate was issued to the key.
+	CredentialBundlePath string
+
+	// Write the key at this path in the projected volume.
+	//
+	// When using keyPath and certificateChainPath, your application needs to check
+	// that the key and leaf certificate are consistent, because it is possible to
+	// read the files mid-rotation.
+	KeyPath string
+
+	// Write the certificate chain at this path in the projected volume.
+	CertificateChainPath string
+}
+
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1883,6 +1931,8 @@ type VolumeProjection struct {
 	ServiceAccountToken *ServiceAccountTokenProjection
 	// information about the ClusterTrustBundle data to project
 	ClusterTrustBundle *ClusterTrustBundleProjection
+	// information about the pod certificate to project.
+	PodCertificate *PodCertificateProjection
 }
 
 // KeyToPath maps a string key to a path within a volume.
