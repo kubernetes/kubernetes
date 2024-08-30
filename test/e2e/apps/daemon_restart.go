@@ -112,9 +112,20 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 			"curl -s -o %v -I -w \"%%{http_code}\" http://127.0.0.1:%v/healthz", nullDev, r.healthzPort)
 
 	}
+
+	systemctlListUnits := "systemctl list-units"
 	err := wait.PollUntilContextTimeout(ctx, r.pollInterval, r.pollTimeout, false, func(ctx context.Context) (bool, error) {
-		framework.Logf("NodeExec for node: %s", r.nodeName)
-		result, err := e2essh.NodeExec(ctx, r.nodeName, healthzCheck, framework.TestContext.Provider)
+
+		framework.Logf("NodeExec systemctl list-units for node: %s", r.nodeName)
+		result, err := e2essh.NodeExec(ctx, r.nodeName, systemctlListUnits, framework.TestContext.Provider)
+		if err != nil {
+			framework.Logf("NodeExec returns error: %v", err)
+			return false, err
+		}
+		e2essh.LogResult(result)
+
+		framework.Logf("NodeExec health check for node: %s", r.nodeName)
+		result, err = e2essh.NodeExec(ctx, r.nodeName, healthzCheck, framework.TestContext.Provider)
 		if err != nil {
 			framework.Logf("NodeExec returns error: %v", err)
 			return false, err
