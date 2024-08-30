@@ -91,6 +91,7 @@ var (
 	procEnumServicesStatusExW                                = modadvapi32.NewProc("EnumServicesStatusExW")
 	procEqualSid                                             = modadvapi32.NewProc("EqualSid")
 	procFreeSid                                              = modadvapi32.NewProc("FreeSid")
+	procGetAce                                               = modadvapi32.NewProc("GetAce")
 	procGetLengthSid                                         = modadvapi32.NewProc("GetLengthSid")
 	procGetNamedSecurityInfoW                                = modadvapi32.NewProc("GetNamedSecurityInfoW")
 	procGetSecurityDescriptorControl                         = modadvapi32.NewProc("GetSecurityDescriptorControl")
@@ -401,6 +402,7 @@ var (
 	procTransmitFile                                         = modmswsock.NewProc("TransmitFile")
 	procNetApiBufferFree                                     = modnetapi32.NewProc("NetApiBufferFree")
 	procNetGetJoinInformation                                = modnetapi32.NewProc("NetGetJoinInformation")
+	procNetUserEnum                                          = modnetapi32.NewProc("NetUserEnum")
 	procNetUserGetInfo                                       = modnetapi32.NewProc("NetUserGetInfo")
 	procNtCreateFile                                         = modntdll.NewProc("NtCreateFile")
 	procNtCreateNamedPipeFile                                = modntdll.NewProc("NtCreateNamedPipeFile")
@@ -476,12 +478,16 @@ var (
 	procGetDesktopWindow                                     = moduser32.NewProc("GetDesktopWindow")
 	procGetForegroundWindow                                  = moduser32.NewProc("GetForegroundWindow")
 	procGetGUIThreadInfo                                     = moduser32.NewProc("GetGUIThreadInfo")
+	procGetKeyboardLayout                                    = moduser32.NewProc("GetKeyboardLayout")
 	procGetShellWindow                                       = moduser32.NewProc("GetShellWindow")
 	procGetWindowThreadProcessId                             = moduser32.NewProc("GetWindowThreadProcessId")
 	procIsWindow                                             = moduser32.NewProc("IsWindow")
 	procIsWindowUnicode                                      = moduser32.NewProc("IsWindowUnicode")
 	procIsWindowVisible                                      = moduser32.NewProc("IsWindowVisible")
+	procLoadKeyboardLayoutW                                  = moduser32.NewProc("LoadKeyboardLayoutW")
 	procMessageBoxW                                          = moduser32.NewProc("MessageBoxW")
+	procToUnicodeEx                                          = moduser32.NewProc("ToUnicodeEx")
+	procUnloadKeyboardLayout                                 = moduser32.NewProc("UnloadKeyboardLayout")
 	procCreateEnvironmentBlock                               = moduserenv.NewProc("CreateEnvironmentBlock")
 	procDestroyEnvironmentBlock                              = moduserenv.NewProc("DestroyEnvironmentBlock")
 	procGetUserProfileDirectoryW                             = moduserenv.NewProc("GetUserProfileDirectoryW")
@@ -782,6 +788,14 @@ func EqualSid(sid1 *SID, sid2 *SID) (isEqual bool) {
 func FreeSid(sid *SID) (err error) {
 	r1, _, e1 := syscall.Syscall(procFreeSid.Addr(), 1, uintptr(unsafe.Pointer(sid)), 0, 0)
 	if r1 != 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func GetAce(acl *ACL, aceIndex uint32, pAce **ACCESS_ALLOWED_ACE) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetAce.Addr(), 3, uintptr(unsafe.Pointer(acl)), uintptr(aceIndex), uintptr(unsafe.Pointer(pAce)))
+	if r1 == 0 {
 		err = errnoErr(e1)
 	}
 	return
@@ -3486,6 +3500,14 @@ func NetGetJoinInformation(server *uint16, name **uint16, bufType *uint32) (nete
 	return
 }
 
+func NetUserEnum(serverName *uint16, level uint32, filter uint32, buf **byte, prefMaxLen uint32, entriesRead *uint32, totalEntries *uint32, resumeHandle *uint32) (neterr error) {
+	r0, _, _ := syscall.Syscall9(procNetUserEnum.Addr(), 8, uintptr(unsafe.Pointer(serverName)), uintptr(level), uintptr(filter), uintptr(unsafe.Pointer(buf)), uintptr(prefMaxLen), uintptr(unsafe.Pointer(entriesRead)), uintptr(unsafe.Pointer(totalEntries)), uintptr(unsafe.Pointer(resumeHandle)), 0)
+	if r0 != 0 {
+		neterr = syscall.Errno(r0)
+	}
+	return
+}
+
 func NetUserGetInfo(serverName *uint16, userName *uint16, level uint32, buf **byte) (neterr error) {
 	r0, _, _ := syscall.Syscall6(procNetUserGetInfo.Addr(), 4, uintptr(unsafe.Pointer(serverName)), uintptr(unsafe.Pointer(userName)), uintptr(level), uintptr(unsafe.Pointer(buf)), 0, 0)
 	if r0 != 0 {
@@ -4064,6 +4086,12 @@ func GetGUIThreadInfo(thread uint32, info *GUIThreadInfo) (err error) {
 	return
 }
 
+func GetKeyboardLayout(tid uint32) (hkl Handle) {
+	r0, _, _ := syscall.Syscall(procGetKeyboardLayout.Addr(), 1, uintptr(tid), 0, 0)
+	hkl = Handle(r0)
+	return
+}
+
 func GetShellWindow() (shellWindow HWND) {
 	r0, _, _ := syscall.Syscall(procGetShellWindow.Addr(), 0, 0, 0, 0)
 	shellWindow = HWND(r0)
@@ -4097,10 +4125,33 @@ func IsWindowVisible(hwnd HWND) (isVisible bool) {
 	return
 }
 
+func LoadKeyboardLayout(name *uint16, flags uint32) (hkl Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procLoadKeyboardLayoutW.Addr(), 2, uintptr(unsafe.Pointer(name)), uintptr(flags), 0)
+	hkl = Handle(r0)
+	if hkl == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func MessageBox(hwnd HWND, text *uint16, caption *uint16, boxtype uint32) (ret int32, err error) {
 	r0, _, e1 := syscall.Syscall6(procMessageBoxW.Addr(), 4, uintptr(hwnd), uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(caption)), uintptr(boxtype), 0, 0)
 	ret = int32(r0)
 	if ret == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func ToUnicodeEx(vkey uint32, scancode uint32, keystate *byte, pwszBuff *uint16, cchBuff int32, flags uint32, hkl Handle) (ret int32) {
+	r0, _, _ := syscall.Syscall9(procToUnicodeEx.Addr(), 7, uintptr(vkey), uintptr(scancode), uintptr(unsafe.Pointer(keystate)), uintptr(unsafe.Pointer(pwszBuff)), uintptr(cchBuff), uintptr(flags), uintptr(hkl), 0, 0)
+	ret = int32(r0)
+	return
+}
+
+func UnloadKeyboardLayout(hkl Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procUnloadKeyboardLayout.Addr(), 1, uintptr(hkl), 0, 0)
+	if r1 == 0 {
 		err = errnoErr(e1)
 	}
 	return

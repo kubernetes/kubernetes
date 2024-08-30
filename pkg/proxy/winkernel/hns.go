@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hcnshim/hcn"
 	"k8s.io/klog/v2"
 
 	"strings"

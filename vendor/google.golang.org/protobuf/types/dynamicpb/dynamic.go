@@ -294,7 +294,7 @@ func (m *Message) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	case fd.IsMap():
 		return protoreflect.ValueOfMap(&dynamicMap{
 			desc: fd,
-			mapv: make(map[interface{}]protoreflect.Value),
+			mapv: make(map[any]protoreflect.Value),
 		})
 	case fd.IsList():
 		return protoreflect.ValueOfList(&dynamicList{desc: fd})
@@ -450,7 +450,7 @@ func (x *dynamicList) IsValid() bool {
 
 type dynamicMap struct {
 	desc protoreflect.FieldDescriptor
-	mapv map[interface{}]protoreflect.Value
+	mapv map[any]protoreflect.Value
 }
 
 func (x *dynamicMap) Get(k protoreflect.MapKey) protoreflect.Value { return x.mapv[k.Interface()] }
@@ -634,11 +634,11 @@ func newListEntry(fd protoreflect.FieldDescriptor) protoreflect.Value {
 //
 // The InterfaceOf and ValueOf methods of the extension type are defined as:
 //
-//	func (xt extensionType) ValueOf(iv interface{}) protoreflect.Value {
+//	func (xt extensionType) ValueOf(iv any) protoreflect.Value {
 //		return protoreflect.ValueOf(iv)
 //	}
 //
-//	func (xt extensionType) InterfaceOf(v protoreflect.Value) interface{} {
+//	func (xt extensionType) InterfaceOf(v protoreflect.Value) any {
 //		return v.Interface()
 //	}
 //
@@ -658,7 +658,7 @@ func (xt extensionType) New() protoreflect.Value {
 	case xt.desc.IsMap():
 		return protoreflect.ValueOfMap(&dynamicMap{
 			desc: xt.desc,
-			mapv: make(map[interface{}]protoreflect.Value),
+			mapv: make(map[any]protoreflect.Value),
 		})
 	case xt.desc.IsList():
 		return protoreflect.ValueOfList(&dynamicList{desc: xt.desc})
@@ -686,18 +686,18 @@ func (xt extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
 	return xt.desc
 }
 
-func (xt extensionType) ValueOf(iv interface{}) protoreflect.Value {
+func (xt extensionType) ValueOf(iv any) protoreflect.Value {
 	v := protoreflect.ValueOf(iv)
 	typecheck(xt.desc, v)
 	return v
 }
 
-func (xt extensionType) InterfaceOf(v protoreflect.Value) interface{} {
+func (xt extensionType) InterfaceOf(v protoreflect.Value) any {
 	typecheck(xt.desc, v)
 	return v.Interface()
 }
 
-func (xt extensionType) IsValidInterface(iv interface{}) bool {
+func (xt extensionType) IsValidInterface(iv any) bool {
 	return typeIsValid(xt.desc, protoreflect.ValueOf(iv)) == nil
 }
 

@@ -2711,7 +2711,7 @@ The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194)
 - sigs.k8s.io/kustomize/kustomize/v5: v5.0.1
 
 ### Changed
-- github.com/Microsoft/hcsshim: [v0.8.22 → v0.8.25](https://github.com/Microsoft/hcsshim/compare/v0.8.22...v0.8.25)
+- github.com/Microsoft/hcnshim: [v0.8.22 → v0.8.25](https://github.com/Microsoft/hcnshim/compare/v0.8.22...v0.8.25)
 - github.com/aws/aws-sdk-go: [v1.44.116 → v1.35.24](https://github.com/aws/aws-sdk-go/compare/v1.44.116...v1.35.24)
 - github.com/coredns/corefile-migration: [v1.0.17 → v1.0.20](https://github.com/coredns/corefile-migration/compare/v1.0.17...v1.0.20)
 - github.com/coreos/go-systemd/v22: [v22.3.2 → v22.4.0](https://github.com/coreos/go-systemd/v22/compare/v22.3.2...v22.4.0)
@@ -3848,7 +3848,7 @@ name | architectures
 - github.com/vmware/vmw-guestinfo: [25eff15](https://github.com/vmware/vmw-guestinfo/tree/25eff15)
 
 ### Changed
-- github.com/Microsoft/hcsshim: [v0.8.22 → v0.8.25](https://github.com/Microsoft/hcsshim/compare/v0.8.22...v0.8.25)
+- github.com/Microsoft/hcnshim: [v0.8.22 → v0.8.25](https://github.com/Microsoft/hcnshim/compare/v0.8.22...v0.8.25)
 - github.com/aws/aws-sdk-go: [v1.44.116 → v1.44.147](https://github.com/aws/aws-sdk-go/compare/v1.44.116...v1.44.147)
 - github.com/coredns/corefile-migration: [v1.0.17 → v1.0.18](https://github.com/coredns/corefile-migration/compare/v1.0.17...v1.0.18)
 - github.com/creack/pty: [v1.1.11 → v1.1.18](https://github.com/creack/pty/compare/v1.1.11...v1.1.18)

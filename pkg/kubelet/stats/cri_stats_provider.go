@@ -71,7 +71,7 @@ type criStatsProvider struct {
 	// hostStatsProvider is used to get the status of the host filesystem consumed by pods.
 	hostStatsProvider HostStatsProvider
 	// windowsNetworkStatsProvider is used by kubelet to gather networking stats on Windows
-	windowsNetworkStatsProvider interface{} //nolint:unused // U1000 We can't import hcsshim due to Build constraints in hcsshim
+	windowsNetworkStatsProvider interface{} //nolint:unused // U1000 We can't import hcnshim due to Build constraints in hcnshim
 	// clock is used report current time
 	clock clock.Clock
 

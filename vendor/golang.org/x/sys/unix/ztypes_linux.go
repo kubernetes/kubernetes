@@ -110,7 +110,8 @@ type Statx_t struct {
 	Mnt_id           uint64
 	Dio_mem_align    uint32
 	Dio_offset_align uint32
-	_                [12]uint64
+	Subvol           uint64
+	_                [11]uint64
 }
 
 type Fsid struct {
@@ -3473,7 +3474,7 @@ const (
 	DEVLINK_PORT_FN_ATTR_STATE                         = 0x2
 	DEVLINK_PORT_FN_ATTR_OPSTATE                       = 0x3
 	DEVLINK_PORT_FN_ATTR_CAPS                          = 0x4
-	DEVLINK_PORT_FUNCTION_ATTR_MAX                     = 0x5
+	DEVLINK_PORT_FUNCTION_ATTR_MAX                     = 0x6
 )
 
 type FsverityDigest struct {
@@ -3806,6 +3807,9 @@ const (
 	ETHTOOL_MSG_PSE_GET_REPLY                 = 0x25
 	ETHTOOL_MSG_RSS_GET_REPLY                 = 0x26
 	ETHTOOL_MSG_KERNEL_MAX                    = 0x2b
+	ETHTOOL_FLAG_COMPACT_BITSETS              = 0x1
+	ETHTOOL_FLAG_OMIT_REPLY                   = 0x2
+	ETHTOOL_FLAG_STATS                        = 0x4
 	ETHTOOL_A_HEADER_UNSPEC                   = 0x0
 	ETHTOOL_A_HEADER_DEV_INDEX                = 0x1
 	ETHTOOL_A_HEADER_DEV_NAME                 = 0x2
@@ -3975,7 +3979,7 @@ const (
 	ETHTOOL_A_TSINFO_TX_TYPES                 = 0x3
 	ETHTOOL_A_TSINFO_RX_FILTERS               = 0x4
 	ETHTOOL_A_TSINFO_PHC_INDEX                = 0x5
-	ETHTOOL_A_TSINFO_MAX                      = 0x5
+	ETHTOOL_A_TSINFO_MAX                      = 0x6
 	ETHTOOL_A_CABLE_TEST_UNSPEC               = 0x0
 	ETHTOOL_A_CABLE_TEST_HEADER               = 0x1
 	ETHTOOL_A_CABLE_TEST_MAX                  = 0x1
@@ -4605,7 +4609,7 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x149
+	NL80211_ATTR_MAX                                        = 0x14a
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
 	NL80211_ATTR_MAX_MATCH_SETS                             = 0x85
@@ -5209,7 +5213,7 @@ const (
 	NL80211_FREQUENCY_ATTR_GO_CONCURRENT                    = 0xf
 	NL80211_FREQUENCY_ATTR_INDOOR_ONLY                      = 0xe
 	NL80211_FREQUENCY_ATTR_IR_CONCURRENT                    = 0xf
-	NL80211_FREQUENCY_ATTR_MAX                              = 0x1f
+	NL80211_FREQUENCY_ATTR_MAX                              = 0x20
 	NL80211_FREQUENCY_ATTR_MAX_TX_POWER                     = 0x6
 	NL80211_FREQUENCY_ATTR_NO_10MHZ                         = 0x11
 	NL80211_FREQUENCY_ATTR_NO_160MHZ                        = 0xc
@@ -5703,7 +5707,7 @@ const (
 	NL80211_STA_FLAG_ASSOCIATED                             = 0x7
 	NL80211_STA_FLAG_AUTHENTICATED                          = 0x5
 	NL80211_STA_FLAG_AUTHORIZED                             = 0x1
-	NL80211_STA_FLAG_MAX                                    = 0x7
+	NL80211_STA_FLAG_MAX                                    = 0x8
 	NL80211_STA_FLAG_MAX_OLD_API                            = 0x6
 	NL80211_STA_FLAG_MFP                                    = 0x4
 	NL80211_STA_FLAG_SHORT_PREAMBLE                         = 0x2
@@ -6000,4 +6004,35 @@ type Cachestat_t struct {
 type CachestatRange struct {
 	Off uint64
 	Len uint64
+}
+
+const (
+	SK_MEMINFO_RMEM_ALLOC          = 0x0
+	SK_MEMINFO_RCVBUF              = 0x1
+	SK_MEMINFO_WMEM_ALLOC          = 0x2
+	SK_MEMINFO_SNDBUF              = 0x3
+	SK_MEMINFO_FWD_ALLOC           = 0x4
+	SK_MEMINFO_WMEM_QUEUED         = 0x5
+	SK_MEMINFO_OPTMEM              = 0x6
+	SK_MEMINFO_BACKLOG             = 0x7
+	SK_MEMINFO_DROPS               = 0x8
+	SK_MEMINFO_VARS                = 0x9
+	SKNLGRP_NONE                   = 0x0
+	SKNLGRP_INET_TCP_DESTROY       = 0x1
+	SKNLGRP_INET_UDP_DESTROY       = 0x2
+	SKNLGRP_INET6_TCP_DESTROY      = 0x3
+	SKNLGRP_INET6_UDP_DESTROY      = 0x4
+	SK_DIAG_BPF_STORAGE_REQ_NONE   = 0x0
+	SK_DIAG_BPF_STORAGE_REQ_MAP_FD = 0x1
+	SK_DIAG_BPF_STORAGE_REP_NONE   = 0x0
+	SK_DIAG_BPF_STORAGE            = 0x1
+	SK_DIAG_BPF_STORAGE_NONE       = 0x0
+	SK_DIAG_BPF_STORAGE_PAD        = 0x1
+	SK_DIAG_BPF_STORAGE_MAP_ID     = 0x2
+	SK_DIAG_BPF_STORAGE_MAP_VALUE  = 0x3
+)
+
+type SockDiagReq struct {
+	Family   uint8
+	Protocol uint8
 }

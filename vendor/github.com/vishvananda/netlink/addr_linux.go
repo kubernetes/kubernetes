@@ -11,9 +11,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// IFA_FLAGS is a u32 attribute.
-const IFA_FLAGS = 0x8
-
 // AddrAdd will add an IP address to a link device.
 //
 // Equivalent to: `ip addr add $addr dev $link`
@@ -125,7 +122,7 @@ func (h *Handle) addrHandle(link Link, addr *Addr, req *nl.NetlinkRequest) error
 		} else {
 			b := make([]byte, 4)
 			native.PutUint32(b, uint32(addr.Flags))
-			flagsData := nl.NewRtAttr(IFA_FLAGS, b)
+			flagsData := nl.NewRtAttr(unix.IFA_FLAGS, b)
 			req.AddData(flagsData)
 		}
 	}
@@ -156,10 +153,10 @@ func (h *Handle) addrHandle(link Link, addr *Addr, req *nl.NetlinkRequest) error
 	// value should be "forever". To compensate for that, only add the attributes if at least one of the values is
 	// non-zero, which means the caller has explicitly set them
 	if addr.ValidLft > 0 || addr.PreferedLft > 0 {
-		cachedata := nl.IfaCacheInfo{
-			IfaValid:    uint32(addr.ValidLft),
-			IfaPrefered: uint32(addr.PreferedLft),
-		}
+		cachedata := nl.IfaCacheInfo{unix.IfaCacheinfo{
+			Valid:    uint32(addr.ValidLft),
+			Prefered: uint32(addr.PreferedLft),
+		}}
 		req.AddData(nl.NewRtAttr(unix.IFA_CACHEINFO, cachedata.Serialize()))
 	}
 
@@ -179,7 +176,7 @@ func AddrList(link Link, family int) ([]Addr, error) {
 // The list can be filtered by link and ip family.
 func (h *Handle) AddrList(link Link, family int) ([]Addr, error) {
 	req := h.newNetlinkRequest(unix.RTM_GETADDR, unix.NLM_F_DUMP)
-	msg := nl.NewIfInfomsg(family)
+	msg := nl.NewIfAddrmsg(family)
 	req.AddData(msg)
 
 	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWADDR)
@@ -196,12 +193,12 @@ func (h *Handle) AddrList(link Link, family int) ([]Addr, error) {
 
 	var res []Addr
 	for _, m := range msgs {
-		addr, msgFamily, ifindex, err := parseAddr(m)
+		addr, msgFamily, err := parseAddr(m)
 		if err != nil {
 			return res, err
 		}
 
-		if link != nil && ifindex != indexFilter {
+		if link != nil && addr.LinkIndex != indexFilter {
 			// Ignore messages from other interfaces
 			continue
 		}
@@ -216,11 +213,11 @@ func (h *Handle) AddrList(link Link, family int) ([]Addr, error) {
 	return res, nil
 }
 
-func parseAddr(m []byte) (addr Addr, family, index int, err error) {
+func parseAddr(m []byte) (addr Addr, family int, err error) {
 	msg := nl.DeserializeIfAddrmsg(m)
 
 	family = -1
-	index = -1
+	addr.LinkIndex = -1
 
 	attrs, err1 := nl.ParseRouteAttr(m[msg.Len():])
 	if err1 != nil {
@@ -229,7 +226,7 @@ func parseAddr(m []byte) (addr Addr, family, index int, err error) {
 	}
 
 	family = int(msg.Family)
-	index = int(msg.Index)
+	addr.LinkIndex = int(msg.Index)
 
 	var local, dst *net.IPNet
 	for _, attr := range attrs {
@@ -254,12 +251,12 @@ func parseAddr(m []byte) (addr Addr, family, index int, err error) {
 			addr.Broadcast = attr.Value
 		case unix.IFA_LABEL:
 			addr.Label = string(attr.Value[:len(attr.Value)-1])
-		case IFA_FLAGS:
+		case unix.IFA_FLAGS:
 			addr.Flags = int(native.Uint32(attr.Value[0:4]))
-		case nl.IFA_CACHEINFO:
+		case unix.IFA_CACHEINFO:
 			ci := nl.DeserializeIfaCacheInfo(attr.Value)
-			addr.PreferedLft = int(ci.IfaPrefered)
-			addr.ValidLft = int(ci.IfaValid)
+			addr.PreferedLft = int(ci.Prefered)
+			addr.ValidLft = int(ci.Valid)
 		}
 	}
 
@@ -271,7 +268,7 @@ func parseAddr(m []byte) (addr Addr, family, index int, err error) {
 	// But obviously, as there are IPv6 PtP addresses, too,
 	// IFA_LOCAL should also be handled for IPv6.
 	if local != nil {
-		if family == FAMILY_V4 && local.IP.Equal(dst.IP) {
+		if family == FAMILY_V4 && dst != nil && local.IP.Equal(dst.IP) {
 			addr.IPNet = dst
 		} else {
 			addr.IPNet = local
@@ -299,13 +296,13 @@ type AddrUpdate struct {
 // AddrSubscribe takes a chan down which notifications will be sent
 // when addresses change.  Close the 'done' chan to stop subscription.
 func AddrSubscribe(ch chan<- AddrUpdate, done <-chan struct{}) error {
-	return addrSubscribeAt(netns.None(), netns.None(), ch, done, nil, false, 0)
+	return addrSubscribeAt(netns.None(), netns.None(), ch, done, nil, false, 0, nil)
 }
 
 // AddrSubscribeAt works like AddrSubscribe plus it allows the caller
 // to choose the network namespace in which to subscribe (ns).
 func AddrSubscribeAt(ns netns.NsHandle, ch chan<- AddrUpdate, done <-chan struct{}) error {
-	return addrSubscribeAt(ns, netns.None(), ch, done, nil, false, 0)
+	return addrSubscribeAt(ns, netns.None(), ch, done, nil, false, 0, nil)
 }
 
 // AddrSubscribeOptions contains a set of options to use with
@@ -315,6 +312,7 @@ type AddrSubscribeOptions struct {
 	ErrorCallback     func(error)
 	ListExisting      bool
 	ReceiveBufferSize int
+	ReceiveTimeout    *unix.Timeval
 }
 
 // AddrSubscribeWithOptions work like AddrSubscribe but enable to
@@ -325,14 +323,20 @@ func AddrSubscribeWithOptions(ch chan<- AddrUpdate, done <-chan struct{}, option
 		none := netns.None()
 		options.Namespace = &none
 	}
-	return addrSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting, options.ReceiveBufferSize)
+	return addrSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting, options.ReceiveBufferSize, options.ReceiveTimeout)
 }
 
-func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-chan struct{}, cberr func(error), listExisting bool, rcvbuf int) error {
+func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-chan struct{}, cberr func(error), listExisting bool, rcvbuf int, rcvTimeout *unix.Timeval) error {
 	s, err := nl.SubscribeAt(newNs, curNs, unix.NETLINK_ROUTE, unix.RTNLGRP_IPV4_IFADDR, unix.RTNLGRP_IPV6_IFADDR)
 	if err != nil {
 		return err
 	}
+	if rcvTimeout != nil {
+		if err := s.SetReceiveTimeout(rcvTimeout); err != nil {
+			return err
+		}
+	}
+
 	if done != nil {
 		go func() {
 			<-done
@@ -360,7 +364,8 @@ func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-c
 			msgs, from, err := s.Receive()
 			if err != nil {
 				if cberr != nil {
-					cberr(err)
+					cberr(fmt.Errorf("Receive failed: %v",
+						err))
 				}
 				return
 			}
@@ -375,7 +380,6 @@ func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-c
 					continue
 				}
 				if m.Header.Type == unix.NLMSG_ERROR {
-					native := nl.NativeEndian()
 					error := int32(native.Uint32(m.Data[0:4]))
 					if error == 0 {
 						continue
@@ -394,7 +398,7 @@ func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-c
 					continue
 				}
 
-				addr, _, ifindex, err := parseAddr(m.Data)
+				addr, _, err := parseAddr(m.Data)
 				if err != nil {
 					if cberr != nil {
 						cberr(fmt.Errorf("could not parse address: %v", err))
@@ -403,7 +407,7 @@ func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-c
 				}
 
 				ch <- AddrUpdate{LinkAddress: *addr.IPNet,
-					LinkIndex:   ifindex,
+					LinkIndex:   addr.LinkIndex,
 					NewAddr:     msgType == unix.RTM_NEWADDR,
 					Flags:       addr.Flags,
 					Scope:       addr.Scope,

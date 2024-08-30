@@ -172,7 +172,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 // cpu count for all processor groups of the windows node.
 // more notes for this issue:
 // same issue in moby: https://github.com/moby/moby/issues/38935#issuecomment-744638345
-// solution in hcsshim: https://github.com/microsoft/hcsshim/blob/master/internal/processorinfo/processor_count.go
+// solution in hcnshim: https://github.com/microsoft/hcnshim/blob/master/internal/processorinfo/processor_count.go
 func ProcessorCount() int {
 	if amount := getActiveProcessorCount(allProcessorGroups); amount != 0 {
 		return int(amount)

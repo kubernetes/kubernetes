@@ -28,6 +28,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"google.golang.org/grpc/internal"
 )
 
 const proxyAuthHeaderKey = "Proxy-Authorization"
@@ -105,14 +107,20 @@ func doHTTPConnectHandshake(ctx context.Context, conn net.Conn, backendAddr stri
 		}
 		return nil, fmt.Errorf("failed to do connect handshake, response: %q", dump)
 	}
-
-	return &bufConn{Conn: conn, r: r}, nil
+	// The buffer could contain extra bytes from the target server, so we can't
+	// discard it. However, in many cases where the server waits for the client
+	// to send the first message (e.g. when TLS is being used), the buffer will
+	// be empty, so we can avoid the overhead of reading through this buffer.
+	if r.Buffered() != 0 {
+		return &bufConn{Conn: conn, r: r}, nil
+	}
+	return conn, nil
 }
 
 // proxyDial dials, connecting to a proxy first if necessary. Checks if a proxy
 // is necessary, dials, does the HTTP CONNECT handshake, and returns the
 // connection.
-func proxyDial(ctx context.Context, addr string, grpcUA string) (conn net.Conn, err error) {
+func proxyDial(ctx context.Context, addr string, grpcUA string) (net.Conn, error) {
 	newAddr := addr
 	proxyURL, err := mapAddress(addr)
 	if err != nil {
@@ -122,15 +130,15 @@ func proxyDial(ctx context.Context, addr string, grpcUA string) (conn net.Conn, 
 		newAddr = proxyURL.Host
 	}
 
-	conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", newAddr)
+	conn, err := internal.NetDialerWithTCPKeepalive().DialContext(ctx, "tcp", newAddr)
 	if err != nil {
-		return
+		return nil, err
 	}
-	if proxyURL != nil {
+	if proxyURL == nil {
 		// proxy is disabled if proxyURL is nil.
-		conn, err = doHTTPConnectHandshake(ctx, conn, addr, proxyURL, grpcUA)
+		return conn, err
 	}
-	return
+	return doHTTPConnectHandshake(ctx, conn, addr, proxyURL, grpcUA)
 }
 
 func sendHTTPRequest(ctx context.Context, req *http.Request, conn net.Conn) error {

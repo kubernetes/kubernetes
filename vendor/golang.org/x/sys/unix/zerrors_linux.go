@@ -457,6 +457,7 @@ const (
 	B600                                        = 0x8
 	B75                                         = 0x2
 	B9600                                       = 0xd
+	BCACHEFS_SUPER_MAGIC                        = 0xca451a4e
 	BDEVFS_MAGIC                                = 0x62646576
 	BINDERFS_SUPER_MAGIC                        = 0x6c6f6f70
 	BINFMTFS_MAGIC                              = 0x42494e4d
@@ -502,6 +503,7 @@ const (
 	BPF_IMM                                     = 0x0
 	BPF_IND                                     = 0x40
 	BPF_JA                                      = 0x0
+	BPF_JCOND                                   = 0xe0
 	BPF_JEQ                                     = 0x10
 	BPF_JGE                                     = 0x30
 	BPF_JGT                                     = 0x20
@@ -657,6 +659,9 @@ const (
 	CAN_NPROTO                                  = 0x8
 	CAN_RAW                                     = 0x1
 	CAN_RAW_FILTER_MAX                          = 0x200
+	CAN_RAW_XL_VCID_RX_FILTER                   = 0x4
+	CAN_RAW_XL_VCID_TX_PASS                     = 0x2
+	CAN_RAW_XL_VCID_TX_SET                      = 0x1
 	CAN_RTR_FLAG                                = 0x40000000
 	CAN_SFF_ID_BITS                             = 0xb
 	CAN_SFF_MASK                                = 0x7ff
@@ -924,6 +929,7 @@ const (
 	EPOLL_CTL_ADD                               = 0x1
 	EPOLL_CTL_DEL                               = 0x2
 	EPOLL_CTL_MOD                               = 0x3
+	EPOLL_IOC_TYPE                              = 0x8a
 	EROFS_SUPER_MAGIC_V1                        = 0xe0f5e1e2
 	ESP_V4_FLOW                                 = 0xa
 	ESP_V6_FLOW                                 = 0xc
@@ -937,9 +943,6 @@ const (
 	ETHTOOL_FEC_OFF                             = 0x4
 	ETHTOOL_FEC_RS                              = 0x8
 	ETHTOOL_FLAG_ALL                            = 0x7
-	ETHTOOL_FLAG_COMPACT_BITSETS                = 0x1
-	ETHTOOL_FLAG_OMIT_REPLY                     = 0x2
-	ETHTOOL_FLAG_STATS                          = 0x4
 	ETHTOOL_FLASHDEV                            = 0x33
 	ETHTOOL_FLASH_MAX_FILENAME                  = 0x80
 	ETHTOOL_FWVERS_LEN                          = 0x20
@@ -1339,6 +1342,7 @@ const (
 	F_OFD_SETLK                                 = 0x25
 	F_OFD_SETLKW                                = 0x26
 	F_OK                                        = 0x0
+	F_SEAL_EXEC                                 = 0x20
 	F_SEAL_FUTURE_WRITE                         = 0x10
 	F_SEAL_GROW                                 = 0x4
 	F_SEAL_SEAL                                 = 0x1
@@ -1627,6 +1631,7 @@ const (
 	IP_FREEBIND                                 = 0xf
 	IP_HDRINCL                                  = 0x3
 	IP_IPSEC_POLICY                             = 0x10
+	IP_LOCAL_PORT_RANGE                         = 0x33
 	IP_MAXPACKET                                = 0xffff
 	IP_MAX_MEMBERSHIPS                          = 0x14
 	IP_MF                                       = 0x2000
@@ -1653,6 +1658,7 @@ const (
 	IP_PMTUDISC_OMIT                            = 0x5
 	IP_PMTUDISC_PROBE                           = 0x3
 	IP_PMTUDISC_WANT                            = 0x1
+	IP_PROTOCOL                                 = 0x34
 	IP_RECVERR                                  = 0xb
 	IP_RECVERR_RFC4884                          = 0x1a
 	IP_RECVFRAGSIZE                             = 0x19
@@ -1698,6 +1704,7 @@ const (
 	KEXEC_ARCH_S390                             = 0x160000
 	KEXEC_ARCH_SH                               = 0x2a0000
 	KEXEC_ARCH_X86_64                           = 0x3e0000
+	KEXEC_CRASH_HOTPLUG_SUPPORT                 = 0x8
 	KEXEC_FILE_DEBUG                            = 0x8
 	KEXEC_FILE_NO_INITRAMFS                     = 0x4
 	KEXEC_FILE_ON_CRASH                         = 0x2
@@ -1773,6 +1780,7 @@ const (
 	KEY_SPEC_USER_KEYRING                       = -0x4
 	KEY_SPEC_USER_SESSION_KEYRING               = -0x5
 	LANDLOCK_ACCESS_FS_EXECUTE                  = 0x1
+	LANDLOCK_ACCESS_FS_IOCTL_DEV                = 0x8000
 	LANDLOCK_ACCESS_FS_MAKE_BLOCK               = 0x800
 	LANDLOCK_ACCESS_FS_MAKE_CHAR                = 0x40
 	LANDLOCK_ACCESS_FS_MAKE_DIR                 = 0x80
@@ -1854,6 +1862,19 @@ const (
 	MAP_FILE                                    = 0x0
 	MAP_FIXED                                   = 0x10
 	MAP_FIXED_NOREPLACE                         = 0x100000
+	MAP_HUGE_16GB                               = 0x88000000
+	MAP_HUGE_16KB                               = 0x38000000
+	MAP_HUGE_16MB                               = 0x60000000
+	MAP_HUGE_1GB                                = 0x78000000
+	MAP_HUGE_1MB                                = 0x50000000
+	MAP_HUGE_256MB                              = 0x70000000
+	MAP_HUGE_2GB                                = 0x7c000000
+	MAP_HUGE_2MB                                = 0x54000000
+	MAP_HUGE_32MB                               = 0x64000000
+	MAP_HUGE_512KB                              = 0x4c000000
+	MAP_HUGE_512MB                              = 0x74000000
+	MAP_HUGE_64KB                               = 0x40000000
+	MAP_HUGE_8MB                                = 0x5c000000
 	MAP_HUGE_MASK                               = 0x3f
 	MAP_HUGE_SHIFT                              = 0x1a
 	MAP_PRIVATE                                 = 0x2
@@ -2169,7 +2190,7 @@ const (
 	NFT_SECMARK_CTX_MAXLEN                      = 0x100
 	NFT_SET_MAXNAMELEN                          = 0x100
 	NFT_SOCKET_MAX                              = 0x3
-	NFT_TABLE_F_MASK                            = 0x3
+	NFT_TABLE_F_MASK                            = 0x7
 	NFT_TABLE_MAXNAMELEN                        = 0x100
 	NFT_TRACETYPE_MAX                           = 0x3
 	NFT_TUNNEL_F_MASK                           = 0x7
@@ -2403,6 +2424,7 @@ const (
 	PERF_RECORD_MISC_USER                       = 0x2
 	PERF_SAMPLE_BRANCH_PLM_ALL                  = 0x7
 	PERF_SAMPLE_WEIGHT_TYPE                     = 0x1004000
+	PID_FS_MAGIC                                = 0x50494446
 	PIPEFS_MAGIC                                = 0x50495045
 	PPPIOCGNPMODE                               = 0xc008744c
 	PPPIOCNEWUNIT                               = 0xc004743e
@@ -2490,6 +2512,23 @@ const (
 	PR_PAC_GET_ENABLED_KEYS                     = 0x3d
 	PR_PAC_RESET_KEYS                           = 0x36
 	PR_PAC_SET_ENABLED_KEYS                     = 0x3c
+	PR_PPC_DEXCR_CTRL_CLEAR                     = 0x4
+	PR_PPC_DEXCR_CTRL_CLEAR_ONEXEC              = 0x10
+	PR_PPC_DEXCR_CTRL_EDITABLE                  = 0x1
+	PR_PPC_DEXCR_CTRL_MASK                      = 0x1f
+	PR_PPC_DEXCR_CTRL_SET                       = 0x2
+	PR_PPC_DEXCR_CTRL_SET_ONEXEC                = 0x8
+	PR_PPC_DEXCR_IBRTPD                         = 0x1
+	PR_PPC_DEXCR_NPHIE                          = 0x3
+	PR_PPC_DEXCR_SBHE                           = 0x0
+	PR_PPC_DEXCR_SRAPD                          = 0x2
+	PR_PPC_GET_DEXCR                            = 0x48
+	PR_PPC_SET_DEXCR                            = 0x49
+	PR_RISCV_CTX_SW_FENCEI_OFF                  = 0x1
+	PR_RISCV_CTX_SW_FENCEI_ON                   = 0x0
+	PR_RISCV_SCOPE_PER_PROCESS                  = 0x0
+	PR_RISCV_SCOPE_PER_THREAD                   = 0x1
+	PR_RISCV_SET_ICACHE_FLUSH_CTX               = 0x47
 	PR_RISCV_V_GET_CONTROL                      = 0x46
 	PR_RISCV_V_SET_CONTROL                      = 0x45
 	PR_RISCV_V_VSTATE_CTRL_CUR_MASK             = 0x3
@@ -2896,8 +2935,9 @@ const (
 	RWF_APPEND                                  = 0x10
 	RWF_DSYNC                                   = 0x2
 	RWF_HIPRI                                   = 0x1
+	RWF_NOAPPEND                                = 0x20
 	RWF_NOWAIT                                  = 0x8
-	RWF_SUPPORTED                               = 0x1f
+	RWF_SUPPORTED                               = 0x3f
 	RWF_SYNC                                    = 0x4
 	RWF_WRITE_LIFE_NOT_SET                      = 0x0
 	SCHED_BATCH                                 = 0x3
@@ -2918,7 +2958,9 @@ const (
 	SCHED_RESET_ON_FORK                         = 0x40000000
 	SCHED_RR                                    = 0x2
 	SCM_CREDENTIALS                             = 0x2
+	SCM_PIDFD                                   = 0x4
 	SCM_RIGHTS                                  = 0x1
+	SCM_SECURITY                                = 0x3
 	SCM_TIMESTAMP                               = 0x1d
 	SC_LOG_FLUSH                                = 0x100000
 	SECCOMP_ADDFD_FLAG_SEND                     = 0x2
@@ -3051,6 +3093,8 @@ const (
 	SIOCSMIIREG                                 = 0x8949
 	SIOCSRARP                                   = 0x8962
 	SIOCWANDEV                                  = 0x894a
+	SK_DIAG_BPF_STORAGE_MAX                     = 0x3
+	SK_DIAG_BPF_STORAGE_REQ_MAX                 = 0x1
 	SMACK_MAGIC                                 = 0x43415d53
 	SMART_AUTOSAVE                              = 0xd2
 	SMART_AUTO_OFFLINE                          = 0xdb
@@ -3071,6 +3115,8 @@ const (
 	SOCKFS_MAGIC                                = 0x534f434b
 	SOCK_BUF_LOCK_MASK                          = 0x3
 	SOCK_DCCP                                   = 0x6
+	SOCK_DESTROY                                = 0x15
+	SOCK_DIAG_BY_FAMILY                         = 0x14
 	SOCK_IOC_TYPE                               = 0x89
 	SOCK_PACKET                                 = 0xa
 	SOCK_RAW                                    = 0x3
@@ -3177,6 +3223,7 @@ const (
 	STATX_MTIME                                 = 0x40
 	STATX_NLINK                                 = 0x4
 	STATX_SIZE                                  = 0x200
+	STATX_SUBVOL                                = 0x8000
 	STATX_TYPE                                  = 0x1
 	STATX_UID                                   = 0x8
 	STATX__RESERVED                             = 0x80000000
@@ -3260,6 +3307,7 @@ const (
 	TCP_MAX_WINSHIFT                            = 0xe
 	TCP_MD5SIG                                  = 0xe
 	TCP_MD5SIG_EXT                              = 0x20
+	TCP_MD5SIG_FLAG_IFINDEX                     = 0x2
 	TCP_MD5SIG_FLAG_PREFIX                      = 0x1
 	TCP_MD5SIG_MAXKEYLEN                        = 0x50
 	TCP_MSS                                     = 0x200

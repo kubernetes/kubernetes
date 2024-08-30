@@ -317,28 +317,32 @@ func newBufWriter(conn net.Conn, batchSize int, pool *sync.Pool) *bufWriter {
 	return w
 }
 
-func (w *bufWriter) Write(b []byte) (n int, err error) {
+func (w *bufWriter) Write(b []byte) (int, error) {
 	if w.err != nil {
 		return 0, w.err
 	}
 	if w.batchSize == 0 { // Buffer has been disabled.
-		n, err = w.conn.Write(b)
+		n, err := w.conn.Write(b)
 		return n, toIOError(err)
 	}
 	if w.buf == nil {
 		b := w.pool.Get().(*[]byte)
 		w.buf = *b
 	}
+	written := 0
 	for len(b) > 0 {
-		nn := copy(w.buf[w.offset:], b)
-		b = b[nn:]
-		w.offset += nn
-		n += nn
-		if w.offset >= w.batchSize {
-			err = w.flushKeepBuffer()
+		copied := copy(w.buf[w.offset:], b)
+		b = b[copied:]
+		written += copied
+		w.offset += copied
+		if w.offset < w.batchSize {
+			continue
+		}
+		if err := w.flushKeepBuffer(); err != nil {
+			return written, err
 		}
 	}
-	return n, err
+	return written, nil
 }
 
 func (w *bufWriter) Flush() error {
@@ -418,10 +422,9 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBu
 	return f
 }
 
-func getWriteBufferPool(writeBufferSize int) *sync.Pool {
+func getWriteBufferPool(size int) *sync.Pool {
 	writeBufferMutex.Lock()
 	defer writeBufferMutex.Unlock()
-	size := writeBufferSize * 2
 	pool, ok := writeBufferPoolMap[size]
 	if ok {
 		return pool

@@ -915,7 +915,7 @@ function Configure-HostNetworkingService {
   if ($created_hns_network) {
     # There is an HNS bug where the route to the GCE metadata server will be
     # removed when the HNS network is created:
-    # https://github.com/Microsoft/hcsshim/issues/299#issuecomment-425491610.
+    # https://github.com/Microsoft/hcnshim/issues/299#issuecomment-425491610.
     # The behavior here is very unpredictable: the route may only be removed
     # after some delay, or it may appear to be removed then you'll add it back
     # but then it will be removed once again. So, we first wait a long

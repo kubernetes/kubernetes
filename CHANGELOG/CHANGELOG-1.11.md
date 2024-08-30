@@ -1500,7 +1500,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Ingress glbc is unchanged from 1.10: v1.0.0 ([#61302](https://github.com/kubernetes/kubernetes/pull/61302))
 * OIDC authentication is unchanged from 1.10: coreos/go-oidc v2 ([#58544](https://github.com/kubernetes/kubernetes/pull/58544))
 * Calico is unchanged from 1.10: v2.6.7 ([#59130](https://github.com/kubernetes/kubernetes/pull/59130))
-* hcsshim has been updated to v0.6.11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272))
+* hcnshim has been updated to v0.6.11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272))
 * gitRepo volumes in pods no longer require git 1.8.5 or newer; older git versions are now supported. ([#62394](https://github.com/kubernetes/kubernetes/pull/62394))
 * Update crictl on GCE to v1.11.0. ([#65254](https://github.com/kubernetes/kubernetes/pull/65254))
 * CoreDNS is now v1.1.3 ([#64258](https://github.com/kubernetes/kubernetes/pull/64258))
@@ -1865,7 +1865,7 @@ filename | sha256 hash
 * Kubernetes json deserializer is now case-sensitive to restore compatibility with pre-1.8 servers. ([#65034](https://github.com/kubernetes/kubernetes/pull/65034), [@caesarxuchao](https://github.com/caesarxuchao))
     * If your config files contains fields with wrong case, the config files will be now invalid.
 * GCE: Fixes operation polling to adhere to the specified interval. Furthermore, operation errors are now returned instead of ignored. ([#64630](https://github.com/kubernetes/kubernetes/pull/64630), [@nicksardo](https://github.com/nicksardo))
-* Updated hcsshim dependency to v0.6.11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272), [@jessfraz](https://github.com/jessfraz))
+* Updated hcnshim dependency to v0.6.11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272), [@jessfraz](https://github.com/jessfraz))
 * Include kms-plugin-container.manifest to master manifests tarball. ([#65035](https://github.com/kubernetes/kubernetes/pull/65035), [@immutableT](https://github.com/immutableT))
 * kubeadm - Ensure the peer port is secured by explicitly setting the peer URLs for the default etcd instance. ([#64988](https://github.com/kubernetes/kubernetes/pull/64988), [@detiber](https://github.com/detiber))
     * kubeadm - Ensure that the etcd certificates are generated using a proper CN

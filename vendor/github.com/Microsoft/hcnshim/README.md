@@ -1,0 +1,2 @@
+# hcnshim
+This package provides the Golang interface for accessing Windows HCN APIs to manage entities within the Host Network Service (HNS), which serves as the server container networking component in Windows. While it is mainly utilized by the Windows Kube Proxy component in Kubernetes, it is also available for use in other projects, such as Azure CNI, Windows CNI, Calico CNI, Flannel CNI, Azure NPM, and more.

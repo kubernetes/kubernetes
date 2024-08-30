@@ -28,17 +28,11 @@ import (
 var (
 	// TXTErrIgnore is set if TXT errors should be ignored ("GRPC_GO_IGNORE_TXT_ERRORS" is not "false").
 	TXTErrIgnore = boolFromEnv("GRPC_GO_IGNORE_TXT_ERRORS", true)
-	// AdvertiseCompressors is set if registered compressor should be advertised
-	// ("GRPC_GO_ADVERTISE_COMPRESSORS" is not "false").
-	AdvertiseCompressors = boolFromEnv("GRPC_GO_ADVERTISE_COMPRESSORS", true)
 	// RingHashCap indicates the maximum ring size which defaults to 4096
 	// entries but may be overridden by setting the environment variable
 	// "GRPC_RING_HASH_CAP".  This does not override the default bounds
 	// checking which NACKs configs specifying ring sizes > 8*1024*1024 (~8M).
 	RingHashCap = uint64FromEnv("GRPC_RING_HASH_CAP", 4096, 1, 8*1024*1024)
-	// PickFirstLBConfig is set if we should support configuration of the
-	// pick_first LB policy.
-	PickFirstLBConfig = boolFromEnv("GRPC_EXPERIMENTAL_PICKFIRST_LB_CONFIG", true)
 	// LeastRequestLB is set if we should support the least_request_experimental
 	// LB policy, which can be enabled by setting the environment variable
 	// "GRPC_EXPERIMENTAL_ENABLE_LEAST_REQUEST" to "true".
@@ -46,6 +40,16 @@ var (
 	// ALTSMaxConcurrentHandshakes is the maximum number of concurrent ALTS
 	// handshakes that can be performed.
 	ALTSMaxConcurrentHandshakes = uint64FromEnv("GRPC_ALTS_MAX_CONCURRENT_HANDSHAKES", 100, 1, 100)
+	// EnforceALPNEnabled is set if TLS connections to servers with ALPN disabled
+	// should be rejected. The HTTP/2 protocol requires ALPN to be enabled, this
+	// option is present for backward compatibility. This option may be overridden
+	// by setting the environment variable "GRPC_ENFORCE_ALPN_ENABLED" to "true"
+	// or "false".
+	EnforceALPNEnabled = boolFromEnv("GRPC_ENFORCE_ALPN_ENABLED", false)
+	// XDSFallbackSupport is the env variable that controls whether support for
+	// xDS fallback is turned on. If this is unset or is false, only the first
+	// xDS server in the list of server configs will be used.
+	XDSFallbackSupport = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FALLBACK", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

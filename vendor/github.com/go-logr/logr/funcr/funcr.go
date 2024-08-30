@@ -236,15 +236,14 @@ func newFormatter(opts Options, outfmt outputFormat) Formatter {
 // implementation. It should be constructed with NewFormatter. Some of
 // its methods directly implement logr.LogSink.
 type Formatter struct {
-	outputFormat    outputFormat
-	prefix          string
-	values          []any
-	valuesStr       string
-	parentValuesStr string
-	depth           int
-	opts            *Options
-	group           string // for slog groups
-	groupDepth      int
+	outputFormat outputFormat
+	prefix       string
+	values       []any
+	valuesStr    string
+	depth        int
+	opts         *Options
+	groupName    string // for slog groups
+	groups       []groupDef
 }
 
 // outputFormat indicates which outputFormat to use.
@@ -257,6 +256,13 @@ const (
 	outputJSON
 )
 
+// groupDef represents a saved group.  The values may be empty, but we don't
+// know if we need to render the group until the final record is rendered.
+type groupDef struct {
+	name   string
+	values string
+}
+
 // PseudoStruct is a list of key-value pairs that gets logged as a struct.
 type PseudoStruct []any
 
@@ -264,76 +270,102 @@ type PseudoStruct []any
 func (f Formatter) render(builtins, args []any) string {
 	// Empirically bytes.Buffer is faster than strings.Builder for this.
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
 	if f.outputFormat == outputJSON {
-		buf.WriteByte('{') // for the whole line
+		buf.WriteByte('{') // for the whole record
 	}
 
+	// Render builtins
 	vals := builtins
 	if hook := f.opts.RenderBuiltinsHook; hook != nil {
 		vals = hook(f.sanitize(vals))
 	}
-	f.flatten(buf, vals, false, false) // keys are ours, no need to escape
+	f.flatten(buf, vals, false) // keys are ours, no need to escape
 	continuing := len(builtins) > 0
 
-	if f.parentValuesStr != "" {
+	// Turn the inner-most group into a string
+	argsStr := func() string {
+		buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
+		vals = args
+		if hook := f.opts.RenderArgsHook; hook != nil {
+			vals = hook(f.sanitize(vals))
+		}
+		f.flatten(buf, vals, true) // escape user-provided keys
+
+		return buf.String()
+	}()
+
+	// Render the stack of groups from the inside out.
+	bodyStr := f.renderGroup(f.groupName, f.valuesStr, argsStr)
+	for i := len(f.groups) - 1; i >= 0; i-- {
+		grp := &f.groups[i]
+		if grp.values == "" && bodyStr == "" {
+			// no contents, so we must elide the whole group
+			continue
+		}
+		bodyStr = f.renderGroup(grp.name, grp.values, bodyStr)
+	}
+
+	if bodyStr != "" {
 		if continuing {
 			buf.WriteByte(f.comma())
 		}
-		buf.WriteString(f.parentValuesStr)
-		continuing = true
-	}
-
-	groupDepth := f.groupDepth
-	if f.group != "" {
-		if f.valuesStr != "" || len(args) != 0 {
-			if continuing {
-				buf.WriteByte(f.comma())
-			}
-			buf.WriteString(f.quoted(f.group, true)) // escape user-provided keys
-			buf.WriteByte(f.colon())
-			buf.WriteByte('{') // for the group
-			continuing = false
-		} else {
-			// The group was empty
-			groupDepth--
-		}
-	}
-
-	if f.valuesStr != "" {
-		if continuing {
-			buf.WriteByte(f.comma())
-		}
-		buf.WriteString(f.valuesStr)
-		continuing = true
-	}
-
-	vals = args
-	if hook := f.opts.RenderArgsHook; hook != nil {
-		vals = hook(f.sanitize(vals))
-	}
-	f.flatten(buf, vals, continuing, true) // escape user-provided keys
-
-	for i := 0; i < groupDepth; i++ {
-		buf.WriteByte('}') // for the groups
+		buf.WriteString(bodyStr)
 	}
 
 	if f.outputFormat == outputJSON {
-		buf.WriteByte('}') // for the whole line
+		buf.WriteByte('}') // for the whole record
 	}
 
 	return buf.String()
 }
 
-// flatten renders a list of key-value pairs into a buffer.  If continuing is
-// true, it assumes that the buffer has previous values and will emit a
-// separator (which depends on the output format) before the first pair it
-// writes.  If escapeKeys is true, the keys are assumed to have
-// non-JSON-compatible characters in them and must be evaluated for escapes.
+// renderGroup returns a string representation of the named group with rendered
+// values and args.  If the name is empty, this will return the values and args,
+// joined.  If the name is not empty, this will return a single key-value pair,
+// where the value is a grouping of the values and args.  If the values and
+// args are both empty, this will return an empty string, even if the name was
+// specified.
+func (f Formatter) renderGroup(name string, values string, args string) string {
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
+	needClosingBrace := false
+	if name != "" && (values != "" || args != "") {
+		buf.WriteString(f.quoted(name, true)) // escape user-provided keys
+		buf.WriteByte(f.colon())
+		buf.WriteByte('{')
+		needClosingBrace = true
+	}
+
+	continuing := false
+	if values != "" {
+		buf.WriteString(values)
+		continuing = true
+	}
+
+	if args != "" {
+		if continuing {
+			buf.WriteByte(f.comma())
+		}
+		buf.WriteString(args)
+	}
+
+	if needClosingBrace {
+		buf.WriteByte('}')
+	}
+
+	return buf.String()
+}
+
+// flatten renders a list of key-value pairs into a buffer.  If escapeKeys is
+// true, the keys are assumed to have non-JSON-compatible characters in them
+// and must be evaluated for escapes.
 //
 // This function returns a potentially modified version of kvList, which
 // ensures that there is a value for every key (adding a value if needed) and
 // that each key is a string (substituting a key if needed).
-func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, continuing bool, escapeKeys bool) []any {
+func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, escapeKeys bool) []any {
 	// This logic overlaps with sanitize() but saves one type-cast per key,
 	// which can be measurable.
 	if len(kvList)%2 != 0 {
@@ -354,7 +386,7 @@ func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, continuing bool, esc
 		}
 		v := kvList[i+1]
 
-		if i > 0 || continuing {
+		if i > 0 {
 			if f.outputFormat == outputJSON {
 				buf.WriteByte(f.comma())
 			} else {
@@ -766,46 +798,17 @@ func (f Formatter) sanitize(kvList []any) []any {
 // startGroup opens a new group scope (basically a sub-struct), which locks all
 // the current saved values and starts them anew.  This is needed to satisfy
 // slog.
-func (f *Formatter) startGroup(group string) {
+func (f *Formatter) startGroup(name string) {
 	// Unnamed groups are just inlined.
-	if group == "" {
+	if name == "" {
 		return
 	}
 
-	// Any saved values can no longer be changed.
-	buf := bytes.NewBuffer(make([]byte, 0, 1024))
-	continuing := false
-
-	if f.parentValuesStr != "" {
-		buf.WriteString(f.parentValuesStr)
-		continuing = true
-	}
-
-	if f.group != "" && f.valuesStr != "" {
-		if continuing {
-			buf.WriteByte(f.comma())
-		}
-		buf.WriteString(f.quoted(f.group, true)) // escape user-provided keys
-		buf.WriteByte(f.colon())
-		buf.WriteByte('{') // for the group
-		continuing = false
-	}
-
-	if f.valuesStr != "" {
-		if continuing {
-			buf.WriteByte(f.comma())
-		}
-		buf.WriteString(f.valuesStr)
-	}
-
-	// NOTE: We don't close the scope here - that's done later, when a log line
-	// is actually rendered (because we have N scopes to close).
-
-	f.parentValuesStr = buf.String()
+	n := len(f.groups)
+	f.groups = append(f.groups[:n:n], groupDef{f.groupName, f.valuesStr})
 
 	// Start collecting new values.
-	f.group = group
-	f.groupDepth++
+	f.groupName = name
 	f.valuesStr = ""
 	f.values = nil
 }
@@ -900,7 +903,7 @@ func (f *Formatter) AddValues(kvList []any) {
 
 	// Pre-render values, so we don't have to do it on each Info/Error call.
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
-	f.flatten(buf, vals, false, true) // escape user-provided keys
+	f.flatten(buf, vals, true) // escape user-provided keys
 	f.valuesStr = buf.String()
 }
 

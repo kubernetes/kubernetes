@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hcnshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

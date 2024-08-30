@@ -3720,7 +3720,7 @@ filename | sha512 hash
 - github.com/Azure/go-autorest/autorest: [v0.9.6 → v0.11.1](https://github.com/Azure/go-autorest/compare/autorest/v0.9.6...autorest/v0.11.1)
 - github.com/Azure/go-autorest/logger: [v0.1.0 → v0.2.0](https://github.com/Azure/go-autorest/compare/logger/v0.1.0...logger/v0.2.0)
 - github.com/Azure/go-autorest/tracing: [v0.5.0 → v0.6.0](https://github.com/Azure/go-autorest/compare/tracing/v0.5.0...tracing/v0.6.0)
-- github.com/Microsoft/hcsshim: [v0.8.9 → 5eafd15](https://github.com/Microsoft/hcsshim/compare/v0.8.9...5eafd15)
+- github.com/Microsoft/hcnshim: [v0.8.9 → 5eafd15](https://github.com/Microsoft/hcnshim/compare/v0.8.9...5eafd15)
 - github.com/cilium/ebpf: [9f1617e → 1c8d4c9](https://github.com/cilium/ebpf/compare/9f1617e...1c8d4c9)
 - github.com/containerd/cgroups: [bf292b2 → 0dbf7f0](https://github.com/containerd/cgroups/compare/bf292b2...0dbf7f0)
 - github.com/coredns/corefile-migration: [v1.0.8 → v1.0.10](https://github.com/coredns/corefile-migration/compare/v1.0.8...v1.0.10)

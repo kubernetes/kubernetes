@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/channelz"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
+	estats "google.golang.org/grpc/experimental/stats"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/metadata"
@@ -54,13 +55,14 @@ var (
 // an init() function), and is not thread-safe. If multiple Balancers are
 // registered with the same name, the one registered last will take effect.
 func Register(b Builder) {
-	if strings.ToLower(b.Name()) != b.Name() {
+	name := strings.ToLower(b.Name())
+	if name != b.Name() {
 		// TODO: Skip the use of strings.ToLower() to index the map after v1.59
 		// is released to switch to case sensitive balancer registry. Also,
 		// remove this warning and update the docstrings for Register and Get.
 		logger.Warningf("Balancer registered with name %q. grpc-go will be switching to case sensitive balancer registries soon", b.Name())
 	}
-	m[strings.ToLower(b.Name())] = b
+	m[name] = b
 }
 
 // unregisterForTesting deletes the balancer with the given name from the
@@ -71,8 +73,21 @@ func unregisterForTesting(name string) {
 	delete(m, name)
 }
 
+// connectedAddress returns the connected address for a SubConnState. The
+// address is only valid if the state is READY.
+func connectedAddress(scs SubConnState) resolver.Address {
+	return scs.connectedAddress
+}
+
+// setConnectedAddress sets the connected address for a SubConnState.
+func setConnectedAddress(scs *SubConnState, addr resolver.Address) {
+	scs.connectedAddress = addr
+}
+
 func init() {
 	internal.BalancerUnregister = unregisterForTesting
+	internal.ConnectedAddress = connectedAddress
+	internal.SetConnectedAddress = setConnectedAddress
 }
 
 // Get returns the resolver builder registered with the given name.
@@ -232,8 +247,8 @@ type BuildOptions struct {
 	// implementations which do not communicate with a remote load balancer
 	// server can ignore this field.
 	Authority string
-	// ChannelzParentID is the parent ClientConn's channelz ID.
-	ChannelzParentID *channelz.Identifier
+	// ChannelzParent is the parent ClientConn's channelz channel.
+	ChannelzParent channelz.Identifier
 	// CustomUserAgent is the custom user agent set on the parent ClientConn.
 	// The balancer should set the same custom user agent if it creates a
 	// ClientConn.
@@ -242,6 +257,10 @@ type BuildOptions struct {
 	// same resolver.Target as passed to the resolver. See the documentation for
 	// the resolver.Target type for details about what it contains.
 	Target resolver.Target
+	// MetricsRecorder is the metrics recorder that balancers can use to record
+	// metrics. Balancer implementations which do not register metrics on
+	// metrics registry and record on them can ignore this field.
+	MetricsRecorder estats.MetricsRecorder
 }
 
 // Builder creates a balancer.
@@ -409,6 +428,9 @@ type SubConnState struct {
 	// ConnectionError is set if the ConnectivityState is TransientFailure,
 	// describing the reason the SubConn failed.  Otherwise, it is nil.
 	ConnectionError error
+	// connectedAddr contains the connected address when ConnectivityState is
+	// Ready. Otherwise, it is indeterminate.
+	connectedAddress resolver.Address
 }
 
 // ClientConnState describes the state of a ClientConn relevant to the

@@ -57,7 +57,7 @@ var (
 	// GetXDSHandshakeInfoForTesting returns a pointer to the xds.HandshakeInfo
 	// stored in the passed in attributes. This is set by
 	// credentials/xds/xds.go.
-	GetXDSHandshakeInfoForTesting any // func (*attributes.Attributes) *xds.HandshakeInfo
+	GetXDSHandshakeInfoForTesting any // func (*attributes.Attributes) *unsafe.Pointer
 	// GetServerCredentials returns the transport credentials configured on a
 	// gRPC server. An xDS-enabled server needs to know what type of credentials
 	// is configured on the underlying gRPC server. This is set by server.go.
@@ -68,11 +68,11 @@ var (
 	// This is used in the 1.0 release of gcp/observability, and thus must not be
 	// deleted or changed.
 	CanonicalString any // func (codes.Code) string
-	// DrainServerTransports initiates a graceful close of existing connections
-	// on a gRPC server accepted on the provided listener address. An
-	// xDS-enabled server invokes this method on a grpc.Server when a particular
-	// listener moves to "not-serving" mode.
-	DrainServerTransports any // func(*grpc.Server, string)
+	// IsRegisteredMethod returns whether the passed in method is registered as
+	// a method on the server.
+	IsRegisteredMethod any // func(*grpc.Server, string) bool
+	// ServerFromContext returns the server from the context.
+	ServerFromContext any // func(context.Context) *grpc.Server
 	// AddGlobalServerOptions adds an array of ServerOption that will be
 	// effective globally for newly created servers. The priority will be: 1.
 	// user-provided; 2. this method; 3. default values.
@@ -106,6 +106,14 @@ var (
 	// This is used in the 1.0 release of gcp/observability, and thus must not be
 	// deleted or changed.
 	ClearGlobalDialOptions func()
+
+	// AddGlobalPerTargetDialOptions adds a PerTargetDialOption that will be
+	// configured for newly created ClientConns.
+	AddGlobalPerTargetDialOptions any // func (opt any)
+	// ClearGlobalPerTargetDialOptions clears the slice of global late apply
+	// dial options.
+	ClearGlobalPerTargetDialOptions func()
+
 	// JoinDialOptions combines the dial options passed as arguments into a
 	// single dial option.
 	JoinDialOptions any // func(...grpc.DialOption) grpc.DialOption
@@ -126,7 +134,8 @@ var (
 	// deleted or changed.
 	BinaryLogger any // func(binarylog.Logger) grpc.ServerOption
 
-	// SubscribeToConnectivityStateChanges adds a grpcsync.Subscriber to a provided grpc.ClientConn
+	// SubscribeToConnectivityStateChanges adds a grpcsync.Subscriber to a
+	// provided grpc.ClientConn.
 	SubscribeToConnectivityStateChanges any // func(*grpc.ClientConn, grpcsync.Subscriber)
 
 	// NewXDSResolverWithConfigForTesting creates a new xds resolver builder using
@@ -177,13 +186,53 @@ var (
 	GRPCResolverSchemeExtraMetadata string = "xds"
 
 	// EnterIdleModeForTesting gets the ClientConn to enter IDLE mode.
-	EnterIdleModeForTesting any // func(*grpc.ClientConn) error
+	EnterIdleModeForTesting any // func(*grpc.ClientConn)
 
 	// ExitIdleModeForTesting gets the ClientConn to exit IDLE mode.
 	ExitIdleModeForTesting any // func(*grpc.ClientConn) error
+
+	ChannelzTurnOffForTesting func()
+
+	// TriggerXDSResourceNotFoundForTesting causes the provided xDS Client to
+	// invoke resource-not-found error for the given resource type and name.
+	TriggerXDSResourceNotFoundForTesting any // func(xdsclient.XDSClient, xdsresource.Type, string) error
+
+	// FromOutgoingContextRaw returns the un-merged, intermediary contents of
+	// metadata.rawMD.
+	FromOutgoingContextRaw any // func(context.Context) (metadata.MD, [][]string, bool)
+
+	// UserSetDefaultScheme is set to true if the user has overridden the
+	// default resolver scheme.
+	UserSetDefaultScheme bool = false
+
+	// ShuffleAddressListForTesting pseudo-randomizes the order of addresses.  n
+	// is the number of elements.  swap swaps the elements with indexes i and j.
+	ShuffleAddressListForTesting any // func(n int, swap func(i, j int))
+
+	// ConnectedAddress returns the connected address for a SubConnState. The
+	// address is only valid if the state is READY.
+	ConnectedAddress any // func (scs SubConnState) resolver.Address
+
+	// SetConnectedAddress sets the connected address for a SubConnState.
+	SetConnectedAddress any // func(scs *SubConnState, addr resolver.Address)
+
+	// SnapshotMetricRegistryForTesting snapshots the global data of the metric
+	// registry. Registers a cleanup function on the provided testing.T that
+	// sets the metric registry to its original state. Only called in testing
+	// functions.
+	SnapshotMetricRegistryForTesting any // func(t *testing.T)
+
+	// SetDefaultBufferPoolForTesting updates the default buffer pool, for
+	// testing purposes.
+	SetDefaultBufferPoolForTesting any // func(mem.BufferPool)
+
+	// SetBufferPoolingThresholdForTesting updates the buffer pooling threshold, for
+	// testing purposes.
+	SetBufferPoolingThresholdForTesting any // func(int)
 )
 
-// HealthChecker defines the signature of the client-side LB channel health checking function.
+// HealthChecker defines the signature of the client-side LB channel health
+// checking function.
 //
 // The implementation is expected to create a health checking RPC stream by
 // calling newStream(), watch for the health status of serviceName, and report
