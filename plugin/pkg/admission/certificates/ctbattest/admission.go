@@ -28,9 +28,9 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/certauthorization"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/rbac"
-	"k8s.io/kubernetes/plugin/pkg/admission/certificates"
 )
 
 const PluginName = "ClusterTrustBundleAttest"
@@ -116,7 +116,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 		return nil
 	}
 
-	if !certificates.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "attest", newBundle.Spec.SignerName) {
+	if !certauthorization.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "attest", newBundle.Spec.SignerName) {
 		klog.V(4).Infof("user not permitted to attest ClusterTrustBundle %q with signerName %q", newBundle.Name, newBundle.Spec.SignerName)
 		return admission.NewForbidden(a, fmt.Errorf("user not permitted to attest for signerName %q", newBundle.Spec.SignerName))
 	}

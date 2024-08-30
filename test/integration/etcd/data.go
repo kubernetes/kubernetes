@@ -224,6 +224,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.26",
 			RemovedVersion:    "1.37",
 		},
+		gvr("certificates.k8s.io", "v1alpha1", "podcertificaterequests"): {
+			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}}`,
+			ExpectedEtcdPath:  "/registry/podcertificaterequests/" + namespace + "/req-1",
+			ExpectedGVK:       gvkP("certificates.k8s.io", "v1alpha1", "PodCertificateRequest"),
+			IntroducedVersion: "1.34",
+			RemovedVersion:    "1.37",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/certificates/v1beta1

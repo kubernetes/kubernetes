@@ -89,6 +89,18 @@ func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.P
 	return corePod, v1Pod
 }
 
+func makeTestServiceAccount(namespace, name string, uid types.UID) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			UID:       types.UID(uid),
+		},
+	}
+
+	return sa
+}
+
 func withLabels(pod *api.Pod, labels map[string]string) *api.Pod {
 	labeledPod := pod.DeepCopy()
 	if labels == nil {
@@ -220,17 +232,18 @@ func setForbiddenUpdateLabels(node *api.Node, value string) *api.Node {
 }
 
 type admitTestCase struct {
-	name            string
-	podsGetter      corev1lister.PodLister
-	nodesGetter     corev1lister.NodeLister
-	csiDriverGetter storagelisters.CSIDriverLister
-	pvcGetter       corev1lister.PersistentVolumeClaimLister
-	pvGetter        corev1lister.PersistentVolumeLister
-	attributes      admission.Attributes
-	features        featuregate.FeatureGate
-	setupFunc       func(t *testing.T)
-	err             string
-	authz           authorizer.Authorizer
+	name                 string
+	podsGetter           corev1lister.PodLister
+	nodesGetter          corev1lister.NodeLister
+	serviceAccountGetter corev1lister.ServiceAccountLister
+	csiDriverGetter      storagelisters.CSIDriverLister
+	pvcGetter            corev1lister.PersistentVolumeClaimLister
+	pvGetter             corev1lister.PersistentVolumeLister
+	attributes           admission.Attributes
+	features             featuregate.FeatureGate
+	setupFunc            func(t *testing.T)
+	err                  string
+	authz                authorizer.Authorizer
 }
 
 func (a *admitTestCase) run(t *testing.T) {
@@ -244,6 +257,7 @@ func (a *admitTestCase) run(t *testing.T) {
 		}
 		c.podsGetter = a.podsGetter
 		c.nodesGetter = a.nodesGetter
+		c.serviceAccountGetter = a.serviceAccountGetter
 		c.csiDriverGetter = a.csiDriverGetter
 		c.pvcGetter = a.pvcGetter
 		c.pvGetter = a.pvGetter
@@ -577,6 +591,40 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	claimpod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
 	claimpod.Spec.ResourceClaims = []api.PodResourceClaim{{Name: "myclaim", ResourceClaimName: ptr.To("myexternalclaim")}}
+
+	pcrServiceAccountIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	pcrServiceAccounts := corev1lister.NewServiceAccountLister(pcrServiceAccountIndex)
+
+	pcrSA := makeTestServiceAccount("ns", "pcr-sa", "pcr-sa-uid")
+	checkNilError(t, pcrServiceAccountIndex.Add(pcrSA))
+
+	pcrNodeIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	pcrNodes := corev1lister.NewNodeLister(pcrNodeIndex)
+
+	pcrNode1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pcr-node-1",
+			UID:  "pcr-node-1-uid",
+		},
+	}
+	checkNilError(t, pcrNodeIndex.Add(pcrNode1))
+	pcrNode1UserInfo := &user.DefaultInfo{Name: "system:node:pcr-node-1", Groups: []string{"system:nodes"}}
+
+	pcrNode2 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pcr-node-1",
+			UID:  "pcr-node-1-uid",
+		},
+	}
+	checkNilError(t, pcrNodeIndex.Add(pcrNode2))
+	pcrNode2UserInfo := &user.DefaultInfo{Name: "system:node:pcr-node-2", Groups: []string{"system:nodes"}}
+
+	pcrPodIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	pcrPods := corev1lister.NewPodLister(pcrPodIndex)
+
+	_, v1PodRequestingPCR := makeTestPod("ns", "pcrpod", pcrNode1.ObjectMeta.Name, false)
+	v1PodRequestingPCR.Spec.ServiceAccountName = pcrSA.Name
+	checkNilError(t, pcrPodIndex.Add(v1PodRequestingPCR))
 
 	tests := []admitTestCase{
 		// Mirror pods bound to us
@@ -1762,9 +1810,143 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, false, privKey, mynode),
 			err:        "unable to parse csr: asn1: syntax error: sequence truncated",
 		},
+
+		// PodCertificateRequest
+		{
+			name:                 "deny node1 create PCR when feature gate disabled",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, v1PodRequestingPCR.Spec.ServiceAccountName, "", pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			err:                  "PodCertificateRequest feature gate is disabled",
+		},
+		{
+			name:                 "allow node1 create PCR that references pod on node1",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+		},
+		{
+			name:                 "deny create node2 create PCR that references pod on node1",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode2UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest.Spec.NodeName="pcr-node-1", which is not the requesting node "pcr-node-2"`,
+		},
+		{
+			name:                 "deny node1 create PCR that references nonexistent pod",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes("ns", "nonexistent-pod", "nonexistent-pod-uid", pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `pod "nonexistent-pod" not found`,
+		},
+		{
+			name:                 "deny node1 create PCR that references nonexistent sa",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, "nonexistent-sa", "nonexistent-sa-uid", pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest for pod "ns/pcrpod" contains serviceAccountName ("nonexistent-sa") that differs from running pod ("pcr-sa")`,
+		},
+		{
+			name:                 "deny node1 create PCR that references nonexistent node",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, "nonexistent-node", "nonexistent-node-uid", pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest.Spec.NodeName="nonexistent-node", which is not the requesting node "pcr-node-1"`,
+		},
+		{
+			name:                 "deny node1 create PCR with mismatched pod UID",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, "wrong-uid", pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest for pod "ns/pcrpod" contains pod UID ("wrong-uid") which differs from running pod "pod-uid"`,
+		},
+		{
+			name:                 "deny node1 create PCR with mismatched SA UID",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes: createPCRAttributes(
+				v1PodRequestingPCR.ObjectMeta.Namespace,
+				v1PodRequestingPCR.ObjectMeta.Name,
+				v1PodRequestingPCR.ObjectMeta.UID,
+				pcrSA.ObjectMeta.Name,
+				"wrong-uid",
+				pcrNode1.ObjectMeta.Name,
+				pcrNode1.ObjectMeta.UID,
+				pcrNode1UserInfo,
+			),
+			features: feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest for pod "ns/pcrpod" names service account UID "wrong-uid", which differs from the running service account ("pcr-sa-uid")`,
+		},
+		{
+			name:                 "deny node1 create PCR with mismatched node UID",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes: createPCRAttributes(
+				v1PodRequestingPCR.ObjectMeta.Namespace,
+				v1PodRequestingPCR.ObjectMeta.Name,
+				v1PodRequestingPCR.ObjectMeta.UID,
+				pcrSA.ObjectMeta.Name,
+				pcrSA.ObjectMeta.UID,
+				pcrNode1.ObjectMeta.Name,
+				"wrong-uid",
+				pcrNode1UserInfo,
+			),
+			features: feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			err: `PodCertificateRequest for pod "ns/pcrpod" names node UID "wrong-uid", inconsistent with the running node ("pcr-node-1-uid")`,
+		},
 	}
 	for _, tt := range tests {
-		tt.nodesGetter = existingNodes
+		if tt.nodesGetter == nil {
+			tt.nodesGetter = existingNodes
+		}
+
 		tt.run(t)
 	}
 }
@@ -2150,7 +2332,43 @@ func createCSRAttributes(cn, signer string, validCsr bool, key any, user user.In
 		},
 	}
 	return admission.NewAttributesRecord(csreq, nil, csrKind, "", "", csrResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
+}
 
+func createPCRAttributes(namespace string, podName string, podUID types.UID, serviceAccountName string, serviceAccountUID types.UID, nodeName string, nodeUID types.UID, user user.Info) admission.Attributes {
+	pcrResource := certificatesapi.Resource("podcertificaterequests").WithVersion("v1alpha1")
+	pcrKind := certificatesapi.Kind("PodCertificateRequest").WithVersion("v1alpha1")
+
+	pcr := &certificatesapi.PodCertificateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "foo",
+		},
+		Spec: certificatesapi.PodCertificateRequestSpec{
+			SignerName:         "example.com/foo",
+			PodName:            podName,
+			PodUID:             types.UID(podUID),
+			ServiceAccountName: serviceAccountName,
+			ServiceAccountUID:  types.UID(serviceAccountUID),
+			NodeName:           types.NodeName(nodeName),
+			NodeUID:            types.UID(nodeUID),
+			// Leave PKIXPublicKey and ProofOfPossession nil, since we're not
+			// actually running validation.
+		},
+	}
+
+	return admission.NewAttributesRecord(
+		pcr,
+		nil,
+		pcrKind,
+		pcr.ObjectMeta.Namespace,
+		pcr.ObjectMeta.Name,
+		pcrResource,
+		"",
+		admission.Create,
+		&metav1.CreateOptions{},
+		false,
+		user,
+	)
 }
 
 func TestAdmitResourceSlice(t *testing.T) {
