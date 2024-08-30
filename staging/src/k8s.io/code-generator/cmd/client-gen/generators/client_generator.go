@@ -161,7 +161,7 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 					version:                   gv.Version.String(),
 					groupGoName:               groupGoName,
 					typeToMatch:               t,
-					imports:                   generator.NewImportTracker(),
+					imports:                   generator.NewImportTrackerForPackage(gvPkg),
 				})
 			}
 
@@ -177,7 +177,7 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 				groupGoName:      groupGoName,
 				apiPath:          apiPath,
 				types:            typeList,
-				imports:          generator.NewImportTracker(),
+				imports:          generator.NewImportTrackerForPackage(gvPkg),
 			})
 
 			expansionFileName := "generated_expansion.go"
@@ -214,7 +214,7 @@ func targetForClientset(args *args.Args, clientsetDir, clientsetPkg string, grou
 					groups:           args.Groups,
 					groupGoNames:     groupGoNames,
 					clientsetPackage: clientsetPkg,
-					imports:          generator.NewImportTracker(),
+					imports:          generator.NewImportTrackerForPackage(clientsetPkg),
 				},
 			}
 			return generators
@@ -260,7 +260,7 @@ NextGroup:
 					OutputPath:     schemeDir,
 					Groups:         args.Groups,
 					GroupGoNames:   groupGoNames,
-					ImportTracker:  generator.NewImportTracker(),
+					ImportTracker:  generator.NewImportTrackerForPackage(schemePkg),
 					CreateRegistry: internalClient,
 				},
 			}

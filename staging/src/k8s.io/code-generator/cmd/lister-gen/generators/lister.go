@@ -149,7 +149,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 						groupVersion:   gv,
 						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
-						imports:        generator.NewImportTracker(),
+						imports:        generator.NewImportTrackerForPackage(outputPkg),
 						objectMeta:     objectMeta,
 					})
 				}

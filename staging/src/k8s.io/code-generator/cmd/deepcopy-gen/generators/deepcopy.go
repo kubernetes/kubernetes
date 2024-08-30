@@ -222,7 +222,7 @@ func NewGenDeepCopy(outputFilename, targetPackage string, boundingDirs []string,
 		boundingDirs:  boundingDirs,
 		allTypes:      allTypes,
 		registerTypes: registerTypes,
-		imports:       generator.NewImportTracker(),
+		imports:       generator.NewImportTrackerForPackage(targetPackage),
 		typesForInit:  make([]*types.Type, 0),
 	}
 }

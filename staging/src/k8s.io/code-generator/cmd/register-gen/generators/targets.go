@@ -115,7 +115,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 							gv:              gv,
 							typesToGenerate: typesToRegister,
 							outputPackage:   pkg.Path,
-							imports:         generator.NewImportTracker(),
+							imports:         generator.NewImportTrackerForPackage(pkg.Path),
 						},
 					}
 				},

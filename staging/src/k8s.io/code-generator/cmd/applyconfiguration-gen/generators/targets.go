@@ -188,7 +188,7 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 					localPkg:     outputPkg,
 					groupVersion: gv,
 					applyConfig:  toGenerate,
-					imports:      generator.NewImportTracker(),
+					imports:      generator.NewImportTrackerForPackage(outputPkg),
 					refGraph:     refs,
 					openAPIType:  openAPIType,
 				})
@@ -211,7 +211,7 @@ func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, gro
 					OutputFilename: "utils.go",
 				},
 				outputPackage:        outputPkgBase,
-				imports:              generator.NewImportTracker(),
+				imports:              generator.NewImportTrackerForPackage(outputPkgBase),
 				groupVersions:        groupVersions,
 				typesForGroupVersion: applyConfigsForGroupVersion,
 				groupGoNames:         groupGoNames,
@@ -236,7 +236,7 @@ func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, 
 					OutputFilename: "internal.go",
 				},
 				outputPackage: outputPkgBase,
-				imports:       generator.NewImportTracker(),
+				imports:       generator.NewImportTrackerForPackage(outputPkg),
 				typeModels:    models,
 			})
 			return generators

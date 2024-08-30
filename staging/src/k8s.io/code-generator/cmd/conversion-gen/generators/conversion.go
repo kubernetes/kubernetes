@@ -478,7 +478,7 @@ func NewGenConversion(outputFilename, typesPackage, outputPackage string, manual
 		outputPackage:       outputPackage,
 		peerPackages:        peerPkgs,
 		manualConversions:   manualConversions,
-		imports:             generator.NewImportTracker(),
+		imports:             generator.NewImportTrackerForPackage(outputPackage),
 		types:               []*types.Type{},
 		explicitConversions: []conversionPair{},
 		skippedFields:       map[*types.Type][]string{},
