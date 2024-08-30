@@ -17,7 +17,9 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +28,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
@@ -64,7 +67,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, emptyVersionedList runtime.Object) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -144,6 +147,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		Framer:          framer,
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
+		transformEvent:  computeEventTransformerFunction(emptyVersionedList),
 
 		MemoryAllocator:      memoryAllocator,
 		TimeoutFactory:       &realTimeoutFactory{timeout},
@@ -174,6 +178,10 @@ type WatchServer struct {
 	Encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
+
+	// transformEvent an optional function that can transform the given
+	// object before sending it to a client.
+	transformEvent func(watch.Event, runtime.Encoder) watch.Event
 
 	MemoryAllocator      runtime.MemoryAllocator
 	TimeoutFactory       TimeoutFactory
@@ -246,7 +254,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
-			if err := watchEncoder.Encode(event); err != nil {
+			if err := watchEncoder.Encode(s.transformEvent(event, watchEncoder.embeddedEncoder)); err != nil {
 				utilruntime.HandleError(err)
 				// client disconnect.
 				return
@@ -303,6 +311,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				return
 			}
 
+			event = s.transformEvent(event, watchEncoder.embeddedEncoder)
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleError(err)
 				// client disconnect.
@@ -355,4 +364,63 @@ func shouldRecordWatchListLatency(event watch.Event) bool {
 		return false
 	}
 	return hasAnnotation
+}
+
+// computeEventTransformerFunction returns a transformer function for watch events.
+//
+// note that: for simplicity, nil emptyVersionedList indicates a standard watch request for
+// which we return a no-op transformer.
+// otherwise, we assume a watchlist request for which we return a transformer
+// that embeds the given list.
+func computeEventTransformerFunction(emptyVersionedList runtime.Object) func(watch.Event, runtime.Encoder) watch.Event {
+	if emptyVersionedList == nil {
+		return func(e watch.Event, _ runtime.Encoder) watch.Event {
+			return e
+		}
+	}
+	return func(event watch.Event, encoder runtime.Encoder) watch.Event {
+		return annotateInitialEventsEmbeddedListBookmark(event, emptyVersionedList, encoder)
+	}
+}
+
+// annotateInitialEventsEmbeddedListBookmark adds a special annotation to the given object
+// which contains an empty base64 encoded list that is used by client to construct the final response.
+func annotateInitialEventsEmbeddedListBookmark(event watch.Event, emptyVersionedList runtime.Object, encoder runtime.Encoder) watch.Event {
+	if event.Type != watch.Bookmark {
+		return event
+	}
+	if objectMeta, err := meta.Accessor(event.Object); err != nil {
+		return newWatchErrorFor(err)
+	} else if objectMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] != "true" {
+		return event
+	}
+
+	event.Object = event.Object.DeepCopyObject()
+	objectMeta, err := meta.Accessor(event.Object)
+	if err != nil {
+		return newWatchErrorFor(err)
+	}
+	annotations := objectMeta.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	var encodedList bytes.Buffer
+	if err = encoder.Encode(emptyVersionedList, &encodedList); err != nil {
+		return newWatchErrorFor(err)
+	}
+	annotations[metav1.InitialEventsEmbeddedListAnnotationKey] = base64.StdEncoding.EncodeToString(encodedList.Bytes())
+	objectMeta.SetAnnotations(annotations)
+	return event
+}
+
+func newWatchErrorFor(err error) watch.Event {
+	return watch.Event{
+		Type: watch.Error,
+		Object: &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: err.Error(),
+			Reason:  metav1.StatusReasonInternalError,
+			Code:    http.StatusInternalServerError,
+		},
+	}
 }
