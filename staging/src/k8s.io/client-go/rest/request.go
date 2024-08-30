@@ -19,6 +19,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -785,10 +786,9 @@ type WatchListResult struct {
 	// the end of the stream.
 	initialEventsEndBookmarkRV string
 
-	// gv represents the API version
-	// it is used to construct the final list response
-	// normally this information is filled by the server
-	gv schema.GroupVersion
+	initialEventsRawEmbeddedList []byte
+
+	decoder runtime.Decoder
 }
 
 func (r WatchListResult) Into(obj runtime.Object) error {
@@ -796,16 +796,26 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		return r.err
 	}
 
-	listPtr, err := meta.GetItemsPtr(obj)
+	listItemsPtr, err := meta.GetItemsPtr(obj)
 	if err != nil {
 		return err
 	}
-	listVal, err := conversion.EnforcePtr(listPtr)
+	listVal, err := conversion.EnforcePtr(listItemsPtr)
 	if err != nil {
 		return err
 	}
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	}
+	// TODO: decode to into ?
+	initialEventsEmbeddedList, _, err := r.decoder.Decode(r.initialEventsRawEmbeddedList, nil, nil)
+	if err != nil {
+		return err
+	}
+	listPointer := reflect.ValueOf(obj).Elem()
+	initialEventsEmbeddedListPointer := reflect.ValueOf(initialEventsEmbeddedList).Elem()
+	if listPointer.CanSet() && listPointer.Type() == initialEventsEmbeddedListPointer.Type() {
+		listPointer.Set(initialEventsEmbeddedListPointer)
 	}
 
 	if len(r.items) == 0 {
@@ -826,15 +836,12 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 	}
 	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
 
-	typeMeta, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return err
-	}
-	version := r.gv.String()
-	typeMeta.SetAPIVersion(version)
-	typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
-
 	return nil
+}
+
+func (r WatchListResult) WithCustomDecoder(d runtime.Decoder) WatchListResult {
+	r.decoder = d
+	return r
 }
 
 // WatchList establishes a stream to get a consistent snapshot of data
@@ -895,10 +902,17 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 				lastKey = key
 			case watch.Bookmark:
 				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+					rawEmbeddedList, err := base64.StdEncoding.DecodeString(meta.GetAnnotations()[metav1.InitialEventsEmbeddedListAnnotationKey])
+					if err != nil {
+						return WatchListResult{err: err}
+					}
+					if len(rawEmbeddedList) == 0 {
+						return WatchListResult{err: fmt.Errorf("%q annotation is missing embeeded list", metav1.InitialEventsEmbeddedListAnnotationKey)}
+					}
 					return WatchListResult{
-						items:                      items,
-						initialEventsEndBookmarkRV: meta.GetResourceVersion(),
-						gv:                         r.c.content.GroupVersion,
+						items:                        items,
+						initialEventsEndBookmarkRV:   meta.GetResourceVersion(),
+						initialEventsRawEmbeddedList: rawEmbeddedList,
 					}
 				}
 			default:
