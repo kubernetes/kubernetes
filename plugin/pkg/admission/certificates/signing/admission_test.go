@@ -27,16 +27,19 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestPlugin_Validate(t *testing.T) {
 	tests := map[string]struct {
-		attributes  admission.Attributes
-		allowedName string
-		allowed     bool
-		authzErr    error
+		attributes        admission.Attributes
+		pcrFeatureEnabled bool
+		allowedName       string
+		allowed           bool
+		authzErr          error
 	}{
 		"wrong type": {
 			attributes: &testAttributes{
@@ -198,12 +201,16 @@ func TestPlugin_Validate(t *testing.T) {
 					err:         test.authzErr,
 				},
 			}
+
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, test.pcrFeatureEnabled)
+			p.InspectFeatureGates(feature.DefaultFeatureGate)
+
 			err := p.Validate(context.Background(), test.attributes, nil)
 			if err == nil && !test.allowed {
-				t.Errorf("Expected authorization policy to reject CSR but it was allowed")
+				t.Errorf("Expected authorization policy to reject CSR/PSR but it was allowed")
 			}
 			if err != nil && test.allowed {
-				t.Errorf("Expected authorization policy to accept CSR but it was rejected: %v", err)
+				t.Errorf("Expected authorization policy to accept CSR/PSR but it was rejected: %v", err)
 			}
 		})
 	}
