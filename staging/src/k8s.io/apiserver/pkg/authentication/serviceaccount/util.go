@@ -163,15 +163,6 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 	return info
 }
 
-// CredentialIDForJTI converts a given JTI string into a credential identifier for use in a
-// users 'extra' info.
-func CredentialIDForJTI(jti string) string {
-	if len(jti) == 0 {
-		return ""
-	}
-	return "JTI=" + jti
-}
-
 // IsServiceAccountToken returns true if the secret is a valid api token for the service account
 func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 	if secret.Type != v1.SecretTypeServiceAccountToken {
