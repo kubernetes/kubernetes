@@ -25,7 +25,7 @@ import (
 
 const (
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	// Default behaviour is 24 hours
+	// Default behavior is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
 )
 
