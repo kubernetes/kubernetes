@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -52,6 +53,7 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
+	userInfo            user.Info
 }
 
 func New(t *testing.T, storage rest.Storage) *Tester {
@@ -102,10 +104,21 @@ func (t *Tester) TestNamespace() string {
 	return "test"
 }
 
+// SetUserInfo sets the UserInfo that should be present in the context when the
+// storage operation is called.
+func (t *Tester) SetUserInfo(userInfo user.Info) {
+	t.userInfo = userInfo
+}
+
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
+	ctx := genericapirequest.NewContext()
+	ctx = genericapirequest.WithNamespace(ctx, t.TestNamespace())
+	if t.userInfo != nil {
+		ctx = genericapirequest.WithUser(ctx, t.userInfo)
+	}
+	return ctx
 }
 
 func (t *Tester) getObjectMetaOrFail(obj runtime.Object) metav1.Object {
