@@ -36,6 +36,7 @@ import (
 )
 
 const (
+	testIPFamily       = v1.IPv4Protocol
 	testClusterIP      = "172.30.1.1"
 	testExternalIP     = "192.168.99.100"
 	testLoadBalancerIP = "1.2.3.4"
@@ -249,7 +250,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fake := NewFake()
-			CleanStaleEntries(fake, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
+			CleanStaleEntries(fake, testIPFamily, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
 			if !fake.ClearedIPs.Equal(tc.result.ClearedIPs) {
 				t.Errorf("Expected ClearedIPs=%v, got %v", tc.result.ClearedIPs, fake.ClearedIPs)
 			}
