@@ -18,7 +18,7 @@ package git_repo
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -197,7 +197,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 			strings.Join(args, " "), output, err)
 	}
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
