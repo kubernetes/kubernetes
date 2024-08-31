@@ -18,7 +18,6 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,7 +136,7 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 	pod = pod.DeepCopy()
 	pod.Name = name
 
-	expectedYAML, _ := ioutil.ReadFile(filename)
+	expectedYAML, _ := os.ReadFile(filename)
 
 	jsonData, err := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), pod)
 	if err != nil {
@@ -160,7 +159,7 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 			if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
 				t.Fatal(err)
 			}
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+			if err := os.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
 				t.Logf("Updated data in %s", filename)
 				t.Logf("Verify the diff, commit changes, and rerun the tests")
 			} else {
