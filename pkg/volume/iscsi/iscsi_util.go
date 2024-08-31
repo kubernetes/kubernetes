@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -74,12 +73,14 @@ var (
 		"discovery.sendtargets.auth.username",
 		"discovery.sendtargets.auth.password",
 		"discovery.sendtargets.auth.username_in",
-		"discovery.sendtargets.auth.password_in"}
+		"discovery.sendtargets.auth.password_in",
+	}
 	chapSess = []string{
 		"node.session.auth.username",
 		"node.session.auth.password",
 		"node.session.auth.username_in",
-		"node.session.auth.password_in"}
+		"node.session.auth.password_in",
+	}
 	ifaceTransportNameRe = regexp.MustCompile(`iface.transport_name = (.*)\n`)
 	ifaceRe              = regexp.MustCompile(`.+/iface-([^/]+)/.+`)
 )
@@ -927,7 +928,7 @@ func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
 func getVolCount(dir, portal, iqn string) (int, error) {
 	// For FileSystem volumes, the topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0.
 	// For Block volumes, the default topmost dir is volumeDevices.
-	contents, err := ioutil.ReadDir(dir)
+	contents, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
@@ -943,7 +944,7 @@ func getVolCount(dir, portal, iqn string) (int, error) {
 			continue
 		}
 
-		mounts, err := ioutil.ReadDir(filepath.Join(dir, c.Name()))
+		mounts, err := os.ReadDir(filepath.Join(dir, c.Name()))
 		if err != nil {
 			return 0, err
 		}
