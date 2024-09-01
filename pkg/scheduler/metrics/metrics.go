@@ -81,6 +81,10 @@ const (
 	QueueingHintResultError     = "Error"
 )
 
+const (
+	PodPoppedInFlightEvent = "PodPopped"
+)
+
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
 	scheduleAttempts = metrics.NewCounterVec(
@@ -141,6 +145,13 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	InFlightEvents = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "inflight_events",
+			Help:           "Number of events recorded in the scheduling queue.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"event"})
 	Goroutines = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -292,6 +303,7 @@ func Register() {
 		RegisterMetrics(metricsList...)
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 			RegisterMetrics(queueingHintExecutionDuration)
+			RegisterMetrics(InFlightEvents)
 		}
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 	})

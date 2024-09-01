@@ -80,22 +80,41 @@ func (r *PendingPodsRecorder) Clear() {
 	r.recorder.Set(float64(0))
 }
 
-// metric is the data structure passed in the buffer channel between the main framework thread
+// histgramVecMetric is the data structure passed in the buffer channel between the main framework thread
 // and the metricsRecorder goroutine.
-type metric struct {
+type histgramVecMetric struct {
 	metric      *metrics.HistogramVec
 	labelValues []string
 	value       float64
 }
 
+type gaugeVecMetric struct {
+	metric      *metrics.GaugeVec
+	labelValues []string
+	valueToAdd  float64
+}
+
+type gaugeVecMetricKey struct {
+	metricName string
+	labelValue string
+}
+
 // MetricAsyncRecorder records metric in a separate goroutine to avoid overhead in the critical path.
 type MetricAsyncRecorder struct {
 	// bufferCh is a channel that serves as a metrics buffer before the metricsRecorder goroutine reports it.
-	bufferCh chan *metric
+	bufferCh chan *histgramVecMetric
 	// if bufferSize is reached, incoming metrics will be discarded.
 	bufferSize int
 	// how often the recorder runs to flush the metrics.
 	interval time.Duration
+
+	// aggregatedInflightEventMetric is only to record InFlightEvents metric asynchronously.
+	// It's a map from gaugeVecMetricKey to the aggregated value
+	// and the aggregated value is flushed to Prometheus every time the interval is reached.
+	// Note that we don't lock the map deliberately because we assume the queue takes lock before updating the in-flight events.
+	aggregatedInflightEventMetric              map[gaugeVecMetricKey]int
+	aggregatedInflightEventMetricLastFlushTime time.Time
+	aggregatedInflightEventMetricBufferCh      chan *gaugeVecMetric
 
 	// stopCh is used to stop the goroutine which periodically flushes metrics.
 	stopCh <-chan struct{}
@@ -106,11 +125,14 @@ type MetricAsyncRecorder struct {
 
 func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
 	recorder := &MetricAsyncRecorder{
-		bufferCh:    make(chan *metric, bufferSize),
-		bufferSize:  bufferSize,
-		interval:    interval,
-		stopCh:      stopCh,
-		IsStoppedCh: make(chan struct{}),
+		bufferCh:                      make(chan *histgramVecMetric, bufferSize),
+		bufferSize:                    bufferSize,
+		interval:                      interval,
+		stopCh:                        stopCh,
+		aggregatedInflightEventMetric: make(map[gaugeVecMetricKey]int),
+		aggregatedInflightEventMetricLastFlushTime: time.Now(),
+		aggregatedInflightEventMetricBufferCh:      make(chan *gaugeVecMetric, bufferSize),
+		IsStoppedCh:                                make(chan struct{}),
 	}
 	go recorder.run()
 	return recorder
@@ -128,8 +150,32 @@ func (r *MetricAsyncRecorder) ObserveQueueingHintDurationAsync(pluginName, event
 	r.observeMetricAsync(queueingHintExecutionDuration, value, pluginName, event, hint)
 }
 
+// ObserveInFlightEventsAsync observes the in_flight_events metric.
+// Note that this function is not goroutine-safe;
+// we don't lock the map deliberately for the performance reason and we assume the queue (i.e., the caller) takes lock before updating the in-flight events.
+func (r *MetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64) {
+	r.aggregatedInflightEventMetric[gaugeVecMetricKey{metricName: InFlightEvents.Name, labelValue: eventLabel}] += int(valueToAdd)
+
+	// Only flush the metric to the channal if the interval is reached.
+	// The values are flushed to Prometheus in the run() function, which runs once the interval time.
+	if time.Since(r.aggregatedInflightEventMetricLastFlushTime) > r.interval {
+		for key, value := range r.aggregatedInflightEventMetric {
+			newMetric := &gaugeVecMetric{
+				metric:      InFlightEvents,
+				labelValues: []string{key.labelValue},
+				valueToAdd:  float64(value),
+			}
+			select {
+			case r.aggregatedInflightEventMetricBufferCh <- newMetric:
+			default:
+			}
+		}
+		r.aggregatedInflightEventMetricLastFlushTime = time.Now()
+	}
+}
+
 func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value float64, labelsValues ...string) {
-	newMetric := &metric{
+	newMetric := &histgramVecMetric{
 		metric:      m,
 		labelValues: labelsValues,
 		value:       value,
@@ -161,7 +207,14 @@ func (r *MetricAsyncRecorder) FlushMetrics() {
 		case m := <-r.bufferCh:
 			m.metric.WithLabelValues(m.labelValues...).Observe(m.value)
 		default:
-			return
+			// no more value
+		}
+
+		select {
+		case m := <-r.aggregatedInflightEventMetricBufferCh:
+			m.metric.WithLabelValues(m.labelValues...).Add(m.valueToAdd)
+		default:
+			// no more value
 		}
 	}
 }
