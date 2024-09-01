@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
-	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -255,7 +254,7 @@ func (m *cgroupCommon) Destroy(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-func (m *cgroupCommon) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+func (m *cgroupCommon) SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error {
 	containerConfig := &CgroupConfig{
 		Name:               name,
 		ResourceParameters: resourceConfig,
