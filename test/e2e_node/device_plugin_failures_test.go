@@ -352,4 +352,61 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		// after the graceful period devices capacity will reset to zero
 		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
 	})
+
+	ginkgo.It("when ListAndWatch will fail immediately in shared GPU scenario, with a large number of devices node allocatable will be set to zero and kubelet will not retry to list resources", func(ctx context.Context) {
+		// randomizing so tests can run in parallel
+		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+		devicePrefix := "GPU-e9ebf26b-6a2c-634b-f6e6-3552ffafa7d8"
+		// 10 GPUs, 80G each, converted to MiB, used to simulate a large number of devices
+		total := 10 * 80 * 1024
+		var devices []kubeletdevicepluginv1beta1.Device
+		for i := 0; i < total; i++ {
+			ID := fmt.Sprintf("%s_%d", devicePrefix, i)
+			devices = append(devices, kubeletdevicepluginv1beta1.Device{ID: ID, Health: kubeletdevicepluginv1beta1.Healthy})
+		}
+
+		// Initially, there are no allocatable of this resource
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
+
+		plugin := testdeviceplugin.NewDevicePlugin(nil)
+
+		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
+		defer plugin.Stop() // should stop even if registration failed
+		gomega.Expect(err).To(gomega.Succeed())
+
+		// kubelet registers the resource, but will not have any allocatable
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
+
+		// kubelet will never retry ListAndWatch (this will sleep for a long time)
+		gomega.Consistently(plugin.Calls, devicePluginUpdateTimeout, f.Timeouts.Poll).Should(gomega.HaveLen(2))
+
+		// however kubelet will not delete the resource
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
+	})
+
+	ginkgo.It("will allocatable to a number of healthy devices in shared GPU scenario", func(ctx context.Context) {
+		// randomizing so tests can run in parallel
+		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+		devicePrefix := "GPU-33054273-1377-182c-ab17-a9c1b2834745"
+		// a GPU with 80G memory, converted to MiB
+		total := 1 * 80 * 1024
+		var devices []kubeletdevicepluginv1beta1.Device
+		for i := 0; i < total; i++ {
+			ID := fmt.Sprintf("%s_%d", devicePrefix, i)
+			devices = append(devices, kubeletdevicepluginv1beta1.Device{ID: ID, Health: kubeletdevicepluginv1beta1.Healthy})
+		}
+
+		// Initially, there are no allocatable of this resource
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
+
+		plugin := testdeviceplugin.NewDevicePlugin(nil)
+
+		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
+		defer plugin.Stop() // should stop even if registration failed
+		gomega.Expect(err).To(gomega.Succeed())
+
+		// at first all the devices are healthy
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: total, Capacity: total}))
+	})
+
 })

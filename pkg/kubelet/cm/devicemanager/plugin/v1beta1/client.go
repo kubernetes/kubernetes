@@ -130,6 +130,7 @@ func dial(unixSocketPath string) (api.DevicePluginClient, *grpc.ClientConn, erro
 		grpc.WithAuthority("localhost"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
