@@ -466,7 +466,7 @@ name | architectures
   
   v1beta3 is now marked as deprecated but will continue to be supported until version 1.34 or later.
   The storage configuration in the kube-system/kubeadm-config ConfigMap is now a v1beta4 ClusterConfiguration. ([#125029](https://github.com/kubernetes/kubernetes/pull/125029), [@neolit123](https://github.com/neolit123))
-- Kubelet would not restart the container when fields other than image in the Pod spec change. pod spec change. ([#124220](https://github.com/kubernetes/kubernetes/pull/124220), [@HirazawaUi](https://github.com/HirazawaUi))
+- Kubelet would not restart the container when fields other than image in the pod spec change. ([#124220](https://github.com/kubernetes/kubernetes/pull/124220), [@HirazawaUi](https://github.com/HirazawaUi))
 - Kubelet/stats: set INFO log level for stats not found in cadvisor memory cache error. ([#125656](https://github.com/kubernetes/kubernetes/pull/125656), [@gyuho](https://github.com/gyuho))
 - Kubelet: warn instead of error for the unsupported options on Windows "CgroupsPerQOS" and "EnforceNodeAllocatable". ([#123137](https://github.com/kubernetes/kubernetes/pull/123137), [@neolit123](https://github.com/neolit123)) [SIG Node and Windows]
 - Kubemark: added two flags, `--kube-api-qps` which indicates the maximum QPS to the apiserver, and `--kube-api-burst` which indicates maximum burst for throttle to the apiserver. ([#124147](https://github.com/kubernetes/kubernetes/pull/124147), [@devincd](https://github.com/devincd))
