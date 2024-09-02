@@ -106,7 +106,7 @@ type Request struct {
 	warningHandler WarningHandlerWithContext
 
 	rateLimiter flowcontrol.RateLimiter
-	backoff     BackoffManager
+	backoff     BackoffManagerWithContext
 	timeout     time.Duration
 	maxRetries  int
 
@@ -136,7 +136,7 @@ type Request struct {
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(c *RESTClient) *Request {
-	var backoff BackoffManager
+	var backoff BackoffManagerWithContext
 	if c.createBackoffMgr != nil {
 		backoff = c.createBackoffMgr()
 	}
@@ -259,8 +259,22 @@ func (r *Request) Resource(resource string) *Request {
 }
 
 // BackOff sets the request's backoff manager to the one specified,
-// or defaults to the stub implementation if nil is provided
+// or defaults to the stub implementation if nil is provided.
+//
+// Deprecated: BackoffManager.Sleep ignores the caller's context. Use BackOffWithContext and BackoffManagerWithContext instead.
 func (r *Request) BackOff(manager BackoffManager) *Request {
+	if manager == nil {
+		r.backoff = &NoBackoff{}
+		return r
+	}
+
+	r.backoff = &backoffManagerNopContext{BackoffManager: manager}
+	return r
+}
+
+// BackOffWithContext sets the request's backoff manager to the one specified,
+// or defaults to the stub implementation if nil is provided.
+func (r *Request) BackOffWithContext(manager BackoffManagerWithContext) *Request {
 	if manager == nil {
 		r.backoff = &NoBackoff{}
 		return r
