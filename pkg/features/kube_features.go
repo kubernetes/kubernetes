@@ -1239,10 +1239,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	genericfeatures.ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
 	genericfeatures.StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},

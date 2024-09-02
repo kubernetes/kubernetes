@@ -688,18 +688,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: ServerSideApply
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: ServerSideFieldValidation
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: ServiceAccountTokenJTI
   versionedSpecs:
   - default: true
