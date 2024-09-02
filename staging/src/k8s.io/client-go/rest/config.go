@@ -558,6 +558,7 @@ func InClusterConfig() (*Config, error) {
 	tlsClientConfig := TLSClientConfig{}
 
 	if _, err := certutil.NewPool(rootCAFile); err != nil {
+		//nolint:logcheck // The decision to log this instead of returning an error goes back to ~2016. It's part of the client-go API now, so not changing it just to support contextual logging.
 		klog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
