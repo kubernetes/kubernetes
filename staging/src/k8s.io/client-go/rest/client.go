@@ -93,7 +93,7 @@ type RESTClient struct {
 	content requestClientContentConfigProvider
 
 	// creates BackoffManager that is passed to requests.
-	createBackoffMgr func() BackoffManager
+	createBackoffMgr func() BackoffManagerWithContext
 
 	// rateLimiter is shared among all requests created by this client unless specifically
 	// overridden.
@@ -178,7 +178,7 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 // readExpBackoffConfig handles the internal logic of determining what the
 // backoff policy is.  By default if no information is available, NoBackoff.
 // TODO Generalize this see #17727 .
-func readExpBackoffConfig() BackoffManager {
+func readExpBackoffConfig() BackoffManagerWithContext {
 	backoffBase := os.Getenv(envBackoffBase)
 	backoffDuration := os.Getenv(envBackoffDuration)
 
