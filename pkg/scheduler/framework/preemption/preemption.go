@@ -108,7 +108,7 @@ type Interface interface {
 	CandidatesToVictimsMap(candidates []Candidate) map[string]*extenderv1.Victims
 	// PodEligibleToPreemptOthers returns one bool and one string. The bool indicates whether this pod should be considered for
 	// preempting other pods or not. The string includes the reason if this pod isn't eligible.
-	PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string)
+	PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string)
 	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
 	// for "pod" to be scheduled.
 	// Note that both `state` and `nodeInfo` are deep copied.
@@ -161,7 +161,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
 	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
-	if ok, msg := ev.PodEligibleToPreemptOthers(pod, nominatedNodeStatus); !ok {
+	if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
 		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
 		return nil, framework.NewStatus(framework.Unschedulable, msg)
 	}
