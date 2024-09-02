@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
 	"strconv"
 	"time"
 
@@ -40,7 +41,6 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -278,12 +278,18 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
-		nodes, err := getControlPlaneNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+
+		// checks if there is at least one control-plane node
+		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
+
 		for i := range nodes.Items {
 
+			ips := framework.GetNodeExternalIPs(&nodes.Items[i])
+			gomega.Expect(ips).NotTo(gomega.BeEmpty(), "at least one external ip should exist.")
+
 			restarter := NewRestartConfig(
-				getFirstIPforNode(&nodes.Items[i]), "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
+				ips[0], "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
 			restarter.restart(ctx)
 
 			// The intent is to ensure the replication controller manager has observed and reported status of
@@ -313,11 +319,17 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func(ctx context.Context) {
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
-		nodes, err := getControlPlaneNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+
+		// checks if there is at least one control-plane node
+		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
+
 		for i := range nodes.Items {
+			ips := framework.GetNodeExternalIPs(&nodes.Items[i])
+			gomega.Expect(ips).NotTo(gomega.BeEmpty(), "at least one external ip should exist.")
+
 			restarter := NewRestartConfig(
-				getFirstIPforNode(&nodes.Items[i]), "kube-scheduler", kubeschedulerconfig.DefaultKubeSchedulerPort, restartPollInterval, restartTimeout, true)
+				ips[0], "kube-scheduler", kubeschedulerconfig.DefaultKubeSchedulerPort, restartPollInterval, restartTimeout, true)
 
 			// Create pods while the scheduler is down and make sure the scheduler picks them up by
 			// scaling the rc to the same size.
@@ -367,42 +379,3 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		}
 	})
 })
-
-func getFirstIPforNode(node *v1.Node) string {
-	var ips []string
-	ips = append(ips, getAddresses(node, v1.NodeExternalIP)...)
-	if len(ips) == 0 {
-		// If ExternalIP isn't set, assume the test programs can reach the InternalIP
-		ips = append(ips, getAddresses(node, v1.NodeInternalIP)...)
-	}
-	if len(ips) == 0 {
-		framework.Failf("did not find any ip(s) for node: %v", node)
-	}
-	return ips[0]
-}
-
-func getAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []string) {
-	for j := range node.Status.Addresses {
-		nodeAddress := &node.Status.Addresses[j]
-		if nodeAddress.Type == addressType && nodeAddress.Address != "" {
-			ips = append(ips, nodeAddress.Address)
-		}
-	}
-	return
-}
-
-func getControlPlaneNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	testfwk.Filter(nodes, func(node v1.Node) bool {
-		_, isMaster := node.Labels["node-role.kubernetes.io/master"]
-		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
-		return isMaster || isControlPlane
-	})
-	if len(nodes.Items) == 0 {
-		return nil, fmt.Errorf("there are currently no ready, schedulable control plane nodes in the cluster")
-	}
-	return nodes, nil
-}
