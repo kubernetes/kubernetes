@@ -40,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -128,6 +129,9 @@ const (
 
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute
+
+	// ControlPlaneLabel is valid for kubeadm based clusters like kops ONLY
+	ControlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
 var (
@@ -662,6 +666,17 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
+// GetNodeExternalIPs returns a list of external ip address(es) if any for a node
+func GetNodeExternalIPs(node *v1.Node) (ips []string) {
+	for j := range node.Status.Addresses {
+		nodeAddress := &node.Status.Addresses[j]
+		if nodeAddress.Type == v1.NodeExternalIP && nodeAddress.Address != "" {
+			ips = append(ips, nodeAddress.Address)
+		}
+	}
+	return
+}
+
 // getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
 // If any of these is unavailable, empty slices are returned.
 func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]string, []string, []string) {
@@ -692,6 +707,15 @@ func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]str
 	}
 
 	return externalIPs, internalIPs, hostnames
+}
+
+// GetControlPlaneNodes returns a list of control plane nodes
+func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
+	selector := labels.Set{ControlPlaneLabel: ""}.AsSelector()
+	cpNodes, err := c.CoreV1().Nodes().
+		List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	ExpectNoError(err, "error reading control-plane nodes")
+	return cpNodes
 }
 
 // GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
