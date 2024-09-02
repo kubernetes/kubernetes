@@ -224,11 +224,6 @@ func (in *UpgradePlan) DeepCopyInto(out *UpgradePlan) {
 		*out = make([]ComponentConfigVersionState, len(*in))
 		copy(*out, *in)
 	}
-	if in.Components != nil {
-		in, out := &in.Components, &out.Components
-		*out = make([]ComponentUpgradePlan, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

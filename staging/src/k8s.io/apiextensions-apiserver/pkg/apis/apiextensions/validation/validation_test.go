@@ -92,6 +92,29 @@ func (v validationMatch) contains(s string) validationMatch {
 
 func strPtr(s string) *string { return &s }
 
+// exampleCert was generated from crypto/tls/generate_cert.go with the following command:
+//
+//	go run generate_cert.go  --rsa-bits 2048 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+var exampleCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIDADCCAeigAwIBAgIQVHG3Fn9SdWayyLOZKCW1vzANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
+MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEArTCu9fiIclNgDdWHphewM+JW55dCb5yYGlJgCBvwbOx547M9p+tn
+zm9QOhsdZDHDZsG9tqnWxE2Nc1HpIJyOlfYsOoonpEoG/Ep6nnK91ngj0bn/JlNy
++i/bwU4r97MOukvnOIQez9/D9jAJaOX2+b8/d4lRz9BsqiwJyg+ynZ5tVVYj7aMi
+vXnd6HOnJmtqutOtr3beucJnkd6XbwRkLUcAYATT+ZihOWRbTuKqhCg6zGkJOoUG
+f8sX61JjoilxiURA//ftGVbdTCU3DrmGmardp5NNOHbumMYU8Vhmqgx1Bqxb+9he
+7G42uW5YWYK/GqJzgVPjjlB2dOGj9KrEWQIDAQABo1AwTjAOBgNVHQ8BAf8EBAMC
+AqQwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zAWBgNVHREE
+DzANggtleGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAig4AIi9xWs1+pLES
+eeGGdSDoclplFpcbXANnsYYFyLf+8pcWgVi2bOmb2gXMbHFkB07MA82wRJAUTaA+
+2iNXVQMhPCoA7J6ADUbww9doJX2S9HGyArhiV/MhHtE8txzMn2EKNLdhhk3N9rmV
+x/qRbWAY1U2z4BpdrAR87Fe81Nlj7h45csW9K+eS+NgXipiNTIfEShKgCFM8EdxL
+1WXg7r9AvYV3TNDPWTjLsm1rQzzZQ7Uvcf6deWiNodZd8MOT/BFLclDPTK6cF2Hr
+UU4dq6G4kCwMSxWE4cM3HlZ4u1dyIt47VbkP0rtvkBCXx36y+NXYA5lzntchNFZP
+uvEQdw==
+-----END CERTIFICATE-----`)
+
 func TestValidateCustomResourceDefinition(t *testing.T) {
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
@@ -234,6 +257,107 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			errors: []validationMatch{
 				invalid("spec", "conversion", "webhookClientConfig", "service", "port"),
 			},
+		},
+		{
+			name: "webhookconfig: invalid CABundle should be allowed on Create",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "webhookconfig: valid CABundle",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: exampleCert,
+						},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			errors: []validationMatch{},
 		},
 		{
 			name: "webhookconfig: both service and URL provided",
@@ -4373,7 +4497,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 }
 
 func TestSelectableFields(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
 			Name:    "version",
@@ -5541,6 +5665,362 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("spec", "conversion", "conversionReviewVersions"),
+			},
+		},
+		{
+			name: "webhookconfig: existing invalid CABundle update should pass",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "webhookconfig: existing valid CABundle should be able to transition to invalid pre-serving",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: exampleCert,
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "webhookconfig: update to invalid CABundle should fail if existing is valid",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: exampleCert,
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "conversion", "webhookClientConfig", "caBundle"),
 			},
 		},
 		{
@@ -7282,7 +7762,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 }
 
 func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.T) {
-	allValidationsErrors := []validationMatch{
+	allRuleValidationsErrors := []validationMatch{
 		invalid("spec", "validation", "openAPIV3Schema", "properties[x]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "properties[a]", "x-kubernetes-validations[0]", "rule"),
@@ -7291,28 +7771,51 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "additionalProperties", "x-kubernetes-validations[0]", "rule"),
 	}
+	allMessageExpressionValidationsErrors := []validationMatch{
+		invalid("spec", "validation", "openAPIV3Schema", "properties[x]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "properties[a]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "items", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "additionalProperties", "x-kubernetes-validations[0]", "messageExpression"),
+	}
 
 	tests := []struct {
-		name        string
-		storedRule  string
-		updatedRule string
-		errors      []validationMatch
+		name                     string
+		storedRule               string
+		updatedRule              string
+		storedMessageExpression  string
+		updatedMessageExpression string
+		errors                   []validationMatch
 	}{
 		{
-			name:        "functions declared for storage mode allowed if expression is unchanged from what is stored",
-			storedRule:  "test() == true",
-			updatedRule: "test() == true",
+			name:                     "functions declared for storage mode allowed if expressions are unchanged from what is stored",
+			storedRule:               "test() == true",
+			updatedRule:              "test() == true",
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test: %s'.format([test()])",
 		},
 		{
-			name:        "functions declared for storage mode not allowed if expression is changed",
-			storedRule:  "test() == false",
-			updatedRule: "test() == true",
-			errors:      allValidationsErrors,
+			name:                     "functions declared for storage mode not allowed if rule expression is changed",
+			storedRule:               "test() == false",
+			updatedRule:              "test() == true", // rule was changed
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test: %s'.format([test()])",
+			errors:                   allRuleValidationsErrors,
+		},
+		{
+			name:                     "functions declared for storage mode not allowed if message expression is changed",
+			storedRule:               "test() == true",
+			updatedRule:              "test() == true",
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test - updated: %s'.format([test()])", // messageExpression was changed
+			errors:                   allMessageExpressionValidationsErrors,
 		},
 	}
 
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998))
+	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998), true)
 	envSet, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 999),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -7322,10 +7825,11 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 	}
 
 	for _, tc := range tests {
-		fn := func(rule string) *apiextensions.CustomResourceDefinition {
+		fn := func(rule, messageExpression string) *apiextensions.CustomResourceDefinition {
 			validationRules := []apiextensions.ValidationRule{
 				{
-					Rule: rule,
+					Rule:              rule,
+					MessageExpression: messageExpression,
 				},
 			}
 			return &apiextensions.CustomResourceDefinition{
@@ -7382,8 +7886,8 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			}
 		}
-		old := fn(tc.storedRule)
-		resource := fn(tc.updatedRule)
+		old := fn(tc.storedRule, tc.storedMessageExpression)
+		resource := fn(tc.updatedRule, tc.updatedMessageExpression)
 
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.TODO()
@@ -8509,6 +9013,189 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid x-kubernetes-validations for escaping (keywords are invalid field names before v1.30)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.__if__ > 0",
+						},
+						{
+							Rule: "self.__namespace__ > 0",
+						},
+						{
+							Rule: "self.if > 0",
+						},
+						{
+							Rule: "self.namespace > 0",
+						},
+						{
+							Rule: "self.as > 0",
+						},
+						{
+							Rule: "self.break > 0",
+						},
+						{
+							Rule: "self.const > 0",
+						},
+						{
+							Rule: "self.continue > 0",
+						},
+						{
+							Rule: "self.else > 0",
+						},
+						{
+							Rule: "self.for > 0",
+						},
+						{
+							Rule: "self.function > 0",
+						},
+						{
+							Rule: "self.import > 0",
+						},
+						{
+							Rule: "self.let > 0",
+						},
+						{
+							Rule: "self.loop > 0",
+						},
+						{
+							Rule: "self.package > 0",
+						},
+						{
+							Rule: "self.return > 0",
+						},
+						{
+							Rule: "self.var > 0",
+						},
+						{
+							Rule: "self.void > 0",
+						},
+						{
+							Rule: "self.while > 0",
+						},
+						{
+							Rule: "self.self > 0",
+						},
+						{
+							Rule: "self.int > 0",
+						},
+						{
+							Rule: "self.true > 0",
+						},
+						{
+							Rule: "self.false > 0",
+						},
+						{
+							Rule: "self.null > 0",
+						},
+						{
+							Rule: "self.in > 0",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"if": {
+							Type: "integer",
+						},
+						"namespace": {
+							Type: "integer",
+						},
+						"as": {
+							Type: "integer",
+						},
+						"break": {
+							Type: "integer",
+						},
+						"const": {
+							Type: "integer",
+						},
+						"continue": {
+							Type: "integer",
+						},
+						"else": {
+							Type: "integer",
+						},
+						"for": {
+							Type: "integer",
+						},
+						"function": {
+							Type: "integer",
+						},
+						"import": {
+							Type: "integer",
+						},
+						"let": {
+							Type: "integer",
+						},
+						"loop": {
+							Type: "integer",
+						},
+						"package": {
+							Type: "integer",
+						},
+						"return": {
+							Type: "integer",
+						},
+						"var": {
+							Type: "integer",
+						},
+						"void": {
+							Type: "integer",
+						},
+						"while": {
+							Type: "integer",
+						},
+						"self": {
+							Type: "integer",
+						},
+						"int": {
+							Type: "integer",
+						},
+						"true": {
+							Type: "integer",
+						},
+						"false": {
+							Type: "integer",
+						},
+						"null": {
+							Type: "integer",
+						},
+						"in": {
+							Type: "integer",
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+				celEnvironmentSet:       environment.MustBaseEnvSet(version.MajorMinor(1, 30), true),
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[3].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[4].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[5].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[6].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[7].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[8].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[9].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[10].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[11].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[12].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[13].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[14].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[15].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[16].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[17].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[18].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[21].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[22].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[23].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[24].rule"),
+			},
+		},
+		{
 			name: "valid x-kubernetes-validations for escaping",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
@@ -8521,10 +9208,74 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Rule: "self.__namespace__ > 0",
 						},
 						{
+							Rule: "self.if > 0",
+						},
+						{
+							Rule: "self.namespace > 0",
+						},
+						{
+							Rule: "self.as > 0",
+						},
+						{
+							Rule: "self.break > 0",
+						},
+						{
+							Rule: "self.const > 0",
+						},
+						{
+							Rule: "self.continue > 0",
+						},
+						{
+							Rule: "self.else > 0",
+						},
+						{
+							Rule: "self.for > 0",
+						},
+						{
+							Rule: "self.function > 0",
+						},
+						{
+							Rule: "self.import > 0",
+						},
+						{
+							Rule: "self.let > 0",
+						},
+						{
+							Rule: "self.loop > 0",
+						},
+						{
+							Rule: "self.package > 0",
+						},
+						{
+							Rule: "self.return > 0",
+						},
+						{
+							Rule: "self.var > 0",
+						},
+						{
+							Rule: "self.void > 0",
+						},
+						{
+							Rule: "self.while > 0",
+						},
+						{
 							Rule: "self.self > 0",
 						},
 						{
 							Rule: "self.int > 0",
+						},
+						// reserved keywords `true`, `false`, `null` and `in` are not supported
+						{
+							Rule: "self.true > 0",
+						},
+						{
+							Rule: "self.false > 0",
+						},
+						{
+							Rule: "self.null > 0",
+						},
+						{
+							Rule: "self.in > 0",
 						},
 					},
 					Properties: map[string]apiextensions.JSONSchemaProps{
@@ -8532,6 +9283,51 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Type: "integer",
 						},
 						"namespace": {
+							Type: "integer",
+						},
+						"as": {
+							Type: "integer",
+						},
+						"break": {
+							Type: "integer",
+						},
+						"const": {
+							Type: "integer",
+						},
+						"continue": {
+							Type: "integer",
+						},
+						"else": {
+							Type: "integer",
+						},
+						"for": {
+							Type: "integer",
+						},
+						"function": {
+							Type: "integer",
+						},
+						"import": {
+							Type: "integer",
+						},
+						"let": {
+							Type: "integer",
+						},
+						"loop": {
+							Type: "integer",
+						},
+						"package": {
+							Type: "integer",
+						},
+						"return": {
+							Type: "integer",
+						},
+						"var": {
+							Type: "integer",
+						},
+						"void": {
+							Type: "integer",
+						},
+						"while": {
 							Type: "integer",
 						},
 						"self": {
@@ -8540,43 +9336,46 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 						"int": {
 							Type: "integer",
 						},
+						"true": {
+							Type: "integer",
+						},
+						"false": {
+							Type: "integer",
+						},
+						"null": {
+							Type: "integer",
+						},
+						"in": {
+							Type: "integer",
+						},
 					},
 				},
 			},
 			opts: validationOptions{
 				requireStructuralSchema: true,
+				celEnvironmentSet:       environment.MustBaseEnvSet(version.MajorMinor(1, 31), true),
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[21].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[22].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[23].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[24].rule"),
 			},
 		},
 		{
-			name: "invalid x-kubernetes-validations for escaping",
+			name: "invalid x-kubernetes-validations for unknown property",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
 					XValidations: apiextensions.ValidationRules{
 						{
-							Rule: "self.if > 0",
-						},
-						{
-							Rule: "self.namespace > 0",
-						},
-						{
 							Rule: "self.unknownProp > 0",
-						},
-					},
-					Properties: map[string]apiextensions.JSONSchemaProps{
-						"if": {
-							Type: "integer",
-						},
-						"namespace": {
-							Type: "integer",
 						},
 					},
 				},
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[1].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
 			},
 			opts: validationOptions{
 				requireStructuralSchema: true,
@@ -10104,7 +10903,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			if tt.opts.celEnvironmentSet == nil {
-				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 			}
 			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 
@@ -10635,7 +11434,7 @@ func TestCelContext(t *testing.T) {
 			celContext := RootCELContext(tt.schema)
 			celContext.converter = converter
 			opts := validationOptions{
-				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 			}
 			openAPIV3Schema := &specStandardValidatorV3{
 				allowDefaults:            opts.allowDefaults,

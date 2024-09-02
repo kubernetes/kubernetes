@@ -24,10 +24,10 @@ import (
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")
-	wait.Until(rc.reconcileNew, rc.loopSleepDuration, stopCh)
+	wait.Until(rc.reconcile, rc.loopSleepDuration, stopCh)
 }
 
-func (rc *reconciler) reconcileNew() {
+func (rc *reconciler) reconcile() {
 	readyToUnmount := rc.readyToUnmount()
 	if readyToUnmount {
 		// Unmounts are triggered before mounts so that a volume that was
@@ -61,12 +61,5 @@ func (rc *reconciler) reconcileNew() {
 		// were reconstructed from the API server.
 		// This will start reconciliation of node.status.volumesInUse.
 		rc.updateLastSyncTime()
-	}
-
-	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {
-		// Once DSW is populated, mark all reconstructed as reported in node.status,
-		// so they can proceed with MountDevice / SetUp.
-		rc.desiredStateOfWorld.MarkVolumesReportedInUse(rc.volumesNeedReportedInUse)
-		rc.volumesNeedReportedInUse = nil
 	}
 }

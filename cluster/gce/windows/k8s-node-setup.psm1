@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.29.0'
-$CRICTL_SHA256 = '9b679305cb05f73e9e4868056e7d48805c47e24d2d38849e64395ff54cf5c701'
+$CRICTL_VERSION = 'v1.30.0'
+$CRICTL_SHA256 = '43d37d94c0dc03830c0988049537fc22fe4b0ad4273ec9066e03586dc8920eb0'
 
 Import-Module -Force C:\common.psm1
 
@@ -561,7 +561,7 @@ function Create-NodePki {
 }
 
 # Creates the bootstrap kubelet kubeconfig at $env:BOOTSTRAP_KUBECONFIG.
-# https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
+# https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/
 #
 # Create-NodePki() must be called first.
 #
@@ -1130,7 +1130,7 @@ function Verify-WorkerServices {
   $timeout = 12
   $retries = 0
   $retryDelayInSeconds = 5
-  
+
   Log-Output ("Testing node connection to API server...")
   do {
       $retries++
@@ -1138,17 +1138,17 @@ function Verify-WorkerServices {
       $host_status = & "${env:NODE_DIR}\kubectl.exe" get nodes (hostname) -o=custom-columns=:.status.conditions[4].type | Out-String
       Start-Sleep $retryDelayInSeconds
   } while (((-Not $nodes_list) -or (-Not $nodes_list.contains((hostname))) -or (-Not $host_status.contains("Ready")))-and ($retries -le $timeout))
-  
+
   If (-Not $nodes_list){
       Throw ("Node: '$(hostname)' failed to connect to API server")
-  
+
   }ElseIf (-Not $nodes_list.contains((hostname))) {
       Throw ("Node: '$(hostname)' failed to join the cluster; NODES: '`n $($nodes_list)'")
 
   }ELseIf (-Not $host_status.contains("Ready")) {
       Throw ("Node: '$(hostname)' is not in Ready state")
   }
-  
+
   Log-Output ("Node: $(hostname) successfully joined cluster `n NODES: `n $($nodes_list)")
   Verify_GceMetadataServerRouteIsPresent
 
@@ -1543,10 +1543,21 @@ function DownloadAndInstall-NodeProblemDetector {
 #   CA_CERT
 #   NODE_PROBLEM_DETECTOR_TOKEN
 function Create-NodeProblemDetectorKubeConfig {
-  if (-not [string]::IsNullOrEmpty(${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE})) {
-    Create-Kubeconfig -Name 'node-problem-detector' `
-      -Path ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE} `
-      -Token ${kube_env}['NODE_PROBLEM_DETECTOR_TOKEN']
+  if ("${env:ENABLE_NODE_PROBLEM_DETECTOR}" -eq "standalone") {
+    if (-not [string]::IsNullOrEmpty(${kube_env]['NODE_PROBLEM_DETECTOR_TOKEN']})) {
+      Log-Output "Create-NodeProblemDetectorKubeConfig using Node Problem Detector token"
+      Create-Kubeconfig -Name 'node-problem-detector' `
+        -Path ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE} `
+        -Token ${kube_env}['NODE_PROBLEM_DETECTOR_TOKEN']
+    } elseif (Test-Path ${env:BOOTSTRAP_KUBECONFIG}) {
+      Log-Output "Create-NodeProblemDetectorKubeConfig creating kubeconfig from kubelet kubeconfig"
+      Copy-Item ${env:BOOTSTRAP_KUBECONFIG} -Destination ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE}
+      Log-Output ("node-problem-detector bootstrap kubeconfig:`n" +
+              "$(Get-Content -Raw ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE})")
+    } else {
+      Log-Output "Either NODE_PROBLEM_DETECTOR_TOKEN or ${env:BOOTSTRAP_KUBECONFIG} must be set"
+      exit 1
+    }
   }
 }
 

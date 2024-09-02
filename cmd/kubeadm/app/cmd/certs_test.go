@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -359,18 +359,12 @@ func TestRunGenCSR(t *testing.T) {
 	for _, name := range expectedCertificates {
 		_, err = pkiutil.TryLoadKeyFromDisk(certDir, name)
 		assert.NoErrorf(t, err, "failed to load key file: %s", name)
-
-		_, err = pkiutil.TryLoadCSRFromDisk(certDir, name)
-		assert.NoError(t, err, "failed to load CSR file: %s", name)
 	}
 
 	t.Log("The command generates kubeconfig files in the configured --kubeconfig-dir")
 	for _, name := range expectedKubeConfigs {
 		_, err = clientcmd.LoadFromFile(kubeConfigDir + "/" + name + ".conf")
 		assert.NoErrorf(t, err, "failed to load kubeconfig file: %s", name)
-
-		_, err = pkiutil.TryLoadCSRFromDisk(kubeConfigDir, name+".conf")
-		assert.NoError(t, err, "failed to load kubeconfig CSR file: %s", name)
 	}
 }
 

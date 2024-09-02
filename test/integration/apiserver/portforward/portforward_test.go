@@ -54,7 +54,7 @@ import (
 const remotePort = "8765"
 
 func TestPortforward(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)
 	t.Setenv("KUBECTL_PORT_FORWARD_WEBSOCKETS", "true")
 
 	var podName string
@@ -79,7 +79,7 @@ func TestPortforward(t *testing.T) {
 	backendPort, _ := strconv.Atoi(backendURL.Port())
 
 	etcd := framework.SharedEtcd()
-	server := kastesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, etcd)
+	server := kastesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcd)
 	defer server.TearDownFn()
 
 	adminClient, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -113,7 +113,15 @@ func TestPortforward(t *testing.T) {
 	// local port missing asks os to find random open port.
 	// Example: ":8000" (local = random, remote = 8000)
 	localRemotePort := fmt.Sprintf(":%s", remotePort)
-	streams, _, out, errOut := genericiooptions.NewTestIOStreams()
+	out := &mBuffer{
+		buffer: bytes.Buffer{},
+	}
+	errOut := &bytes.Buffer{}
+	streams := genericiooptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    out,
+		ErrOut: errOut,
+	}
 	portForwardOptions := portforward.NewDefaultPortForwardOptions(streams)
 	portForwardOptions.Namespace = "default"
 	portForwardOptions.PodName = "mypod"
@@ -225,4 +233,21 @@ func (d *dummyPortForwarder) PortForward(ctx context.Context, name string, uid t
 	}
 	resp.Write(stream) //nolint:errcheck
 	return stream.Close()
+}
+
+type mBuffer struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (s *mBuffer) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buffer.Write(p)
+}
+
+func (s *mBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buffer.String()
 }

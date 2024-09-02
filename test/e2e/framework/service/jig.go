@@ -440,7 +440,7 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 
 	go esController.Run(stopCh)
 
-	err := wait.PollWithContext(ctx, 1*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		return endpointAvailable && endpointSliceAvailable, nil
 	})
 	if err != nil {
@@ -475,7 +475,7 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 
 	expectNodePorts := needsNodePorts(svc)
 	for i, port := range svc.Spec.Ports {
-		hasNodePort := (port.NodePort != 0)
+		hasNodePort := port.NodePort != 0
 		if hasNodePort != expectNodePorts {
 			return nil, fmt.Errorf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
@@ -1046,7 +1046,7 @@ func (j *TestJig) CreateServicePods(ctx context.Context, replica int) error {
 	config := testutils.RCConfig{
 		Client:       j.Client,
 		Name:         j.Name,
-		Image:        framework.ServeHostnameImage,
+		Image:        imageutils.GetE2EImage(imageutils.Agnhost),
 		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
 		Namespace:    j.Namespace,
 		Labels:       j.Labels,

@@ -199,11 +199,11 @@ func testSchema() *schema.Structural {
 					"flags": {
 						Generic: schema.Generic{
 							Type: "object",
-							AdditionalProperties: &schema.StructuralOrBool{
-								Structural: &schema.Structural{
-									Generic: schema.Generic{
-										Type: "boolean",
-									},
+						},
+						AdditionalProperties: &schema.StructuralOrBool{
+							Structural: &schema.Structural{
+								Generic: schema.Generic{
+									Type: "boolean",
 								},
 							},
 						},
@@ -274,6 +274,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 		Name                string
 		InputSchema         *schema.Structural
 		ExpectedMaxElements int64
+		ExpectNilType       bool
 	}
 	tests := []maxLengthTest{
 		{
@@ -317,12 +318,12 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
-						Generic: schema.Generic{
-							Type: "string",
-						},
-					}},
 				},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+				}},
 			},
 			// expected JSON is {"":"","":"",...} so our length should be (3000000 - 2) / 6
 			ExpectedMaxElements: 393215,
@@ -382,12 +383,12 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
-						Generic: schema.Generic{
-							Type: "string",
-						},
-					}},
 				},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+				}},
 				ValueValidation: &schema.ValueValidation{
 					Format:        "string",
 					MaxProperties: maxPtr(15),
@@ -499,12 +500,60 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			// so we expect the max length to be exactly equal to the user-supplied one
 			ExpectedMaxElements: 20,
 		},
+		{
+			Name: "Property under array",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Properties: map[string]schema.Structural{
+					"field": {
+						Generic: schema.Generic{
+							Type:    "string",
+							Default: schema.JSON{Object: "default"},
+						},
+					},
+				},
+			},
+			// Got nil for delType
+			ExpectedMaxElements: 0,
+			ExpectNilType:       true,
+		},
+		{
+			Name: "Items under object",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "array",
+					},
+					Properties: map[string]schema.Structural{
+						"field": {
+							Generic: schema.Generic{
+								Type:    "string",
+								Default: schema.JSON{Object: "default"},
+							},
+						},
+					},
+					ValueValidation: &schema.ValueValidation{
+						Required: []string{"field"},
+					},
+				},
+			},
+			// Skip items under object for schema conversion.
+			ExpectedMaxElements: 0,
+		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.Name, func(t *testing.T) {
 			decl := SchemaDeclType(testCase.InputSchema, false)
-			if decl.MaxElements != testCase.ExpectedMaxElements {
+			if decl != nil && decl.MaxElements != testCase.ExpectedMaxElements {
 				t.Errorf("wrong maxElements (got %d, expected %d)", decl.MaxElements, testCase.ExpectedMaxElements)
+			}
+			if testCase.ExpectNilType && decl != nil {
+				t.Errorf("expected nil type, got %v", decl)
 			}
 		})
 	}
@@ -519,15 +568,15 @@ func genNestedSchema(depth int) *schema.Structural {
 	generator = func(d int) schema.Structural {
 		nodeTemplate := schema.Structural{
 			Generic: schema.Generic{
-				Type:                 "object",
-				AdditionalProperties: &schema.StructuralOrBool{},
+				Type: "object",
 			},
+			AdditionalProperties: &schema.StructuralOrBool{},
 		}
 		if d == 1 {
 			return nodeTemplate
 		} else {
 			mapType := generator(d - 1)
-			nodeTemplate.Generic.AdditionalProperties.Structural = &mapType
+			nodeTemplate.AdditionalProperties.Structural = &mapType
 			return nodeTemplate
 		}
 	}

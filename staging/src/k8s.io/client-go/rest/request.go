@@ -37,12 +37,15 @@ import (
 	"golang.org/x/net/http2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
@@ -749,8 +752,9 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// the server must have sent us an error in 'err'
 				return true, nil
 			}
-			if result := r.transformResponse(resp, req); result.err != nil {
-				return true, result.err
+			result := r.transformResponse(resp, req)
+			if err := result.Error(); err != nil {
+				return true, err
 			}
 			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 		}()
@@ -764,6 +768,142 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				err = transformErr
 			}
 			return nil, retry.WrapPreviousError(err)
+		}
+	}
+}
+
+type WatchListResult struct {
+	// err holds any errors we might have received
+	// during streaming.
+	err error
+
+	// items hold the collected data
+	items []runtime.Object
+
+	// initialEventsEndBookmarkRV holds the resource version
+	// extracted from the bookmark event that marks
+	// the end of the stream.
+	initialEventsEndBookmarkRV string
+
+	// gv represents the API version
+	// it is used to construct the final list response
+	// normally this information is filled by the server
+	gv schema.GroupVersion
+}
+
+func (r WatchListResult) Into(obj runtime.Object) error {
+	if r.err != nil {
+		return r.err
+	}
+
+	listPtr, err := meta.GetItemsPtr(obj)
+	if err != nil {
+		return err
+	}
+	listVal, err := conversion.EnforcePtr(listPtr)
+	if err != nil {
+		return err
+	}
+	if listVal.Kind() != reflect.Slice {
+		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	}
+
+	if len(r.items) == 0 {
+		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+	} else {
+		listVal.Set(reflect.MakeSlice(listVal.Type(), len(r.items), len(r.items)))
+		for i, o := range r.items {
+			if listVal.Type().Elem() != reflect.TypeOf(o).Elem() {
+				return fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
+			}
+			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+		}
+	}
+
+	listMeta, err := meta.ListAccessor(obj)
+	if err != nil {
+		return err
+	}
+	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
+
+	typeMeta, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return err
+	}
+	version := r.gv.String()
+	typeMeta.SetAPIVersion(version)
+	typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
+
+	return nil
+}
+
+// WatchList establishes a stream to get a consistent snapshot of data
+// from the server as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#proposal
+//
+// Note that the watchlist requires properly setting the ListOptions
+// otherwise it just establishes a regular watch with the server.
+// Check the documentation https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+// to see what parameters are currently required.
+func (r *Request) WatchList(ctx context.Context) WatchListResult {
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
+		return WatchListResult{err: fmt.Errorf("%q feature gate is not enabled", clientfeatures.WatchListClient)}
+	}
+	// TODO(#115478): consider validating request parameters (i.e sendInitialEvents).
+	//  Most users use the generated client, which handles the proper setting of parameters.
+	//  We don't have validation for other methods (e.g., the Watch)
+	//  thus, for symmetry, we haven't added additional checks for the WatchList method.
+	w, err := r.Watch(ctx)
+	if err != nil {
+		return WatchListResult{err: err}
+	}
+	return r.handleWatchList(ctx, w)
+}
+
+// handleWatchList holds the actual logic for easier unit testing.
+// Note that this function will close the passed watch.
+func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchListResult {
+	defer w.Stop()
+	var lastKey string
+	var items []runtime.Object
+
+	for {
+		select {
+		case <-ctx.Done():
+			return WatchListResult{err: ctx.Err()}
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				return WatchListResult{err: fmt.Errorf("unexpected watch close")}
+			}
+			if event.Type == watch.Error {
+				return WatchListResult{err: errors.FromObject(event.Object)}
+			}
+			meta, err := meta.Accessor(event.Object)
+			if err != nil {
+				return WatchListResult{err: fmt.Errorf("failed to parse watch event: %#v", event)}
+			}
+
+			switch event.Type {
+			case watch.Added:
+				// the following check ensures that the response is ordered.
+				// earlier servers had a bug that caused them to not sort the output.
+				// in such cases, return an error which can trigger fallback logic.
+				key := objectKeyFromMeta(meta)
+				if len(lastKey) > 0 && lastKey > key {
+					return WatchListResult{err: fmt.Errorf("cannot add the obj (%#v) with the key = %s, as it violates the ordering guarantees provided by the watchlist feature in beta phase, lastInsertedKey was = %s", event.Object, key, lastKey)}
+				}
+				items = append(items, event.Object)
+				lastKey = key
+			case watch.Bookmark:
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+					return WatchListResult{
+						items:                      items,
+						initialEventsEndBookmarkRV: meta.GetResourceVersion(),
+						gv:                         r.c.content.GroupVersion,
+					}
+				}
+			default:
+				return WatchListResult{err: fmt.Errorf("unexpected watch event %#v, expected to only receive watch.Added and watch.Bookmark events", event)}
+			}
 		}
 	}
 }
@@ -1004,7 +1144,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return false
 		}
 		// For connection errors and apiserver shutdown errors retry.
-		if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) {
 			return true
 		}
 		return false
@@ -1469,4 +1609,11 @@ func ValidatePathSegmentName(name string, prefix bool) []string {
 		return IsValidPathSegmentPrefix(name)
 	}
 	return IsValidPathSegmentName(name)
+}
+
+func objectKeyFromMeta(objMeta metav1.Object) string {
+	if len(objMeta.GetNamespace()) > 0 {
+		return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
+	}
+	return objMeta.GetName()
 }

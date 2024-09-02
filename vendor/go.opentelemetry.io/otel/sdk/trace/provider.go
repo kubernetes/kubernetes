@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
@@ -25,6 +14,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/embedded"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -53,7 +44,7 @@ type tracerProviderConfig struct {
 	resource *resource.Resource
 }
 
-// MarshalLog is the marshaling function used by the logging system to represent this exporter.
+// MarshalLog is the marshaling function used by the logging system to represent this Provider.
 func (cfg tracerProviderConfig) MarshalLog() interface{} {
 	return struct {
 		SpanProcessors  []SpanProcessor
@@ -73,6 +64,8 @@ func (cfg tracerProviderConfig) MarshalLog() interface{} {
 // TracerProvider is an OpenTelemetry TracerProvider. It provides Tracers to
 // instrumentation so it can trace operational flow through a system.
 type TracerProvider struct {
+	embedded.TracerProvider
+
 	mu             sync.Mutex
 	namedTracer    map[instrumentation.Scope]*tracer
 	spanProcessors atomic.Pointer[spanProcessorStates]
@@ -139,7 +132,7 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 	// This check happens before the mutex is acquired to avoid deadlocking if Tracer() is called from within Shutdown().
 	if p.isShutdown.Load() {
-		return trace.NewNoopTracerProvider().Tracer(name, opts...)
+		return noop.NewTracerProvider().Tracer(name, opts...)
 	}
 	c := trace.NewTracerConfig(opts...)
 	if name == "" {
@@ -157,7 +150,7 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		// Must check the flag after acquiring the mutex to avoid returning a valid tracer if Shutdown() ran
 		// after the first check above but before we acquired the mutex.
 		if p.isShutdown.Load() {
-			return trace.NewNoopTracerProvider().Tracer(name, opts...), true
+			return noop.NewTracerProvider().Tracer(name, opts...), true
 		}
 		t, ok := p.namedTracer[is]
 		if !ok {
@@ -298,7 +291,7 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 				retErr = err
 			} else {
 				// Poor man's list of errors
-				retErr = fmt.Errorf("%v; %v", retErr, err)
+				retErr = fmt.Errorf("%w; %w", retErr, err)
 			}
 		}
 	}

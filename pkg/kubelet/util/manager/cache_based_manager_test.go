@@ -73,8 +73,8 @@ func newSecretStore(fakeClient clientset.Interface, clock clock.Clock, getTTL Ge
 	}
 }
 
-func getSecretNames(pod *v1.Pod) sets.String {
-	result := sets.NewString()
+func getSecretNames(pod *v1.Pod) sets.Set[string] {
+	result := sets.New[string]()
 	podutil.VisitPodSecretNames(pod, func(name string) bool {
 		result.Insert(name)
 		return true
@@ -99,7 +99,7 @@ func TestSecretStore(t *testing.T) {
 
 	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
-	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	assert.Empty(t, actions, "unexpected actions")
 	// Should issue Get request
 	store.Get("ns1", "name1")
 	// Shouldn't issue Get request, as secret is not registered
@@ -108,7 +108,7 @@ func TestSecretStore(t *testing.T) {
 	store.Get("ns3", "name3")
 
 	actions = fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 2, "unexpected actions")
 
 	for _, a := range actions {
 		assert.True(t, a.Matches("get", "secrets"), "unexpected actions: %#v", a)
@@ -169,7 +169,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	}
 	wg.Wait()
 	actions := fakeClient.Actions()
-	assert.Equal(t, 100, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 100, "unexpected actions")
 
 	for _, a := range actions {
 		assert.True(t, a.Matches("get", "secrets"), "unexpected actions: %#v", a)
@@ -197,7 +197,7 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	wg.Wait()
 	actions := fakeClient.Actions()
 	// Only first Get, should forward the Get request.
-	assert.Equal(t, 10, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 10, "unexpected actions")
 }
 
 func TestCustomTTL(t *testing.T) {
@@ -220,24 +220,24 @@ func TestCustomTTL(t *testing.T) {
 	ttlExists = true
 	store.Get("ns", "name")
 	actions := fakeClient.Actions()
-	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 1, "unexpected actions")
 	fakeClient.ClearActions()
 
 	// Set 5-minute ttl and see if this works.
 	ttl = time.Duration(5) * time.Minute
 	store.Get("ns", "name")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	assert.Empty(t, actions, "unexpected actions")
 	// Still no effect after 4 minutes.
 	fakeClock.Step(4 * time.Minute)
 	store.Get("ns", "name")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	assert.Empty(t, actions, "unexpected actions")
 	// Now it should have an effect.
 	fakeClock.Step(time.Minute)
 	store.Get("ns", "name")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 1, "unexpected actions")
 	fakeClient.ClearActions()
 
 	// Now remove the custom ttl and see if that works.
@@ -245,12 +245,12 @@ func TestCustomTTL(t *testing.T) {
 	fakeClock.Step(55 * time.Second)
 	store.Get("ns", "name")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	assert.Empty(t, actions, "unexpected action")
 	// Pass the minute and it should be triggered now.
 	fakeClock.Step(5 * time.Second)
 	store.Get("ns", "name")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 1, "unexpected actions")
 }
 
 func TestParseNodeAnnotation(t *testing.T) {
@@ -402,7 +402,7 @@ func TestCacheInvalidation(t *testing.T) {
 	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")
 	actions := fakeClient.Actions()
-	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 3, "unexpected number of actions")
 	fakeClient.ClearActions()
 
 	// Update a pod with a new secret.
@@ -421,7 +421,7 @@ func TestCacheInvalidation(t *testing.T) {
 	store.Get("ns1", "s20")
 	store.Get("ns1", "s3")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 2, "unexpected actions")
 	fakeClient.ClearActions()
 
 	// Create a new pod that is refencing the first three secrets - those should
@@ -433,7 +433,7 @@ func TestCacheInvalidation(t *testing.T) {
 	store.Get("ns1", "s20")
 	store.Get("ns1", "s3")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 3, "unexpected actions")
 	fakeClient.ClearActions()
 }
 

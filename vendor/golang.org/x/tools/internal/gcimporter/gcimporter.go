@@ -259,13 +259,6 @@ func Import(packages map[string]*types.Package, path, srcDir string, lookup func
 	return
 }
 
-func deref(typ types.Type) types.Type {
-	if p, _ := typ.(*types.Pointer); p != nil {
-		return p.Elem()
-	}
-	return typ
-}
-
 type byPath []*types.Package
 
 func (a byPath) Len() int           { return len(a) }

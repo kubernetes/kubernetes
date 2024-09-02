@@ -23,8 +23,12 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestCompileCELExpression(t *testing.T) {
@@ -32,6 +36,8 @@ func TestCompileCELExpression(t *testing.T) {
 		name          string
 		expression    string
 		expectedError string
+
+		authorizeWithSelectorsEnabled bool
 	}{
 		{
 			name:       "SubjectAccessReviewSpec user comparison",
@@ -57,12 +63,44 @@ func TestCompileCELExpression(t *testing.T) {
 			expression:    "x.user",
 			expectedError: "undeclared reference",
 		},
+		{
+			name:                          "fieldSelector not enabled",
+			expression:                    "request.resourceAttributes.fieldSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: false,
+			expectedError:                 `undefined field 'fieldSelector'`,
+		},
+		{
+			name:                          "fieldSelector rawSelector",
+			expression:                    "request.resourceAttributes.fieldSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: true,
+		},
+		{
+			name:                          "fieldSelector requirement",
+			expression:                    "request.resourceAttributes.fieldSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			authorizeWithSelectorsEnabled: true,
+		},
+		{
+			name:                          "labelSelector not enabled",
+			expression:                    "request.resourceAttributes.labelSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: false,
+			expectedError:                 `undefined field 'labelSelector'`,
+		},
+		{
+			name:                          "labelSelector rawSelector",
+			expression:                    "request.resourceAttributes.labelSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: true,
+		},
+		{
+			name:                          "labelSelector requirement",
+			expression:                    "request.resourceAttributes.labelSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			authorizeWithSelectorsEnabled: true,
+		},
 	}
-
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, tc.authorizeWithSelectorsEnabled)
+			compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 			_, err := compiler.CompileCELExpression(&SubjectAccessReviewMatchCondition{
 				Expression: tc.expression,
 			})
@@ -77,6 +115,7 @@ func TestCompileCELExpression(t *testing.T) {
 }
 
 func TestBuildRequestType(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 	f := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}
@@ -122,7 +161,10 @@ func compareFieldsForType(t *testing.T, nativeType reflect.Type, declType *apise
 			t.Fatalf("expected field %q to be present", nativeField.Name)
 		}
 		declFieldType := nativeTypeToCELType(t, nativeField.Type, field, fields)
-		if declFieldType != nil && declFieldType.CelType().Equal(declField.Type.CelType()).Value() != true {
+		if declFieldType == nil {
+			return fmt.Errorf("no field type found for %s %v", nativeField.Name, nativeField.Type)
+		}
+		if declFieldType.CelType().Equal(declField.Type.CelType()).Value() != true {
 			return fmt.Errorf("expected native field %q to have type %v, got %v", nativeField.Name, nativeField.Type, declField.Type)
 		}
 	}
@@ -131,7 +173,7 @@ func compareFieldsForType(t *testing.T, nativeType reflect.Type, declType *apise
 
 func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	switch nativeType {
-	case reflect.TypeOf(""):
+	case reflect.TypeOf(""), reflect.TypeOf(metav1.LabelSelectorOperator("")), reflect.TypeOf(metav1.FieldSelectorOperator("")):
 		return apiservercel.StringType
 	case reflect.TypeOf([]string{}):
 		return apiservercel.NewListType(apiservercel.StringType, -1)
@@ -151,6 +193,34 @@ func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name 
 			return nil
 		}
 		return nonResourceAttributesDeclType
+	case reflect.TypeOf(&v1.FieldSelectorAttributes{}):
+		selectorAttributesDeclType := buildFieldSelectorType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeOf(v1.FieldSelectorAttributes{}), selectorAttributesDeclType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return selectorAttributesDeclType
+	case reflect.TypeOf(&v1.LabelSelectorAttributes{}):
+		selectorAttributesDeclType := buildLabelSelectorType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeOf(v1.LabelSelectorAttributes{}), selectorAttributesDeclType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return selectorAttributesDeclType
+	case reflect.TypeOf([]metav1.FieldSelectorRequirement{}):
+		requirementType := buildSelectorRequirementType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeOf(metav1.FieldSelectorRequirement{}), requirementType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return apiservercel.NewListType(requirementType, -1)
+	case reflect.TypeOf([]metav1.LabelSelectorRequirement{}):
+		requirementType := buildSelectorRequirementType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeOf(metav1.LabelSelectorRequirement{}), requirementType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return apiservercel.NewListType(requirementType, -1)
 	default:
 		t.Fatalf("unsupported type %v", nativeType)
 	}

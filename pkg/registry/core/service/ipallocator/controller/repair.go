@@ -156,13 +156,14 @@ func (c *Repair) doRunOnce() error {
 	snapshotByFamily := make(map[v1.IPFamily]*api.RangeAllocation)
 	storedByFamily := make(map[v1.IPFamily]ipallocator.Interface)
 
-	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		for family, allocator := range c.allocatorByFamily {
 			// get snapshot if it is not there
 			if _, ok := snapshotByFamily[family]; !ok {
 				snapshot, err := allocator.Get()
 				if err != nil {
-					return false, err
+					runtime.HandleError(fmt.Errorf("unable to refresh the service IP block: %w", err))
+					return false, nil
 				}
 
 				snapshotByFamily[family] = snapshot
@@ -172,7 +173,7 @@ func (c *Repair) doRunOnce() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("unable to refresh the service IP block: %v", err)
+		return fmt.Errorf("unable to refresh the service IP block: %w", err)
 	}
 
 	// ensure that ranges are assigned

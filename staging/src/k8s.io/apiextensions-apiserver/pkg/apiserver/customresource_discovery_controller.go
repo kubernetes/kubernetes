@@ -53,7 +53,7 @@ type DiscoveryController struct {
 	// To allow injection for testing.
 	syncFn func(version schema.GroupVersion) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[schema.GroupVersion]
 }
 
 func NewDiscoveryController(
@@ -69,7 +69,10 @@ func NewDiscoveryController(
 		crdLister:       crdInformer.Lister(),
 		crdsSynced:      crdInformer.Informer().HasSynced,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[schema.GroupVersion](),
+			workqueue.TypedRateLimitingQueueConfig[schema.GroupVersion]{Name: "DiscoveryController"},
+		),
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -337,7 +340,7 @@ func (c *DiscoveryController) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(schema.GroupVersion))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

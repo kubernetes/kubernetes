@@ -112,7 +112,7 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 
 	// Enable JTI feature
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, true)
 
 	ctx := context.Background()
 	// Create a test service account

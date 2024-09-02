@@ -73,24 +73,16 @@ func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string
 	gomega.Expect(expectedFSGroup).To(gomega.Equal(fsGroupResult), "Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
 }
 
-// getKubeletMainPid return the Main PID of the Kubelet Process
-func getKubeletMainPid(ctx context.Context, nodeIP string, sudoPresent bool, systemctlPresent bool) string {
-	command := ""
-	if systemctlPresent {
-		command = "systemctl status kubelet | grep 'Main PID'"
-	} else {
-		command = "service kubelet status | grep 'Main PID'"
-	}
-	if sudoPresent {
-		command = fmt.Sprintf("sudo %s", command)
-	}
+// getKubeletRunning return if the kubelet is running or not
+func getKubeletRunning(ctx context.Context, nodeIP string) bool {
+	command := "systemctl show kubelet --property ActiveState --value"
 	framework.Logf("Attempting `%s`", command)
 	sshResult, err := e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
 	e2essh.LogResult(sshResult)
-	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet PID")
-	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet Main PID should not be Empty")
-	return sshResult.Stdout
+	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet status")
+	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet status should not be Empty")
+	return strings.TrimSpace(sshResult.Stdout) == "active"
 }
 
 // TestKubeletRestartsAndRestoresMount tests that a volume mounted to a pod remains mounted after a kubelet restarts
@@ -103,6 +95,9 @@ func TestKubeletRestartsAndRestoresMount(ctx context.Context, c clientset.Interf
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(ctx, KRestart, c, clientPod)
+
+	ginkgo.By("Wait 20s for the volume to become stable")
+	time.Sleep(20 * time.Second)
 
 	ginkgo.By("Testing that written file is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
@@ -120,6 +115,9 @@ func TestKubeletRestartsAndRestoresMap(ctx context.Context, c clientset.Interfac
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(ctx, KRestart, c, clientPod)
+
+	ginkgo.By("Wait 20s for the volume to become stable")
+	time.Sleep(20 * time.Second)
 
 	ginkgo.By("Testing that written pv is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, volumePath, byteLen, seed)
@@ -617,6 +615,40 @@ func WaitForGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.Gro
 	}
 
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// EnsureGVRDeletion checks that no object as defined by the group/version/kind and name is ever found during the given time period
+func EnsureGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration, namespace string) error {
+	var resourceClient dynamic.ResourceInterface
+	if namespace != "" {
+		resourceClient = c.Resource(gvr).Namespace(namespace)
+	} else {
+		resourceClient = c.Resource(gvr)
+	}
+
+	err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+		_, err := resourceClient.Get(ctx, objectName, metav1.GetOptions{})
+		return err
+	}).WithTimeout(timeout).WithPolling(poll).Should(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("failed to delete %s %s", gvr, objectName)))
+	return err
+}
+
+// EnsureNoGVRDeletion checks that an object as defined by the group/version/kind and name has not been deleted during the given time period
+func EnsureNoGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration, namespace string) error {
+	var resourceClient dynamic.ResourceInterface
+	if namespace != "" {
+		resourceClient = c.Resource(gvr).Namespace(namespace)
+	} else {
+		resourceClient = c.Resource(gvr)
+	}
+	err := framework.Gomega().Consistently(ctx, func(ctx context.Context) error {
+		_, err := resourceClient.Get(ctx, objectName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get %s %s: %w", gvr.Resource, objectName, err)
+		}
+		return nil
+	}).WithTimeout(timeout).WithPolling(poll).Should(gomega.Succeed())
+	return err
 }
 
 // WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted

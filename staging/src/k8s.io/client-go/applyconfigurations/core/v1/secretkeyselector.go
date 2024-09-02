@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// SecretKeySelectorApplyConfiguration represents an declarative configuration of the SecretKeySelector type for use
+// SecretKeySelectorApplyConfiguration represents a declarative configuration of the SecretKeySelector type for use
 // with apply.
 type SecretKeySelectorApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -26,7 +26,7 @@ type SecretKeySelectorApplyConfiguration struct {
 	Optional                               *bool   `json:"optional,omitempty"`
 }
 
-// SecretKeySelectorApplyConfiguration constructs an declarative configuration of the SecretKeySelector type for use with
+// SecretKeySelectorApplyConfiguration constructs a declarative configuration of the SecretKeySelector type for use with
 // apply.
 func SecretKeySelector() *SecretKeySelectorApplyConfiguration {
 	return &SecretKeySelectorApplyConfiguration{}
@@ -36,7 +36,7 @@ func SecretKeySelector() *SecretKeySelectorApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *SecretKeySelectorApplyConfiguration) WithName(value string) *SecretKeySelectorApplyConfiguration {
-	b.Name = &value
+	b.LocalObjectReferenceApplyConfiguration.Name = &value
 	return b
 }
 

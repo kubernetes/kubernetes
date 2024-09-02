@@ -25,11 +25,13 @@ import (
 
 // Structural represents a structural schema.
 type Structural struct {
-	Items      *Structural
-	Properties map[string]Structural
+	Items                *Structural
+	Properties           map[string]Structural
+	AdditionalProperties *StructuralOrBool
 
 	Generic
 	Extensions
+	ValidationExtensions
 
 	ValueValidation *ValueValidation
 }
@@ -51,11 +53,10 @@ type Generic struct {
 	// It can be object, array, number, integer, boolean, string.
 	// It is optional only if x-kubernetes-preserve-unknown-fields
 	// or x-kubernetes-int-or-string is true.
-	Type                 string
-	Title                string
-	Default              JSON
-	AdditionalProperties *StructuralOrBool
-	Nullable             bool
+	Type     string
+	Title    string
+	Default  JSON
+	Nullable bool
 }
 
 // +k8s:deepcopy-gen=true
@@ -128,7 +129,13 @@ type Extensions struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string
+}
 
+// +k8s:deepcopy-gen=true
+
+// ValidationExtensions contains the Kubernetes OpenAPI v3 extensions that are
+// used for validation rather than structure.
+type ValidationExtensions struct {
 	// x-kubernetes-validations describes a list of validation rules for expression validation.
 	// Use the v1 struct since this gets serialized as an extension.
 	XValidations apiextensionsv1.ValidationRules
@@ -166,9 +173,11 @@ type ValueValidation struct {
 // under a logical junctor, and catch all structs for generic and vendor extensions schema fields.
 type NestedValueValidation struct {
 	ValueValidation
+	ValidationExtensions
 
-	Items      *NestedValueValidation
-	Properties map[string]NestedValueValidation
+	Items                *NestedValueValidation
+	Properties           map[string]NestedValueValidation
+	AdditionalProperties *NestedValueValidation
 
 	// Anything set in the following will make the scheme
 	// non-structural, with the exception of these two patterns if

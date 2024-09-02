@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ReplicaSetConditionApplyConfiguration represents an declarative configuration of the ReplicaSetCondition type for use
+// ReplicaSetConditionApplyConfiguration represents a declarative configuration of the ReplicaSetCondition type for use
 // with apply.
 type ReplicaSetConditionApplyConfiguration struct {
 	Type               *v1.ReplicaSetConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type ReplicaSetConditionApplyConfiguration struct {
 	Message            *string                     `json:"message,omitempty"`
 }
 
-// ReplicaSetConditionApplyConfiguration constructs an declarative configuration of the ReplicaSetCondition type for use with
+// ReplicaSetConditionApplyConfiguration constructs a declarative configuration of the ReplicaSetCondition type for use with
 // apply.
 func ReplicaSetCondition() *ReplicaSetConditionApplyConfiguration {
 	return &ReplicaSetConditionApplyConfiguration{}

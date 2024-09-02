@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ConfigMapEnvSourceApplyConfiguration represents an declarative configuration of the ConfigMapEnvSource type for use
+// ConfigMapEnvSourceApplyConfiguration represents a declarative configuration of the ConfigMapEnvSource type for use
 // with apply.
 type ConfigMapEnvSourceApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
 	Optional                               *bool `json:"optional,omitempty"`
 }
 
-// ConfigMapEnvSourceApplyConfiguration constructs an declarative configuration of the ConfigMapEnvSource type for use with
+// ConfigMapEnvSourceApplyConfiguration constructs a declarative configuration of the ConfigMapEnvSource type for use with
 // apply.
 func ConfigMapEnvSource() *ConfigMapEnvSourceApplyConfiguration {
 	return &ConfigMapEnvSourceApplyConfiguration{}
@@ -35,7 +35,7 @@ func ConfigMapEnvSource() *ConfigMapEnvSourceApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ConfigMapEnvSourceApplyConfiguration) WithName(value string) *ConfigMapEnvSourceApplyConfiguration {
-	b.Name = &value
+	b.LocalObjectReferenceApplyConfiguration.Name = &value
 	return b
 }
 

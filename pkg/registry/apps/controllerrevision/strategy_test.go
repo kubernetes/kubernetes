@@ -17,6 +17,7 @@ limitations under the License.
 package controllerrevision
 
 import (
+	"encoding/json"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ func TestStrategy_Validate(t *testing.T) {
 		invalidName = newControllerRevision("NoUppercaseOrSpecialCharsLike=Equals", "validns", newObject(), 0)
 		emptyNs     = newControllerRevision("validname", "", newObject(), 100)
 		invalidNs   = newControllerRevision("validname", "NoUppercaseOrSpecialCharsLike=Equals", newObject(), 100)
-		nilData     = newControllerRevision("validname", "validns", nil, 0)
+		nilData     = newControllerRevision("validname", "validns", runtime.RawExtension{Raw: nil}, 0)
 	)
 
 	tests := map[string]struct {
@@ -79,11 +80,10 @@ func TestStrategy_ValidateUpdate(t *testing.T) {
 	var (
 		valid       = newControllerRevision("validname", "validns", newObject(), 0)
 		changedData = newControllerRevision("validname", "validns",
-			func() runtime.Object {
-				modified := newObject()
-				ss := modified.(*apps.StatefulSet)
+			func() runtime.RawExtension {
+				ss := newStatefulSet()
 				ss.Name = "cde"
-				return modified
+				return newRawExtensionFromObject(ss)
 			}(), 0)
 		changedRevision = newControllerRevision("validname", "validns", newObject(), 1)
 	)
@@ -125,7 +125,7 @@ func TestStrategy_ValidateUpdate(t *testing.T) {
 	}
 }
 
-func newControllerRevision(name, namespace string, data runtime.Object, revision int64) *apps.ControllerRevision {
+func newControllerRevision(name, namespace string, data runtime.RawExtension, revision int64) *apps.ControllerRevision {
 	return &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -138,7 +138,7 @@ func newControllerRevision(name, namespace string, data runtime.Object, revision
 	}
 }
 
-func newObject() runtime.Object {
+func newStatefulSet() *apps.StatefulSet {
 	return &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.StatefulSetSpec{
@@ -154,4 +154,11 @@ func newObject() runtime.Object {
 			},
 		},
 	}
+}
+func newRawExtensionFromObject(obj runtime.Object) runtime.RawExtension {
+	jsonData, _ := json.Marshal(obj)
+	return runtime.RawExtension{Raw: jsonData}
+}
+func newObject() runtime.RawExtension {
+	return newRawExtensionFromObject(newStatefulSet())
 }

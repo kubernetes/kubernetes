@@ -60,7 +60,7 @@ type Controller struct {
 	nodeStore listers.NodeLister
 
 	// Nodes that need to be synced.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// Returns true if all underlying informers are synced.
 	hasSynced func() bool
@@ -81,7 +81,10 @@ type Controller struct {
 func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
 	ttlc := &Controller{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttlcontroller"},
+		),
 	}
 	logger := klog.FromContext(ctx)
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -216,7 +219,7 @@ func (ttlc *Controller) processItem(ctx context.Context) bool {
 	}
 	defer ttlc.queue.Done(key)
 
-	err := ttlc.updateNodeIfNeeded(ctx, key.(string))
+	err := ttlc.updateNodeIfNeeded(ctx, key)
 	if err == nil {
 		ttlc.queue.Forget(key)
 		return true

@@ -27,6 +27,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -250,6 +251,17 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
+	startTime := kubeadmutil.StartTimeUTC()
+
+	// Backdate certificate to allow small time jumps.
+	cfg.NotBefore = startTime.Add(-kubeadmconstants.CertificateBackdate)
+
+	// Use the validity periods defined in the ClusterConfiguration.
+	// Only use CertificateValidityPeriod as CA renewal is not supported.
+	if rm.cfg.CertificateValidityPeriod != nil {
+		cfg.NotAfter = startTime.Add(rm.cfg.CertificateValidityPeriod.Duration)
+	}
+
 	// reads the CA
 	caCert, caKey, err := certsphase.LoadCertificateAuthority(rm.cfg.CertificatesDir, handler.CABaseName)
 	if err != nil {
@@ -322,7 +334,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCertificateExpirationInfo returns certificate expiration info.
@@ -358,7 +370,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCAExpirationInfo returns CA expiration info.

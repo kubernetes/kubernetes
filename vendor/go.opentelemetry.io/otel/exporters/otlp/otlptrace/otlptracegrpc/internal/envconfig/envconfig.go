@@ -2,18 +2,7 @@
 // source: internal/shared/otlp/envconfig/envconfig.go.tmpl
 
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package envconfig // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/envconfig"
 
@@ -174,13 +163,13 @@ func stringToHeader(value string) map[string]string {
 			global.Error(errors.New("missing '="), "parse headers", "input", header)
 			continue
 		}
-		name, err := url.QueryUnescape(n)
+		name, err := url.PathUnescape(n)
 		if err != nil {
 			global.Error(err, "escape header key", "key", n)
 			continue
 		}
 		trimmedName := strings.TrimSpace(name)
-		value, err := url.QueryUnescape(v)
+		value, err := url.PathUnescape(v)
 		if err != nil {
 			global.Error(err, "escape header value", "value", v)
 			continue

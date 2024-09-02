@@ -1873,7 +1873,7 @@
         },
         "persistentVolumeClaimRetentionPolicy": {
           "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy",
-          "description": "persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent volume claims created from volumeClaimTemplates. By default, all persistent volume claims are created as needed and retained until manually deleted. This policy allows the lifecycle to be altered, for example by deleting persistent volume claims when their stateful set is deleted, or when their pod is scaled down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.  +optional"
+          "description": "persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent volume claims created from volumeClaimTemplates. By default, all persistent volume claims are created as needed and retained until manually deleted. This policy allows the lifecycle to be altered, for example by deleting persistent volume claims when their stateful set is deleted, or when their pod is scaled down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled.  +optional"
         },
         "podManagementPolicy": {
           "description": "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once.",
@@ -62716,7 +62716,7 @@
           "application/vnd.kubernetes.protobuf"
         ],
         "description": "get available resources",
-        "operationId": "getResourceV1alpha2APIResources",
+        "operationId": "getResourceV1alpha3APIResources",
         "produces": [
           "application/json",
           "application/yaml",
@@ -62747,7 +62747,7 @@
           "*/*"
         ],
         "description": "delete collection of PodSchedulingContext",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedPodSchedulingContext",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -62823,7 +62823,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind PodSchedulingContext",
-        "operationId": "listResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "listResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HTxmzgxC"
@@ -62900,7 +62900,7 @@
           "*/*"
         ],
         "description": "create a PodSchedulingContext",
-        "operationId": "createResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "createResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "in": "body",
@@ -62968,7 +62968,7 @@
           "*/*"
         ],
         "description": "delete a PodSchedulingContext",
-        "operationId": "deleteResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "deleteResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -63026,7 +63026,7 @@
           "*/*"
         ],
         "description": "read the specified PodSchedulingContext",
-        "operationId": "readResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "readResourceV1alpha3NamespacedPodSchedulingContext",
         "produces": [
           "application/json",
           "application/yaml",
@@ -63080,7 +63080,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified PodSchedulingContext",
-        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "patchResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -63138,7 +63138,7 @@
           "*/*"
         ],
         "description": "replace the specified PodSchedulingContext",
-        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "replaceResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "in": "body",
@@ -63200,7 +63200,7 @@
           "*/*"
         ],
         "description": "read status of the specified PodSchedulingContext",
-        "operationId": "readResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "readResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "produces": [
           "application/json",
           "application/yaml",
@@ -63254,7 +63254,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update status of the specified PodSchedulingContext",
-        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "patchResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -63312,7 +63312,7 @@
           "*/*"
         ],
         "description": "replace status of the specified PodSchedulingContext",
-        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "replaceResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "parameters": [
           {
             "in": "body",
@@ -63374,7 +63374,7 @@
           "*/*"
         ],
         "description": "delete collection of ResourceClaim",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClaim",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -63450,7 +63450,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaim",
-        "operationId": "listResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "listResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HTxmzgxC"
@@ -63527,7 +63527,7 @@
           "*/*"
         ],
         "description": "create a ResourceClaim",
-        "operationId": "createResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "createResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "in": "body",
@@ -63595,7 +63595,7 @@
           "*/*"
         ],
         "description": "delete a ResourceClaim",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -63653,7 +63653,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClaim",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaim",
         "produces": [
           "application/json",
           "application/yaml",
@@ -63707,7 +63707,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClaim",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -63765,7 +63765,7 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClaim",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "in": "body",
@@ -63827,7 +63827,7 @@
           "*/*"
         ],
         "description": "read status of the specified ResourceClaim",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaimStatus",
         "produces": [
           "application/json",
           "application/yaml",
@@ -63881,7 +63881,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update status of the specified ResourceClaim",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaimStatus",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -63939,7 +63939,7 @@
           "*/*"
         ],
         "description": "replace status of the specified ResourceClaim",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaimStatus",
         "parameters": [
           {
             "in": "body",
@@ -64001,7 +64001,7 @@
           "*/*"
         ],
         "description": "delete collection of ResourceClaimTemplate",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClaimTemplate",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -64077,7 +64077,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimTemplate",
-        "operationId": "listResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "listResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HTxmzgxC"
@@ -64154,7 +64154,7 @@
           "*/*"
         ],
         "description": "create a ResourceClaimTemplate",
-        "operationId": "createResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "createResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "in": "body",
@@ -64222,7 +64222,7 @@
           "*/*"
         ],
         "description": "delete a ResourceClaimTemplate",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -64280,7 +64280,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClaimTemplate",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaimTemplate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -64334,7 +64334,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClaimTemplate",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -64392,7 +64392,7 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClaimTemplate",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "in": "body",
@@ -64454,7 +64454,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind PodSchedulingContext",
-        "operationId": "listResourceV1alpha2PodSchedulingContextForAllNamespaces",
+        "operationId": "listResourceV1alpha3PodSchedulingContextForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -64528,7 +64528,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaim",
-        "operationId": "listResourceV1alpha2ResourceClaimForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClaimForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -64602,7 +64602,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimTemplate",
-        "operationId": "listResourceV1alpha2ResourceClaimTemplateForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClaimTemplateForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -64676,7 +64676,7 @@
           "*/*"
         ],
         "description": "delete collection of ResourceClass",
-        "operationId": "deleteResourceV1alpha2CollectionResourceClass",
+        "operationId": "deleteResourceV1alpha3CollectionResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -64752,7 +64752,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClass",
-        "operationId": "listResourceV1alpha2ResourceClass",
+        "operationId": "listResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HTxmzgxC"
@@ -64826,7 +64826,7 @@
           "*/*"
         ],
         "description": "create a ResourceClass",
-        "operationId": "createResourceV1alpha2ResourceClass",
+        "operationId": "createResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "in": "body",
@@ -64894,7 +64894,7 @@
           "*/*"
         ],
         "description": "delete a ResourceClass",
-        "operationId": "deleteResourceV1alpha2ResourceClass",
+        "operationId": "deleteResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-jLCaEqdf"
@@ -64952,7 +64952,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClass",
-        "operationId": "readResourceV1alpha2ResourceClass",
+        "operationId": "readResourceV1alpha3ResourceClass",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65003,7 +65003,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClass",
-        "operationId": "patchResourceV1alpha2ResourceClass",
+        "operationId": "patchResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-YKtvzQTo"
@@ -65061,7 +65061,7 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClass",
-        "operationId": "replaceResourceV1alpha2ResourceClass",
+        "operationId": "replaceResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "in": "body",
@@ -65123,7 +65123,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingContextList",
+        "operationId": "watchResourceV1alpha3NamespacedPodSchedulingContextList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65200,7 +65200,7 @@
           "*/*"
         ],
         "description": "watch changes to an object of kind PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "watchResourceV1alpha3NamespacedPodSchedulingContext",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65285,7 +65285,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65362,7 +65362,7 @@
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaim",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65447,7 +65447,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimTemplateList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimTemplateList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65524,7 +65524,7 @@
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimTemplate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65609,7 +65609,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2PodSchedulingContextListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3PodSchedulingContextListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65683,7 +65683,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClaimListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClaimListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65757,7 +65757,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClaimTemplateListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClaimTemplateListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65831,7 +65831,7 @@
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClass. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClassList",
+        "operationId": "watchResourceV1alpha3ResourceClassList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -65905,7 +65905,7 @@
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2ResourceClass",
+        "operationId": "watchResourceV1alpha3ResourceClass",
         "produces": [
           "application/json",
           "application/yaml",

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-dra-{{.Index}}
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.9
+    name: pause
+    resources:
+      claims:
+      - name: resource
+  resourceClaims:
+  - name: resource
+    # Five pods share access to the same claim.
+    resourceClaimName: test-claim-{{div .Index 5}}

@@ -1,0 +1,80 @@
+# Real driver deployments must replace all occurrences of "dra-kubelet-plugin"
+# with something specific to their driver.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dra-kubelet-plugin-service-account
+  namespace: dra-kubelet-plugin-namespace
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dra-kubelet-plugin-role
+rules:
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceclaims"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceslices"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dra-kubelet-plugin-role-binding
+subjects:
+- kind: ServiceAccount
+  name: dra-kubelet-plugin-service-account
+  namespace: dra-kubelet-plugin-namespace
+roleRef:
+  kind: ClusterRole
+  name: dra-kubelet-plugin-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# This ValidatingAdmissionPolicy is specific to the DRA driver's kubelet plugin
+# because it checks the ServiceAccount defined for it above. An admin could
+# also define a single policy for all drivers.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: resourceslices-policy-dra-kubelet-plugin
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["resource.k8s.io"]
+      apiVersions: ["v1alpha3"]
+      operations:  ["CREATE", "UPDATE", "DELETE"]
+      resources:   ["resourceslices"]
+  matchConditions:
+  - name: isRestrictedUser
+    expression: >-
+      request.userInfo.username == "system:serviceaccount:dra-kubelet-plugin-namespace:dra-kubelet-plugin-service-account"
+  variables:
+  - name: userNodeName
+    expression: >-
+      request.userInfo.extra[?'authentication.kubernetes.io/node-name'][0].orValue('')
+  - name: objectNodeName
+    expression: >-
+      (request.operation == "DELETE" ? oldObject : object).spec.?nodeName.orValue("")
+  validations:
+  - expression: variables.userNodeName != ""
+    message: >-
+      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+  - expression: variables.userNodeName == variables.objectNodeName
+    messageExpression: >-
+      "this user running on node '"+variables.userNodeName+"' may not modify " +
+      (variables.objectNodeName == "" ?"cluster resourceslices" : "resourceslices on node '"+variables.objectNodeName+"'")
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: resourceslices-policy-dra-kubelet-plugin
+spec:
+  policyName: resourceslices-policy-dra-kubelet-plugin
+  validationActions: [Deny]
+  # All ResourceSlices are matched.

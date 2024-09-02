@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
+	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
@@ -119,18 +119,6 @@ import (
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
 
-// CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with namespace of a persistent volume claim used to create this volume.
-const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
-
-// CloudVolumeCreatedForClaimNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with name of a persistent volume claim used to create this volume.
-const CloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
-
-// CloudVolumeCreatedForVolumeNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with name of appropriate Kubernetes persistent volume .
-const CloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
-
 // Number of retries when we create a PV object for a provisioned volume.
 const createProvisionedPVRetryCount = 5
 
@@ -167,10 +155,8 @@ type PersistentVolumeController struct {
 	kubeClient                clientset.Interface
 	eventBroadcaster          record.EventBroadcaster
 	eventRecorder             record.EventRecorder
-	cloud                     cloudprovider.Interface
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
-	clusterName               string
 	resyncPeriod              time.Duration
 
 	// Cache of the last known version of volumes and claims. This cache is
@@ -202,8 +188,8 @@ type PersistentVolumeController struct {
 	// version errors in API server and other checks in this controller),
 	// however overall speed of multi-worker controller would be lower than if
 	// it runs single thread only.
-	claimQueue  *workqueue.Type
-	volumeQueue *workqueue.Type
+	claimQueue  *workqueue.Typed[string]
+	volumeQueue *workqueue.Typed[string]
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
@@ -287,6 +273,20 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	requestedClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	if storagehelpers.GetPersistentVolumeClass(volume) != requestedClass {
 		return fmt.Errorf("storageClassName does not match")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		requestedVAC := ptr.Deref(claim.Spec.VolumeAttributesClassName, "")
+		volumeVAC := ptr.Deref(volume.Spec.VolumeAttributesClassName, "")
+		if requestedVAC != volumeVAC {
+			return fmt.Errorf("volumeAttributesClassName does not match")
+		}
+	} else {
+		requestedVAC := ptr.Deref(claim.Spec.VolumeAttributesClassName, "")
+		volumeVAC := ptr.Deref(volume.Spec.VolumeAttributesClassName, "")
+		if requestedVAC != "" || volumeVAC != "" {
+			return fmt.Errorf("volumeAttributesClassName is not supported when the feature-gate VolumeAttributesClass is disabled")
+		}
 	}
 
 	if storagehelpers.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
@@ -779,7 +779,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 //
 //	claim - claim to update
 //	phase - phase to set
-//	volume - volume which Capacity is set into claim.Status.Capacity
+//	volume - volume which Capacity is set into claim.Status.Capacity and VolumeAttributesClassName is set into claim.Status.CurrentVolumeAttributesClassName
 func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Updating PersistentVolumeClaim status", "PVC", klog.KObj(claim), "setPhase", phase)
@@ -793,7 +793,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 	}
 
 	if volume == nil {
-		// Need to reset AccessModes and Capacity
+		// Need to reset AccessModes, Capacity and CurrentVolumeAttributesClassName
 		if claim.Status.AccessModes != nil {
 			claimClone.Status.AccessModes = nil
 			dirty = true
@@ -802,8 +802,12 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 			claimClone.Status.Capacity = nil
 			dirty = true
 		}
+		if claim.Status.CurrentVolumeAttributesClassName != nil {
+			claimClone.Status.CurrentVolumeAttributesClassName = nil
+			dirty = true
+		}
 	} else {
-		// Need to update AccessModes and Capacity
+		// Need to update AccessModes, Capacity and CurrentVolumeAttributesClassName
 		if !reflect.DeepEqual(claim.Status.AccessModes, volume.Spec.AccessModes) {
 			claimClone.Status.AccessModes = volume.Spec.AccessModes
 			dirty = true
@@ -836,6 +840,20 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 				dirty = true
 			}
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+			// There are two components to updating the current vac name, this controller and external-resizer.
+			// The controller ensures that the field is set properly when the volume is statically provisioned.
+			// It is safer for the controller to only set this field during binding, but not after. Without this
+			// constraint, there is a potential race condition where the resizer sets the field after the controller
+			// has set it, or vice versa. Afterwards, it should be handled only by the resizer, or if an admin wants
+			// to override.
+			if claim.Status.Phase == v1.ClaimPending && phase == v1.ClaimBound &&
+				!reflect.DeepEqual(claim.Status.CurrentVolumeAttributesClassName, volume.Spec.VolumeAttributesClassName) {
+				claimClone.Status.CurrentVolumeAttributesClassName = volume.Spec.VolumeAttributesClassName
+				dirty = true
+			}
+		}
 	}
 
 	if !dirty {
@@ -865,7 +883,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 //
 //	claim - claim to update
 //	phase - phase to set
-//	volume - volume which Capacity is set into claim.Status.Capacity
+//	volume - volume which Capacity is set into claim.Status.Capacity and VolumeAttributesClassName is set into claim.Status.CurrentVolumeAttributesClassName
 //	eventtype, reason, message - event to send, see EventRecorder.Event()
 func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(ctx context.Context, claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume, eventtype, reason, message string) (*v1.PersistentVolumeClaim, error) {
 	logger := klog.FromContext(ctx)
@@ -1653,17 +1671,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		return pluginName, err
 	}
 
-	// Gather provisioning options
-	tags := make(map[string]string)
-	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
-	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
-	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
-
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
 		MountOptions:                  storageClass.MountOptions,
-		CloudTags:                     &tags,
-		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
@@ -1958,16 +1968,14 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnMigratedTo) {
-			// CSI migration scenario - do not depend on in-tree plugin
-			return nil, nil
-		}
+	if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnMigratedTo) {
+		// CSI migration scenario - do not depend on in-tree plugin
+		return nil, nil
+	}
 
-		if volume.Spec.CSI != nil {
-			// CSI volume source scenario - external provisioner is requested
-			return nil, nil
-		}
+	if volume.Spec.CSI != nil {
+		// CSI volume source scenario - external provisioner is requested
+		return nil, nil
 	}
 
 	// The plugin that provisioned the volume was not found or the volume

@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// LoadBalancerIngressApplyConfiguration represents an declarative configuration of the LoadBalancerIngress type for use
+// LoadBalancerIngressApplyConfiguration represents a declarative configuration of the LoadBalancerIngress type for use
 // with apply.
 type LoadBalancerIngressApplyConfiguration struct {
 	IP       *string                        `json:"ip,omitempty"`
@@ -31,7 +31,7 @@ type LoadBalancerIngressApplyConfiguration struct {
 	Ports    []PortStatusApplyConfiguration `json:"ports,omitempty"`
 }
 
-// LoadBalancerIngressApplyConfiguration constructs an declarative configuration of the LoadBalancerIngress type for use with
+// LoadBalancerIngressApplyConfiguration constructs a declarative configuration of the LoadBalancerIngress type for use with
 // apply.
 func LoadBalancerIngress() *LoadBalancerIngressApplyConfiguration {
 	return &LoadBalancerIngressApplyConfiguration{}

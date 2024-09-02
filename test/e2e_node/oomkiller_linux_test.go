@@ -31,6 +31,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/utils/ptr"
 )
 
 type testCase struct {
@@ -45,7 +46,7 @@ const KubeReservedMemory = 0.35
 
 var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly]", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("nodeallocatable-oomkiller-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	testCases := []testCase{
 		{
@@ -112,6 +113,9 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 		}
 
 		ginkgo.BeforeEach(func() {
+			// Precautionary check that kubelet is healthy before running the test.
+			waitForKubeletToStart(context.TODO(), f)
+
 			ginkgo.By("setting up the pod to be used in the test")
 			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
 		})
@@ -163,7 +167,8 @@ func getOOMTargetPod(podName string, ctnName string, createContainer func(name s
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			PriorityClassName: "system-node-critical",
+			RestartPolicy:     v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				createContainer(ctnName),
 			},
@@ -211,6 +216,16 @@ func getOOMTargetContainer(name string) v1.Container {
 				v1.ResourceMemory: resource.MustParse("15Mi"),
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		},
 	}
 }
 
@@ -234,6 +249,16 @@ func getOOMTargetContainerMultiProcess(name string) v1.Container {
 				v1.ResourceMemory: resource.MustParse("15Mi"),
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		},
 	}
 }
 
@@ -247,7 +272,17 @@ func getOOMTargetContainerWithoutLimit(name string) v1.Container {
 			"sh",
 			"-c",
 			// use the dd tool to attempt to allocate huge block of memory which exceeds the node allocatable
-			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
+			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=1024G",
+		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 		},
 	}
 }

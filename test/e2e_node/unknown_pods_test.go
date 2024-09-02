@@ -77,7 +77,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.Logf("Delete the static pod manifest while the kubelet is not running")
 			file := staticPodPath(podPath, staticPodName, ns)
@@ -91,7 +91,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			framework.Logf("wait for the mirror pod %v to disappear", mirrorPodName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -148,7 +148,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.Logf("Delete the pod while the kubelet is not running")
 			// Delete pod sync by name will force delete the pod, removing it from kubelet's config
@@ -160,7 +160,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			framework.Logf("wait for the pod %v to disappear", podName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {

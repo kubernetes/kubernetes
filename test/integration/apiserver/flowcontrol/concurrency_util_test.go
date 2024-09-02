@@ -155,7 +155,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Wrap default authorizer with one that delays requests from noxu clients
-			config.GenericConfig.Authorization.Authorizer = &noxuDelayingAuthorizer{config.GenericConfig.Authorization.Authorizer}
+			config.ControlPlane.Generic.Authorization.Authorizer = &noxuDelayingAuthorizer{config.ControlPlane.Generic.Authorization.Authorizer}
 		},
 	})
 	defer closeFn()
@@ -280,9 +280,9 @@ func TestConcurrencyIsolation(t *testing.T) {
 	// standard deviation divided by mean, for a class of traffic is a characterization of all the noise that applied to
 	// that class. We found that noxu1 generally had a much bigger CV than noxu2. This makes sense, because noxu1 probes
 	// more behavior --- the waiting in queues. So we take the minimum of the two as an indicator of the relative amount
-	// of noise that comes from all the other behavior. Currently, we use 2 times the experienced coefficient of variation
+	// of noise that comes from all the other behavior. Currently, we use 3 times the experienced coefficient of variation
 	// as the margin of error.
-	margin := 2 * math.Min(noxu1LatStats.cv, noxu2LatStats.cv)
+	margin := 3 * math.Min(noxu1LatStats.cv, noxu2LatStats.cv)
 	t.Logf("Error margin is %v", margin)
 
 	isConcurrencyExpected := func(name string, observed float64, expected float64) bool {
@@ -314,7 +314,7 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
+	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.NewFormat(expfmt.TypeTextPlain))
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},

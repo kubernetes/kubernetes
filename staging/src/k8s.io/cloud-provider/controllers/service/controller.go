@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,7 +43,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
-	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 )
 
@@ -90,8 +88,8 @@ type Controller struct {
 	nodeLister          corelisters.NodeLister
 	nodeListerSynced    cache.InformerSynced
 	// services and nodes that need to be synced
-	serviceQueue workqueue.RateLimitingInterface
-	nodeQueue    workqueue.RateLimitingInterface
+	serviceQueue workqueue.TypedRateLimitingInterface[string]
+	nodeQueue    workqueue.TypedRateLimitingInterface[string]
 	// lastSyncedNodes is used when reconciling node state and keeps track of
 	// the last synced set of nodes per service key. This is accessed from the
 	// service and node controllers, hence it is protected by a lock.
@@ -109,22 +107,23 @@ func New(
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
-	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
-
 	registerMetrics()
 	s := &Controller{
 		cloud:            cloud,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster: broadcaster,
-		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
-		lastSyncedNodes:  make(map[string][]*v1.Node),
+		serviceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "service"},
+		),
+		nodeQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node"},
+		),
+		lastSyncedNodes: make(map[string][]*v1.Node),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -219,6 +218,9 @@ func (c *Controller) enqueueNode(obj interface{}) {
 // It's an error to call Run() more than once for a given ServiceController
 // object.
 func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
+
 	defer runtime.HandleCrash()
 	defer c.serviceQueue.ShutDown()
 	defer c.nodeQueue.ShutDown()
@@ -284,7 +286,7 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 	}
 	defer c.serviceQueue.Done(key)
 
-	err := c.syncService(ctx, key.(string))
+	err := c.syncService(ctx, key)
 	if err == nil {
 		c.serviceQueue.Forget(key)
 		return true
@@ -435,7 +437,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 }
 
 func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := listWithPredicates(c.nodeLister, getNodePredicatesForService(service)...)
+	nodes, err := listWithPredicates(c.nodeLister, stableNodeSetPredicates...)
 	if err != nil {
 		return nil, err
 	}
@@ -697,12 +699,9 @@ func loggableNodeNames(nodes []*v1.Node) []string {
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync changes on the
-	// readiness condition for eTP:Local services or when
-	// StableLoadBalancerNodeSet is enabled, hence if a node remains NotReady
-	// and a user adds the exclusion label we will need to sync as to make sure
-	// this change is reflected correctly on ETP=local services. The sync
-	// function compares lastSyncedNodes with the new (existing) set of nodes
+	// compounded result of all predicates.
+	//
+	// The sync function compares lastSyncedNodes with the new (existing) set of nodes
 	// for each service, so services which are synced with the same set of nodes
 	// should be skipped internally in the sync function. This is needed as to
 	// trigger a global sync for all services and make sure no service gets
@@ -714,9 +713,7 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
-	}
+
 	return false
 }
 
@@ -756,8 +753,8 @@ func (c *Controller) nodeSyncService(svc *v1.Service) bool {
 		nodeSyncErrorCount.Inc()
 		return retNeedRetry
 	}
-	newNodes = filterWithPredicates(newNodes, getNodePredicatesForService(svc)...)
-	oldNodes := filterWithPredicates(c.getLastSyncedNodes(svc), getNodePredicatesForService(svc)...)
+	newNodes = filterWithPredicates(newNodes, stableNodeSetPredicates...)
+	oldNodes := filterWithPredicates(c.getLastSyncedNodes(svc), stableNodeSetPredicates...)
 	// Store last synced nodes without actually determining if we successfully
 	// synced them or not. Failed node syncs are passed off to retries in the
 	// service queue, so no need to wait. If we don't store it now, we risk
@@ -1007,11 +1004,7 @@ var (
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
 	}
-	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
-		nodeIncludedPredicate,
-		nodeUnTaintedPredicate,
-		nodeReadyPredicate,
-	}
+
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
 		nodeIncludedPredicate,
@@ -1023,16 +1016,6 @@ var (
 		nodeUnTaintedPredicate,
 	}
 )
-
-func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		return stableNodeSetPredicates
-	}
-	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
-		return etpLocalNodePredicates
-	}
-	return allNodePredicates
-}
 
 // We consider the node for load balancing only when the node is not labelled for exclusion.
 func nodeIncludedPredicate(node *v1.Node) bool {

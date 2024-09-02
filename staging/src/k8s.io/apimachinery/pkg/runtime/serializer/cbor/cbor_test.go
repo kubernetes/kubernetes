@@ -121,6 +121,30 @@ func (p *anyObject) UnmarshalCBOR(in []byte) error {
 	return modes.Decode.Unmarshal(in, &p.Value)
 }
 
+type structWithRawFields struct {
+	FieldsV1            metav1.FieldsV1       `json:"f"`
+	FieldsV1Pointer     *metav1.FieldsV1      `json:"fp"`
+	RawExtension        runtime.RawExtension  `json:"r"`
+	RawExtensionPointer *runtime.RawExtension `json:"rp"`
+}
+
+func (structWithRawFields) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (structWithRawFields) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+type structWithEmbeddedMetas struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+func (structWithEmbeddedMetas) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
 func TestEncode(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
@@ -156,6 +180,69 @@ func TestEncode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "unstructuredlist",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"foo": int64(1)}},
+					{Object: map[string]interface{}{"foo": int64(2)}},
+				},
+			},
+			assertOnWriter: func() (io.Writer, func(t *testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					// {'kind': 'kList', 'items': [{'foo': 1}, {'foo': 2}], 'apiVersion': 'v'}
+					if diff := cmp.Diff(b.Bytes(), []byte("\xd9\xd9\xf7\xa3\x44kind\x45kList\x45items\x82\xa1\x43foo\x01\xa1\x43foo\x02\x4aapiVersion\x41v")); diff != "" {
+						t.Errorf("unexpected diff:\n%s", diff)
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "unsupported marshaler",
+			in:   &textMarshalerObject{},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
+		{
+			name: "unsupported marshaler within unstructured content",
+			in: &unstructured.Unstructured{
+				Object: map[string]interface{}{"": textMarshalerObject{}},
+			},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize map[string]interface {}: cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := NewSerializer(nil, nil)
@@ -181,6 +268,24 @@ func TestDecode(t *testing.T) {
 		expectedGVK   *schema.GroupVersionKind
 		assertOnError func(*testing.T, error)
 	}{
+		{
+			name:        "self-described cbor tag accepted",
+			data:        []byte("\xd9\xd9\xf7\xa3\x4aapiVersion\x41v\x44kind\x41k\x48metadata\xa1\x44name\x43foo"), // 55799({'apiVersion': 'v', 'kind': 'k', 'metadata': {'name': 'foo'}})
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: &defaultMetaFactory{},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Version: "v", Kind: "k"}}},
+			into:        &metav1.PartialObjectMetadata{},
+			expectedObj: &metav1.PartialObjectMetadata{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v", Kind: "k"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
 		{
 			name:        "error determining gvk",
 			metaFactory: stubMetaFactory{err: errors.New("test")},
@@ -212,6 +317,43 @@ func TestDecode(t *testing.T) {
 			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
 			into:        &anyObject{},
 			expectedObj: &anyObject{},
+			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "raw types transcoded",
+			data:        []byte{0xa4, 0x41, 'f', 0xa1, 0x41, 'a', 0x01, 0x42, 'f', 'p', 0xa1, 0x41, 'z', 0x02, 0x41, 'r', 0xa1, 0x41, 'b', 0x03, 0x42, 'r', 'p', 0xa1, 0x41, 'y', 0x04},
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
+			into:        &structWithRawFields{},
+			expectedObj: &structWithRawFields{
+				FieldsV1:            metav1.FieldsV1{Raw: []byte(`{"a":1}`)},
+				FieldsV1Pointer:     &metav1.FieldsV1{Raw: []byte(`{"z":2}`)},
+				RawExtension:        runtime.RawExtension{Raw: []byte(`{"b":3}`)},
+				RawExtensionPointer: &runtime.RawExtension{Raw: []byte(`{"y":4}`)},
+			},
+			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "object with embedded typemeta and objectmeta",
+			data:        []byte("\xa2\x48metadata\xa1\x44name\x43foo\x44spec\xa0"), // {"metadata": {"name": "foo"}}
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
+			into:        &structWithEmbeddedMetas{},
+			expectedObj: &structWithEmbeddedMetas{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
 			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
 			assertOnError: func(t *testing.T, err error) {
 				if err != nil {
@@ -399,6 +541,139 @@ func TestDecode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "into unstructuredlist missing kind",
+			data:        []byte("\xa1\x6aapiVersion\x61v"),
+			into:        &unstructured.UnstructuredList{},
+			expectedObj: nil,
+			expectedGVK: &schema.GroupVersionKind{Version: "v"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingKind(err) {
+					t.Errorf("expected MissingKind, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist missing version",
+			data:        []byte("\xa1\x64kind\x65kList"),
+			into:        &unstructured.UnstructuredList{},
+			expectedObj: nil,
+			expectedGVK: &schema.GroupVersionKind{Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingVersion(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist empty",
+			data: []byte("\xa2\x6aapiVersion\x61v\x64kind\x65kList"),
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{Object: map[string]interface{}{
+				"apiVersion": "v",
+				"kind":       "kList",
+			}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist nonempty",
+			data: []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x82\xa1\x63foo\x01\xa1\x63foo\x02"), // {"apiVersion": "v", "kind": "kList", "items": [{"foo": 1}, {"foo": 2}]}
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "v", "kind": "k", "foo": int64(1)}},
+					{Object: map[string]interface{}{"apiVersion": "v", "kind": "k", "foo": int64(2)}},
+				},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist item gvk present",
+			data: []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa2\x6aapiVersion\x62vv\x64kind\x62kk"), // {"apiVersion": "v", "kind": "kList", "items": [{"apiVersion": "vv", "kind": "kk"}]}
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "vv", "kind": "kk"}},
+				},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist item missing kind",
+			data:        []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa1\x6aapiVersion\x62vv"), // {"apiVersion": "v", "kind": "kList", "items": [{"apiVersion": "vv"}]}
+			metaFactory: &defaultMetaFactory{},
+			into:        &unstructured.UnstructuredList{},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingKind(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist item missing version",
+			data:        []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa1\x64kind\x62kk"), // {"apiVersion": "v", "kind": "kList", "items": [{"kind": "kk"}]}
+			metaFactory: &defaultMetaFactory{},
+			into:        &unstructured.UnstructuredList{},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingVersion(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "using unstructuredlist creater",
+			data:        []byte("\xa2\x6aapiVersion\x61v\x64kind\x65kList"),
+			metaFactory: &defaultMetaFactory{},
+			creater:     stubCreater{obj: &unstructured.UnstructuredList{}},
+			expectedObj: &unstructured.UnstructuredList{Object: map[string]interface{}{
+				"apiVersion": "v",
+				"kind":       "kList",
+			}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unsupported marshaler",
+			data:        []byte("\xa0"),
+			into:        &textMarshalerObject{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Version: "v", Kind: "k"}}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newSerializer(tc.metaFactory, tc.creater, tc.typer, tc.options...)
@@ -415,6 +690,20 @@ func TestDecode(t *testing.T) {
 			}
 		})
 	}
+}
+
+type textMarshalerObject struct{}
+
+func (p textMarshalerObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (textMarshalerObject) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func (textMarshalerObject) MarshalText() ([]byte, error) {
+	return nil, nil
 }
 
 func TestMetaFactoryInterpret(t *testing.T) {

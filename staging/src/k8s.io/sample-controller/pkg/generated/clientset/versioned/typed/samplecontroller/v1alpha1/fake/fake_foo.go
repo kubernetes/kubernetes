@@ -41,22 +41,24 @@ var foosKind = v1alpha1.SchemeGroupVersion.WithKind("Foo")
 
 // Get takes name of the foo, and returns the corresponding foo object, and an error if there is any.
 func (c *FakeFoos) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Foo, err error) {
+	emptyResult := &v1alpha1.Foo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(foosResource, c.ns, name), &v1alpha1.Foo{})
+		Invokes(testing.NewGetActionWithOptions(foosResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Foo), err
 }
 
 // List takes label and field selectors, and returns the list of Foos that match those selectors.
 func (c *FakeFoos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
+	emptyResult := &v1alpha1.FooList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(foosResource, foosKind, c.ns, opts), &v1alpha1.FooList{})
+		Invokes(testing.NewListActionWithOptions(foosResource, foosKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,40 +77,43 @@ func (c *FakeFoos) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 // Watch returns a watch.Interface that watches the requested foos.
 func (c *FakeFoos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(foosResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(foosResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a foo and creates it.  Returns the server's representation of the foo, and an error, if there is any.
 func (c *FakeFoos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (result *v1alpha1.Foo, err error) {
+	emptyResult := &v1alpha1.Foo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(foosResource, c.ns, foo), &v1alpha1.Foo{})
+		Invokes(testing.NewCreateActionWithOptions(foosResource, c.ns, foo, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Foo), err
 }
 
 // Update takes the representation of a foo and updates it. Returns the server's representation of the foo, and an error, if there is any.
 func (c *FakeFoos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
+	emptyResult := &v1alpha1.Foo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(foosResource, c.ns, foo), &v1alpha1.Foo{})
+		Invokes(testing.NewUpdateActionWithOptions(foosResource, c.ns, foo, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Foo), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFoos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error) {
+func (c *FakeFoos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
+	emptyResult := &v1alpha1.Foo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(foosResource, "status", c.ns, foo), &v1alpha1.Foo{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(foosResource, "status", c.ns, foo, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Foo), err
 }
@@ -123,7 +128,7 @@ func (c *FakeFoos) Delete(ctx context.Context, name string, opts v1.DeleteOption
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeFoos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(foosResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(foosResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.FooList{})
 	return err
@@ -131,11 +136,12 @@ func (c *FakeFoos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 
 // Patch applies the patch and returns the patched foo.
 func (c *FakeFoos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error) {
+	emptyResult := &v1alpha1.Foo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(foosResource, c.ns, name, pt, data, subresources...), &v1alpha1.Foo{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(foosResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Foo), err
 }

@@ -32,7 +32,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -215,6 +218,8 @@ leaderElection:
 		wantPlugins          map[string]*config.Plugins
 		wantLeaderElection   *componentbaseconfig.LeaderElectionConfiguration
 		wantClientConnection *componentbaseconfig.ClientConnectionConfiguration
+		wantErr              bool
+		wantFeaturesGates    map[string]bool
 	}{
 		{
 			name: "default config with an alpha feature enabled",
@@ -376,6 +381,46 @@ leaderElection:
 				ResourceNamespace: configv1.SchedulerDefaultLockObjectNamespace,
 			},
 		},
+		{
+			name: "emulated version out of range",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--emulated-version=1.28",
+			},
+			wantErr: true,
+		},
+		{
+			name: "default feature gates at binary version",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+			},
+			wantFeaturesGates: map[string]bool{"kubeA": true, "kubeB": false},
+		},
+		{
+			name: "default feature gates at emulated version",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--emulated-version=1.31",
+			},
+			wantFeaturesGates: map[string]bool{"kubeA": false, "kubeB": false},
+		},
+		{
+			name: "set feature gates at emulated version",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--emulated-version=1.31",
+				"--feature-gates=kubeA=false,kubeB=true",
+			},
+			wantFeaturesGates: map[string]bool{"kubeA": false, "kubeB": true},
+		},
+		{
+			name: "cannot set locked feature gate",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--feature-gates=kubeA=false,kubeB=true",
+			},
+			wantErr: true,
+		},
 	}
 
 	makeListener := func(t *testing.T) net.Listener {
@@ -390,8 +435,25 @@ leaderElection:
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.restoreFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
+			componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+			t.Cleanup(func() {
+				componentGlobalsRegistry.Reset()
+			})
+			componentGlobalsRegistry.Reset()
+			verKube := utilversion.NewEffectiveVersion("1.32")
+			fg := feature.DefaultFeatureGate.DeepCopy()
+			utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+				"kubeA": {
+					{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+				},
+				"kubeB": {
+					{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+				},
+			}))
+			utilruntime.Must(componentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, verKube, fg))
 
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 			opts := options.NewOptions()
@@ -415,6 +477,12 @@ leaderElection:
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			_, sched, err := Setup(ctx, opts, tc.registryOptions...)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected Setup error, got nil")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -441,6 +509,12 @@ leaderElection:
 				gotClientConnection := opts.ComponentConfig.ClientConnection
 				if diff := cmp.Diff(*tc.wantClientConnection, gotClientConnection); diff != "" {
 					t.Errorf("Unexpected clientConnection diff (-want, +got): %s", diff)
+				}
+			}
+			for f, v := range tc.wantFeaturesGates {
+				enabled := fg.Enabled(featuregate.Feature(f))
+				if enabled != v {
+					t.Errorf("expected featuregate.Enabled(%s)=%v, got %v", f, v, enabled)
 				}
 			}
 		})

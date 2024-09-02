@@ -17,18 +17,19 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
-	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
+	networkingv1beta1informers "k8s.io/client-go/informers/networking/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -71,15 +72,16 @@ type EndpointSliceHandler interface {
 type EndpointSliceConfig struct {
 	listerSynced  cache.InformerSynced
 	eventHandlers []EndpointSliceHandler
+	logger        klog.Logger
 }
 
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
-func NewEndpointSliceConfig(endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
+func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
 	result := &EndpointSliceConfig{
-		listerSynced: endpointSliceInformer.Informer().HasSynced,
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddEndpointSlice,
 			UpdateFunc: result.handleUpdateEndpointSlice,
@@ -87,6 +89,8 @@ func NewEndpointSliceConfig(endpointSliceInformer discoveryv1informers.EndpointS
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
@@ -98,14 +102,14 @@ func (c *EndpointSliceConfig) RegisterEventHandler(handler EndpointSliceHandler)
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting endpoint slice config controller")
+	c.logger.Info("Starting endpoint slice config controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint slice config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for _, h := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnEndpointSlicesSynced()")
+		c.logger.V(3).Info("Calling handler.OnEndpointSlicesSynced()")
 		h.OnEndpointSlicesSynced()
 	}
 }
@@ -117,7 +121,7 @@ func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
 		return
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnEndpointSliceAdd", "endpoints", klog.KObj(endpointSlice))
+		c.logger.V(4).Info("Calling handler.OnEndpointSliceAdd", "endpoints", klog.KObj(endpointSlice))
 		h.OnEndpointSliceAdd(endpointSlice)
 	}
 }
@@ -134,7 +138,7 @@ func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface
 		return
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnEndpointSliceUpdate")
+		c.logger.V(4).Info("Calling handler.OnEndpointSliceUpdate")
 		h.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
 	}
 }
@@ -153,7 +157,7 @@ func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
 		}
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnEndpointsDelete")
+		c.logger.V(4).Info("Calling handler.OnEndpointsDelete")
 		h.OnEndpointSliceDelete(endpointSlice)
 	}
 }
@@ -162,15 +166,16 @@ func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
 type ServiceConfig struct {
 	listerSynced  cache.InformerSynced
 	eventHandlers []ServiceHandler
+	logger        klog.Logger
 }
 
 // NewServiceConfig creates a new ServiceConfig.
-func NewServiceConfig(serviceInformer v1informers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
+func NewServiceConfig(ctx context.Context, serviceInformer v1informers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
-		listerSynced: serviceInformer.Informer().HasSynced,
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddService,
 			UpdateFunc: result.handleUpdateService,
@@ -178,6 +183,8 @@ func NewServiceConfig(serviceInformer v1informers.ServiceInformer, resyncPeriod 
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
@@ -189,14 +196,14 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting service config controller")
+	c.logger.Info("Starting service config controller")
 
 	if !cache.WaitForNamedCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnServiceSynced()")
+		c.logger.V(3).Info("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
 }
@@ -208,7 +215,7 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnServiceAdd")
+		c.logger.V(4).Info("Calling handler.OnServiceAdd")
 		c.eventHandlers[i].OnServiceAdd(service)
 	}
 }
@@ -225,7 +232,7 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnServiceUpdate")
+		c.logger.V(4).Info("Calling handler.OnServiceUpdate")
 		c.eventHandlers[i].OnServiceUpdate(oldService, service)
 	}
 }
@@ -244,7 +251,7 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnServiceDelete")
+		c.logger.V(4).Info("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)
 	}
 }
@@ -289,15 +296,16 @@ var _ NodeHandler = &NoopNodeHandler{}
 type NodeConfig struct {
 	listerSynced  cache.InformerSynced
 	eventHandlers []NodeHandler
+	logger        klog.Logger
 }
 
 // NewNodeConfig creates a new NodeConfig.
-func NewNodeConfig(nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
+func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
 	result := &NodeConfig{
-		listerSynced: nodeInformer.Informer().HasSynced,
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddNode,
 			UpdateFunc: result.handleUpdateNode,
@@ -305,6 +313,8 @@ func NewNodeConfig(nodeInformer v1informers.NodeInformer, resyncPeriod time.Dura
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
@@ -316,14 +326,14 @@ func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 
 // Run starts the goroutine responsible for calling registered handlers.
 func (c *NodeConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting node config controller")
+	c.logger.Info("Starting node config controller")
 
 	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnNodeSynced()")
+		c.logger.V(3).Info("Calling handler.OnNodeSynced()")
 		c.eventHandlers[i].OnNodeSynced()
 	}
 }
@@ -335,7 +345,7 @@ func (c *NodeConfig) handleAddNode(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnNodeAdd")
+		c.logger.V(4).Info("Calling handler.OnNodeAdd")
 		c.eventHandlers[i].OnNodeAdd(node)
 	}
 }
@@ -352,7 +362,7 @@ func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(5).InfoS("Calling handler.OnNodeUpdate")
+		c.logger.V(5).Info("Calling handler.OnNodeUpdate")
 		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
 	}
 }
@@ -371,7 +381,7 @@ func (c *NodeConfig) handleDeleteNode(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnNodeDelete")
+		c.logger.V(4).Info("Calling handler.OnNodeDelete")
 		c.eventHandlers[i].OnNodeDelete(node)
 	}
 }
@@ -390,16 +400,17 @@ type ServiceCIDRConfig struct {
 	eventHandlers []ServiceCIDRHandler
 	mu            sync.Mutex
 	cidrs         sets.Set[string]
+	logger        klog.Logger
 }
 
 // NewServiceCIDRConfig creates a new ServiceCIDRConfig.
-func NewServiceCIDRConfig(serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
+func NewServiceCIDRConfig(ctx context.Context, serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
 	result := &ServiceCIDRConfig{
-		listerSynced: serviceCIDRInformer.Informer().HasSynced,
-		cidrs:        sets.New[string](),
+		cidrs:  sets.New[string](),
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = serviceCIDRInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := serviceCIDRInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				result.handleServiceCIDREvent(nil, obj)
@@ -413,6 +424,9 @@ func NewServiceCIDRConfig(serviceCIDRInformer networkingv1alpha1informers.Servic
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
+
 	return result
 }
 
@@ -423,7 +437,7 @@ func (c *ServiceCIDRConfig) RegisterEventHandler(handler ServiceCIDRHandler) {
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *ServiceCIDRConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting serviceCIDR config controller")
+	c.logger.Info("Starting serviceCIDR config controller")
 
 	if !cache.WaitForNamedCacheSync("serviceCIDR config", stopCh, c.listerSynced) {
 		return
@@ -434,11 +448,11 @@ func (c *ServiceCIDRConfig) Run(stopCh <-chan struct{}) {
 // handleServiceCIDREvent is a helper function to handle Add, Update and Delete
 // events on ServiceCIDR objects and call downstream event handlers.
 func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
-	var oldServiceCIDR, newServiceCIDR *networkingv1alpha1.ServiceCIDR
+	var oldServiceCIDR, newServiceCIDR *networkingv1beta1.ServiceCIDR
 	var ok bool
 
 	if oldObj != nil {
-		oldServiceCIDR, ok = oldObj.(*networkingv1alpha1.ServiceCIDR)
+		oldServiceCIDR, ok = oldObj.(*networkingv1beta1.ServiceCIDR)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 			return
@@ -446,7 +460,7 @@ func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
 	}
 
 	if newObj != nil {
-		newServiceCIDR, ok = newObj.(*networkingv1alpha1.ServiceCIDR)
+		newServiceCIDR, ok = newObj.(*networkingv1beta1.ServiceCIDR)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 			return
@@ -465,7 +479,7 @@ func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(4).InfoS("Calling handler.OnServiceCIDRsChanged")
+		c.logger.V(4).Info("Calling handler.OnServiceCIDRsChanged")
 		c.eventHandlers[i].OnServiceCIDRsChanged(c.cidrs.UnsortedList())
 	}
 }

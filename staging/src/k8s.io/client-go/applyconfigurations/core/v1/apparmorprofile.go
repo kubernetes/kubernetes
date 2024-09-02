@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// AppArmorProfileApplyConfiguration represents an declarative configuration of the AppArmorProfile type for use
+// AppArmorProfileApplyConfiguration represents a declarative configuration of the AppArmorProfile type for use
 // with apply.
 type AppArmorProfileApplyConfiguration struct {
 	Type             *v1.AppArmorProfileType `json:"type,omitempty"`
 	LocalhostProfile *string                 `json:"localhostProfile,omitempty"`
 }
 
-// AppArmorProfileApplyConfiguration constructs an declarative configuration of the AppArmorProfile type for use with
+// AppArmorProfileApplyConfiguration constructs a declarative configuration of the AppArmorProfile type for use with
 // apply.
 func AppArmorProfile() *AppArmorProfileApplyConfiguration {
 	return &AppArmorProfileApplyConfiguration{}

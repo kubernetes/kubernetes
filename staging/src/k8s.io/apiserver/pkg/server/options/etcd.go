@@ -383,8 +383,8 @@ type StorageFactoryRestOptionsFactory struct {
 	StorageFactory serverstorage.StorageFactory
 }
 
-func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := f.StorageFactory.NewConfig(resource)
+func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource, example runtime.Object) (generic.RESTOptions, error) {
+	storageConfig, err := f.StorageFactory.NewConfig(resource, example)
 	if err != nil {
 		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
@@ -397,6 +397,10 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		ResourcePrefix:            f.StorageFactory.ResourcePrefix(resource),
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
+	}
+
+	if ret.StorageObjectCountTracker == nil {
+		ret.StorageObjectCountTracker = storageConfig.StorageObjectCountTracker
 	}
 
 	if f.Options.EnableWatchCache {
@@ -465,7 +469,7 @@ type SimpleStorageFactory struct {
 	StorageConfig storagebackend.Config
 }
 
-func (s *SimpleStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
+func (s *SimpleStorageFactory) NewConfig(resource schema.GroupResource, example runtime.Object) (*storagebackend.ConfigForResource, error) {
 	return s.StorageConfig.ForResource(resource), nil
 }
 
@@ -489,8 +493,8 @@ type transformerStorageFactory struct {
 	resourceTransformers storagevalue.ResourceTransformers
 }
 
-func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
-	config, err := t.delegate.NewConfig(resource)
+func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource, example runtime.Object) (*storagebackend.ConfigForResource, error) {
+	config, err := t.delegate.NewConfig(resource, example)
 	if err != nil {
 		return nil, err
 	}

@@ -370,12 +370,11 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)
 
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
-				volume.VolumeOptions{},
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -509,7 +508,6 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
-				volume.VolumeOptions{},
 			)
 			if tc.shouldFail && err != nil {
 				t.Log(err)
@@ -616,7 +614,6 @@ func TestPluginNewMounter(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
-				volume.VolumeOptions{},
 			)
 			if test.shouldFail != (err != nil) {
 				t.Fatal("Unexpected error:", err)
@@ -719,7 +716,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				mounter, err := plug.NewMounter(
 					test.spec,
 					&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
-					volume.VolumeOptions{},
 				)
 
 				// Some test cases are meant to fail because their input data is broken.
@@ -1113,7 +1109,6 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	mounter, err := plug.NewBlockVolumeMapper(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
 		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
-		volume.VolumeOptions{},
 	)
 	if err != nil {
 		t.Fatalf("Failed to make a new BlockMapper: %v", err)

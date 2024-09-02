@@ -24,11 +24,12 @@ import (
 
 	"github.com/google/uuid"
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -128,7 +129,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 	return sc, pc, nil
 }
 
-func NewValidator(getter ServiceAccountTokenGetter) Validator {
+func NewValidator(getter ServiceAccountTokenGetter) Validator[privateClaims] {
 	return &validator{
 		getter: getter,
 	}
@@ -138,14 +139,9 @@ type validator struct {
 	getter ServiceAccountTokenGetter
 }
 
-var _ = Validator(&validator{})
+var _ = Validator[privateClaims](&validator{})
 
-func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, privateObj interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error) {
-	private, ok := privateObj.(*privateClaims)
-	if !ok {
-		klog.Errorf("service account jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
-		return nil, errors.New("service account token claims could not be validated due to unexpected private claim")
-	}
+func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, private *privateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error) {
 	nowTime := now()
 	err := public.Validate(jwt.Expected{
 		Time: nowTime,
@@ -291,10 +287,6 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		PodUID:       podUID,
 		NodeName:     nodeName,
 		NodeUID:      nodeUID,
-		CredentialID: apiserverserviceaccount.CredentialIDForJTI(jti),
+		CredentialID: authenticationtokenjwt.CredentialIDForJTI(jti),
 	}, nil
-}
-
-func (v *validator) NewPrivateClaims() interface{} {
-	return &privateClaims{}
 }

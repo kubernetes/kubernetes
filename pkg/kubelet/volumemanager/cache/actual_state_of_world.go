@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -168,10 +169,6 @@ type ActualStateOfWorld interface {
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
 
-	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
-	// the one populated from dsw, if they do not match, update this field from the value from dsw.
-	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
-
 	// Add the specified volume to ASW as uncertainly attached.
 	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
@@ -215,10 +212,11 @@ func NewActualStateOfWorld(
 	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
-		nodeName:                  nodeName,
-		attachedVolumes:           make(map[v1.UniqueVolumeName]attachedVolume),
-		foundDuringReconstruction: make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
-		volumePluginMgr:           volumePluginMgr,
+		nodeName:                        nodeName,
+		attachedVolumes:                 make(map[v1.UniqueVolumeName]attachedVolume),
+		foundDuringReconstruction:       make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
+		volumePluginMgr:                 volumePluginMgr,
+		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
 	}
 }
 
@@ -250,6 +248,8 @@ type actualStateOfWorld struct {
 	// foundDuringReconstruction is a map of volumes which were discovered
 	// from kubelet root directory when kubelet was restarted.
 	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
+
+	volumesWithFinalExpansionErrors sets.Set[v1.UniqueVolumeName]
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -398,6 +398,27 @@ func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)
+}
+
+func (asw *actualStateOfWorld) MarkVolumeExpansionFailedWithFinalError(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	asw.volumesWithFinalExpansionErrors.Insert(volumeName)
+}
+
+func (asw *actualStateOfWorld) RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	asw.volumesWithFinalExpansionErrors.Delete(volumeName)
+}
+
+func (asw *actualStateOfWorld) CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	return asw.volumesWithFinalExpansionErrors.Has(volumeName)
 }
 
 func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
@@ -717,7 +738,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		// Update uncertain volumes - the new markVolumeOpts may have updated information.
 		// Especially reconstructed volumes (marked as uncertain during reconstruction) need
 		// an update.
-		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
+		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
 	}
 	if !podExists || updateUncertainVolume {
 		// Add new mountedPod or update existing one.
@@ -939,6 +960,8 @@ func (asw *actualStateOfWorld) volumeNeedsExpansion(volumeObj attachedVolume, de
 		return currentSize, false
 	}
 
+	klog.V(5).InfoS("NodeExpandVolume checking size", "actualSize", volumeObj.persistentVolumeSize.String(), "desiredSize", desiredVolumeSize.String(), "volume", volumeObj.volumeName)
+
 	if desiredVolumeSize.Cmp(*volumeObj.persistentVolumeSize) > 0 {
 		volumePlugin, err := asw.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeObj.spec)
 		if err != nil || volumePlugin == nil {
@@ -1117,19 +1140,6 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	}
 
 	return unmountedVolumes
-}
-
-func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string) {
-	asw.Lock()
-	defer asw.Unlock()
-	if volumeObj, volumeExists := asw.attachedVolumes[volumeName]; volumeExists {
-		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
-			if podObj.outerVolumeSpecName != outerVolumeSpecName {
-				podObj.outerVolumeSpecName = outerVolumeSpecName
-				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
-			}
-		}
-	}
 }
 
 func (asw *actualStateOfWorld) newAttachedVolume(

@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// AttachedVolumeApplyConfiguration represents an declarative configuration of the AttachedVolume type for use
+// AttachedVolumeApplyConfiguration represents a declarative configuration of the AttachedVolume type for use
 // with apply.
 type AttachedVolumeApplyConfiguration struct {
 	Name       *v1.UniqueVolumeName `json:"name,omitempty"`
 	DevicePath *string              `json:"devicePath,omitempty"`
 }
 
-// AttachedVolumeApplyConfiguration constructs an declarative configuration of the AttachedVolume type for use with
+// AttachedVolumeApplyConfiguration constructs a declarative configuration of the AttachedVolume type for use with
 // apply.
 func AttachedVolume() *AttachedVolumeApplyConfiguration {
 	return &AttachedVolumeApplyConfiguration{}

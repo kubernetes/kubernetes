@@ -1,3 +1,15 @@
+- name: compilation_duration_seconds
+  subsystem: cel
+  namespace: apiserver
+  help: CEL compilation time in seconds.
+  type: Histogram
+  stabilityLevel: BETA
+- name: evaluation_duration_seconds
+  subsystem: cel
+  namespace: apiserver
+  help: CEL evaluation time in seconds.
+  type: Histogram
+  stabilityLevel: BETA
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
@@ -80,6 +92,36 @@
   - 10
   - 15
   - 30
+- name: check_duration_seconds
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission latency for individual validation expressions in seconds,
+    labeled by policy and further including binding and enforcement action taken.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - enforcement_action
+  - error_type
+  - policy
+  - policy_binding
+  buckets:
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+- name: check_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy check total, labeled by policy and further identified
+    by binding and enforcement action taken.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - enforcement_action
+  - error_type
+  - policy
+  - policy_binding
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -107,7 +149,7 @@
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
-    queue an d might involve multiple scheduling attempts.
+    queue and might involve multiple scheduling attempts.
   type: Histogram
   stabilityLevel: BETA
   labels:
@@ -314,7 +356,7 @@
   type: Custom
   stabilityLevel: STABLE
   labels:
-  - cluster
+  - storage_cluster_id
 - name: container_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the container in core-seconds
   type: Custom

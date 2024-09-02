@@ -24,10 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -168,53 +165,24 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 	)
 	testCases := []struct {
 		description          string
-		gate                 bool
 		responsesPerResource map[string]*pluginapi.ContainerAllocateResponse
 		expected             *DeviceRunContainerOptions
 	}{
 		{
 			description: "empty response",
-			gate:        false,
 			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
 				resource1: newContainerAllocateResponse(),
 			},
 			expected: &DeviceRunContainerOptions{},
 		},
 		{
-			description: "cdi devices are ingored when feature gate is disabled",
-			gate:        false,
-			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
-				resource1: newContainerAllocateResponse(
-					withDevices(map[string]string{"/dev/r1": "/dev/r1"}),
-					withMounts(map[string]string{"/home/lib1": "/home/lib1"}),
-					withEnvs(map[string]string{"ENV1": "VALUE1"}),
-					withCDIDevices("vendor1.com/class1=device1", "vendor2.com/class2=device2"),
-				),
-			},
-			expected: &DeviceRunContainerOptions{
-				Devices: []kubecontainer.DeviceInfo{
-					{PathOnHost: "/dev/r1", PathInContainer: "/dev/r1", Permissions: "mrw"},
-				},
-				Mounts: []kubecontainer.Mount{
-					{Name: "/home/lib1", HostPath: "/home/lib1", ContainerPath: "/home/lib1", ReadOnly: true},
-				},
-				Envs: []kubecontainer.EnvVar{
-					{Name: "ENV1", Value: "VALUE1"},
-				},
-			},
-		},
-		{
-			description: "cdi devices are handled when feature gate is enabled",
-			gate:        true,
+			description: "cdi devices are handled",
 			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
 				resource1: newContainerAllocateResponse(
 					withCDIDevices("vendor1.com/class1=device1", "vendor2.com/class2=device2"),
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},
@@ -222,8 +190,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 			},
 		},
 		{
-			description: "cdi devices from multiple resources are handled when feature gate is enabled",
-			gate:        true,
+			description: "cdi devices from multiple resources are handled",
 			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
 				resource1: newContainerAllocateResponse(
 					withCDIDevices("vendor1.com/class1=device1", "vendor2.com/class2=device2"),
@@ -233,9 +200,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2,vendor3.com/class3=device3,vendor4.com/class4=device4"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},
@@ -246,7 +210,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 		},
 		{
 			description: "duplicate cdi devices are skipped",
-			gate:        true,
 			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
 				resource1: newContainerAllocateResponse(
 					withCDIDevices("vendor1.com/class1=device1", "vendor2.com/class2=device2"),
@@ -256,9 +219,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2,vendor3.com/class3=device3"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},
@@ -272,7 +232,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			as := assert.New(t)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DevicePluginCDIDevices, tc.gate)()
 			podDevices := newPodDevices()
 			for resourceName, response := range tc.responsesPerResource {
 				podDevices.insert("pod", "container", resourceName,

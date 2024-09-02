@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
-	stringslices "k8s.io/utils/strings/slices"
 )
 
 var (
@@ -44,6 +44,19 @@ var (
 
 // Requirements is AND of all requirements.
 type Requirements []Requirement
+
+func (r Requirements) String() string {
+	var sb strings.Builder
+
+	for i, requirement := range r {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(requirement.String())
+	}
+
+	return sb.String()
+}
 
 // Selector represents a label selector.
 type Selector interface {
@@ -285,6 +298,13 @@ func (r *Requirement) Values() sets.String {
 	return ret
 }
 
+// ValuesUnsorted returns a copy of requirement values as passed to NewRequirement without sorting.
+func (r *Requirement) ValuesUnsorted() []string {
+	ret := make([]string, 0, len(r.strValues))
+	ret = append(ret, r.strValues...)
+	return ret
+}
+
 // Equal checks the equality of requirement.
 func (r Requirement) Equal(x Requirement) bool {
 	if r.key != x.key {
@@ -293,7 +313,7 @@ func (r Requirement) Equal(x Requirement) bool {
 	if r.operator != x.operator {
 		return false
 	}
-	return stringslices.Equal(r.strValues, x.strValues)
+	return slices.Equal(r.strValues, x.strValues)
 }
 
 // Empty returns true if the internalSelector doesn't restrict selection space

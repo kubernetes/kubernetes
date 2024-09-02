@@ -43,7 +43,7 @@ const (
 	LSCIQuotaFeature = features.LocalStorageCapacityIsolationFSQuotaMonitoring
 )
 
-func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
+func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespacesEnabled bool) {
 	evictionTestTimeout := 10 * time.Minute
 	sizeLimit := resource.MustParse("100Mi")
 	useOverLimit := 101 /* Mb */
@@ -63,7 +63,10 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-			if quotasRequested && !supportsQuotas("/var/lib/kubelet") {
+			if !supportsUserNS(ctx, f) {
+				e2eskipper.Skipf("runtime does not support user namespaces")
+			}
+			if quotasRequested && !supportsQuotas("/var/lib/kubelet", userNamespacesEnabled) {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
 				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationFSQuotaMonitoring on filesystem without project quota enabled")
@@ -98,11 +101,13 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
 // file; if du is used to monitor, it will not detect this.
-var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, nodefeature.LSCIQuotaMonitoring, func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, nodefeature.LSCIQuotaMonitoring, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	runOneQuotaTest(f, true)
-	runOneQuotaTest(f, false)
+	runOneQuotaTest(f, true, true)
+	runOneQuotaTest(f, true, false)
+	runOneQuotaTest(f, false, true)
+	addAfterEachForCleaningUpPods(f)
 })
 
 const (
@@ -151,7 +156,7 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 
 // Don't bother returning an error; if something goes wrong,
 // simply treat it as "no".
-func supportsQuotas(dir string) bool {
-	supportsQuota, err := fsquota.SupportsQuotas(mount.New(""), dir)
+func supportsQuotas(dir string, userNamespacesEnabled bool) bool {
+	supportsQuota, err := fsquota.SupportsQuotas(mount.New(""), dir, userNamespacesEnabled)
 	return supportsQuota && err == nil
 }

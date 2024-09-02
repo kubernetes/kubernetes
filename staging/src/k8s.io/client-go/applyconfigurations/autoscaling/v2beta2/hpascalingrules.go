@@ -22,7 +22,7 @@ import (
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 )
 
-// HPAScalingRulesApplyConfiguration represents an declarative configuration of the HPAScalingRules type for use
+// HPAScalingRulesApplyConfiguration represents a declarative configuration of the HPAScalingRules type for use
 // with apply.
 type HPAScalingRulesApplyConfiguration struct {
 	StabilizationWindowSeconds *int32                               `json:"stabilizationWindowSeconds,omitempty"`
@@ -30,7 +30,7 @@ type HPAScalingRulesApplyConfiguration struct {
 	Policies                   []HPAScalingPolicyApplyConfiguration `json:"policies,omitempty"`
 }
 
-// HPAScalingRulesApplyConfiguration constructs an declarative configuration of the HPAScalingRules type for use with
+// HPAScalingRulesApplyConfiguration constructs a declarative configuration of the HPAScalingRules type for use with
 // apply.
 func HPAScalingRules() *HPAScalingRulesApplyConfiguration {
 	return &HPAScalingRulesApplyConfiguration{}

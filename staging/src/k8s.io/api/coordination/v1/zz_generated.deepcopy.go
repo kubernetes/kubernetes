@@ -111,6 +111,16 @@ func (in *LeaseSpec) DeepCopyInto(out *LeaseSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Strategy != nil {
+		in, out := &in.Strategy, &out.Strategy
+		*out = new(CoordinatedLeaseStrategy)
+		**out = **in
+	}
+	if in.PreferredHolder != nil {
+		in, out := &in.PreferredHolder, &out.PreferredHolder
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

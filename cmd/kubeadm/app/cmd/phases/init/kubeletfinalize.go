@@ -57,19 +57,19 @@ func NewKubeletFinalizePhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			{
-				Name:         "experimental-cert-rotation",
+				Name:         "enable-client-cert-rotation",
 				Short:        "Enable kubelet client certificate rotation",
 				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
-				Run:          runKubeletFinalizeCertRotation,
+				Run:          runKubeletFinalizeEnableClientCertRotation,
 			},
 		},
 	}
 }
 
-// runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
+// runKubeletFinalizeEnableClientCertRotation detects if the kubelet certificate rotation is enabled
 // and updates the kubelet.conf file to point to a rotatable certificate and key for the
 // Node user.
-func runKubeletFinalizeCertRotation(c workflow.RunData) error {
+func runKubeletFinalizeEnableClientCertRotation(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-finalize phase invoked with an invalid data struct")

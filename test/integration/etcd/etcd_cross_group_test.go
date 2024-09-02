@@ -31,14 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // TestCrossGroupStorage tests to make sure that all objects stored in an expected location in etcd can be converted/read.
 func TestCrossGroupStorage(t *testing.T) {
-	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
-		// force enable all resources so we can check storage.
-	})
+	apiServer := StartRealAPIServerOrDie(t)
 	defer apiServer.Cleanup()
 
 	etcdStorageData := GetEtcdStorageData()

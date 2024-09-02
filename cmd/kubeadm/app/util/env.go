@@ -18,6 +18,7 @@ package util
 
 import (
 	"os"
+	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -25,13 +26,17 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// GetProxyEnvVars builds a list of environment variables in order to use the right proxy
-func GetProxyEnvVars() []kubeadmapi.EnvVar {
+// GetProxyEnvVars builds a list of environment variables in order to use the right proxy.
+// Passing nil for environment will make the function use the OS environment.
+func GetProxyEnvVars(environment []string) []kubeadmapi.EnvVar {
 	envs := []kubeadmapi.EnvVar{}
-	for _, env := range os.Environ() {
+	if environment == nil {
+		environment = os.Environ()
+	}
+	for _, env := range environment {
 		pos := strings.Index(env, "=")
 		if pos == -1 {
-			// malformed environment variable, skip it.
+			// Malformed environment variable, skip it.
 			continue
 		}
 		name := env[:pos]
@@ -59,5 +64,8 @@ func MergeKubeadmEnvVars(envList ...[]kubeadmapi.EnvVar) []v1.EnvVar {
 	for _, v := range m {
 		merged = append(merged, v)
 	}
+	sort.Slice(merged, func(i, j int) bool {
+		return merged[i].Name < merged[j].Name
+	})
 	return merged
 }

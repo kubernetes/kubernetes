@@ -43,7 +43,6 @@ EXCLUDED_PATTERNS=(
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
     "verify-typecheck.sh"              # runs in separate typecheck job
-    "verify-typecheck-providerless.sh" # runs in separate typecheck job
     )
 fi
 
@@ -78,6 +77,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-boilerplate.sh"
   "verify-external-dependencies-version.sh"
+  "verify-featuregates.sh"
   "verify-fieldname-docs.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"

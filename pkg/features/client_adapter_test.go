@@ -19,6 +19,8 @@ package features
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 )
@@ -78,8 +80,7 @@ func TestClientAdapterAdd(t *testing.T) {
 			t.Errorf("expected feature %q not found", name)
 			continue
 		}
-
-		if actual != expected {
+		if diff := cmp.Diff(actual, expected, cmpopts.IgnoreFields(featuregate.FeatureSpec{}, "Version")); diff != "" {
 			t.Errorf("expected feature %q spec %#v, got spec %#v", name, expected, actual)
 		}
 	}

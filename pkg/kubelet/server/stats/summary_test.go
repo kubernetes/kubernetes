@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
@@ -72,14 +71,12 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
@@ -105,7 +102,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "kubelet",
 		StartTime:          kubeletCreationTime,
@@ -169,14 +166,12 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 		"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
@@ -204,7 +199,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	// Since we are a split filesystem we want root filesystem to be container fs and image to be image filesystem
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: rootFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "kubelet",
 		StartTime:          kubeletCreationTime,
@@ -265,9 +260,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 		"/pods":    {cs: getVolumeCPUAndMemoryStats()},
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
@@ -291,7 +284,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(summary.Node.Fs)
 	assert.Nil(summary.Node.Runtime)
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:      "kubelet",
 		StartTime: cgroupStatsMap["/kubelet"].cs.StartTime,

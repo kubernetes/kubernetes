@@ -21,15 +21,18 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -747,9 +750,12 @@ func TestValidateMixedArguments(t *testing.T) {
 		// Expected to succeed, --config is mixed with skip-* flags only or no other flags
 		{[]string{"--config=hello", "--skip-token-print=true"}, true},
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--skip-token-print"}, true},
+		{[]string{"--config=hello", "--yes=true"}, true},
+		{[]string{"--config=hello", "--print-manifest"}, true},
 		// Expected to fail, --config is mixed with the --foo flag
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--foo=bar"}, false},
 		{[]string{"--config=hello", "--foo=bar"}, false},
+		{[]string{"--config=hello", "--yes=true", "--foo=bar"}, false},
 		// Expected to fail, --config is mixed with the upgrade related flag
 		{[]string{"--config=hello", "--allow-experimental-upgrades"}, false},
 	}
@@ -765,6 +771,8 @@ func TestValidateMixedArguments(t *testing.T) {
 		f.StringSliceVar(&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors, "flag not bound to config object")
 		f.Bool("allow-experimental-upgrades", true, "upgrade flags for plan and apply command")
 		f.Bool("skip-token-print", false, "flag not bound to config object")
+		f.Bool("yes", false, "flag not bound to config object")
+		f.Bool("print-manifest", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 		if err := f.Parse(rt.args); err != nil {
 			t.Fatal(err)
@@ -1539,5 +1547,153 @@ func TestPullPolicy(t *testing.T) {
 		if len(actual) != tc.expectedErrors {
 			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
 		}
+	}
+}
+
+func TestValidateCertValidity(t *testing.T) {
+	var tests = []struct {
+		name           string
+		cfg            *kubeadmapi.ClusterConfiguration
+		expectedErrors int
+	}{
+		{
+			name: "no errors from nil values",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod:   nil,
+				CACertificateValidityPeriod: nil,
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "no errors from defaults",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod: &metav1.Duration{
+					Duration: constants.CertificateValidityPeriod,
+				},
+				CACertificateValidityPeriod: &metav1.Duration{
+					Duration: constants.CACertificateValidityPeriod,
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "two errors from long durations",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod: &metav1.Duration{
+					Duration: constants.CertificateValidityPeriod * 2,
+				},
+				CACertificateValidityPeriod: &metav1.Duration{
+					Duration: constants.CACertificateValidityPeriod * 2,
+				},
+			},
+			expectedErrors: 2,
+		},
+		{
+			name: "one error from mismatched durations (CertificateValidityPeriod > CACertificateValidityPeriod) ",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour * 2,
+				},
+				CACertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour,
+				},
+			},
+			expectedErrors: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateCertValidity(tc.cfg)
+		if len(actual) != tc.expectedErrors {
+			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
+		}
+	}
+}
+
+func TestValidateResetConfiguration(t *testing.T) {
+	var tests = []struct {
+		name           string
+		cfg            *kubeadmapi.ResetConfiguration
+		expectedErrors int
+	}{
+		{
+			name: "expect 3 errors",
+			cfg: &kubeadmapi.ResetConfiguration{
+				CRISocket:       "foo",
+				CertificatesDir: "bar",
+				UnmountFlags:    []string{"baz"},
+			},
+			expectedErrors: 3,
+		},
+		{
+			name: "expect 0 errors",
+			cfg: &kubeadmapi.ResetConfiguration{
+				CRISocket:       fmt.Sprintf("%s:///var/run/containerd/containerd.sock", kubeadmapiv1.DefaultContainerRuntimeURLScheme),
+				CertificatesDir: "/foo/bar", // this is work on Windows too because of the local isAbs()
+				UnmountFlags:    []string{kubeadmapi.UnmountFlagMNTForce},
+			},
+			expectedErrors: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ValidateResetConfiguration(tc.cfg)
+			if len(actual) != tc.expectedErrors {
+				t.Errorf("expected errors: %d, got: %+v", tc.expectedErrors, actual)
+			}
+		})
+	}
+}
+
+func TestValidateUpgradeConfiguration(t *testing.T) {
+	var tests = []struct {
+		name           string
+		cfg            *kubeadmapi.UpgradeConfiguration
+		expectedErrors int
+	}{
+		{
+			name: "expect 4 errors",
+			cfg: &kubeadmapi.UpgradeConfiguration{
+				Apply: kubeadmapi.UpgradeApplyConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "foo",
+					},
+					ImagePullPolicy: "bar",
+				},
+				Node: kubeadmapi.UpgradeNodeConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "foo",
+					},
+					ImagePullPolicy: "bar",
+				},
+			},
+			expectedErrors: 4,
+		},
+		{
+			name: "expect 0 errors",
+			cfg: &kubeadmapi.UpgradeConfiguration{
+				Apply: kubeadmapi.UpgradeApplyConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "/foo/bar",
+					},
+					ImagePullPolicy: corev1.PullAlways,
+				},
+				Node: kubeadmapi.UpgradeNodeConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "/foo/bar",
+					},
+					ImagePullPolicy: corev1.PullAlways,
+				},
+			},
+			expectedErrors: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ValidateUpgradeConfiguration(tc.cfg)
+			if len(actual) != tc.expectedErrors {
+				t.Errorf("expected errors: %d, got: %+v", tc.expectedErrors, actual)
+			}
+		})
 	}
 }

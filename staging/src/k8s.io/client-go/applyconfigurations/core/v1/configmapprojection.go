@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ConfigMapProjectionApplyConfiguration represents an declarative configuration of the ConfigMapProjection type for use
+// ConfigMapProjectionApplyConfiguration represents a declarative configuration of the ConfigMapProjection type for use
 // with apply.
 type ConfigMapProjectionApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -26,7 +26,7 @@ type ConfigMapProjectionApplyConfiguration struct {
 	Optional                               *bool                         `json:"optional,omitempty"`
 }
 
-// ConfigMapProjectionApplyConfiguration constructs an declarative configuration of the ConfigMapProjection type for use with
+// ConfigMapProjectionApplyConfiguration constructs a declarative configuration of the ConfigMapProjection type for use with
 // apply.
 func ConfigMapProjection() *ConfigMapProjectionApplyConfiguration {
 	return &ConfigMapProjectionApplyConfiguration{}
@@ -36,7 +36,7 @@ func ConfigMapProjection() *ConfigMapProjectionApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ConfigMapProjectionApplyConfiguration) WithName(value string) *ConfigMapProjectionApplyConfiguration {
-	b.Name = &value
+	b.LocalObjectReferenceApplyConfiguration.Name = &value
 	return b
 }
 

@@ -1,0 +1,14 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - feature-approvers
+  - sig-api-machinery-api-approvers
+  - jpbetz
+  - siyuanfoundation
+reviewers:
+  - feature-approvers
+  - sig-api-machinery-api-reviewers
+  - jpbetz
+  - siyuanfoundation
+labels:
+  - sig/api-machinery

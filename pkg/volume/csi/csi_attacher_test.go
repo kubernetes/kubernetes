@@ -83,6 +83,7 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 	for i := 0; i < 100; i++ {
 		attach, err = client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 		if err != nil {
+			attach = nil
 			if apierrors.IsNotFound(err) {
 				<-ticker.C
 				continue
@@ -644,119 +645,6 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 			if attachID != test.expectedAttachID {
 				t.Errorf("Expected attachID %q, got %q", test.expectedAttachID, attachID)
 			}
-		})
-	}
-}
-
-func TestAttacherWaitForVolumeAttachment(t *testing.T) {
-	nodeName := "fakeNode"
-	testCases := []struct {
-		name                 string
-		initAttached         bool
-		finalAttached        bool
-		trigerWatchEventTime time.Duration
-		initAttachErr        *storage.VolumeError
-		finalAttachErr       *storage.VolumeError
-		timeout              time.Duration
-		shouldFail           bool
-		watchTimeout         time.Duration
-	}{
-		{
-			name:         "attach success at get",
-			initAttached: true,
-			timeout:      50 * time.Millisecond,
-			shouldFail:   false,
-		},
-		{
-			name:          "attachment error ant get",
-			initAttachErr: &storage.VolumeError{Message: "missing volume"},
-			timeout:       30 * time.Millisecond,
-			shouldFail:    true,
-		},
-		{
-			name:                 "attach success at watch",
-			initAttached:         false,
-			finalAttached:        true,
-			trigerWatchEventTime: 5 * time.Millisecond,
-			timeout:              50 * time.Millisecond,
-			shouldFail:           false,
-		},
-		{
-			name:                 "attachment error ant watch",
-			initAttached:         false,
-			finalAttached:        false,
-			finalAttachErr:       &storage.VolumeError{Message: "missing volume"},
-			trigerWatchEventTime: 5 * time.Millisecond,
-			timeout:              30 * time.Millisecond,
-			shouldFail:           true,
-		},
-		{
-			name:                 "time ran out",
-			initAttached:         false,
-			finalAttached:        true,
-			trigerWatchEventTime: 100 * time.Millisecond,
-			timeout:              50 * time.Millisecond,
-			shouldFail:           true,
-		},
-	}
-
-	for i, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
-
-			fakeWatcher := watch.NewRaceFreeFake()
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
-
-			attacher, err := plug.NewAttacher()
-			if err != nil {
-				t.Fatalf("failed to create new attacher: %v", err)
-			}
-			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, tc.watchTimeout)
-
-			t.Logf("running test: %v", tc.name)
-			pvName := fmt.Sprintf("test-pv-%d", i)
-			volID := fmt.Sprintf("test-vol-%d", i)
-			attachID := getAttachmentName(volID, testDriver, nodeName)
-			attachment := makeTestAttachment(attachID, nodeName, pvName)
-			attachment.Status.Attached = tc.initAttached
-			attachment.Status.AttachError = tc.initAttachErr
-			_, err = csiAttacher.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("failed to attach: %v", err)
-			}
-
-			trigerWatchEventTime := tc.trigerWatchEventTime
-			finalAttached := tc.finalAttached
-			finalAttachErr := tc.finalAttachErr
-			var wg sync.WaitGroup
-			// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
-			if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					time.Sleep(trigerWatchEventTime)
-					attachment := makeTestAttachment(attachID, nodeName, pvName)
-					attachment.Status.Attached = finalAttached
-					attachment.Status.AttachError = finalAttachErr
-					fakeWatcher.Modify(attachment)
-				}()
-			}
-
-			retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
-			if tc.shouldFail && err == nil {
-				t.Error("expecting failure, but err is nil")
-			}
-			if tc.initAttachErr != nil && err != nil {
-				if tc.initAttachErr.Message != err.Error() {
-					t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
-				}
-			}
-			if err == nil && retID != attachID {
-				t.Errorf("attacher.WaitForAttach not returning attachment ID")
-			}
-			wg.Wait()
 		})
 	}
 }

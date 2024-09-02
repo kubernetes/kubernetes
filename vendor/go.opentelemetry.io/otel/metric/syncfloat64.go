@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
@@ -39,7 +28,7 @@ type Float64Counter interface {
 }
 
 // Float64CounterConfig contains options for synchronous counter instruments that
-// record int64 values.
+// record float64 values.
 type Float64CounterConfig struct {
 	description string
 	unit        string
@@ -92,7 +81,7 @@ type Float64UpDownCounter interface {
 }
 
 // Float64UpDownCounterConfig contains options for synchronous counter
-// instruments that record int64 values.
+// instruments that record float64 values.
 type Float64UpDownCounterConfig struct {
 	description string
 	unit        string
@@ -144,11 +133,12 @@ type Float64Histogram interface {
 	Record(ctx context.Context, incr float64, options ...RecordOption)
 }
 
-// Float64HistogramConfig contains options for synchronous counter instruments
-// that record int64 values.
+// Float64HistogramConfig contains options for synchronous histogram
+// instruments that record float64 values.
 type Float64HistogramConfig struct {
-	description string
-	unit        string
+	description              string
+	unit                     string
+	explicitBucketBoundaries []float64
 }
 
 // NewFloat64HistogramConfig returns a new [Float64HistogramConfig] with all
@@ -171,9 +161,66 @@ func (c Float64HistogramConfig) Unit() string {
 	return c.unit
 }
 
+// ExplicitBucketBoundaries returns the configured explicit bucket boundaries.
+func (c Float64HistogramConfig) ExplicitBucketBoundaries() []float64 {
+	return c.explicitBucketBoundaries
+}
+
 // Float64HistogramOption applies options to a [Float64HistogramConfig]. See
 // [InstrumentOption] for other options that can be used as a
 // Float64HistogramOption.
 type Float64HistogramOption interface {
 	applyFloat64Histogram(Float64HistogramConfig) Float64HistogramConfig
+}
+
+// Float64Gauge is an instrument that records instantaneous float64 values.
+//
+// Warning: Methods may be added to this interface in minor releases. See
+// package documentation on API implementation for information on how to set
+// default behavior for unimplemented methods.
+type Float64Gauge interface {
+	// Users of the interface can ignore this. This embedded type is only used
+	// by implementations of this interface. See the "API Implementations"
+	// section of the package documentation for more information.
+	embedded.Float64Gauge
+
+	// Record records the instantaneous value.
+	//
+	// Use the WithAttributeSet (or, if performance is not a concern,
+	// the WithAttributes) option to include measurement attributes.
+	Record(ctx context.Context, value float64, options ...RecordOption)
+}
+
+// Float64GaugeConfig contains options for synchronous gauge instruments that
+// record float64 values.
+type Float64GaugeConfig struct {
+	description string
+	unit        string
+}
+
+// NewFloat64GaugeConfig returns a new [Float64GaugeConfig] with all opts
+// applied.
+func NewFloat64GaugeConfig(opts ...Float64GaugeOption) Float64GaugeConfig {
+	var config Float64GaugeConfig
+	for _, o := range opts {
+		config = o.applyFloat64Gauge(config)
+	}
+	return config
+}
+
+// Description returns the configured description.
+func (c Float64GaugeConfig) Description() string {
+	return c.description
+}
+
+// Unit returns the configured unit.
+func (c Float64GaugeConfig) Unit() string {
+	return c.unit
+}
+
+// Float64GaugeOption applies options to a [Float64GaugeConfig]. See
+// [InstrumentOption] for other options that can be used as a
+// Float64GaugeOption.
+type Float64GaugeOption interface {
+	applyFloat64Gauge(Float64GaugeConfig) Float64GaugeConfig
 }

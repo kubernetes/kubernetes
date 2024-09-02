@@ -17,13 +17,10 @@ limitations under the License.
 package populator
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
-
-	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/ptr"
-
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -165,7 +164,8 @@ func TestFindAndAddNewPods_WithDifferentConditions(t *testing.T) {
 
 			dswp.hasAddedPods = tc.hasAddedPods
 			// Action
-			dswp.findAndAddNewPods()
+			tCtx := ktesting.Init(t)
+			dswp.findAndAddNewPods(tCtx)
 
 			// Verify
 			podsInDSW := dswp.desiredStateOfWorld.GetPods()
@@ -204,7 +204,8 @@ func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T)
 
 	podName := util.GetUniquePodName(pod)
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.podPreviouslyProcessed(podName) {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
@@ -212,7 +213,7 @@ func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T)
 	pluginPVOmittingClient(dswp)
 
 	dswp.ReprocessPod(podName)
-	dswp.findAndAddNewPods()
+	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.podPreviouslyProcessed(podName) {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
@@ -243,7 +244,8 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 
 	if dswp.podPreviouslyProcessed(podName) {
 		t.Fatalf("The volumes for the specified pod: %s should not have been processed by the populator", podName)
@@ -485,7 +487,8 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *fakePod
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
@@ -535,7 +538,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 	}
 
 	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dswp, fakePodManager, fakesDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
+	dswp, fakePodManager, fakesDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(pv, pvc, fakeVolumePluginMgr)
 
 	// create pod
 	containers := []v1.Container{
@@ -556,7 +559,8 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
@@ -602,7 +606,8 @@ func TestEphemeralVolumeOwnerCheck(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("%s should not have been processed by the populator", podName)
 	}
@@ -656,7 +661,8 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
-	dswp.findAndAddNewPods()
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
 
 	if !dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
@@ -758,10 +764,11 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -804,10 +811,11 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -850,10 +858,11 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -896,10 +905,11 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -942,10 +952,11 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -1104,13 +1115,14 @@ func TestCheckVolumeFSResize(t *testing.T) {
 
 		fakePodManager.AddPod(pod)
 		// Fill the dsw to contains volumes and pods.
-		dswp.findAndAddNewPods()
+		tCtx := ktesting.Init(t)
+		dswp.findAndAddNewPods(tCtx)
 		reconcileASW(fakeASW, fakeDSW, t)
 
 		func() {
 			tc.resize(t, pv, pvc, dswp)
 
-			resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW, *pv.Spec.Capacity.Storage())
+			resizeRequiredVolumes := reprocess(tCtx, dswp, uniquePodName, fakeDSW, fakeASW, *pv.Spec.Capacity.Storage())
 
 			tc.verify(t, resizeRequiredVolumes, uniqueVolumeName)
 		}()
@@ -1118,7 +1130,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 }
 
 func TestCheckVolumeSELinux(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	fullOpts := &v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -1275,12 +1287,13 @@ func TestCheckVolumeSELinux(t *testing.T) {
 					},
 				},
 			}
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, tc.seLinuxMountFeatureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, tc.seLinuxMountFeatureEnabled)
 
 			fakeVolumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = tc.pluginSupportsSELinux
-			dswp, fakePodManager, fakeDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
+			dswp, fakePodManager, fakeDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(pv, pvc, fakeVolumePluginMgr)
 
+			tCtx := ktesting.Init(t)
 			var existingPod *v1.Pod
 			if tc.existingContainerSELinuxOpts != nil {
 				// Add existing pod + volume
@@ -1288,7 +1301,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 				existingContainer.SecurityContext.SELinuxOptions = tc.existingContainerSELinuxOpts
 				existingPod = createPodWithVolume("dswp-old-pod", "dswp-test-volume-name", "file-bound", []v1.Container{existingContainer})
 				fakePodManager.AddPod(existingPod)
-				dswp.findAndAddNewPods()
+				dswp.findAndAddNewPods(tCtx)
 			}
 
 			newContainer := container
@@ -1297,7 +1310,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 
 			// Act - add the new Pod
 			fakePodManager.AddPod(newPod)
-			dswp.findAndAddNewPods()
+			dswp.findAndAddNewPods(tCtx)
 
 			// Assert
 
@@ -1402,10 +1415,10 @@ func clearASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *te
 	}
 }
 
-func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePodName,
+func reprocess(ctx context.Context, dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePodName,
 	dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld, newSize resource.Quantity) []v1.UniqueVolumeName {
 	dswp.ReprocessPod(uniquePodName)
-	dswp.findAndAddNewPods()
+	dswp.findAndAddNewPods(ctx)
 	return getResizeRequiredVolumes(dsw, asw, newSize)
 }
 
@@ -1544,7 +1557,7 @@ func createEphemeralVolumeObjects(podName, volumeName string, owned bool, volume
 
 func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld, *containertest.FakeRuntime, *fakePodStateProvider) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
+	dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider := createDswpWithVolumeWithCustomPluginMgr(pv, pvc, fakeVolumePluginMgr)
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
 }
 
@@ -1567,7 +1580,7 @@ func (p *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid kubetypes.UID) bool
 	return ok
 }
 
-func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim,
+func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim,
 	fakeVolumePluginMgr *volume.VolumePluginMgr) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld, *containertest.FakeRuntime, *fakePodStateProvider) {
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
@@ -1596,7 +1609,6 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
-		keepTerminatedPodVolumes: false,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,

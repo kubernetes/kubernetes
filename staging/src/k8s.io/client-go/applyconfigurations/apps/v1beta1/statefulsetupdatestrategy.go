@@ -22,14 +22,14 @@ import (
 	v1beta1 "k8s.io/api/apps/v1beta1"
 )
 
-// StatefulSetUpdateStrategyApplyConfiguration represents an declarative configuration of the StatefulSetUpdateStrategy type for use
+// StatefulSetUpdateStrategyApplyConfiguration represents a declarative configuration of the StatefulSetUpdateStrategy type for use
 // with apply.
 type StatefulSetUpdateStrategyApplyConfiguration struct {
 	Type          *v1beta1.StatefulSetUpdateStrategyType              `json:"type,omitempty"`
 	RollingUpdate *RollingUpdateStatefulSetStrategyApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// StatefulSetUpdateStrategyApplyConfiguration constructs an declarative configuration of the StatefulSetUpdateStrategy type for use with
+// StatefulSetUpdateStrategyApplyConfiguration constructs a declarative configuration of the StatefulSetUpdateStrategy type for use with
 // apply.
 func StatefulSetUpdateStrategy() *StatefulSetUpdateStrategyApplyConfiguration {
 	return &StatefulSetUpdateStrategyApplyConfiguration{}

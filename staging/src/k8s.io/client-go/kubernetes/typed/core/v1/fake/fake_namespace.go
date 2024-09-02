@@ -43,20 +43,22 @@ var namespacesKind = v1.SchemeGroupVersion.WithKind("Namespace")
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
 func (c *FakeNamespaces) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Namespace, err error) {
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(namespacesResource, name), &v1.Namespace{})
+		Invokes(testing.NewRootGetActionWithOptions(namespacesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
 
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
 func (c *FakeNamespaces) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NamespaceList, err error) {
+	emptyResult := &v1.NamespaceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(namespacesResource, namespacesKind, opts), &v1.NamespaceList{})
+		Invokes(testing.NewRootListActionWithOptions(namespacesResource, namespacesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,36 +77,39 @@ func (c *FakeNamespaces) List(ctx context.Context, opts metav1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested namespaces.
 func (c *FakeNamespaces) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(namespacesResource, opts))
 }
 
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
 func (c *FakeNamespaces) Create(ctx context.Context, namespace *v1.Namespace, opts metav1.CreateOptions) (result *v1.Namespace, err error) {
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &v1.Namespace{})
+		Invokes(testing.NewRootCreateActionWithOptions(namespacesResource, namespace, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
 
 // Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
 func (c *FakeNamespaces) Update(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (result *v1.Namespace, err error) {
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &v1.Namespace{})
+		Invokes(testing.NewRootUpdateActionWithOptions(namespacesResource, namespace, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNamespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error) {
+func (c *FakeNamespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (result *v1.Namespace, err error) {
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &v1.Namespace{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(namespacesResource, "status", namespace, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
@@ -118,10 +123,11 @@ func (c *FakeNamespaces) Delete(ctx context.Context, name string, opts metav1.De
 
 // Patch applies the patch and returns the patched namespace.
 func (c *FakeNamespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Namespace, err error) {
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, pt, data, subresources...), &v1.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(namespacesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
@@ -139,10 +145,11 @@ func (c *FakeNamespaces) Apply(ctx context.Context, namespace *corev1.NamespaceA
 	if name == nil {
 		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, *name, types.ApplyPatchType, data), &v1.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(namespacesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }
@@ -161,10 +168,11 @@ func (c *FakeNamespaces) ApplyStatus(ctx context.Context, namespace *corev1.Name
 	if name == nil {
 		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Namespace{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, *name, types.ApplyPatchType, data, "status"), &v1.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(namespacesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Namespace), err
 }

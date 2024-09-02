@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// SecretProjectionApplyConfiguration represents an declarative configuration of the SecretProjection type for use
+// SecretProjectionApplyConfiguration represents a declarative configuration of the SecretProjection type for use
 // with apply.
 type SecretProjectionApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -26,7 +26,7 @@ type SecretProjectionApplyConfiguration struct {
 	Optional                               *bool                         `json:"optional,omitempty"`
 }
 
-// SecretProjectionApplyConfiguration constructs an declarative configuration of the SecretProjection type for use with
+// SecretProjectionApplyConfiguration constructs a declarative configuration of the SecretProjection type for use with
 // apply.
 func SecretProjection() *SecretProjectionApplyConfiguration {
 	return &SecretProjectionApplyConfiguration{}
@@ -36,7 +36,7 @@ func SecretProjection() *SecretProjectionApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *SecretProjectionApplyConfiguration) WithName(value string) *SecretProjectionApplyConfiguration {
-	b.Name = &value
+	b.LocalObjectReferenceApplyConfiguration.Name = &value
 	return b
 }
 

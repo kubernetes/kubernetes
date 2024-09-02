@@ -133,6 +133,12 @@ func TestEtcdWatchSemantics(t *testing.T) {
 	storagetesting.RunWatchSemantics(ctx, t, store)
 }
 
+func TestEtcdWatchSemanticsWithConcurrentDecode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, true)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemantics(ctx, t, store)
+}
+
 func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
@@ -189,7 +195,7 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			if scenario.enableWatchList {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			}
 			origCtx, store, _ := testSetup(t, scenario.setupFn)
 			ctx, cancel := context.WithCancel(origCtx)
@@ -210,7 +216,7 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 }
 
 func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
 	defer cancel()

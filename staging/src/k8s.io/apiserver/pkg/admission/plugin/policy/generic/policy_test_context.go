@@ -45,7 +45,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/features"
 )
 
 // PolicyTestContext is everything you need to unit test a policy plugin
@@ -196,18 +195,6 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	plugin.SetEnabled(true)
 
 	featureGate := featuregate.NewFeatureGate()
-	err = featureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		//!TODO: move this to validating specific tests
-		features.ValidatingAdmissionPolicy: {
-			Default: true, PreRelease: featuregate.Beta}})
-	if err != nil {
-		return nil, nil, err
-	}
-	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
-	if err != nil {
-		return nil, nil, err
-	}
-
 	testContext, testCancel := context.WithCancel(context.Background())
 	genericInitializer := initializer.New(
 		nativeClient,

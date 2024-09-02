@@ -15,11 +15,11 @@ type errTimeOut struct {
 	cmd      string
 }
 
-func NewErrTimeOut(d time.Duration, c string) errTimeOut {
-	return errTimeOut{duration: d, cmd: c}
+func NewErrTimeOut(d time.Duration, c string) *errTimeOut {
+	return &errTimeOut{duration: d, cmd: c}
 }
 
-func (e errTimeOut) Error() string {
+func (e *errTimeOut) Error() string {
 	return fmt.Sprintf("hit %s timeout running '%s'", e.duration, e.cmd)
 }
 

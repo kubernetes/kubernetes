@@ -21,12 +21,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
@@ -238,7 +240,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
-			p, err := New(ctx, nil, fh)
+			p, err := New(ctx, nil, fh, feature.Features{})
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
@@ -342,13 +344,205 @@ func TestTaintTolerationFilter(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			p, err := New(ctx, nil, nil)
+			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterNodeChange(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		oldObj       interface{}
+		newObj       interface{}
+		expectedHint framework.QueueingHint
+		wantErr      bool
+	}{
+		{
+			name:         "backoff-wrong-new-object",
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "backoff-wrong-old-object",
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			oldObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "skip-queue-on-untoleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-toleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "skip-unrelated-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}, {Key: "dedicated", Value: "user3", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-taint-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pl := &TaintToleration{}
+			got, err := pl.isSchedulableAfterNodeChange(logger, test.pod, test.oldObj, test.newObj)
+			if (err != nil) != test.wantErr {
+				t.Errorf("isSchedulableAfterNodeChange() error = %v, wantErr %v", err, test.wantErr)
+			}
+			if got != test.expectedHint {
+				t.Errorf("isSchedulableAfterNodeChange() = %v, want %v", got, test.expectedHint)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          &v1.Pod{},
+			newObj:       "not-a-pod",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-pod",
+			newObj:       &v1.Pod{},
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"skip-updates-other-pod": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					UID:       "uid0",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "ns-1",
+					UID:       "uid1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "ns-1",
+					UID:       "uid1",
+				},
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "foo",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-updates-not-toleration": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-on-toleration-added": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				},
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "foo",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil, feature.Features{})
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			actualHint, err := p.(*TaintToleration).isSchedulableAfterPodChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				if err == nil {
+					t.Errorf("unexpected success")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error")
+				return
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Unexpected hint (-want, +got):\n%s", diff)
 			}
 		})
 	}

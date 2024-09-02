@@ -31,9 +31,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
+	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
 const (
@@ -50,17 +50,17 @@ var (
 
 type TestServer struct {
 	httpServer   *httptest.Server
-	tokenHandler *MockTokenHandler
-	jwksHandler  *MockJWKsHandler
+	tokenHandler *handlers.MockTokenHandler
+	jwksHandler  *handlers.MockJWKsHandler
 }
 
 // JwksHandler is getter of JSON Web Key Sets handler
-func (ts *TestServer) JwksHandler() *MockJWKsHandler {
+func (ts *TestServer) JwksHandler() *handlers.MockJWKsHandler {
 	return ts.jwksHandler
 }
 
 // TokenHandler is getter of JWT token handler
-func (ts *TestServer) TokenHandler() *MockTokenHandler {
+func (ts *TestServer) TokenHandler() *handlers.MockTokenHandler {
 	return ts.tokenHandler
 }
 
@@ -98,17 +98,14 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 	}
 	httpServer.StartTLS()
 
-	mockCtrl := gomock.NewController(t)
-
 	t.Cleanup(func() {
-		mockCtrl.Finish()
 		httpServer.Close()
 	})
 
 	oidcServer := &TestServer{
 		httpServer:   httpServer,
-		tokenHandler: NewMockTokenHandler(mockCtrl),
-		jwksHandler:  NewMockJWKsHandler(mockCtrl),
+		tokenHandler: handlers.NewMockTokenHandler(t),
+		jwksHandler:  handlers.NewMockJWKsHandler(t),
 	}
 
 	issuer := httpServer.URL
@@ -197,10 +194,10 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 	t *testing.T,
 	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
-) func() (Token, error) {
+) func() (handlers.Token, error) {
 	t.Helper()
 
-	return func() (Token, error) {
+	return func() (handlers.Token, error) {
 		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
 		require.NoError(t, err)
 
@@ -212,7 +209,7 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 		idToken, err := idTokenSignature.CompactSerialize()
 		require.NoError(t, err)
 
-		return Token{
+		return handlers.Token{
 			IDToken:      idToken,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,

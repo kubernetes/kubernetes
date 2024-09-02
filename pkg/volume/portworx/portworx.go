@@ -115,7 +115,7 @@ func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccess
 	}
 }
 
-func (plugin *portworxVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *portworxVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, plugin.util, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
@@ -225,10 +225,6 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 }
 
 func (plugin *portworxVolumePlugin) SupportsMountOption() bool {
-	return false
-}
-
-func (plugin *portworxVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 

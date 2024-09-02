@@ -23,8 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
@@ -33,7 +31,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Run with -v=2, this is the default log level in production.
-	ktesting.SetDefaultVerbosity(2)
+	ktesting.SetDefaultVerbosity(DefaultLoggingVerbosity)
 
 	// test/integration/framework/flags.go unconditionally initializes the
 	// logging flags. That's correct for most tests, but in the
@@ -50,20 +48,17 @@ func TestMain(m *testing.M) {
 	})
 	flag.CommandLine = &fs
 
-	featureGate := featuregate.NewFeatureGate()
-	runtime.Must(logsapi.AddFeatureGates(featureGate))
-	flag.Var(featureGate, "feature-gate",
+	flag.Var(LoggingFeatureGate, "feature-gate",
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-			"Options are:\n"+strings.Join(featureGate.KnownFeatures(), "\n"))
-	c := logsapi.NewLoggingConfiguration()
+			"Options are:\n"+strings.Join(LoggingFeatureGate.KnownFeatures(), "\n"))
 
 	// This would fail if we hadn't removed the logging flags above.
-	logsapi.AddGoFlags(c, flag.CommandLine)
+	logsapi.AddGoFlags(LoggingConfig, flag.CommandLine)
 
 	flag.Parse()
 
 	logs.InitLogs()
-	if err := logsapi.ValidateAndApply(c, featureGate); err != nil {
+	if err := logsapi.ValidateAndApply(LoggingConfig, LoggingFeatureGate); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

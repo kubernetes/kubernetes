@@ -26,7 +26,7 @@ run_kubectl_exec_pod_tests() {
   kube::log::status "Testing kubectl exec POD COMMAND"
 
   ### Test execute non-existing POD
-  output_message=$(! kubectl exec abc date 2>&1)
+  output_message=$(! kubectl exec abc 2>&1 -- date)
   # POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 

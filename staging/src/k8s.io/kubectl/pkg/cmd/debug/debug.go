@@ -25,8 +25,6 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +44,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/attach"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"
@@ -56,6 +55,8 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -111,29 +112,35 @@ type DebugAttachFunc func(ctx context.Context, restClientGetter genericclioption
 
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
-	Args              []string
-	ArgsOnly          bool
-	Attach            bool
-	AttachFunc        DebugAttachFunc
-	Container         string
-	CopyTo            string
-	Replace           bool
-	Env               []corev1.EnvVar
-	Image             string
-	Interactive       bool
-	Namespace         string
-	TargetNames       []string
-	PullPolicy        corev1.PullPolicy
-	Quiet             bool
-	SameNode          bool
-	SetImages         map[string]string
-	ShareProcesses    bool
-	TargetContainer   string
-	TTY               bool
-	Profile           string
-	CustomProfileFile string
-	CustomProfile     *corev1.Container
-	Applier           ProfileApplier
+	Args               []string
+	ArgsOnly           bool
+	Attach             bool
+	AttachFunc         DebugAttachFunc
+	Container          string
+	CopyTo             string
+	Replace            bool
+	Env                []corev1.EnvVar
+	Image              string
+	Interactive        bool
+	KeepLabels         bool
+	KeepAnnotations    bool
+	KeepLiveness       bool
+	KeepReadiness      bool
+	KeepStartup        bool
+	KeepInitContainers bool
+	Namespace          string
+	TargetNames        []string
+	PullPolicy         corev1.PullPolicy
+	Quiet              bool
+	SameNode           bool
+	SetImages          map[string]string
+	ShareProcesses     bool
+	TargetContainer    string
+	TTY                bool
+	Profile            string
+	CustomProfileFile  string
+	CustomProfile      *corev1.Container
+	Applier            ProfileApplier
 
 	explicitNamespace     bool
 	attachChanged         bool
@@ -151,10 +158,11 @@ type DebugOptions struct {
 // NewDebugOptions returns a DebugOptions initialized with default values.
 func NewDebugOptions(streams genericiooptions.IOStreams) *DebugOptions {
 	return &DebugOptions{
-		Args:           []string{},
-		IOStreams:      streams,
-		TargetNames:    []string{},
-		ShareProcesses: true,
+		Args:               []string{},
+		IOStreams:          streams,
+		KeepInitContainers: true,
+		TargetNames:        []string{},
+		ShareProcesses:     true,
 	}
 }
 
@@ -189,6 +197,12 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.Replace, "replace", o.Replace, i18n.T("When used with '--copy-to', delete the original Pod."))
 	cmd.Flags().StringToString("env", nil, i18n.T("Environment variables to set in the container."))
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, i18n.T("Container image to use for debug container."))
+	cmd.Flags().BoolVar(&o.KeepLabels, "keep-labels", o.KeepLabels, i18n.T("If true, keep the original pod labels.(This flag only works when used with '--copy-to')"))
+	cmd.Flags().BoolVar(&o.KeepAnnotations, "keep-annotations", o.KeepAnnotations, i18n.T("If true, keep the original pod annotations.(This flag only works when used with '--copy-to')"))
+	cmd.Flags().BoolVar(&o.KeepLiveness, "keep-liveness", o.KeepLiveness, i18n.T("If true, keep the original pod liveness probes.(This flag only works when used with '--copy-to')"))
+	cmd.Flags().BoolVar(&o.KeepReadiness, "keep-readiness", o.KeepReadiness, i18n.T("If true, keep the original pod readiness probes.(This flag only works when used with '--copy-to')"))
+	cmd.Flags().BoolVar(&o.KeepStartup, "keep-startup", o.KeepStartup, i18n.T("If true, keep the original startup probes.(This flag only works when used with '--copy-to')"))
+	cmd.Flags().BoolVar(&o.KeepInitContainers, "keep-init-containers", o.KeepInitContainers, i18n.T("Run the init containers for the pod. Defaults to true.(This flag only works when used with '--copy-to')"))
 	cmd.Flags().StringToStringVar(&o.SetImages, "set-image", o.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
 	cmd.Flags().BoolVarP(&o.Interactive, "stdin", "i", o.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
@@ -198,8 +212,8 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
-	if cmdutil.DebugCustomProfile.IsEnabled() {
-		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON file containing a partial container spec to customize built-in debug profiles."))
+	if !cmdutil.DebugCustomProfile.IsDisabled() {
+		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
 	}
 }
 
@@ -257,7 +271,15 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	}
 
 	if o.Applier == nil {
-		applier, err := NewProfileApplier(o.Profile)
+		kflags := KeepFlags{
+			Labels:         o.KeepLabels,
+			Annotations:    o.KeepAnnotations,
+			Liveness:       o.KeepLiveness,
+			Readiness:      o.KeepReadiness,
+			Startup:        o.KeepStartup,
+			InitContainers: o.KeepInitContainers,
+		}
+		applier, err := NewProfileApplier(o.Profile, kflags)
 		if err != nil {
 			return err
 		}
@@ -272,7 +294,10 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 
 		err = json.Unmarshal(customProfileBytes, &o.CustomProfile)
 		if err != nil {
-			return fmt.Errorf("%s does not contain a valid container spec: %w", o.CustomProfileFile, err)
+			err = yaml.Unmarshal(customProfileBytes, &o.CustomProfile)
+			if err != nil {
+				return fmt.Errorf("%s does not contain a valid container spec: %w", o.CustomProfileFile, err)
+			}
 		}
 	}
 
@@ -708,6 +733,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 			Name:        o.CopyTo,
 			Namespace:   pod.Namespace,
 			Annotations: pod.Annotations,
+			Labels:      pod.Labels,
 		},
 		Spec: *pod.Spec.DeepCopy(),
 	}
@@ -715,7 +741,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly
 	if o.shareProcessedChanged {
-		copied.Spec.ShareProcessNamespace = pointer.Bool(o.ShareProcesses)
+		copied.Spec.ShareProcessNamespace = ptr.To(o.ShareProcesses)
 	}
 	if !o.SameNode {
 		copied.Spec.NodeName = ""

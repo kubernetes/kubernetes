@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NodeApplyConfiguration represents an declarative configuration of the Node type for use
+// NodeApplyConfiguration represents a declarative configuration of the Node type for use
 // with apply.
 type NodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type NodeApplyConfiguration struct {
 	Status                           *NodeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Node constructs an declarative configuration of the Node type for use with
+// Node constructs a declarative configuration of the Node type for use with
 // apply.
 func Node(name string) *NodeApplyConfiguration {
 	b := &NodeApplyConfiguration{}
@@ -85,7 +85,7 @@ func extractNode(node *apicorev1.Node, fieldManager string, subresource string) 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithKind(value string) *NodeApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -93,7 +93,7 @@ func (b *NodeApplyConfiguration) WithKind(value string) *NodeApplyConfiguration 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithAPIVersion(value string) *NodeApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -102,7 +102,7 @@ func (b *NodeApplyConfiguration) WithAPIVersion(value string) *NodeApplyConfigur
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithName(value string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -111,7 +111,7 @@ func (b *NodeApplyConfiguration) WithName(value string) *NodeApplyConfiguration 
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithGenerateName(value string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -120,7 +120,7 @@ func (b *NodeApplyConfiguration) WithGenerateName(value string) *NodeApplyConfig
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithNamespace(value string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -129,7 +129,7 @@ func (b *NodeApplyConfiguration) WithNamespace(value string) *NodeApplyConfigura
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithUID(value types.UID) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -138,7 +138,7 @@ func (b *NodeApplyConfiguration) WithUID(value types.UID) *NodeApplyConfiguratio
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithResourceVersion(value string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -147,7 +147,7 @@ func (b *NodeApplyConfiguration) WithResourceVersion(value string) *NodeApplyCon
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithGeneration(value int64) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -156,7 +156,7 @@ func (b *NodeApplyConfiguration) WithGeneration(value int64) *NodeApplyConfigura
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithCreationTimestamp(value metav1.Time) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -165,7 +165,7 @@ func (b *NodeApplyConfiguration) WithCreationTimestamp(value metav1.Time) *NodeA
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -174,7 +174,7 @@ func (b *NodeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *NodeA
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *NodeApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -184,11 +184,11 @@ func (b *NodeApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *No
 // overwriting an existing map entries in Labels field with the same key.
 func (b *NodeApplyConfiguration) WithLabels(entries map[string]string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -199,11 +199,11 @@ func (b *NodeApplyConfiguration) WithLabels(entries map[string]string) *NodeAppl
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *NodeApplyConfiguration) WithAnnotations(entries map[string]string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -217,7 +217,7 @@ func (b *NodeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenc
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -228,7 +228,7 @@ func (b *NodeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenc
 func (b *NodeApplyConfiguration) WithFinalizers(values ...string) *NodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -253,4 +253,10 @@ func (b *NodeApplyConfiguration) WithSpec(value *NodeSpecApplyConfiguration) *No
 func (b *NodeApplyConfiguration) WithStatus(value *NodeStatusApplyConfiguration) *NodeApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *NodeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Name
 }

@@ -26,7 +26,6 @@ nodes:
       apiServer:
         extraArgs:
           encryption-provider-config: "/etc/kubernetes/encryption-config.yaml"
-          feature-gates: "KMSv2=true"
           v: "5"
         extraVolumes:
         - name: encryption-config

@@ -44,22 +44,24 @@ var configmapsKind = v1.SchemeGroupVersion.WithKind("ConfigMap")
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
 func (c *FakeConfigMaps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ConfigMap, err error) {
+	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), &v1.ConfigMap{})
+		Invokes(testing.NewGetActionWithOptions(configmapsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ConfigMap), err
 }
 
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
 func (c *FakeConfigMaps) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ConfigMapList, err error) {
+	emptyResult := &v1.ConfigMapList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(configmapsResource, configmapsKind, c.ns, opts), &v1.ConfigMapList{})
+		Invokes(testing.NewListActionWithOptions(configmapsResource, configmapsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -78,28 +80,30 @@ func (c *FakeConfigMaps) List(ctx context.Context, opts metav1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested configMaps.
 func (c *FakeConfigMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(configmapsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(configmapsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
 func (c *FakeConfigMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (result *v1.ConfigMap, err error) {
+	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &v1.ConfigMap{})
+		Invokes(testing.NewCreateActionWithOptions(configmapsResource, c.ns, configMap, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ConfigMap), err
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
 func (c *FakeConfigMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (result *v1.ConfigMap, err error) {
+	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &v1.ConfigMap{})
+		Invokes(testing.NewUpdateActionWithOptions(configmapsResource, c.ns, configMap, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ConfigMap), err
 }
@@ -114,7 +118,7 @@ func (c *FakeConfigMaps) Delete(ctx context.Context, name string, opts metav1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(configmapsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ConfigMapList{})
 	return err
@@ -122,11 +126,12 @@ func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, opts metav1.Delet
 
 // Patch applies the patch and returns the patched configMap.
 func (c *FakeConfigMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error) {
+	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, pt, data, subresources...), &v1.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(configmapsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ConfigMap), err
 }
@@ -144,11 +149,12 @@ func (c *FakeConfigMaps) Apply(ctx context.Context, configMap *corev1.ConfigMapA
 	if name == nil {
 		return nil, fmt.Errorf("configMap.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(configmapsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ConfigMap), err
 }

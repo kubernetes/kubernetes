@@ -47,4 +47,8 @@ const (
 	MinBoolSize = 4
 	// MinNumberSize is the length of literal 0
 	MinNumberSize = 1
+
+	// MaxFormatSize is the maximum size we allow for format strings
+	MaxFormatSize          = 64
+	MaxNameFormatRegexSize = 128
 )

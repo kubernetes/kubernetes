@@ -120,18 +120,23 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	kubeClient, err := kubernetes.NewForConfig(config.ClientConfig)
-	if err != nil {
-		return err
+	var kubeClient kubernetes.Interface
+	var dynamicClient dynamic.Interface
+	if config.ClientConfig != nil {
+		var err error
+		kubeClient, err = kubernetes.NewForConfig(config.ClientConfig)
+		if err != nil {
+			return err
+		}
+		dynamicClient, err = dynamic.NewForConfig(config.ClientConfig)
+		if err != nil {
+			return err
+		}
 	}
 	if err := o.Features.ApplyTo(&config.Config, kubeClient, config.SharedInformerFactory); err != nil {
 		return err
 	}
 	initializers, err := o.ExtraAdmissionInitializers(config)
-	if err != nil {
-		return err
-	}
-	dynamicClient, err := dynamic.NewForConfig(config.ClientConfig)
 	if err != nil {
 		return err
 	}

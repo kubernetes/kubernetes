@@ -20,32 +20,26 @@ limitations under the License.
 package app
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/spf13/cobra"
-
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/logs"
@@ -56,18 +50,12 @@ import (
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/features"
-	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 func init() {
@@ -76,7 +64,10 @@ func init() {
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
+	_, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	s := options.NewServerRunOptions()
+
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data
@@ -87,6 +78,9 @@ cluster's shared state through which all other components interact.`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
+			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
 			// silence client-go warnings.
 			// kube-apiserver loopback clients should not log self-issued warnings.
 			rest.SetDefaultWarningHandler(rest.NoWarnings{})
@@ -95,10 +89,9 @@ cluster's shared state through which all other components interact.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
-
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.Logs, featureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
@@ -114,8 +107,8 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
-			return Run(completedOptions, genericapiserver.SetupSignalHandler())
+			featureGate.AddMetrics()
+			return Run(cmd.Context(), completedOptions)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -126,6 +119,7 @@ cluster's shared state through which all other components interact.`,
 			return nil
 		},
 	}
+	cmd.SetContext(genericapiserver.SetupSignalContext())
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
@@ -143,7 +137,7 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
+func Run(ctx context.Context, opts options.CompletedOptions) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -167,25 +161,25 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	return prepared.Run(stopCh)
+	return prepared.Run(ctx)
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
-	notFoundHandler := notfoundhandler.New(config.ControlPlane.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+	notFoundHandler := notfoundhandler.New(config.KubeAPIs.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, err
 	}
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
 
-	kubeAPIServer, err := config.ControlPlane.New(apiExtensionsServer.GenericAPIServer)
+	kubeAPIServer, err := config.KubeAPIs.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// aggregator comes last in the chain
-	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
+	aggregatorServer, err := controlplaneapiserver.CreateAggregatorServer(config.Aggregator, kubeAPIServer.ControlPlane.GenericAPIServer, apiExtensionsServer.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdAPIEnabled, apiVersionPriorities)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err
@@ -194,50 +188,40 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	return aggregatorServer, nil
 }
 
-// CreateProxyTransport creates the dialer infrastructure to connect to the nodes.
-func CreateProxyTransport() *http.Transport {
-	var proxyDialerFn utilnet.DialFunc
-	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		DialContext:     proxyDialerFn,
-		TLSClientConfig: proxyTLSClientConfig,
-	})
-	return proxyTransport
-}
-
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
-func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
+func CreateKubeAPIServerConfig(
+	opts options.CompletedOptions,
+	genericConfig *genericapiserver.Config,
+	versionedInformers clientgoinformers.SharedInformerFactory,
+	storageFactory *serverstorage.DefaultStorageFactory,
+) (
 	*controlplane.Config,
 	aggregatorapiserver.ServiceResolver,
 	[]admission.PluginInitializer,
 	error,
 ) {
-	proxyTransport := CreateProxyTransport()
+	// global stuff
+	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
 
-	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
-		opts.CompletedOptions,
-		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
-		generatedopenapi.GetOpenAPIDefinitions,
-	)
+	// additional admission initializers
+	kubeAdmissionConfig := &kubeapiserveradmission.Config{
+		CloudConfigFile: opts.CloudProvider.CloudConfigFile,
+	}
+	kubeInitializers, err := kubeAdmissionConfig.New()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+	}
+
+	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
-
-	opts.Metrics.Apply()
-	serviceaccount.RegisterMetrics()
-
 	config := &controlplane.Config{
-		GenericConfig: genericConfig,
-		ExtraConfig: controlplane.ExtraConfig{
-			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
-			StorageFactory:          storageFactory,
-			EventTTL:                opts.EventTTL,
-			KubeletClientConfig:     opts.KubeletConfig,
-			EnableLogsSupport:       opts.EnableLogsHandler,
-			ProxyTransport:          proxyTransport,
+		ControlPlane: *controlplaneConfig,
+		Extra: controlplane.Extra{
+			KubeletClientConfig: opts.KubeletConfig,
 
 			ServiceIPRange:          opts.PrimaryServiceClusterIPRange,
 			APIServerServiceIP:      opts.APIServerServiceIP,
@@ -250,107 +234,25 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 
 			EndpointReconcilerType: reconcilers.Type(opts.EndpointReconcilerType),
 			MasterCount:            opts.MasterCount,
-
-			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
-			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
-			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
-
-			VersionedInformers: versionedInformers,
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		// build peer proxy config only if peer ca file exists
-		if opts.PeerCAFile != "" {
-			config.ExtraConfig.PeerProxy, err = controlplaneapiserver.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
-				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.ExtraConfig.PeerEndpointLeaseReconciler, config.GenericConfig.Serializer)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-		}
-	}
+	if config.ControlPlane.Generic.EgressSelector != nil {
+		// Use the config.ControlPlane.Generic.EgressSelector lookup to find the dialer to connect to the kubelet
+		config.Extra.KubeletClientConfig.Lookup = config.ControlPlane.Generic.EgressSelector.Lookup
 
-	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	config.ExtraConfig.ClusterAuthenticationInfo.ClientCA = clientCAProvider
-
-	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if requestHeaderConfig != nil {
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderAllowedNames = requestHeaderConfig.AllowedClientNames
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
-	}
-
-	// setup admission
-	admissionConfig := &kubeapiserveradmission.Config{
-		ExternalInformers:    versionedInformers,
-		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
-		CloudConfigFile:      opts.CloudProvider.CloudConfigFile,
-	}
-	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-	pluginInitializers, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
-	}
-	clientgoExternalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
-	}
-	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
-	}
-	err = opts.Admission.ApplyTo(
-		genericConfig,
-		versionedInformers,
-		clientgoExternalClient,
-		dynamicExternalClient,
-		utilfeature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
-	}
-
-	if config.GenericConfig.EgressSelector != nil {
-		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
-		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
-
-		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+		// Use the config.ControlPlane.Generic.EgressSelector lookup as the transport used by the "proxy" subresources.
 		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
+		dialer, err := config.ControlPlane.Generic.EgressSelector.Lookup(networkContext)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		c := proxyTransport.Clone()
+		c := config.ControlPlane.Extra.ProxyTransport.Clone()
 		c.DialContext = dialer
-		config.ExtraConfig.ProxyTransport = c
+		config.ControlPlane.ProxyTransport = c
 	}
 
-	// Load and set the public keys.
-	var pubKeys []interface{}
-	for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
-		keys, err := keyutil.PublicKeysFromFile(f)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
-		}
-		pubKeys = append(pubKeys, keys...)
-	}
-	config.ExtraConfig.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
-	config.ExtraConfig.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
-	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
-
-	return config, serviceResolver, pluginInitializers, nil
+	return config, serviceResolver, admissionInitializers, nil
 }
 
 var testServiceResolver webhook.ServiceResolver

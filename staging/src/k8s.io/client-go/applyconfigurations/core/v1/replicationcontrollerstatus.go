@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ReplicationControllerStatusApplyConfiguration represents an declarative configuration of the ReplicationControllerStatus type for use
+// ReplicationControllerStatusApplyConfiguration represents a declarative configuration of the ReplicationControllerStatus type for use
 // with apply.
 type ReplicationControllerStatusApplyConfiguration struct {
 	Replicas             *int32                                             `json:"replicas,omitempty"`
@@ -29,7 +29,7 @@ type ReplicationControllerStatusApplyConfiguration struct {
 	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ReplicationControllerStatusApplyConfiguration constructs an declarative configuration of the ReplicationControllerStatus type for use with
+// ReplicationControllerStatusApplyConfiguration constructs a declarative configuration of the ReplicationControllerStatus type for use with
 // apply.
 func ReplicationControllerStatus() *ReplicationControllerStatusApplyConfiguration {
 	return &ReplicationControllerStatusApplyConfiguration{}

@@ -38,17 +38,18 @@ import (
 var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 	f := framework.NewDefaultFramework("node-lease-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	var systemPodsNo int32
+	var systemPodsNo int
 	var c clientset.Interface
 	var ns string
 	var group string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
 		framework.ExpectNoError(err)
-		systemPodsNo = int32(len(systemPods))
+		systemPodsNo = len(systemPods)
 		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
@@ -97,7 +98,7 @@ var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
-			err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout)
+			err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
 			framework.ExpectNoError(err)
 		})
 
@@ -141,13 +142,17 @@ var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 			var deletedNodeName string
 			for _, originalNode := range originalNodes.Items {
 				originalNodeName := originalNode.ObjectMeta.Name
+				var found bool
 				for _, targetNode := range targetNodes.Items {
 					if originalNodeName == targetNode.ObjectMeta.Name {
-						continue
+						found = true
+						break
 					}
 				}
-				deletedNodeName = originalNodeName
-				break
+				if !found {
+					deletedNodeName = originalNodeName
+					break
+				}
 			}
 			gomega.Expect(deletedNodeName).NotTo(gomega.BeEmpty())
 			gomega.Eventually(ctx, func() error {

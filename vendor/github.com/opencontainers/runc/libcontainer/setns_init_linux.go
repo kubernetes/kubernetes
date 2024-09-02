@@ -48,6 +48,7 @@ func (l *linuxSetnsInit) Init() error {
 			}
 		}
 	}
+
 	if l.config.CreateConsole {
 		if err := setupConsole(l.consoleSocket, l.config, false); err != nil {
 			return err
@@ -61,6 +62,14 @@ func (l *linuxSetnsInit) Init() error {
 			return err
 		}
 	}
+
+	// Tell our parent that we're ready to exec. This must be done before the
+	// Seccomp rules have been applied, because we need to be able to read and
+	// write to a socket.
+	if err := syncParentReady(l.pipe); err != nil {
+		return fmt.Errorf("sync ready: %w", err)
+	}
+
 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return err
 	}

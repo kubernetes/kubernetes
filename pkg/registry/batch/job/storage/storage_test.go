@@ -17,8 +17,9 @@ limitations under the License.
 package storage
 
 import (
-	"k8s.io/utils/pointer"
 	"testing"
+
+	"k8s.io/utils/ptr"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/warning"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -72,18 +74,7 @@ func validNewJob() *batch.Job {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:                     "test",
-							Image:                    "test_image",
-							ImagePullPolicy:          api.PullIfNotPresent,
-							TerminationMessagePolicy: api.TerminationMessageReadFile,
-						},
-					},
-					RestartPolicy: api.RestartPolicyOnFailure,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
+				Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 			},
 		},
 	}
@@ -138,7 +129,7 @@ func TestCreate(t *testing.T) {
 		// invalid (empty selector)
 		&batch.Job{
 			Spec: batch.JobSpec{
-				ManualSelector: pointer.Bool(false),
+				ManualSelector: ptr.To(false),
 				Completions:    validJob.Spec.Completions,
 				Selector:       &metav1.LabelSelector{},
 				Template:       validJob.Spec.Template,

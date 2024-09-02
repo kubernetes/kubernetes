@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -64,15 +65,17 @@ func getAvailablePort() (int, error) {
 
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
-func startEtcd(output io.Writer) (func(), error) {
-	etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
-	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
-	if err == nil {
-		klog.Infof("etcd already running at %s", etcdURL)
-		conn.Close()
-		return func() {}, nil
+func startEtcd(output io.Writer, forceCreate bool) (func(), error) {
+	if !forceCreate {
+		etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+		conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
+		if err == nil {
+			klog.Infof("etcd already running at %s", etcdURL)
+			_ = conn.Close()
+			return func() {}, nil
+		}
+		klog.V(1).Infof("could not connect to etcd: %v", err)
 	}
-	klog.V(1).Infof("could not connect to etcd: %v", err)
 
 	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil, output)
 	if err != nil {
@@ -144,7 +147,10 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 		// try to exit etcd gracefully
 		defer cancel()
 		cmd.Process.Signal(syscall.SIGTERM)
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			select {
 			case <-ctx.Done():
 				klog.Infof("etcd exited gracefully, context cancelled")
@@ -154,6 +160,7 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 			}
 		}()
 		err := cmd.Wait()
+		wg.Wait()
 		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
@@ -207,9 +214,17 @@ func EtcdMain(tests func() int) {
 		// Both names occurred in practice.
 		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
 		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+		// If there is an error during connection shutdown, SPDY keeps a
+		// goroutine around for ten minutes, which gets reported as a leak
+		// (the goroutine is cleaned up after the ten minutes).
+		//
+		// https://github.com/kubernetes/kubernetes/blob/master/vendor/github.com/moby/spdystream/connection.go#L732-L744
+		//
+		// Ignore this reported leak.
+		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
-	stop, err := startEtcd(nil)
+	stop, err := startEtcd(nil, false)
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
@@ -239,8 +254,8 @@ func GetEtcdURL() string {
 //
 // Starting etcd multiple times per test run instead of once with EtcdMain
 // provides better separation between different tests.
-func StartEtcd(tb testing.TB, etcdOutput io.Writer) {
-	stop, err := startEtcd(etcdOutput)
+func StartEtcd(tb testing.TB, etcdOutput io.Writer, forceCreate bool) {
+	stop, err := startEtcd(etcdOutput, forceCreate)
 	if err != nil {
 		tb.Fatalf("unable to start etcd: %v", err)
 	}

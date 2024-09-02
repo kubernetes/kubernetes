@@ -66,7 +66,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
         - name: socat
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.13.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.14.0
           command:
           - socat
           args:

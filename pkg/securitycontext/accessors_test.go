@@ -30,6 +30,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 	runAsUser := int64(1)
 	runAsGroup := int64(1)
 	runAsNonRoot := true
+	hostUsers := false
 
 	testcases := []*api.PodSecurityContext{
 		nil,
@@ -38,6 +39,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		{HostIPC: true},
 		{HostNetwork: true},
 		{HostPID: true},
+		{HostUsers: &hostUsers},
 		{RunAsNonRoot: &runAsNonRoot},
 		{RunAsUser: &runAsUser},
 		{RunAsGroup: &runAsGroup},
@@ -65,6 +67,9 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		}
 		if v := a.HostPID(); !reflect.DeepEqual(expected.HostPID, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.HostPID, v)
+		}
+		if v := a.HostUsers(); !reflect.DeepEqual(expected.HostUsers, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.HostUsers, v)
 		}
 		if v := a.RunAsNonRoot(); !reflect.DeepEqual(expected.RunAsNonRoot, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsNonRoot, v)
@@ -103,6 +108,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 					HostNetwork:        true,
 					HostIPC:            true,
 					HostPID:            true,
+					HostUsers:          nil,
 					SELinuxOptions:     &api.SELinuxOptions{},
 					RunAsUser:          nil,
 					RunAsGroup:         nil,
@@ -133,6 +139,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m.SetHostNetwork(m.HostNetwork())
 			m.SetHostIPC(m.HostIPC())
 			m.SetHostPID(m.HostPID())
+			m.SetHostUsers(m.HostUsers())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
 			m.SetRunAsGroup(m.RunAsGroup())
@@ -190,6 +197,19 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m := NewPodSecurityContextMutator(tc.newSC())
 			modifiedSC.HostPID = !modifiedSC.HostPID
 			m.SetHostPID(!m.HostPID())
+			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
+				continue
+			}
+		}
+
+		// HostUsers
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewPodSecurityContextMutator(tc.newSC())
+			b := false
+			modifiedSC.HostUsers = &b
+			m.SetHostUsers(&b)
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue

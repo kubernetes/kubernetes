@@ -214,7 +214,7 @@ func (d *Decoder) parseNext() (Token, error) {
 
 // newSyntaxError returns an error with line and column information useful for
 // syntax errors.
-func (d *Decoder) newSyntaxError(pos int, f string, x ...interface{}) error {
+func (d *Decoder) newSyntaxError(pos int, f string, x ...any) error {
 	e := errors.New(f, x...)
 	line, column := d.Position(pos)
 	return errors.New("syntax error (line %d:%d): %v", line, column, e)

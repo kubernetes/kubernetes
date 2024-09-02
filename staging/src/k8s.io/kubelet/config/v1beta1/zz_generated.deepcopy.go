@@ -485,6 +485,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.FailCgroupV1 != nil {
+		in, out := &in.FailCgroupV1, &out.FailCgroupV1
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

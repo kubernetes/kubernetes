@@ -103,15 +103,11 @@ func (plugin *projectedPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *projectedPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
-func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
 			volName:         spec.Name(),
@@ -122,7 +118,6 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 		},
 		source: *spec.Volume.Projected,
 		pod:    pod,
-		opts:   &opts,
 	}, nil
 }
 
@@ -169,7 +164,6 @@ type projectedVolumeMounter struct {
 
 	source v1.ProjectedVolumeSource
 	pod    *v1.Pod
-	opts   *volume.VolumeOptions
 }
 
 var _ volume.Mounter = &projectedVolumeMounter{}
@@ -190,7 +184,7 @@ func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
-	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
+	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod)
 	if err != nil {
 		return err
 	}

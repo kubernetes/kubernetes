@@ -411,7 +411,7 @@ func TestOpenAPIMemCache(t *testing.T) {
 	require.NoError(t, err)
 	defer fakeServer.HttpServer.Close()
 
-	require.Greater(t, len(fakeServer.ServedDocuments), 0)
+	require.NotEmpty(t, fakeServer.ServedDocuments)
 
 	client := NewMemCacheClient(
 		discovery.NewDiscoveryClientForConfigOrDie(
@@ -604,7 +604,7 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		require.NoError(t, err)
 		// "Unaggregated" discovery always returns nil for resources.
 		assert.Nil(t, resourcesMap)
-		assert.True(t, len(failedGVs) == 0, "expected empty failed GroupVersions, got (%d)", len(failedGVs))
+		assert.Emptyf(t, failedGVs, "expected empty failed GroupVersions, got (%d)", len(failedGVs))
 		assert.False(t, memClient.receivedAggregatedDiscovery)
 		assert.True(t, memClient.Fresh())
 		// Test the expected groups are returned for the aggregated format.

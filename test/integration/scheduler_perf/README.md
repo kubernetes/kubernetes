@@ -102,6 +102,15 @@ performance.
 During interactive debugging sessions it is possible to enable per-test output
 via -use-testing-log.
 
+Log output can be quite large, in particular when running the large benchmarks
+and when not using -use-testing-log. For benchmarks, we want to produce that
+log output in a realistic way (= write to disk using the normal logging
+backends) and only capture the output of a specific test as part of the job
+results when that test failed. Therefore each test redirects its own output if
+the ARTIFACTS env variable is set to a `$ARTIFACTS/<test name>.log` file and
+removes that file only if the test passed.
+
+
 ### Integration tests
 
 To run integration tests, use:
@@ -110,6 +119,57 @@ make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_ARGS=-use
 ```
 
 Integration testing uses the same `config/performance-config.yaml` as
-benchmarking. By default, workloads labeled as `integration-test` are executed
-as part of integration testing. `-test-scheduling-label-filter` can be used to
-change that.
+benchmarking. By default, workloads labeled as `integration-test`
+are executed as part of integration testing (in ci-kubernetes-integration-master job).
+`-test-scheduling-label-filter` can be used to change that.
+All test cases should have at least one workload labeled as `integration-test`.
+
+Running the integration tests with command above will only execute the workloads labeled as `short`.
+`SHORT=--short=false` variable added to the command can be used to disable this filtering.
+
+We should make each test case with `short` label very small,
+so that all tests with the label should take less than 5 min to complete.
+The test cases labeled as `short` are executed in pull-kubernetes-integration job.
+
+### Labels used by CI jobs
+
+| CI Job                           | Labels                 |
+|----------------------------------|------------------------|
+| ci-kubernetes-integration-master | integration-test       |
+| pull-kubernetes-integration      | integration-test,short |
+| ci-benchmark-scheduler-perf      | performance            |
+
+## Scheduling throughput thresholds
+
+Thresholds are used to capture scheduler performance regressions in a periodic ci-benchmark-scheduler-perf job. 
+Most test cases have a threshold set for the largest `performance` workloads. 
+By default, these are defined for the `Average` statistic of the `SchedulingThroughput` metric. 
+It is possible to use other metric by configuring `thresholdMetricSelector` per test case or workload. 
+
+### How to calculate the threshold
+
+The initial values for scheduling throughput thresholds were calculated through an analysis of historical data, 
+specifically focusing on the minimum, average, and standard deviation values for each workload 
+(see [#126871](https://github.com/kubernetes/kubernetes/pull/126871)). 
+Our goal is to set the thresholds somewhat pessimistically to minimize flakiness, 
+so it's recommended to set the threshold slightly below the observed historical minimum. 
+Depending on variability of data, the threshold can be lowered more. 
+
+Thresholds should be adjusted based on the flakiness level and minima observed in the future. 
+Remember to set the value for newly added test cases as well, 
+but after collecting some data on workload characteristics.
+
+### How to determine the failed workload
+
+When the workload's scheduling throughput doesn't exceed the threshold, 
+the ci-benchmark-scheduler-perf periodic job will fail with an error log such as:
+
+```
+--- FAIL: BenchmarkPerfScheduling/SchedulingBasic/5000Nodes_10000Pods
+    ...
+    scheduler_perf.go:1098: ERROR: op 2: SchedulingBasic/5000Nodes_10000Pods/namespace-2: expected SchedulingThroughput Average to be higher: got 256.12, want 270
+```
+
+This allows to analyze which workload failed. Make sure that the failure is not an outlier 
+by checking multiple runs of the job. If the failures are not related to any regression, 
+but to an incorrect threshold setting, it is reasonable to decrease it.

@@ -4,18 +4,18 @@ approvers:
   - neolit123
   - SataQiu
   - pacoxu
-  - chendave
 reviewers:
   - neolit123
   - SataQiu
   - pacoxu
-  - chendave
+  - carlory
 emeritus_approvers:
   - fabriziopandini
   - luxas
   - timothysc
   - rosti
   - ereslibre
+  - chendave
 labels:
   - area/kubeadm
   - sig/cluster-lifecycle

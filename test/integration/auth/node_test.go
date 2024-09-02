@@ -27,7 +27,7 @@ import (
 	coordination "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	"k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
@@ -65,7 +66,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}, "\n"))
 	tokenFile.Close()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--runtime-config=api/all=true",
@@ -107,10 +108,16 @@ func TestNodeAuthorizer(t *testing.T) {
 	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.ResourceV1alpha2().ResourceClaims("ns").Create(context.TODO(), &v1alpha2.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mynamedresourceclaim"}, Spec: v1alpha2.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mynamedresourceclaim"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.ResourceV1alpha2().ResourceClaims("ns").Create(context.TODO(), &v1alpha2.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}, Spec: v1alpha2.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice1"}, Spec: resourceapi.ResourceSliceSpec{NodeName: "node1", Driver: "dra.example.com", Pool: resourceapi.ResourcePool{Name: "node1-slice", ResourceSliceCount: 1}}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice2"}, Spec: resourceapi.ResourceSliceSpec{NodeName: "node2", Driver: "dra.example.com", Pool: resourceapi.ResourcePool{Name: "node2-slice", ResourceSliceCount: 1}}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,14 +192,23 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	getResourceClaim := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mynamedresourceclaim", metav1.GetOptions{})
+			_, err := client.ResourceV1alpha3().ResourceClaims("ns").Get(context.TODO(), "mynamedresourceclaim", metav1.GetOptions{})
 			return err
 		}
 	}
 	getResourceClaimTemplate := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mytemplatizedresourceclaim", metav1.GetOptions{})
+			_, err := client.ResourceV1alpha3().ResourceClaims("ns").Get(context.TODO(), "mytemplatizedresourceclaim", metav1.GetOptions{})
 			return err
+		}
+	}
+	deleteResourceSliceCollection := func(client clientset.Interface, nodeName *string) func() error {
+		return func() error {
+			var listOptions metav1.ListOptions
+			if nodeName != nil {
+				listOptions.FieldSelector = resourceapi.ResourceSliceSelectorNodeName + "=" + *nodeName
+			}
+			return client.ResourceV1alpha3().ResourceSlices().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listOptions)
 		}
 	}
 	addResourceClaimTemplateReference := func(client clientset.Interface) func() error {
@@ -225,8 +241,8 @@ func TestNodeAuthorizer(t *testing.T) {
 						{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}}},
 					},
 					ResourceClaims: []corev1.PodResourceClaim{
-						{Name: "namedclaim", Source: corev1.ClaimSource{ResourceClaimName: pointer.String("mynamedresourceclaim")}},
-						{Name: "templateclaim", Source: corev1.ClaimSource{ResourceClaimTemplateName: pointer.String("myresourceclaimtemplate")}},
+						{Name: "namedclaim", ResourceClaimName: pointer.String("mynamedresourceclaim")},
+						{Name: "templateclaim", ResourceClaimTemplateName: pointer.String("myresourceclaimtemplate")},
 					},
 				},
 			}, metav1.CreateOptions{})
@@ -640,6 +656,32 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, updateNode1CSINode(csiNode2Client))
 	expectForbidden(t, patchNode1CSINode(csiNode2Client))
 	expectForbidden(t, deleteNode1CSINode(csiNode2Client))
+
+	// Always allowed. Permission to delete specific objects is checked per object.
+	// Beware, this is destructive!
+	expectAllowed(t, deleteResourceSliceCollection(csiNode1Client, ptr.To("node1")))
+
+	// One slice must have been deleted, the other not.
+	slices, err := superuserClient.ResourceV1alpha3().ResourceSlices().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(slices.Items) != 1 {
+		t.Fatalf("unexpected slices: %v", slices.Items)
+	}
+	if slices.Items[0].Spec.NodeName != "node2" {
+		t.Fatal("wrong slice deleted")
+	}
+
+	// Superuser can delete.
+	expectAllowed(t, deleteResourceSliceCollection(superuserClient, nil))
+	slices, err = superuserClient.ResourceV1alpha3().ResourceSlices().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(slices.Items) != 0 {
+		t.Fatalf("unexpected slices: %v", slices.Items)
+	}
 }
 
 // expect executes a function a set number of times until it either returns the

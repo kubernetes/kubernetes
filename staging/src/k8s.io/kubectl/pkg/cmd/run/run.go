@@ -167,22 +167,6 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 
-	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
-	// TODO: Remove the cascade flag from the run command in kubectl 1.29
-	cmd.Flags().MarkDeprecated("cascade", "because it is not relevant for this command. It will be removed in version 1.29.")
-
-	// Deprecate and hide unused flags.
-	// These flags are being added to the run command by DeleteFlags to support pod deletion after attach,
-	// but they are not used if set, so they effectively do nothing.
-	// TODO: Remove these flags from the run command in kubectl 1.29
-	cmd.Flags().MarkDeprecated("filename", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("force", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("grace-period", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("kustomize", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("recursive", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("timeout", "because it is not used by this command. It will be removed in version 1.29.")
-	cmd.Flags().MarkDeprecated("wait", "because it is not used by this command. It will be removed in version 1.29.")
-
 	return cmd
 }
 

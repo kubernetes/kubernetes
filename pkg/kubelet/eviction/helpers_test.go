@@ -1279,11 +1279,20 @@ func TestMakeSignalObservations(t *testing.T) {
 				Inodes:         &nodeFsInodes,
 			},
 			SystemContainers: []statsapi.ContainerStats{
+				// Used for memory signal observations on linux
 				{
 					Name: statsapi.SystemContainerPods,
 					Memory: &statsapi.MemoryStats{
 						AvailableBytes:  &nodeAvailableBytes,
 						WorkingSetBytes: &nodeWorkingSetBytes,
+					},
+				},
+				// Used for memory signal observations on windows
+				{
+					Name: statsapi.SystemContainerWindowsGlobalCommitMemory,
+					Memory: &statsapi.MemoryStats{
+						AvailableBytes: &nodeAvailableBytes,
+						UsageBytes:     &nodeWorkingSetBytes,
 					},
 				},
 			},
@@ -1307,7 +1316,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	actualObservations, statsFunc := makeSignalObservations(fakeStats)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
-		t.Errorf("Expected allocatable memory observation, but didnt find one")
+		t.Errorf("Expected allocatable memory observation, but didn't find one")
 	}
 	if expectedBytes := int64(nodeAvailableBytes); allocatableMemQuantity.available.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.available.Value())
@@ -3053,8 +3062,9 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 
 	rootFsUsedBytes := uint64(rootFsUsed.Value())
 	logsUsedBytes := uint64(logsUsed.Value())
-	for range pod.Spec.Containers {
+	for _, container := range pod.Spec.Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
+			Name: container.Name,
 			Rootfs: &statsapi.FsStats{
 				UsedBytes: &rootFsUsedBytes,
 			},
@@ -3235,7 +3245,7 @@ func TestEvictonMessageWithResourceResize(t *testing.T) {
 
 	for _, enabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodVerticalScaling enabled=%v", enabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
 			msg, _ := evictionMessage(v1.ResourceMemory, testpod, statsFn, threshold, observations)
 			if enabled {
 				if !strings.Contains(msg, "testcontainer was using 150Mi, request is 100Mi") {

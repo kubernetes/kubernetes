@@ -17,6 +17,8 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -54,11 +56,17 @@ func (f *fakeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 
 // KubeadmVersion gets a fake kubeadm version
 func (f *fakeVersionGetter) KubeadmVersion() (string, *versionutil.Version, error) {
+	if f.kubeadmVersion == "" {
+		return "", nil, errors.New("get kubeadm version error")
+	}
 	return f.kubeadmVersion, versionutil.MustParseSemantic(f.kubeadmVersion), nil
 }
 
 // VersionFromCILabel gets fake latest versions from CI
 func (f *fakeVersionGetter) VersionFromCILabel(ciVersionLabel, _ string) (string, *versionutil.Version, error) {
+	if f.stableVersion == "" {
+		return "", nil, errors.New("fake error")
+	}
 	if ciVersionLabel == "stable" {
 		return f.stableVersion, versionutil.MustParseSemantic(f.stableVersion), nil
 	}
@@ -73,6 +81,9 @@ func (f *fakeVersionGetter) VersionFromCILabel(ciVersionLabel, _ string) (string
 
 // KubeletVersions should return a map with a version and a list of node names that describes how many kubelets there are for that version
 func (f *fakeVersionGetter) KubeletVersions() (map[string][]string, error) {
+	if f.kubeletVersion == "" {
+		return nil, errors.New("get kubelet version failed")
+	}
 	return map[string][]string{
 		f.kubeletVersion: {"node1"},
 	}, nil
@@ -86,6 +97,17 @@ func (f *fakeVersionGetter) ComponentVersions(name string) (map[string][]string,
 		}
 		return map[string][]string{
 			f.etcdVersion: {"node1"},
+		}, nil
+	}
+
+	if f.componentVersion == "" {
+		return nil, errors.New("get component version failed")
+	}
+
+	if f.componentVersion == "multiVersion" {
+		return map[string][]string{
+			"node1": {"node1"},
+			"node2": {"node2"},
 		}, nil
 	}
 
@@ -136,6 +158,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		allowExperimental, allowRCs bool
 		errExpected                 bool
 		beforeDNSVersion            string
+		deployDNSFailed             bool
 	}{
 		{
 			name: "no action needed, already up-to-date",
@@ -153,6 +176,110 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  nil,
 			allowExperimental: false,
 			errExpected:       false,
+		},
+		{
+			name: "get component version failed",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: "",
+				kubeletVersion:   v1Y0.String(),
+				kubeadmVersion:   v1Y0.String(),
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      v1Y0.String(),
+			},
+			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       true,
+		},
+		{
+			name: "there is version information about multiple components",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: "multiVersion",
+				kubeletVersion:   v1Y0.String(),
+				kubeadmVersion:   v1Y0.String(),
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      v1Y0.String(),
+			},
+			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       true,
+		},
+		{
+			name: "get kubeadm version failed",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: v1Y0.String(),
+				kubeletVersion:   v1Y0.String(),
+				kubeadmVersion:   "",
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      v1Y0.String(),
+			},
+			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       true,
+		},
+		{
+			name: "get kubelet version failed",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: v1Y0.String(),
+				kubeletVersion:   "",
+				kubeadmVersion:   v1Y0.String(),
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      v1Y0.String(),
+			},
+			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       true,
+		},
+		{
+			name: "deploy DNS failed",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: v1Y0.String(),
+				kubeletVersion:   v1Y0.String(),
+				kubeadmVersion:   v1Y0.String(),
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      v1Y0.String(),
+			},
+			beforeDNSVersion: fakeCurrentCoreDNSVersion,
+
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       false,
+		},
+		{
+			name: "get stable version from CI label failed",
+			vg: &fakeVersionGetter{
+				clusterVersion:   v1Y0.String(),
+				componentVersion: v1Y0.String(),
+				kubeletVersion:   v1Y0.String(),
+				kubeadmVersion:   v1Y0.String(),
+				etcdVersion:      fakeCurrentEtcdVersion,
+
+				stablePatchVersion: v1Y0.String(),
+				stableVersion:      "",
+			},
+			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
+			deployDNSFailed:   true,
+			expectedUpgrades:  nil,
+			allowExperimental: false,
+			errExpected:       true,
 		},
 		{
 			name: "simple patch version upgrade",
@@ -781,30 +908,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 
 			dnsName := constants.CoreDNSDeploymentName
 
-			client := clientsetfake.NewSimpleClientset(&apps.Deployment{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Deployment",
-					APIVersion: "apps/v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      dnsName,
-					Namespace: "kube-system",
-					Labels: map[string]string{
-						"k8s-app": "kube-dns",
-					},
-				},
-				Spec: apps.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
-								{
-									Image: "test:" + rt.beforeDNSVersion,
-								},
-							},
-						},
-					},
-				},
-			})
+			client := newMockClientForTest(t, dnsName, rt.beforeDNSVersion, rt.deployDNSFailed)
 
 			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, client, &output.TextPrinter{})
 			if diff := cmp.Diff(rt.expectedUpgrades, actualUpgrades); len(diff) > 0 {
@@ -994,4 +1098,43 @@ func TestGetSuggestedEtcdVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newMockClientForTest(t *testing.T, dnsName string, dnsVersion string, multiDNS bool) *clientsetfake.Clientset {
+	client := clientsetfake.NewSimpleClientset()
+	createDeployment := func(name string) {
+		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      dnsName + name,
+				Namespace: "kube-system",
+				Labels: map[string]string{
+					"k8s-app": "kube-dns",
+				},
+			},
+			Spec: apps.DeploymentSpec{
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Image: "test:" + dnsVersion + name,
+							},
+						},
+					},
+				},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("error creating deployment: %v", err)
+		}
+	}
+
+	createDeployment("")
+	if multiDNS {
+		createDeployment("dns2")
+	}
+	return client
 }

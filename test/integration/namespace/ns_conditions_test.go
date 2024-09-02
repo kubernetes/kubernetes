@@ -42,10 +42,10 @@ import (
 )
 
 func TestNamespaceCondition(t *testing.T) {
-	closeFn, nsController, informers, kubeClient, dynamicClient := namespaceLifecycleSetup(t)
+	ctx, closeFn, nsController, informers, kubeClient, dynamicClient := namespaceLifecycleSetup(t)
 	defer closeFn()
 	nsName := "test-namespace-conditions"
-	_, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
 		},
@@ -55,11 +55,11 @@ func TestNamespaceCondition(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
 	go nsController.Run(ctx, 5)
 
 	data := etcd.GetEtcdStorageDataForNamespace(nsName)
@@ -67,7 +67,7 @@ func TestNamespaceCondition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(context.TODO(), podJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(ctx, podJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,17 +77,17 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 	deploymentJSON.SetFinalizers([]string{"custom.io/finalizer"})
-	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(context.TODO(), deploymentJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(ctx, deploymentJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = kubeClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{}); err != nil {
+	if err = kubeClient.CoreV1().Namespaces().Delete(ctx, nsName, metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(1*time.Second, 60*time.Second, func() (bool, error) {
-		curr, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
+		curr, err := kubeClient.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -121,19 +121,18 @@ func TestNamespaceCondition(t *testing.T) {
 
 // TestNamespaceLabels tests for default labels added in https://github.com/kubernetes/kubernetes/pull/96968
 func TestNamespaceLabels(t *testing.T) {
-	closeFn, nsController, _, kubeClient, _ := namespaceLifecycleSetup(t)
+	ctx, closeFn, nsController, _, kubeClient, _ := namespaceLifecycleSetup(t)
 	defer closeFn()
 
 	// Even though nscontroller isn't used in this test, its creation is already
 	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go nsController.Run(ctx, 5)
 
 	nsName := "test-namespace-labels-generated"
 	// Create a new namespace w/ no name
-	ns, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	ns, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nsName,
 		},
@@ -147,7 +146,7 @@ func TestNamespaceLabels(t *testing.T) {
 		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
 	}
 
-	nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	nsList, err := kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 
 	if err != nil {
 		t.Fatal(err)
@@ -175,9 +174,9 @@ func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured,
 	return &unstructured.Unstructured{Object: typeMetaAdder}, nil
 }
 
-func namespaceLifecycleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *namespace.NamespaceController, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *namespace.NamespaceController, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = 10000
@@ -191,7 +190,7 @@ func namespaceLifecycleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *
 
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
@@ -205,5 +204,5 @@ func namespaceLifecycleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *
 		10*time.Hour,
 		corev1.FinalizerKubernetes)
 
-	return server.TearDownFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(config)
+	return ctx, server.TearDownFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(config)
 }

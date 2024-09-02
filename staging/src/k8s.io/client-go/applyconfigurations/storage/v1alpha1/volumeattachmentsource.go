@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// VolumeAttachmentSourceApplyConfiguration represents an declarative configuration of the VolumeAttachmentSource type for use
+// VolumeAttachmentSourceApplyConfiguration represents a declarative configuration of the VolumeAttachmentSource type for use
 // with apply.
 type VolumeAttachmentSourceApplyConfiguration struct {
 	PersistentVolumeName *string                                    `json:"persistentVolumeName,omitempty"`
 	InlineVolumeSpec     *v1.PersistentVolumeSpecApplyConfiguration `json:"inlineVolumeSpec,omitempty"`
 }
 
-// VolumeAttachmentSourceApplyConfiguration constructs an declarative configuration of the VolumeAttachmentSource type for use with
+// VolumeAttachmentSourceApplyConfiguration constructs a declarative configuration of the VolumeAttachmentSource type for use with
 // apply.
 func VolumeAttachmentSource() *VolumeAttachmentSourceApplyConfiguration {
 	return &VolumeAttachmentSourceApplyConfiguration{}

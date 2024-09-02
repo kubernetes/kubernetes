@@ -56,10 +56,10 @@ func (pl *fooPlugin) Filter(ctx context.Context, state *framework.CycleState, po
 	return framework.NewStatus(framework.Unschedulable)
 }
 
-func (pl *fooPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fooPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}},
-	}
+	}, nil
 }
 
 // newPlugin returns a plugin factory with specified Plugin.
@@ -114,7 +114,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		t.Fatalf("Creating pod error: %v", err)
 	}
 
-	if err := testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Fatalf("Pod %v got scheduled: %v", pod.Name, err)
 	}
 	node, err = testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})

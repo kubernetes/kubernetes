@@ -518,6 +518,16 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("completionTime"), status.CompletionTime, "completionTime cannot be set before startTime"))
 		}
 	}
+	if opts.RejectFailedJobWithoutFailureTarget {
+		if IsJobFailed(job) && !isJobFailureTarget(job) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Failed=True condition without the FailureTarget=true condition"))
+		}
+	}
+	if opts.RejectCompleteJobWithoutSuccessCriteriaMet {
+		if IsJobComplete(job) && !isJobSuccessCriteriaMet(job) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True condition without the SuccessCriteriaMet=true condition"))
+		}
+	}
 	isJobFinished := IsJobFinished(job)
 	if opts.RejectFinishedJobWithActivePods {
 		if status.Active > 0 && isJobFinished {
@@ -568,7 +578,17 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			}
 		}
 	}
-	if ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
+	if opts.RejectFinishedJobWithTerminatingPods {
+		if status.Terminating != nil && *status.Terminating > 0 && isJobFinished {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("terminating"), status.Terminating, "terminating>0 is invalid for finished job"))
+		}
+	}
+	if opts.RejectMoreReadyThanActivePods {
+		if status.Ready != nil && *status.Ready > status.Active {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
+		}
+	}
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
 	}
 	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
@@ -577,7 +597,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
 	}
-	if job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
 	}
 	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
@@ -838,13 +858,7 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 }
 
 func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
-	if !opts.AllowElasticIndexedJobs {
-		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
-	}
-
-	// Completions is immutable for non-indexed jobs.
-	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
-	// fall back to validating that spec.Completions is always immutable.
+	// Completions is immutable for non-indexed jobs, but mutable for Indexed Jobs.
 	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
 	if !isIndexedJob {
 		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
@@ -998,8 +1012,6 @@ type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
-	// Allow elastic indexed jobs
-	AllowElasticIndexedJobs bool
 	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
 	RequirePrefixedLabels bool
 }
@@ -1013,6 +1025,8 @@ type JobStatusValidationOptions struct {
 	RejectFailedIndexesOverlappingCompleted      bool
 	RejectCompletedIndexesForNonIndexedJob       bool
 	RejectFailedIndexesForNoBackoffLimitPerIndex bool
+	RejectFailedJobWithoutFailureTarget          bool
+	RejectCompleteJobWithoutSuccessCriteriaMet   bool
 	RejectFinishedJobWithActivePods              bool
 	RejectFinishedJobWithoutStartTime            bool
 	RejectFinishedJobWithUncountedTerminatedPods bool
@@ -1023,4 +1037,7 @@ type JobStatusValidationOptions struct {
 	RejectNotCompleteJobWithCompletionTime       bool
 	RejectCompleteJobWithFailedCondition         bool
 	RejectCompleteJobWithFailureTargetCondition  bool
+	AllowForSuccessCriteriaMetInExtendedScope    bool
+	RejectMoreReadyThanActivePods                bool
+	RejectFinishedJobWithTerminatingPods         bool
 }

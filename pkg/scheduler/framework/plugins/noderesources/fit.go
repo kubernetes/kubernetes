@@ -247,17 +247,17 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
+func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		podActionType |= framework.Update
+		podActionType |= framework.UpdatePodScaleDown
 	}
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodChange},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: f.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 // isSchedulableAfterPodChange is invoked whenever a pod deleted or updated. It checks whether
@@ -296,22 +296,24 @@ func (f *Fit) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldOb
 		return framework.QueueSkip, nil
 	}
 
-	logger.V(5).Info("the max request resources of another scheduled pod got reduced and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+	logger.V(5).Info("another scheduled pod or the target pod itself got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return framework.Queue, nil
 }
 
-// isResourceScaleDown checks whether the resource request of the modified pod is less than the original pod
-// for the resources requested by the pod we are trying to schedule.
-func (f *Fit) isResourceScaleDown(targetPod, originalOtherPod, modifiedOtherPod *v1.Pod) bool {
-	if modifiedOtherPod.Spec.NodeName == "" {
-		// no resource is freed up whatever the pod is modified.
+// isResourceScaleDown checks whether an update event may make the pod schedulable. Specifically:
+// - Returns true when an update event shows a scheduled pod's resource request got reduced.
+// - Returns true when an update event is for the unscheduled pod itself, and it shows the pod's resource request got reduced.
+func (f *Fit) isResourceScaleDown(targetPod, originalPod, modifiedPod *v1.Pod) bool {
+	if modifiedPod.UID != targetPod.UID && modifiedPod.Spec.NodeName == "" {
+		// If the update event is not for targetPod and a scheduled Pod,
+		// it wouldn't make targetPod schedulable.
 		return false
 	}
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalOtherPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
-	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedOtherPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
+	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
+	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
 
 	// check whether the resource request of the modified pod is less than the original pod.
 	podRequests := resource.PodRequests(targetPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling})

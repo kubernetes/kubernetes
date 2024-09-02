@@ -87,6 +87,7 @@ kube-apiserver \
   --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
   --service-account-issuer="https://kubernetes.default.svc" \
   --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
+  --enable-logs-handler=true \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!
@@ -103,7 +104,7 @@ kube::log::status "Updating aggregated discovery"
 
 rm -fr "${DISCOVERY_ROOT_DIR}"
 mkdir -p "${DISCOVERY_ROOT_DIR}"
-curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2beta1.json"
+curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2.json"
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 

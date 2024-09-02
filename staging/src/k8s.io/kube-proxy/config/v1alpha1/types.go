@@ -213,21 +213,23 @@ type KubeProxyConfiguration struct {
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
 
-	// detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	// detectLocalMode determines mode to use for detecting local traffic, defaults to ClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. (For dual-stack
 	// clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When
-	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
+	// DetectLocalMode is set to ClusterCIDR, kube-proxy will consider
 	// traffic to be local if its source IP is in this range. (Otherwise it is not
 	// used.)
 	ClusterCIDR string `json:"clusterCIDR"`
 
-	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set,
+	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
+	// alternatively, the single string 'primary'. If set to a list of CIDRs,
 	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If unset, NodePort connections will be accepted on all
-	// local IPs.
+	// the indicated ranges. If set to 'primary', NodePort services will only be
+	// accepted on the node's primary IPv4 and/or IPv6 address according to the Node
+	// object. If unset, NodePort connections will be accepted on all local IPs.
 	NodePortAddresses []string `json:"nodePortAddresses"`
 
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
@@ -241,6 +243,9 @@ type KubeProxyConfiguration struct {
 
 	// portRange was previously used to configure the userspace proxy, but is now unused.
 	PortRange string `json:"portRange"`
+
+	// windowsRunAsService, if true, enables Windows service control manager API integration.
+	WindowsRunAsService bool `json:"windowsRunAsService,omitempty"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.

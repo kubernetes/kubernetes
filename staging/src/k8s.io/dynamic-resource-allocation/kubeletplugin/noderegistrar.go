@@ -17,30 +17,30 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"context"
 	"fmt"
 
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
 type nodeRegistrar struct {
-	logger klog.Logger
 	registrationServer
 	server *grpcServer
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
+//
+// The context is only used for additional values, cancellation is ignored.
+func startRegistrar(valueCtx context.Context, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
-		logger: logger,
 		registrationServer: registrationServer{
 			driverName:        driverName,
 			endpoint:          endpoint,
 			supportedVersions: []string{"1.0.0"}, // TODO: is this correct?
 		},
 	}
-	s, err := startGRPCServer(logger, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
+	s, err := startGRPCServer(valueCtx, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
 		registerapi.RegisterRegistrationServer(grpcServer, n)
 	})
 	if err != nil {

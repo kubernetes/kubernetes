@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	cliflag "k8s.io/component-base/cli/flag"
 
@@ -62,7 +63,7 @@ type Extra struct {
 	MasterCount int
 }
 
-// NewServerRunOptions creates a new ServerRunOptions object with default parameters
+// NewServerRunOptions creates and returns ServerRunOptions according to the given featureGate and effectiveVersion of the server binary to run.
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		Options:       controlplaneapiserver.NewOptions(),
@@ -91,6 +92,8 @@ func NewServerRunOptions() *ServerRunOptions {
 			MasterCount:          1,
 		},
 	}
+
+	s.Options.SystemNamespaces = append(s.Options.SystemNamespaces, v1.NamespaceNodeLease)
 
 	return &s
 }

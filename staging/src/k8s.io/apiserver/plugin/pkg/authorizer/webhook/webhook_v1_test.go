@@ -40,6 +40,9 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -588,7 +591,7 @@ func TestV1WebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 	expressions := []apiserver.WebhookMatchCondition{
 		{
 			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
@@ -700,6 +703,8 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 	}
 	defer s.Close()
 
+	labelRequirement, _ := labels.NewRequirement("baz", selection.Equals, []string{"qux"})
+
 	type webhookMatchConditionsTestCase struct {
 		name               string
 		attr               authorizer.AttributesRecord
@@ -709,6 +714,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		expectedDecision   authorizer.Decision
 		expressions        []apiserver.WebhookMatchCondition
 		featureEnabled     bool
+		selectorEnabled    bool
 	}
 	aliceAttr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
@@ -720,6 +726,19 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		ResourceRequest: true,
 		Namespace:       "kittensandponies",
 		Verb:            "get",
+	}
+	aliceWithSelectorsAttr := authorizer.AttributesRecord{
+		User: &user.DefaultInfo{
+			Name:   "alice",
+			UID:    "1",
+			Groups: []string{"group1", "group2"},
+			Extra:  map[string][]string{"key1": {"a", "b", "c"}},
+		},
+		ResourceRequest:           true,
+		Namespace:                 "kittensandponies",
+		Verb:                      "get",
+		FieldSelectorRequirements: fields.Requirements{fields.Requirement{Field: "foo", Operator: selection.Equals, Value: "bar"}},
+		LabelSelectorRequirements: labels.Requirements{*labelRequirement},
 	}
 	tests := []webhookMatchConditionsTestCase{
 		{
@@ -746,7 +765,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		},
 		{
 			name:               "feature enabled, match all against all expressions",
-			attr:               aliceAttr,
+			attr:               aliceWithSelectorsAttr,
 			allow:              true,
 			expectedCompileErr: false,
 			expectedDecision:   authorizer.DecisionAllow,
@@ -763,14 +782,28 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 				{
 					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
 				},
+				{
+					Expression: "request.?resourceAttributes.fieldSelector.requirements.orValue([]).exists(r, r.key=='foo' && r.operator=='In' && ('bar' in r.values))",
+				},
+				{
+					Expression: "request.?resourceAttributes.labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.?labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.labelSelector.?requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
 			},
-			featureEnabled: true,
+			featureEnabled:  true,
+			selectorEnabled: true,
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, test.selectorEnabled)
 			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions, "")
 			if test.expectedCompileErr && err == nil {
 				t.Fatalf("%d: Expected compile error", i)
@@ -802,7 +835,7 @@ func TestWebhookMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 
 	aliceAttr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
@@ -1054,7 +1087,7 @@ func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.Webhook
 		b.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1087,7 +1120,7 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 		b.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)
 	// Create an authorizer with or without expressions to compile
 	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), expressions, "")
 	if err != nil {
@@ -1107,7 +1140,7 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 
 // TestV1WebhookMatchConditions verifies cel expressions are compiled and evaluated correctly
 func TestV1WebhookMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()

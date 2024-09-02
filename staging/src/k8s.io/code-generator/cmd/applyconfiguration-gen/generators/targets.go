@@ -86,10 +86,14 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				klog.V(5).Infof("skipping type %v because does not have ObjectMeta", t)
 				continue
 			}
+			gvk := gv.WithKind(clientgentypes.Kind(t.Name.Name))
+			openAPIName := typeModels.gvkToOpenAPIType[gvk]
+
 			if typePkg, ok := refs[t.Name]; ok {
 				toGenerate = append(toGenerate, applyConfig{
 					Type:               t,
 					ApplyConfiguration: types.Ref(typePkg, t.Name.Name+ApplyConfigurationTypeSuffix),
+					OpenAPIName:        openAPIName,
 				})
 			}
 		}
@@ -132,7 +136,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	// generate ForKind() utility function
 	targetList = append(targetList,
 		targetForUtils(args.OutputDir, args.OutputPkg,
-			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
+			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames, typeModels))
 	// generate internal embedded schema, required for generated Extract functions
 	targetList = append(targetList,
 		targetForInternal(args.OutputDir, args.OutputPkg,
@@ -171,11 +175,7 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			for _, toGenerate := range typesToGenerate {
 				var openAPIType *string
-				gvk := gvk{
-					group:   gv.Group.String(),
-					version: gv.Version.String(),
-					kind:    toGenerate.Type.Name.Name,
-				}
+				gvk := gv.WithKind(clientgentypes.Kind(toGenerate.Type.Name.Name))
 				if v, ok := models.gvkToOpenAPIType[gvk]; ok {
 					openAPIType = &v
 				}
@@ -185,6 +185,7 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 						OutputFilename: strings.ToLower(toGenerate.Type.Name.Name) + ".go",
 					},
 					outPkgBase:   outputPkgBase,
+					localPkg:     outputPkg,
 					groupVersion: gv,
 					applyConfig:  toGenerate,
 					imports:      generator.NewImportTracker(),
@@ -197,7 +198,8 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 	}
 }
 
-func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) generator.Target {
+func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions,
+	applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string, models *typeModels) generator.Target {
 	return &generator.SimpleTarget{
 		PkgName:       path.Base(outputPkgBase),
 		PkgPath:       outputPkgBase,
@@ -213,6 +215,7 @@ func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, gro
 				groupVersions:        groupVersions,
 				typesForGroupVersion: applyConfigsForGroupVersion,
 				groupGoNames:         groupGoNames,
+				typeModels:           models,
 			})
 			return generators
 		},

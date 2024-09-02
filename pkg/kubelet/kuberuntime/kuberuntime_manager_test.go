@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -31,7 +32,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -71,7 +73,7 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring, oteltrace.NewNoopTracerProvider().Tracer(""))
+	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring, noopoteltrace.NewTracerProvider().Tracer(""))
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -171,7 +173,7 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, _, err := m.generateContainerConfig(ctx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil)
+	containerConfig, _, err := m.generateContainerConfig(ctx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
@@ -246,8 +248,8 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
-	actual := sets.NewString()
+func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.Set[string]) (sets.Set[string], bool) {
+	actual := sets.New[string]()
 	for _, c := range fakeRuntime.Containers {
 		actual.Insert(c.Id)
 	}
@@ -600,8 +602,8 @@ func TestKillPod(t *testing.T) {
 
 	err = m.KillPod(ctx, pod, runningPod, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(fakeRuntime.Containers))
-	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	assert.Len(t, fakeRuntime.Containers, 3)
+	assert.Len(t, fakeRuntime.Sandboxes, 1)
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
 	}
@@ -640,9 +642,9 @@ func TestSyncPod(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	result := m.SyncPod(context.Background(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
-	assert.Equal(t, 2, len(fakeRuntime.Containers))
-	assert.Equal(t, 2, len(fakeImage.Images))
-	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	assert.Len(t, fakeRuntime.Containers, 2)
+	assert.Len(t, fakeImage.Images, 2)
+	assert.Len(t, fakeRuntime.Sandboxes, 1)
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
 	}
@@ -741,7 +743,7 @@ func TestPruneInitContainers(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.pruneInitContainersBeforeStart(ctx, pod, podStatus)
-	expectedContainers := sets.NewString(fakes[0].Id, fakes[2].Id)
+	expectedContainers := sets.New[string](fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %v, got %v", expectedContainers, actual)
 	}
@@ -1229,7 +1231,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 }
 
 func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1488,7 +1490,7 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1900,7 +1902,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 }
 
 func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarContainersEnabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -2118,7 +2120,7 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 }
 
 func TestComputePodActionsForPodResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -2436,7 +2438,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			// compute hash
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		makeAndSetFakePod(t, m, fakeRuntime, pod)
@@ -2452,7 +2453,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		for idx := range pod.Spec.Containers {
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		if test.mutatePodFn != nil {
@@ -2465,7 +2465,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -2578,5 +2578,133 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			assert.Equal(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
 			assert.Equal(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
 		}
+	}
+}
+
+func TestToKubeContainerImageVolumes(t *testing.T) {
+	_, _, manager, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const (
+		volume1 = "volume-1"
+		volume2 = "volume-2"
+	)
+	imageSpec1 := runtimeapi.ImageSpec{Image: "image-1"}
+	imageSpec2 := runtimeapi.ImageSpec{Image: "image-2"}
+	errTest := errors.New("pull failed")
+	syncResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, "test")
+
+	for desc, tc := range map[string]struct {
+		pullResults          imageVolumePulls
+		container            *v1.Container
+		expectedError        error
+		expectedImageVolumes kubecontainer.ImageVolumes
+	}{
+		"empty volumes": {},
+		"multiple volumes": {
+			pullResults: imageVolumePulls{
+				volume1: imageVolumePullResult{spec: imageSpec1},
+				volume2: imageVolumePullResult{spec: imageSpec2},
+			},
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{Name: volume1},
+					{Name: volume2},
+				},
+			},
+			expectedImageVolumes: kubecontainer.ImageVolumes{
+				volume1: &imageSpec1,
+				volume2: &imageSpec2,
+			},
+		},
+		"not matching volume": {
+			pullResults: imageVolumePulls{
+				"different": imageVolumePullResult{spec: imageSpec1},
+			},
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{Name: volume1}},
+			},
+			expectedImageVolumes: kubecontainer.ImageVolumes{},
+		},
+		"error in pull result": {
+			pullResults: imageVolumePulls{
+				volume1: imageVolumePullResult{err: errTest},
+			},
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{Name: volume1},
+				},
+			},
+			expectedError: errTest,
+		},
+	} {
+		imageVolumes, err := manager.toKubeContainerImageVolumes(tc.pullResults, tc.container, &v1.Pod{}, syncResult)
+		if tc.expectedError != nil {
+			require.EqualError(t, err, tc.expectedError.Error())
+		} else {
+			require.NoError(t, err, desc)
+		}
+		assert.Equal(t, tc.expectedImageVolumes, imageVolumes)
+	}
+}
+
+func TestGetImageVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+
+	_, _, manager, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const (
+		volume1 = "volume-1"
+		volume2 = "volume-2"
+		image1  = "image-1:latest"
+		image2  = "image-2:latest"
+	)
+	imageSpec1 := runtimeapi.ImageSpec{Image: image1, UserSpecifiedImage: image1}
+	imageSpec2 := runtimeapi.ImageSpec{Image: image2, UserSpecifiedImage: image2}
+
+	for desc, tc := range map[string]struct {
+		pod                      *v1.Pod
+		expectedImageVolumePulls imageVolumePulls
+		expectedError            error
+	}{
+		"empty volumes": {
+			pod:                      &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{}}},
+			expectedImageVolumePulls: imageVolumePulls{},
+		},
+		"multiple volumes": {
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{
+				{Name: volume1, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image1, PullPolicy: v1.PullAlways}}},
+				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image2, PullPolicy: v1.PullAlways}}},
+			}}},
+			expectedImageVolumePulls: imageVolumePulls{
+				volume1: imageVolumePullResult{spec: imageSpec1},
+				volume2: imageVolumePullResult{spec: imageSpec2},
+			},
+		},
+		"different than image volumes": {
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{
+				{Name: volume1, VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}},
+			}}},
+			expectedImageVolumePulls: imageVolumePulls{},
+		},
+		"multiple volumes but one failed to pull": {
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{
+				{Name: volume1, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image1, PullPolicy: v1.PullAlways}}},
+				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image", PullPolicy: v1.PullNever}}}, // fails
+			}}},
+			expectedImageVolumePulls: imageVolumePulls{
+				volume1: imageVolumePullResult{spec: imageSpec1},
+				volume2: imageVolumePullResult{err: imagetypes.ErrImageNeverPull, msg: `Container image "image" is not present with pull policy of Never`},
+			},
+		},
+	} {
+		imageVolumePulls, err := manager.getImageVolumes(context.TODO(), tc.pod, nil, nil)
+		if tc.expectedError != nil {
+			require.EqualError(t, err, tc.expectedError.Error())
+		} else {
+			require.NoError(t, err, desc)
+		}
+		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
 	}
 }

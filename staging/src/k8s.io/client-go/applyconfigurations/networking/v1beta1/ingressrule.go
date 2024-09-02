@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1beta1
 
-// IngressRuleApplyConfiguration represents an declarative configuration of the IngressRule type for use
+// IngressRuleApplyConfiguration represents a declarative configuration of the IngressRule type for use
 // with apply.
 type IngressRuleApplyConfiguration struct {
 	Host                               *string `json:"host,omitempty"`
-	IngressRuleValueApplyConfiguration `json:",omitempty,inline"`
+	IngressRuleValueApplyConfiguration `json:",inline"`
 }
 
-// IngressRuleApplyConfiguration constructs an declarative configuration of the IngressRule type for use with
+// IngressRuleApplyConfiguration constructs a declarative configuration of the IngressRule type for use with
 // apply.
 func IngressRule() *IngressRuleApplyConfiguration {
 	return &IngressRuleApplyConfiguration{}
@@ -43,6 +43,6 @@ func (b *IngressRuleApplyConfiguration) WithHost(value string) *IngressRuleApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HTTP field is set to the value of the last call.
 func (b *IngressRuleApplyConfiguration) WithHTTP(value *HTTPIngressRuleValueApplyConfiguration) *IngressRuleApplyConfiguration {
-	b.HTTP = value
+	b.IngressRuleValueApplyConfiguration.HTTP = value
 	return b
 }

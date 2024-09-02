@@ -88,15 +88,11 @@ func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
-func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName:         spec.Name(),
 		items:           spec.Volume.DownwardAPI.Items,
@@ -108,7 +104,6 @@ func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts
 	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
 		source:            *spec.Volume.DownwardAPI,
-		opts:              &opts,
 	}, nil
 }
 
@@ -150,7 +145,6 @@ type downwardAPIVolume struct {
 type downwardAPIVolumeMounter struct {
 	*downwardAPIVolume
 	source v1.DownwardAPIVolumeSource
-	opts   *volume.VolumeOptions
 }
 
 // downwardAPIVolumeMounter implements volume.Mounter interface
@@ -176,7 +170,7 @@ func (b *downwardAPIVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod)
 	if err != nil {
 		klog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err

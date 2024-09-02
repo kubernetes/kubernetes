@@ -59,6 +59,14 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 			// No need to set a cause here. The cause or error of
 			// the parent context will be used.
 		case <-after.C:
+			// Code using this tCtx may or may not log the
+			// information above when it runs into the
+			// cancellation. It's better if we do it, just to be on
+			// the safe side.
+			//
+			// Would be nice to log this with the source code location
+			// of our caller, but testing.Logf does not support that.
+			tb.Logf("\nWARNING: %s\n", timeoutCause)
 			cancel(canceledError(timeoutCause))
 		}
 	}()

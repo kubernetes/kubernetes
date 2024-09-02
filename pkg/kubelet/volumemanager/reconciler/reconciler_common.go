@@ -119,7 +119,6 @@ func NewReconciler(
 		timeOfLastSync:                  time.Time{},
 		volumesFailedReconstruction:     make([]podVolume, 0),
 		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
-		volumesNeedReportedInUse:        make([]v1.UniqueVolumeName, 0),
 	}
 }
 
@@ -143,7 +142,6 @@ type reconciler struct {
 	timeOfLastSync                  time.Time
 	volumesFailedReconstruction     []podVolume
 	volumesNeedUpdateFromNodeStatus []v1.UniqueVolumeName
-	volumesNeedReportedInUse        []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) unmountVolumes() {
@@ -250,9 +248,10 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 		// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher,
 		// so attach it
 		volumeToAttach := operationexecutor.VolumeToAttach{
-			VolumeName: volumeToMount.VolumeName,
-			VolumeSpec: volumeToMount.VolumeSpec,
-			NodeName:   rc.nodeName,
+			VolumeName:    volumeToMount.VolumeName,
+			VolumeSpec:    volumeToMount.VolumeSpec,
+			NodeName:      rc.nodeName,
+			ScheduledPods: []*v1.Pod{volumeToMount.Pod},
 		}
 		klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
 		err := rc.operationExecutor.AttachVolume(logger, volumeToAttach, rc.actualStateOfWorld)

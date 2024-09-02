@@ -567,6 +567,13 @@ func (s *service) ControllerGetCapabilities(
 				},
 			},
 		},
+		{
+			Type: &csi.ControllerServiceCapability_Rpc{
+				Rpc: &csi.ControllerServiceCapability_RPC{
+					Type: csi.ControllerServiceCapability_RPC_MODIFY_VOLUME,
+				},
+			},
+		},
 	}
 
 	if !s.config.DisableAttach {
@@ -733,6 +740,14 @@ func (s *service) ControllerExpandVolume(
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
 
+	return resp, nil
+}
+
+func (s *service) ControllerModifyVolume(
+	ctx context.Context,
+	req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	// todo: implement the functionality while we add the modifyVolume test
+	resp := &csi.ControllerModifyVolumeResponse{}
 	return resp, nil
 }
 

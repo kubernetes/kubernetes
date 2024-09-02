@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -105,11 +104,8 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	// Setup mock stats provider
-	mockStats := statstest.NewMockProvider(mockCtrl)
+	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
 	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
@@ -165,9 +161,7 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockStats := statstest.NewMockProvider(mockCtrl)
+	mockStats := statstest.NewMockProvider(t)
 
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
 	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
@@ -189,12 +183,10 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	// Setup mock stats provider
-	mockStats := statstest.NewMockProvider(mockCtrl)
+	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}}
 	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol1: &fakeBlockVolume{}}

@@ -87,7 +87,8 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 	_, err = rt.RoundTrip(req)
 	// Ensure a "bad handshake" error is returned, since requested protocol is not supported.
 	require.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "bad handshake"))
+	assert.True(t, strings.Contains(err.Error(), "websocket: bad handshake"))
+	assert.True(t, strings.Contains(err.Error(), "403 Forbidden"))
 	assert.True(t, httpstream.IsUpgradeFailure(err))
 }
 

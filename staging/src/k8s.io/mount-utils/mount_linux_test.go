@@ -25,12 +25,15 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/constraints"
+	"golang.org/x/sys/unix"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
@@ -810,6 +813,50 @@ func TestFormatTimeout(t *testing.T) {
 		t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 0", concurrent)
 	}
 	mu.Unlock()
+}
+
+// Some platforms define unix.Statfs_t.Flags differently.  Our need here is
+// pretty constrained, so some aggressive type-conversion is OK.
+func mkStatfsFlags[T1 constraints.Integer, T2 constraints.Integer](orig T1, add T2) T1 {
+	return orig | T1(add)
+}
+
+func TestGetUserNSBindMountOptions(t *testing.T) {
+	var testCases = map[string]struct {
+		flags        int32 // smallest size used by any platform we care about
+		mountoptions string
+	}{
+		"ro":            {flags: unix.MS_RDONLY, mountoptions: "ro"},
+		"nodev":         {flags: unix.MS_NODEV, mountoptions: "nodev"},
+		"noexec":        {flags: unix.MS_NOEXEC, mountoptions: "noexec"},
+		"nosuid":        {flags: unix.MS_NOSUID, mountoptions: "nosuid"},
+		"noatime":       {flags: unix.MS_NOATIME, mountoptions: "noatime"},
+		"relatime":      {flags: unix.MS_RELATIME, mountoptions: "relatime"},
+		"nodiratime":    {flags: unix.MS_NODIRATIME, mountoptions: "nodiratime"},
+		"ronodev":       {flags: unix.MS_RDONLY | unix.MS_NODEV, mountoptions: "nodev,ro"},
+		"ronodevnoexec": {flags: unix.MS_RDONLY | unix.MS_NODEV | unix.MS_NOEXEC, mountoptions: "nodev,noexec,ro"},
+	}
+
+	statfsMock := func(path string, buf *unix.Statfs_t) (err error) {
+		*buf = unix.Statfs_t{}
+		buf.Flags = mkStatfsFlags(buf.Flags, testCases[path].flags)
+		return nil
+	}
+
+	testGetUserNSBindMountOptionsSingleCase := func(t *testing.T) {
+		path := strings.Split(t.Name(), "/")[1]
+		options, _ := getUserNSBindMountOptions(path, statfsMock)
+		sort.Strings(options)
+		optionString := strings.Join(options, ",")
+		mountOptions := testCases[path].mountoptions
+		if optionString != mountOptions {
+			t.Fatalf(`Mountoptions differ. Wanted: %s, returned: %s`, mountOptions, optionString)
+		}
+	}
+
+	for k := range testCases {
+		t.Run(k, testGetUserNSBindMountOptionsSingleCase)
+	}
 }
 
 func makeFakeCommandAction(stdout string, err error, cmdFn func()) testexec.FakeCommandAction {

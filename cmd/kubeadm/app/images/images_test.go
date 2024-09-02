@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -315,21 +315,21 @@ func TestGetDNSImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "foo.io/coredns:v1.11.1",
+			expected: "foo.io/coredns:v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
-			expected: kubeadmapiv1beta3.DefaultImageRepository + "/coredns/coredns:v1.11.1",
+			expected: kubeadmapiv1.DefaultImageRepository + "/coredns/coredns:v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository: kubeadmapiv1beta3.DefaultImageRepository,
+				ImageRepository: kubeadmapiv1.DefaultImageRepository,
 				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
-			expected: "foo.io/coredns/coredns:v1.11.1",
+			expected: "foo.io/coredns/coredns:v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{
@@ -340,12 +340,12 @@ func TestGetDNSImage(t *testing.T) {
 			},
 		},
 		{
-			expected: "foo.io/coredns/coredns:v1.11.1",
+			expected: "foo.io/coredns/coredns:v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io/coredns",
 				DNS: kubeadmapi.DNS{
 					ImageMeta: kubeadmapi.ImageMeta{
-						ImageTag: "v1.11.1",
+						ImageTag: "v1.11.3",
 					},
 				},
 			},

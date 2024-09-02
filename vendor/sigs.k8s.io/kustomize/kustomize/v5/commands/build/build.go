@@ -27,10 +27,12 @@ var theFlags struct {
 		managedByLabel bool
 		helm           bool
 	}
-	helmCommand    string
-	loadRestrictor string
-	reorderOutput  string
-	fnOptions      types.FnPluginLoadingOptions
+	helmCommand     string
+	helmApiVersions []string
+	helmKubeVersion string
+	loadRestrictor  string
+	reorderOutput   string
+	fnOptions       types.FnPluginLoadingOptions
 }
 
 type Help struct {
@@ -100,12 +102,18 @@ func NewCmdBuild(
 			return err
 		},
 	}
+
 	AddFlagOutputPath(cmd.Flags())
 	AddFunctionBasicsFlags(cmd.Flags())
 	AddFlagLoadRestrictor(cmd.Flags())
 	AddFlagEnablePlugins(cmd.Flags())
 	AddFlagReorderOutput(cmd.Flags())
 	AddFlagEnableManagedbyLabel(cmd.Flags())
+
+	if err := AddFlagLoadRestrictorCompletion(cmd); err != nil {
+		log.Fatalf("Error adding completion for flag '--%s': %v", flagLoadRestrictorName, err)
+	}
+
 	msg := "Error marking flag '%s' as deprecated: %v"
 	err := cmd.Flags().MarkDeprecated(flagReorderOutputName,
 		"use the new 'sortOptions' field in kustomization.yaml instead.")
@@ -153,6 +161,8 @@ func HonorKustomizeFlags(kOpts *krusty.Options, flags *flag.FlagSet) *krusty.Opt
 		kOpts.PluginConfig.HelmConfig.Enabled = theFlags.enable.helm
 	}
 	kOpts.PluginConfig.HelmConfig.Command = theFlags.helmCommand
+	kOpts.PluginConfig.HelmConfig.ApiVersions = theFlags.helmApiVersions
+	kOpts.PluginConfig.HelmConfig.KubeVersion = theFlags.helmKubeVersion
 	kOpts.AddManagedbyLabel = isManagedByLabelEnabled()
 	return kOpts
 }

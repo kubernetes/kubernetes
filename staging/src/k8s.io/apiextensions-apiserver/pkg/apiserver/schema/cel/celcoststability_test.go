@@ -37,17 +37,19 @@ func TestCelCostStability(t *testing.T) {
 	}{
 		{name: "integers",
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
-			obj:    objs(math.MaxInt64, math.MaxInt64, math.MaxInt32, math.MaxInt32, math.MaxInt64, math.MaxInt64),
+			obj: objs(int64(math.MaxInt64), int64(math.MaxInt64), int32(math.MaxInt32), int32(math.MaxInt32),
+				int64(math.MaxInt64), int64(math.MaxInt64)),
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
 			expectCost: map[string]int64{
-				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", math.MaxInt64)): 11,
+				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", int64(math.MaxInt64))): 11,
 				"self.val1 == self.val6":                              5, // integer with no format is the same as int64
 				"type(self.val1) == int":                              4,
 				fmt.Sprintf("self.val3 + 1 == %d + 1", math.MaxInt32): 5, // CEL integers are 64 bit
 			},
 		},
 		{name: "numbers",
-			obj:    objs(math.MaxFloat64, math.MaxFloat64, math.MaxFloat32, math.MaxFloat32, math.MaxFloat64, math.MaxFloat64, int64(1)),
+			obj: objs(float64(math.MaxFloat64), float64(math.MaxFloat64), float32(math.MaxFloat32), float32(math.MaxFloat32),
+				float64(math.MaxFloat64), float64(math.MaxFloat64), int64(1)),
 			schema: schemas(numberType, numberType, floatType, floatType, doubleType, doubleType, doubleType),
 			expectCost: map[string]int64{
 				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%f", math.MaxFloat64)): 11,
@@ -1218,7 +1220,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
 			expectCost: map[string]uint64{
-				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", math.MaxInt64)): 8,
+				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", int64(math.MaxInt64))): 8,
 				"self.val1 == self.val6":                              4, // integer with no format is the same as int64
 				"type(self.val1) == int":                              4,
 				fmt.Sprintf("self.val3 + 1 == %d + 1", math.MaxInt32): 5, // CEL integers are 64 bit
@@ -2008,14 +2010,14 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`isQuantity(self.val2)`: 314575,
 				`isQuantity("200M")`:    1,
 				`isQuantity("20Mi")`:    1,
-				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           uint64(3689348814741910532),
-				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: uint64(5534023222112865798),
+				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           uint64(6),
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: uint64(9),
 				`quantity(self.val1).isLessThan(quantity(self.val2))`:                                                                    629151,
 				`quantity("50M").isLessThan(quantity("100M"))`:                                                                           3,
 				`quantity("50Mi").isGreaterThan(quantity("50M"))`:                                                                        3,
 				`quantity("200M").compareTo(quantity("0.2G")) == 0`:                                                                      4,
-				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              uint64(1844674407370955268),
-				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(1844674407370955267),
+				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              uint64(5),
+				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(4),
 				`quantity("50").isInteger()`:                                                                                             2,
 				`quantity(self.val1).isInteger()`:                                                                                        314576,
 			},

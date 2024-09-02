@@ -18,9 +18,12 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/matttproud/golang_protobuf_extensions/pbutil"
-	"github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg"
+	"google.golang.org/protobuf/encoding/protodelim"
 	"google.golang.org/protobuf/encoding/prototext"
+
+	"github.com/prometheus/common/model"
+
+	"github.com/munnerz/goautoneg"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -60,23 +63,32 @@ func (ec encoderCloser) Close() error {
 // as the support is still experimental. To include the option to negotiate
 // FmtOpenMetrics, use NegotiateOpenMetrics.
 func Negotiate(h http.Header) Format {
+	escapingScheme := Format(fmt.Sprintf("; escaping=%s", Format(model.NameEscapingScheme.String())))
 	for _, ac := range goautoneg.ParseAccept(h.Get(hdrAccept)) {
+		if escapeParam := ac.Params[model.EscapingKey]; escapeParam != "" {
+			switch Format(escapeParam) {
+			case model.AllowUTF8, model.EscapeUnderscores, model.EscapeDots, model.EscapeValues:
+				escapingScheme = Format(fmt.Sprintf("; escaping=%s", escapeParam))
+			default:
+				// If the escaping parameter is unknown, ignore it.
+			}
+		}
 		ver := ac.Params["version"]
 		if ac.Type+"/"+ac.SubType == ProtoType && ac.Params["proto"] == ProtoProtocol {
 			switch ac.Params["encoding"] {
 			case "delimited":
-				return FmtProtoDelim
+				return fmtProtoDelim + escapingScheme
 			case "text":
-				return FmtProtoText
+				return fmtProtoText + escapingScheme
 			case "compact-text":
-				return FmtProtoCompact
+				return fmtProtoCompact + escapingScheme
 			}
 		}
 		if ac.Type == "text" && ac.SubType == "plain" && (ver == TextVersion || ver == "") {
-			return FmtText
+			return fmtText + escapingScheme
 		}
 	}
-	return FmtText
+	return fmtText + escapingScheme
 }
 
 // NegotiateIncludingOpenMetrics works like Negotiate but includes
@@ -84,29 +96,40 @@ func Negotiate(h http.Header) Format {
 // temporary and will disappear once FmtOpenMetrics is fully supported and as
 // such may be negotiated by the normal Negotiate function.
 func NegotiateIncludingOpenMetrics(h http.Header) Format {
+	escapingScheme := Format(fmt.Sprintf("; escaping=%s", Format(model.NameEscapingScheme.String())))
 	for _, ac := range goautoneg.ParseAccept(h.Get(hdrAccept)) {
+		if escapeParam := ac.Params[model.EscapingKey]; escapeParam != "" {
+			switch Format(escapeParam) {
+			case model.AllowUTF8, model.EscapeUnderscores, model.EscapeDots, model.EscapeValues:
+				escapingScheme = Format(fmt.Sprintf("; escaping=%s", escapeParam))
+			default:
+				// If the escaping parameter is unknown, ignore it.
+			}
+		}
 		ver := ac.Params["version"]
 		if ac.Type+"/"+ac.SubType == ProtoType && ac.Params["proto"] == ProtoProtocol {
 			switch ac.Params["encoding"] {
 			case "delimited":
-				return FmtProtoDelim
+				return fmtProtoDelim + escapingScheme
 			case "text":
-				return FmtProtoText
+				return fmtProtoText + escapingScheme
 			case "compact-text":
-				return FmtProtoCompact
+				return fmtProtoCompact + escapingScheme
 			}
 		}
 		if ac.Type == "text" && ac.SubType == "plain" && (ver == TextVersion || ver == "") {
-			return FmtText
+			return fmtText + escapingScheme
 		}
 		if ac.Type+"/"+ac.SubType == OpenMetricsType && (ver == OpenMetricsVersion_0_0_1 || ver == OpenMetricsVersion_1_0_0 || ver == "") {
-			if ver == OpenMetricsVersion_1_0_0 {
-				return FmtOpenMetrics_1_0_0
+			switch ver {
+			case OpenMetricsVersion_1_0_0:
+				return fmtOpenMetrics_1_0_0 + escapingScheme
+			default:
+				return fmtOpenMetrics_0_0_1 + escapingScheme
 			}
-			return FmtOpenMetrics_0_0_1
 		}
 	}
-	return FmtText
+	return fmtText + escapingScheme
 }
 
 // NewEncoder returns a new encoder based on content type negotiation. All
@@ -115,44 +138,54 @@ func NegotiateIncludingOpenMetrics(h http.Header) Format {
 // for FmtOpenMetrics, but a future (breaking) release will add the Close method
 // to the Encoder interface directly. The current version of the Encoder
 // interface is kept for backwards compatibility.
-func NewEncoder(w io.Writer, format Format) Encoder {
-	switch format {
-	case FmtProtoDelim:
+// In cases where the Format does not allow for UTF-8 names, the global
+// NameEscapingScheme will be applied.
+//
+// NewEncoder can be called with additional options to customize the OpenMetrics text output.
+// For example:
+// NewEncoder(w, FmtOpenMetrics_1_0_0, WithCreatedLines())
+//
+// Extra options are ignored for all other formats.
+func NewEncoder(w io.Writer, format Format, options ...EncoderOption) Encoder {
+	escapingScheme := format.ToEscapingScheme()
+
+	switch format.FormatType() {
+	case TypeProtoDelim:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := pbutil.WriteDelimited(w, v)
+				_, err := protodelim.MarshalTo(w, v)
 				return err
 			},
 			close: func() error { return nil },
 		}
-	case FmtProtoCompact:
+	case TypeProtoCompact:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := fmt.Fprintln(w, v.String())
+				_, err := fmt.Fprintln(w, model.EscapeMetricFamily(v, escapingScheme).String())
 				return err
 			},
 			close: func() error { return nil },
 		}
-	case FmtProtoText:
+	case TypeProtoText:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := fmt.Fprintln(w, prototext.Format(v))
+				_, err := fmt.Fprintln(w, prototext.Format(model.EscapeMetricFamily(v, escapingScheme)))
 				return err
 			},
 			close: func() error { return nil },
 		}
-	case FmtText:
+	case TypeTextPlain:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := MetricFamilyToText(w, v)
+				_, err := MetricFamilyToText(w, model.EscapeMetricFamily(v, escapingScheme))
 				return err
 			},
 			close: func() error { return nil },
 		}
-	case FmtOpenMetrics_0_0_1, FmtOpenMetrics_1_0_0:
+	case TypeOpenMetrics:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := MetricFamilyToOpenMetrics(w, v)
+				_, err := MetricFamilyToOpenMetrics(w, model.EscapeMetricFamily(v, escapingScheme), options...)
 				return err
 			},
 			close: func() error {

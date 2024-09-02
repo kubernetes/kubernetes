@@ -59,7 +59,7 @@ var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			configDir := framework.TestContext.KubeletConfigDropinDir
 
@@ -132,7 +132,7 @@ featureGates:
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			mergedConfig, err := getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)
@@ -169,7 +169,13 @@ featureGates:
 				},
 			}
 			// This covers the case where the fields within the map are overridden.
-			initialConfig.FeatureGates = map[string]bool{"DisableKubeletCloudCredentialProviders": true, "PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
+			overrides := map[string]bool{"DisableKubeletCloudCredentialProviders": true, "PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
+			// In some CI jobs, `NodeSwap` is explicitly disabled as the images are cgroupv1 based,
+			// so such flags should be picked up directly from the initial configuration
+			if _, ok := initialConfig.FeatureGates["NodeSwap"]; ok {
+				overrides["NodeSwap"] = initialConfig.FeatureGates["NodeSwap"]
+			}
+			initialConfig.FeatureGates = overrides
 			// Compare the expected config with the merged config
 			gomega.Expect(initialConfig).To(gomega.BeComparableTo(mergedConfig), "Merged kubelet config does not match the expected configuration.")
 		})

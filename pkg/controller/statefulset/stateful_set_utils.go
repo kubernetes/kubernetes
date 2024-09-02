@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -89,10 +90,8 @@ func getOrdinal(pod *v1.Pod) int {
 // getStartOrdinal gets the first possible ordinal (inclusive).
 // Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
 func getStartOrdinal(set *apps.StatefulSet) int {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if set.Spec.Ordinals != nil {
-			return int(set.Spec.Ordinals.Start)
-		}
+	if set.Spec.Ordinals != nil {
+		return int(set.Spec.Ordinals.Start)
 	}
 	return 0
 }
@@ -170,9 +169,100 @@ func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.Statefu
 	return policy
 }
 
-// claimOwnerMatchesSetAndPod returns false if the ownerRefs of the claim are not set consistently with the
+// matchesRef returns true when the object matches the owner reference, that is the name and GVK are the same.
+func matchesRef(ref *metav1.OwnerReference, obj metav1.Object, gvk schema.GroupVersionKind) bool {
+	return gvk.GroupVersion().String() == ref.APIVersion && gvk.Kind == ref.Kind && ref.Name == obj.GetName()
+}
+
+// hasUnexpectedController returns true if the set has a retention policy and there is a controller
+// for the claim that's not the set or pod. Since the retention policy may have been changed, it is
+// always valid for the set or pod to be a controller.
+func hasUnexpectedController(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	policy := getPersistentVolumeClaimRetentionPolicy(set)
+	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
+	if policy.WhenScaled == retain && policy.WhenDeleted == retain {
+		// On a retain policy, it's not a problem for different controller to be managing the claims.
+		return false
+	}
+	for _, ownerRef := range claim.GetOwnerReferences() {
+		if matchesRef(&ownerRef, set, controllerKind) {
+			if ownerRef.UID != set.GetUID() {
+				// A UID mismatch means that pods were incorrectly orphaned. Treating this as an unexpected
+				// controller means we won't touch the PVCs (eg, leave it to the garbage collector to clean
+				// up if appropriate).
+				return true
+			}
+			continue // This is us.
+		}
+
+		if matchesRef(&ownerRef, pod, podKind) {
+			if ownerRef.UID != pod.GetUID() {
+				// This is the same situation as the set UID mismatch, above.
+				return true
+			}
+			continue // This is us.
+		}
+		if ownerRef.Controller != nil && *ownerRef.Controller {
+			return true // This is another controller.
+		}
+	}
+	return false
+}
+
+// hasNonControllerOwner returns true if the pod or set is an owner but not controller of the claim.
+func hasNonControllerOwner(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	for _, ownerRef := range claim.GetOwnerReferences() {
+		if ownerRef.UID == set.GetUID() || ownerRef.UID == pod.GetUID() {
+			if ownerRef.Controller == nil || !*ownerRef.Controller {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// removeRefs removes any owner refs from the list matching predicate. Returns true if the list was changed and
+// the new (or unchanged list).
+func removeRefs(refs []metav1.OwnerReference, predicate func(ref *metav1.OwnerReference) bool) []metav1.OwnerReference {
+	newRefs := []metav1.OwnerReference{}
+	for _, ownerRef := range refs {
+		if !predicate(&ownerRef) {
+			newRefs = append(newRefs, ownerRef)
+		}
+	}
+	return newRefs
+}
+
+// isClaimOwnerUpToDate returns false if the ownerRefs of the claim are not set consistently with the
 // PVC deletion policy for the StatefulSet.
-func claimOwnerMatchesSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+//
+// If there are stale references or unexpected controllers, this returns true in order to not touch
+// PVCs that have gotten into this unknown state. Otherwise the ownerships are checked to match the
+// PVC retention policy:
+//
+//	Retain on scaling and set deletion: no owner ref
+//	Retain on scaling and delete on set deletion: owner ref on the set only
+//	Delete on scaling and retain on set deletion: owner ref on the pod only
+//	Delete on scaling and set deletion: owner refs on both set and pod.
+func isClaimOwnerUpToDate(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	if hasStaleOwnerRef(claim, set, controllerKind) || hasStaleOwnerRef(claim, pod, podKind) {
+		// The claim is being managed by previous, presumably deleted, version of the controller. It should not be touched.
+		return true
+	}
+
+	if hasUnexpectedController(claim, set, pod) {
+		if hasOwnerRef(claim, set) || hasOwnerRef(claim, pod) {
+			return false // Need to clean up the conflicting controllers
+		}
+		// The claim refs are good, we don't want to add any controllers on top of the unexpected one.
+		return true
+	}
+
+	if hasNonControllerOwner(claim, set, pod) {
+		// Some resource has an owner ref, but there is no controller. This needs to be updated.
+		return false
+	}
+
 	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
@@ -214,64 +304,53 @@ func claimOwnerMatchesSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeCl
 
 // updateClaimOwnerRefForSetAndPod updates the ownerRefs for the claim according to the deletion policy of
 // the StatefulSet. Returns true if the claim was changed and should be updated and false otherwise.
-func updateClaimOwnerRefForSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
-	needsUpdate := false
-	// Sometimes the version and kind are not set {pod,set}.TypeMeta. These are necessary for the ownerRef.
-	// This is the case both in real clusters and the unittests.
-	// TODO: there must be a better way to do this other than hardcoding the pod version?
-	updateMeta := func(tm *metav1.TypeMeta, kind string) {
-		if tm.APIVersion == "" {
-			if kind == "StatefulSet" {
-				tm.APIVersion = "apps/v1"
-			} else {
-				tm.APIVersion = "v1"
-			}
-		}
-		if tm.Kind == "" {
-			tm.Kind = kind
-		}
+// isClaimOwnerUpToDate should be called before this to avoid an expensive update operation.
+func updateClaimOwnerRefForSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) {
+	refs := claim.GetOwnerReferences()
+
+	unexpectedController := hasUnexpectedController(claim, set, pod)
+
+	// Scrub any ownerRefs to our set & pod.
+	refs = removeRefs(refs, func(ref *metav1.OwnerReference) bool {
+		return matchesRef(ref, set, controllerKind) || matchesRef(ref, pod, podKind)
+	})
+
+	if unexpectedController {
+		// Leave ownerRefs to our set & pod scrubed and return without creating new ones.
+		claim.SetOwnerReferences(refs)
+		return
 	}
-	podMeta := pod.TypeMeta
-	updateMeta(&podMeta, "Pod")
-	setMeta := set.TypeMeta
-	updateMeta(&setMeta, "StatefulSet")
+
 	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
 		logger.Error(nil, "Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
-		fallthrough
+		// Nothing to do
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
-		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
-		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+		// Nothing to do
 	case policy.WhenScaled == retain && policy.WhenDeleted == delete:
-		needsUpdate = setOwnerRef(claim, set, &setMeta) || needsUpdate
-		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+		refs = addControllerRef(refs, set, controllerKind)
 	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
-		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
 		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
-			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
-		}
-		if !podScaledDown {
-			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+			refs = addControllerRef(refs, pod, podKind)
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
 		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
-			needsUpdate = removeOwnerRef(claim, set) || needsUpdate
-			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
+			refs = addControllerRef(refs, pod, podKind)
 		}
 		if !podScaledDown {
-			needsUpdate = setOwnerRef(claim, set, &setMeta) || needsUpdate
-			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+			refs = addControllerRef(refs, set, controllerKind)
 		}
 	}
-	return needsUpdate
+	claim.SetOwnerReferences(refs)
 }
 
-// hasOwnerRef returns true if target has an ownerRef to owner.
+// hasOwnerRef returns true if target has an ownerRef to owner (as its UID).
+// This does not check if the owner is a controller.
 func hasOwnerRef(target, owner metav1.Object) bool {
 	ownerUID := owner.GetUID()
 	for _, ownerRef := range target.GetOwnerReferences() {
@@ -282,53 +361,28 @@ func hasOwnerRef(target, owner metav1.Object) bool {
 	return false
 }
 
-// hasStaleOwnerRef returns true if target has a ref to owner that appears to be stale.
-func hasStaleOwnerRef(target, owner metav1.Object) bool {
+// hasStaleOwnerRef returns true if target has a ref to owner that appears to be stale, that is,
+// the ref matches the object but not the UID.
+func hasStaleOwnerRef(target *v1.PersistentVolumeClaim, obj metav1.Object, gvk schema.GroupVersionKind) bool {
 	for _, ownerRef := range target.GetOwnerReferences() {
-		if ownerRef.Name == owner.GetName() && ownerRef.UID != owner.GetUID() {
-			return true
+		if matchesRef(&ownerRef, obj, gvk) {
+			return ownerRef.UID != obj.GetUID()
 		}
 	}
 	return false
 }
 
-// setOwnerRef adds owner to the ownerRefs of target, if necessary. Returns true if target needs to be
-// updated and false otherwise.
-func setOwnerRef(target, owner metav1.Object, ownerType *metav1.TypeMeta) bool {
-	if hasOwnerRef(target, owner) {
-		return false
-	}
-	ownerRefs := append(
-		target.GetOwnerReferences(),
-		metav1.OwnerReference{
-			APIVersion: ownerType.APIVersion,
-			Kind:       ownerType.Kind,
-			Name:       owner.GetName(),
-			UID:        owner.GetUID(),
-		})
-	target.SetOwnerReferences(ownerRefs)
-	return true
-}
-
-// removeOwnerRef removes owner from the ownerRefs of target, if necessary. Returns true if target needs
-// to be updated and false otherwise.
-func removeOwnerRef(target, owner metav1.Object) bool {
-	if !hasOwnerRef(target, owner) {
-		return false
-	}
-	ownerUID := owner.GetUID()
-	oldRefs := target.GetOwnerReferences()
-	newRefs := make([]metav1.OwnerReference, len(oldRefs)-1)
-	skip := 0
-	for i := range oldRefs {
-		if oldRefs[i].UID == ownerUID {
-			skip = -1
-		} else {
-			newRefs[i+skip] = oldRefs[i]
+// addControllerRef returns refs with owner added as a controller, if necessary.
+func addControllerRef(refs []metav1.OwnerReference, owner metav1.Object, gvk schema.GroupVersionKind) []metav1.OwnerReference {
+	for _, ref := range refs {
+		if ref.UID == owner.GetUID() {
+			// Already added. Since we scrub our refs before making any changes, we know it's already
+			// a controller if appropriate.
+			return refs
 		}
 	}
-	target.SetOwnerReferences(newRefs)
-	return true
+
+	return append(refs, *metav1.NewControllerRef(owner, gvk))
 }
 
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The

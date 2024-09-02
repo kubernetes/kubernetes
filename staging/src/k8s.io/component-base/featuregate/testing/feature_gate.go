@@ -20,14 +20,16 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"testing"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
 var (
-	overrideLock        sync.Mutex
-	featureFlagOverride map[featuregate.Feature]string
+	overrideLock                  sync.Mutex
+	featureFlagOverride           map[featuregate.Feature]string
+	emulationVersionOverride      string
+	emulationVersionOverrideValue *version.Version
 )
 
 func init() {
@@ -36,21 +38,20 @@ func init() {
 
 // SetFeatureGateDuringTest sets the specified gate to the specified value for duration of the test.
 // Fails when it detects second call to the same flag or is unable to set or restore feature flag.
-// Returns empty cleanup function to maintain the old function signature that uses defer.
-// TODO: Remove defer from calls to SetFeatureGateDuringTest and update hack/verify-test-featuregates.sh when we can do large scale code change.
 //
 // WARNING: Can leak set variable when called in test calling t.Parallel(), however second attempt to set the same feature flag will cause fatal.
 //
 // Example use:
 //
-// defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
+// featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)
+func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
 	originalValue := gate.Enabled(f)
+	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
+	originalExplicitlySet := gate.(featuregate.MutableVersionedFeatureGate).ExplicitlySet(f)
 
 	// Specially handle AllAlpha and AllBeta
-	var cleanups []func()
 	if f == "AllAlpha" || f == "AllBeta" {
 		// Iterate over individual gates so their individual values get restored
 		for k, v := range gate.(featuregate.MutableFeatureGate).GetAll() {
@@ -58,7 +59,7 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 				continue
 			}
 			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
-				cleanups = append(cleanups, SetFeatureGateDuringTest(tb, gate, k, value))
+				SetFeatureGateDuringTest(tb, gate, k, value)
 			}
 		}
 	}
@@ -70,17 +71,46 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
-			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+		emuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
+		if !emuVer.EqualTo(originalEmuVer) {
+			tb.Fatalf("change of feature gate emulation version from %s to %s in the chain of SetFeatureGateDuringTest is not allowed\nuse SetFeatureGateEmulationVersionDuringTest to change emulation version in tests",
+				originalEmuVer.String(), emuVer.String())
 		}
-		for _, cleanup := range cleanups {
-			cleanup()
+		if originalExplicitlySet {
+			if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
+				tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+			}
+		} else {
+			if err := gate.(featuregate.MutableVersionedFeatureGate).ResetFeatureValueToDefault(f); err != nil {
+				tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+			}
 		}
 	})
-	return func() {}
 }
 
-func detectParallelOverride(tb testing.TB, f featuregate.Feature) func() {
+// SetFeatureGateEmulationVersionDuringTest sets the specified gate to the specified emulation version for duration of the test.
+// Fails when it detects second call to set a different emulation version or is unable to set or restore emulation version.
+// WARNING: Can leak set variable when called in test calling t.Parallel(), however second attempt to set a different emulation version will cause fatal.
+// Example use:
+
+// featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+func SetFeatureGateEmulationVersionDuringTest(tb TB, gate featuregate.FeatureGate, ver *version.Version) {
+	tb.Helper()
+	detectParallelOverrideCleanup := detectParallelOverrideEmulationVersion(tb, ver)
+	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
+	if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(ver); err != nil {
+		tb.Fatalf("failed to set emulation version to %s during test", ver.String())
+	}
+	tb.Cleanup(func() {
+		tb.Helper()
+		detectParallelOverrideCleanup()
+		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(originalEmuVer); err != nil {
+			tb.Fatalf("failed to restore emulation version to %s during test", originalEmuVer.String())
+		}
+	})
+}
+
+func detectParallelOverride(tb TB, f featuregate.Feature) func() {
 	tb.Helper()
 	overrideLock.Lock()
 	defer overrideLock.Unlock()
@@ -101,7 +131,44 @@ func detectParallelOverride(tb testing.TB, f featuregate.Feature) func() {
 	}
 }
 
-func sameTestOrSubtest(tb testing.TB, testName string) bool {
+func detectParallelOverrideEmulationVersion(tb TB, ver *version.Version) func() {
+	tb.Helper()
+	overrideLock.Lock()
+	defer overrideLock.Unlock()
+	beforeOverrideTestName := emulationVersionOverride
+	beforeOverrideValue := emulationVersionOverrideValue
+	if ver.EqualTo(beforeOverrideValue) {
+		return func() {}
+	}
+	if beforeOverrideTestName != "" && !sameTestOrSubtest(tb, beforeOverrideTestName) {
+		tb.Fatalf("Detected parallel setting of a feature gate emulation version by both %q and %q", beforeOverrideTestName, tb.Name())
+	}
+	emulationVersionOverride = tb.Name()
+	emulationVersionOverrideValue = ver
+
+	return func() {
+		tb.Helper()
+		overrideLock.Lock()
+		defer overrideLock.Unlock()
+		if afterOverrideTestName := emulationVersionOverride; afterOverrideTestName != tb.Name() {
+			tb.Fatalf("Detected parallel setting of a feature gate emulation version between both %q and %q", afterOverrideTestName, tb.Name())
+		}
+		emulationVersionOverride = beforeOverrideTestName
+		emulationVersionOverrideValue = beforeOverrideValue
+	}
+}
+
+func sameTestOrSubtest(tb TB, testName string) bool {
 	// Assumes that "/" is not used in test names.
 	return tb.Name() == testName || strings.HasPrefix(tb.Name(), testName+"/")
+}
+
+type TB interface {
+	Cleanup(func())
+	Error(args ...any)
+	Errorf(format string, args ...any)
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
+	Helper()
+	Name() string
 }

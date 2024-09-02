@@ -160,7 +160,7 @@ func init() {
 func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 
 	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -185,7 +185,7 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 }
 
 func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
 
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
@@ -282,7 +282,7 @@ func unregisterAPIService(ctx context.Context, client aggregator.Interface, gv m
 }
 
 func TestAggregatedAPIServiceDiscovery(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
 
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
@@ -382,7 +382,7 @@ func runTestCases(t *testing.T, cases []testCase) {
 
 // Declarative tests targeting CRD integration
 func TestCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
 
 	runTestCases(t, []testCase{
 		{
@@ -622,7 +622,7 @@ func TestCRD(t *testing.T) {
 }
 
 func TestFreshness(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
 
 	requireStaleGVs := func(gvs ...metav1.GroupVersion) inlineAction {
 		return inlineAction(func(ctx context.Context, client testClient) error {
@@ -712,7 +712,7 @@ func TestFreshness(t *testing.T) {
 // Shows a group for which multiple APIServices specify a GroupPriorityMinimum,
 // it is sorted the same in both versions of discovery
 func TestGroupPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
 
 	makeApiServiceSpec := func(gv metav1.GroupVersion, groupPriorityMin, versionPriority int) apiregistrationv1.APIServiceSpec {
 		return apiregistrationv1.APIServiceSpec{

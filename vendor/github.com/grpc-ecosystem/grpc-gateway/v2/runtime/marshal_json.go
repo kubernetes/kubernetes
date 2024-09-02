@@ -24,6 +24,11 @@ func (j *JSONBuiltin) Marshal(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
+// MarshalIndent is like Marshal but applies Indent to format the output
+func (j *JSONBuiltin) MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+	return json.MarshalIndent(v, prefix, indent)
+}
+
 // Unmarshal unmarshals JSON data into "v".
 func (j *JSONBuiltin) Unmarshal(data []byte, v interface{}) error {
 	return json.Unmarshal(data, v)

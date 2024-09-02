@@ -18,13 +18,11 @@ package persistentvolume
 
 import (
 	"context"
+
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"reflect"
 	"testing"
 	"time"
@@ -52,14 +50,12 @@ func TestStatusUpdate(t *testing.T) {
 	}()
 	tests := []struct {
 		name        string
-		fg          bool
 		oldObj      *api.PersistentVolume
 		newObj      *api.PersistentVolume
 		expectedObj *api.PersistentVolume
 	}{
 		{
-			name: "feature enabled: timestamp is updated when phase changes",
-			fg:   true,
+			name: "timestamp is updated when phase changes",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -87,8 +83,7 @@ func TestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "feature enabled: timestamp is updated when phase changes and old pv has a timestamp",
-			fg:   true,
+			name: "timestamp is updated when phase changes and old pv has a timestamp",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -117,8 +112,7 @@ func TestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "feature enabled: user timestamp change is respected on no phase change",
-			fg:   true,
+			name: "user timestamp change is respected on no phase change",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -147,8 +141,7 @@ func TestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "feature enabled: user timestamp is respected on phase change",
-			fg:   true,
+			name: "user timestamp is respected on phase change",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -178,8 +171,7 @@ func TestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "feature enabled: user timestamp change is respected on no phase change when old pv has a timestamp",
-			fg:   true,
+			name: "user timestamp change is respected on no phase change when old pv has a timestamp",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -209,8 +201,7 @@ func TestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "feature enabled: timestamp is updated when phase changes and both new and old timestamp matches",
-			fg:   true,
+			name: "timestamp is updated when phase changes and both new and old timestamp matches",
 			oldObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -236,126 +227,6 @@ func TestStatusUpdate(t *testing.T) {
 				Status: api.PersistentVolumeStatus{
 					Phase:                   api.VolumeBound,
 					LastPhaseTransitionTime: &now,
-				},
-			},
-		},
-		{
-			name: "feature disabled: timestamp is not updated",
-			fg:   false,
-			oldObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase: api.VolumePending,
-				},
-			},
-			newObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase: api.VolumeBound,
-				},
-			},
-			expectedObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase: api.VolumeBound,
-				},
-			},
-		},
-		{
-			name: "feature disabled: user timestamp is overwritten on phase change to nil",
-			fg:   false,
-			oldObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase: api.VolumePending,
-				},
-			},
-			newObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumePending,
-					LastPhaseTransitionTime: &later,
-				},
-			},
-			expectedObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumePending,
-					LastPhaseTransitionTime: nil,
-				},
-			},
-		},
-		{
-			name: "feature disabled: user timestamp change is respected on phase change",
-			fg:   false,
-			oldObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumePending,
-					LastPhaseTransitionTime: &origin,
-				},
-			},
-			newObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumeBound,
-					LastPhaseTransitionTime: &later,
-				},
-			},
-			expectedObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumeBound,
-					LastPhaseTransitionTime: &later,
-				},
-			},
-		},
-		{
-			name: "feature disabled: user timestamp change is respected on no phase change",
-			fg:   false,
-			oldObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumeBound,
-					LastPhaseTransitionTime: &origin,
-				},
-			},
-			newObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumeBound,
-					LastPhaseTransitionTime: &later,
-				},
-			},
-			expectedObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Status: api.PersistentVolumeStatus{
-					Phase:                   api.VolumeBound,
-					LastPhaseTransitionTime: &later,
 				},
 			},
 		},
@@ -363,7 +234,6 @@ func TestStatusUpdate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)()
 
 			obj := tc.newObj.DeepCopy()
 			StatusStrategy.PrepareForUpdate(context.TODO(), obj, tc.oldObj.DeepCopy())
@@ -382,13 +252,11 @@ func TestStatusCreate(t *testing.T) {
 	}()
 	tests := []struct {
 		name        string
-		fg          bool
 		newObj      *api.PersistentVolume
 		expectedObj *api.PersistentVolume
 	}{
 		{
-			name: "feature enabled: pv is in pending phase and has a timestamp",
-			fg:   true,
+			name: "pv is in pending phase and has a timestamp",
 			newObj: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -404,26 +272,11 @@ func TestStatusCreate(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "feature disabled: pv does not have phase and timestamp",
-			fg:   false,
-			newObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			expectedObj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)()
 			obj := tc.newObj.DeepCopy()
 			StatusStrategy.PrepareForCreate(context.TODO(), obj)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {

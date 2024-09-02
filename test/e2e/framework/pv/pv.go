@@ -93,6 +93,9 @@ type PersistentVolumeConfig struct {
 	// [Optional] Labels contains information used to organize and categorize
 	// objects
 	Labels labels.Set
+	// [Optional] Annotations contains information used to organize and categorize
+	// objects
+	Annotations map[string]string
 	// PVSource contains the details of the underlying volume and must be set
 	PVSource v1.PersistentVolumeSource
 	// [Optional] Prebind lets you specify a PVC to bind this PV to before
@@ -124,10 +127,11 @@ type PersistentVolumeClaimConfig struct {
 	// unspecified
 	ClaimSize string
 	// AccessModes defaults to RWO if unspecified
-	AccessModes      []v1.PersistentVolumeAccessMode
-	Annotations      map[string]string
-	Selector         *metav1.LabelSelector
-	StorageClassName *string
+	AccessModes               []v1.PersistentVolumeAccessMode
+	Annotations               map[string]string
+	Selector                  *metav1.LabelSelector
+	StorageClassName          *string
+	VolumeAttributesClassName *string
 	// VolumeMode defaults to nil if unspecified or specified as the empty
 	// string
 	VolumeMode *v1.PersistentVolumeMode
@@ -595,13 +599,18 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 		}
 	}
 
+	annotations := map[string]string{
+		volumeGidAnnotationKey: "777",
+	}
+	for k, v := range pvConfig.Annotations {
+		annotations[k] = v
+	}
+
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
-			Annotations: map[string]string{
-				volumeGidAnnotationKey: "777",
-			},
+			Annotations:  annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: pvConfig.ReclaimPolicy,
@@ -653,8 +662,9 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 					v1.ResourceStorage: resource.MustParse(cfg.ClaimSize),
 				},
 			},
-			StorageClassName: cfg.StorageClassName,
-			VolumeMode:       cfg.VolumeMode,
+			StorageClassName:          cfg.StorageClassName,
+			VolumeAttributesClassName: cfg.VolumeAttributesClassName,
+			VolumeMode:                cfg.VolumeMode,
 		},
 	}
 }

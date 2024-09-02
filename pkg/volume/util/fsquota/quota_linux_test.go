@@ -366,19 +366,19 @@ func (v testVolumeQuota) GetInodes(_ string, _ common.QuotaID) (int64, error) {
 	return 1, nil
 }
 
-func fakeSupportsQuotas(path string) (bool, error) {
+func fakeSupportsQuotas(path string, userNamespacesEnabled bool) (bool, error) {
 	dummySetFSInfo(path)
-	return SupportsQuotas(dummyQuotaTest(), path)
+	return SupportsQuotas(dummyQuotaTest(), path, userNamespacesEnabled)
 }
 
-func fakeAssignQuota(path string, poduid types.UID, bytes int64) error {
+func fakeAssignQuota(path string, poduid types.UID, bytes int64, userNamespacesEnabled bool) error {
 	dummySetFSInfo(path)
-	return AssignQuota(dummyQuotaTest(), path, poduid, resource.NewQuantity(bytes, resource.DecimalSI))
+	return AssignQuota(dummyQuotaTest(), path, poduid, resource.NewQuantity(bytes, resource.DecimalSI), userNamespacesEnabled)
 }
 
-func fakeClearQuota(path string) error {
+func fakeClearQuota(path string, userNamespacesEnabled bool) error {
 	dummySetFSInfo(path)
-	return ClearQuota(dummyQuotaTest(), path)
+	return ClearQuota(dummyQuotaTest(), path, userNamespacesEnabled)
 }
 
 type quotaTestCase struct {
@@ -391,6 +391,7 @@ type quotaTestCase struct {
 	expectedProjid                   string
 	supportsQuota                    bool
 	expectsSetQuota                  bool
+	userNamespacesEnabled            bool
 	deltaExpectedPodQuotaCount       int
 	deltaExpectedDirQuotaCount       int
 	deltaExpectedQuotaPodCount       int
@@ -444,59 +445,64 @@ volume1048581:1048581
 
 var quotaTestCases = []quotaTestCase{
 	{
-		"SupportsQuotaOnQuotaVolume",
+		"SupportsQuotaOnQuotaVolumeWithUserNamespace",
 		"/quota1/a", "", 1024, "Supports", "", "",
-		true, true, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1,
+		true, true, true, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1,
+	},
+	{
+		"SupportsQuotaOnQuotaVolumeWithoutUserNamespace",
+		"/quota1/a", "", 1024, "Supports", "", "",
+		true, true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"AssignQuotaFirstTime",
 		"/quota1/a", "", 1024, "Set", projects1, projid1,
-		true, true, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0,
+		true, true, true, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0,
 	},
 	{
 		"AssignQuotaFirstTime",
 		"/quota1/b", "x", 1024, "Set", projects2, projid2,
-		true, true, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+		true, true, true, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	},
 	{
 		"AssignQuotaFirstTime",
 		"/quota2/b", "x", 1024, "Set", projects3, projid3,
-		true, true, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		true, true, true, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	},
 	{
 		"AssignQuotaSecondTimeWithSameSize",
 		"/quota1/b", "x", 1024, "Set", projects3, projid3,
-		true, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		true, true, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"AssignQuotaSecondTimeWithDifferentSize",
 		"/quota2/b", "x", 2048, "Set", projects3, projid3,
-		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		true, false, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"ClearQuotaFirstTime",
 		"/quota1/b", "", 1024, "Clear", projects4, projid4,
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
 	},
 	{
 		"SupportsQuotaOnNonQuotaVolume",
 		"/noquota/a", "", 1024, "Supports", projects4, projid4,
-		false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		false, false, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"ClearQuotaFirstTime",
 		"/quota1/a", "", 1024, "Clear", projects5, projid5,
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
 	},
 	{
 		"ClearQuotaSecondTime",
 		"/quota1/a", "", 1024, "Clear", projects5, projid5,
-		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		true, false, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"ClearQuotaFirstTime",
 		"/quota2/b", "", 1024, "Clear", "", "",
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
 	},
 }
 
@@ -534,20 +540,21 @@ func runCaseEnabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	var err error
 	switch testcase.op {
 	case "Supports":
-		supports, err := fakeSupportsQuotas(testcase.path)
+		supports, err := fakeSupportsQuotas(testcase.path, testcase.userNamespacesEnabled)
 		if err != nil {
 			fail = true
 			t.Errorf("Case %v (%s, %s, %v) Got error in fakeSupportsQuotas: %v", seq, testcase.name, testcase.path, true, err)
 		}
-		if supports != testcase.supportsQuota {
+		expectedSupport := testcase.supportsQuota && testcase.userNamespacesEnabled
+		if supports != expectedSupport {
 			fail = true
-			t.Errorf("Case %v (%s, %s, %v) fakeSupportsQuotas got %v, expect %v", seq, testcase.name, testcase.path, true, supports, testcase.supportsQuota)
+			t.Errorf("Case %v (%s, %s, userNamespacesEnabled: %v) fakeSupportsQuotas got %v, expect %v", seq, testcase.name, testcase.path, testcase.userNamespacesEnabled, supports, expectedSupport)
 		}
 		return fail
 	case "Set":
-		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes)
+		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes, testcase.userNamespacesEnabled)
 	case "Clear":
-		err = fakeClearQuota(testcase.path)
+		err = fakeClearQuota(testcase.path, testcase.userNamespacesEnabled)
 	case "GetConsumption":
 		_, err = GetConsumption(testcase.path)
 	case "GetInodes":
@@ -571,15 +578,15 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	var supports bool
 	switch testcase.op {
 	case "Supports":
-		if supports, _ = fakeSupportsQuotas(testcase.path); supports {
+		if supports, _ = fakeSupportsQuotas(testcase.path, testcase.userNamespacesEnabled); supports {
 			t.Errorf("Case %v (%s, %s, %v) supports quotas but shouldn't", seq, testcase.name, testcase.path, false)
 			return true
 		}
 		return false
 	case "Set":
-		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes)
+		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes, testcase.userNamespacesEnabled)
 	case "Clear":
-		err = fakeClearQuota(testcase.path)
+		err = fakeClearQuota(testcase.path, testcase.userNamespacesEnabled)
 	case "GetConsumption":
 		_, err = GetConsumption(testcase.path)
 	case "GetInodes":
@@ -596,7 +603,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 }
 
 func testAddRemoveQuotas(t *testing.T, enabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)
 	tmpProjectsFile, err := os.CreateTemp("", "projects")
 	if err == nil {
 		_, err = tmpProjectsFile.WriteString(projectsHeader)

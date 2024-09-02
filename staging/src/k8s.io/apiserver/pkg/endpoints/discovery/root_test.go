@@ -105,7 +105,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assert.Equal(t, 0, len(groupList.Groups))
+	assert.Empty(t, groupList.Groups)
 
 	// Add a Group.
 	extensionsGroupName := "extensions"
@@ -130,7 +130,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assert.Equal(t, 1, len(groupList.Groups))
+	assert.Len(t, groupList.Groups, 1)
 	groupListGroup := groupList.Groups[0]
 	assert.Equal(t, extensionsGroupName, groupListGroup.Name)
 	assert.Equal(t, extensionsVersions, groupListGroup.Versions)
@@ -144,7 +144,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assert.Equal(t, 0, len(groupList.Groups))
+	assert.Empty(t, groupList.Groups)
 }
 
 func TestDiscoveryOrdering(t *testing.T) {
@@ -155,7 +155,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assert.Equal(t, 0, len(groupList.Groups))
+	assert.Empty(t, groupList.Groups)
 
 	// Register three groups
 	handler.AddGroup(metav1.APIGroup{Name: "x"})
@@ -173,7 +173,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assert.Equal(t, 6, len(groupList.Groups))
+	assert.Len(t, groupList.Groups, 6)
 	assert.Equal(t, "x", groupList.Groups[0].Name)
 	assert.Equal(t, "y", groupList.Groups[1].Name)
 	assert.Equal(t, "z", groupList.Groups[2].Name)
@@ -187,7 +187,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assert.Equal(t, 5, len(groupList.Groups))
+	assert.Len(t, groupList.Groups, 5)
 
 	// Re-adding should move to the end.
 	handler.AddGroup(metav1.APIGroup{Name: "a"})
@@ -195,7 +195,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assert.Equal(t, 6, len(groupList.Groups))
+	assert.Len(t, groupList.Groups, 6)
 	assert.Equal(t, "x", groupList.Groups[0].Name)
 	assert.Equal(t, "y", groupList.Groups[1].Name)
 	assert.Equal(t, "z", groupList.Groups[2].Name)

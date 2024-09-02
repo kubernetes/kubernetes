@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
@@ -130,7 +131,7 @@ func init() {
 	configScheme := runtime.NewScheme()
 	utilruntime.Must(apiserver.AddToScheme(configScheme))
 	utilruntime.Must(apiserverv1.AddToScheme(configScheme))
-	codecs = serializer.NewCodecFactory(configScheme)
+	codecs = serializer.NewCodecFactory(configScheme, serializer.EnableStrict)
 	envelopemetrics.RegisterMetrics()
 	storagevalue.RegisterMetrics()
 	metrics.RegisterMetrics()
@@ -760,10 +761,6 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguratio
 		}, nil
 
 	case kmsAPIVersionV2:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
-		}
-
 		envelopeService, err := EnvelopeKMSv2ServiceFactory(ctx, config.Endpoint, config.Name, config.Timeout.Duration)
 		if err != nil {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %w", kmsName, err)
@@ -1013,7 +1010,9 @@ var anyGroupAnyResource = schema.GroupResource{
 	Resource: "*",
 }
 
-func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) storagevalue.Transformer {
+func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) (out storagevalue.Transformer) {
+	defer func() { out = newRequestInfoTransformer(resource, out) }()
+
 	if transformer := transformerOverrides[resource]; transformer != nil {
 		return transformer
 	}
@@ -1038,4 +1037,42 @@ func grYAMLString(gr schema.GroupResource) string {
 	}
 
 	return gr.String()
+}
+
+var _ storagevalue.Transformer = &requestInfoTransformer{}
+
+type requestInfoTransformer struct {
+	baseValueCtx context.Context
+	delegate     storagevalue.Transformer
+}
+
+func newRequestInfoTransformer(resource schema.GroupResource, delegate storagevalue.Transformer) *requestInfoTransformer {
+	return &requestInfoTransformer{
+		baseValueCtx: request.WithRequestInfo(context.Background(), &request.RequestInfo{IsResourceRequest: true, APIGroup: resource.Group, Resource: resource.Resource}),
+		delegate:     delegate,
+	}
+}
+
+func (l *requestInfoTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, bool, error) {
+	return l.delegate.TransformFromStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, error) {
+	return l.delegate.TransformToStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) withBaseValueCtx(ctx context.Context) context.Context {
+	return &joinValueContext{Context: ctx, baseValueCtx: l.baseValueCtx}
+}
+
+type joinValueContext struct {
+	context.Context
+	baseValueCtx context.Context
+}
+
+func (j *joinValueContext) Value(key any) any {
+	if val := j.Context.Value(key); val != nil {
+		return val
+	}
+	return j.baseValueCtx.Value(key)
 }

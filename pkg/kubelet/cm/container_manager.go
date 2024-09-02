@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -42,6 +44,11 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+const (
+	// Warning message for the users still using cgroup v1
+	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+)
+
 type ActivePodsFunc func() []*v1.Pod
 
 // Manages the containers running on a machine.
@@ -49,7 +56,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -88,7 +95,7 @@ type ContainerManager interface {
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
-	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
+	GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
 
 	// UpdatePluginResources calls Allocate of device plugin handler for potential
 	// requests for device plugin resources, and returns an error if fails.
@@ -118,14 +125,20 @@ type ContainerManager interface {
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
 	// PrepareDynamicResource prepares dynamic pod resources
-	PrepareDynamicResources(*v1.Pod) error
+	PrepareDynamicResources(context.Context, *v1.Pod) error
 
-	// UnrepareDynamicResources unprepares dynamic pod resources
-	UnprepareDynamicResources(*v1.Pod) error
+	// UnprepareDynamicResources unprepares dynamic pod resources
+	UnprepareDynamicResources(context.Context, *v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
+
+	// UpdateAllocatedResourcesStatus updates the status of allocated resources for the pod.
+	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+
+	// Updates returns a channel that receives an Update when the device changed its status.
+	Updates() <-chan resourceupdates.Update
 
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
@@ -159,6 +172,7 @@ type NodeConfig struct {
 	CPUCFSQuotaPeriod                       time.Duration
 	TopologyManagerPolicy                   string
 	TopologyManagerPolicyOptions            map[string]string
+	CgroupVersion                           int
 }
 
 type NodeAllocatableConfig struct {

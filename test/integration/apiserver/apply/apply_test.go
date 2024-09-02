@@ -30,26 +30,34 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"sigs.k8s.io/yaml"
 )
 
 func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	// There are some tests (in scale_test.go) that rely on the response to be returned in JSON.
@@ -236,6 +244,237 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 
 	if createdAccessor.GetResourceVersion() != updatedAccessor.GetResourceVersion() {
 		t.Fatalf("Expected same resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
+			createdAccessor.GetResourceVersion(),
+			updatedAccessor.GetResourceVersion(),
+			string(createdBytes),
+			string(updatedBytes),
+		)
+	}
+}
+
+// TestNoOpApplyWithEmptyMap
+func TestNoOpApplyWithEmptyMap(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	deploymentName := "no-op"
+	deploymentsResource := "deployments"
+	deploymentBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "` + deploymentName + `",
+			"labels": {
+				"app": "nginx"
+			}
+		},
+		"spec": {
+			"replicas": 1,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"annotations": {},
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"image": "nginx:1.14.2",
+						"ports": [{
+							"containerPort": 80
+						}]
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(deploymentsResource).
+		Name(deploymentName).
+		Body(deploymentBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// This sleep is necessary to consistently produce different timestamps because the time field in managedFields has
+	// 1 second granularity and if both apply requests happen during the same second, this test would flake.
+	time.Sleep(1 * time.Second)
+
+	createdObject, err := client.AppsV1().RESTClient().Get().Namespace("default").Resource(deploymentsResource).Name(deploymentName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve created object: %v", err)
+	}
+
+	createdAccessor, err := meta.Accessor(createdObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for created object: %v", err)
+	}
+
+	createdBytes, err := json.MarshalIndent(createdObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+
+	// Test that we can apply the same object and don't change the RV
+	_, err = client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(deploymentsResource).
+		Name(deploymentName).
+		Body(deploymentBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updatedObject, err := client.AppsV1().RESTClient().Get().Namespace("default").Resource(deploymentsResource).Name(deploymentName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated object: %v", err)
+	}
+
+	updatedAccessor, err := meta.Accessor(updatedObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for updated object: %v", err)
+	}
+
+	updatedBytes, err := json.MarshalIndent(updatedObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal updated object: %v", err)
+	}
+
+	if createdAccessor.GetResourceVersion() != updatedAccessor.GetResourceVersion() {
+		t.Fatalf("Expected same resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
+			createdAccessor.GetResourceVersion(),
+			updatedAccessor.GetResourceVersion(),
+			string(createdBytes),
+			string(updatedBytes),
+		)
+	}
+}
+
+// TestApplyEmptyMarkerStructDifferentFromNil
+func TestApplyEmptyMarkerStructDifferentFromNil(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	podName := "pod-with-empty-dir"
+	podsResource := "pods"
+	podBytesWithEmptyDir := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "` + podName + `"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one",
+				"volumeMounts": [{
+					"mountPath": "/cache",
+					"name": "cache-volume"
+				}],
+			}],
+			"volumes": [{
+				"name": "cache-volume",
+				"emptyDir": {}
+			}]
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(podsResource).
+		Name(podName).
+		Body(podBytesWithEmptyDir).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// This sleep is necessary to consistently produce different timestamps because the time field in managedFields has
+	// 1 second granularity and if both apply requests happen during the same second, this test would flake.
+	time.Sleep(1 * time.Second)
+
+	createdObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podsResource).Name(podName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve created object: %v", err)
+	}
+
+	createdAccessor, err := meta.Accessor(createdObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for created object: %v", err)
+	}
+
+	createdBytes, err := json.MarshalIndent(createdObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+
+	podBytesNoEmptyDir := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "` + podName + `"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one",
+				"volumeMounts": [{
+					"mountPath": "/cache",
+					"name": "cache-volume"
+				}],
+			}],
+			"volumes": [{
+				"name": "cache-volume"
+			}]
+		}
+	}`)
+
+	// Test that an apply with no emptyDir is recognized as distinct from an empty marker struct emptyDir.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(podsResource).
+		Name(podName).
+		Body(podBytesNoEmptyDir).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updatedObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podsResource).Name(podName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated object: %v", err)
+	}
+
+	updatedAccessor, err := meta.Accessor(updatedObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for updated object: %v", err)
+	}
+
+	updatedBytes, err := json.MarshalIndent(updatedObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal updated object: %v", err)
+	}
+
+	if createdAccessor.GetResourceVersion() == updatedAccessor.GetResourceVersion() {
+		t.Fatalf("Expected different resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
 			createdAccessor.GetResourceVersion(),
 			updatedAccessor.GetResourceVersion(),
 			string(createdBytes),
@@ -4421,6 +4660,109 @@ spec:
 `)
 }
 
+func TestApplyMatchesFakeClientsetApply(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+	fakeClient := fake.NewClientset()
+
+	// The fake client does not default fields, so we set all defaulted fields directly.
+	deployment := appsv1ac.Deployment("deployment", "default").
+		WithLabels(map[string]string{"app": "nginx"}).
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithReplicas(3).
+			WithStrategy(appsv1ac.DeploymentStrategy().
+				WithType(appsv1.RollingUpdateDeploymentStrategyType).
+				WithRollingUpdate(appsv1ac.RollingUpdateDeployment().
+					WithMaxUnavailable(intstr.FromString("25%")).
+					WithMaxSurge(intstr.FromString("25%")))).
+			WithRevisionHistoryLimit(10).
+			WithProgressDeadlineSeconds(600).
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"})).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithRestartPolicy(v1.RestartPolicyAlways).
+					WithTerminationGracePeriodSeconds(30).
+					WithDNSPolicy(v1.DNSClusterFirst).
+					WithSecurityContext(corev1ac.PodSecurityContext()).
+					WithSchedulerName("default-scheduler").
+					WithContainers(corev1ac.Container().
+						WithName("nginx").
+						WithImage("nginx:latest").
+						WithTerminationMessagePath("/dev/termination-log").
+						WithTerminationMessagePolicy("File").
+						WithImagePullPolicy(v1.PullAlways)))))
+	fieldManager := "m-1"
+
+	realCreated, err := client.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	fakeCreated, err := fakeClient.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// wipe metadata except name, namespace, labels and managedFields (but wipe timestamps in managedFields)
+	realCreated.ObjectMeta = wipeMetadataForFakeClientTests(realCreated.ObjectMeta)
+	fakeCreated.ObjectMeta = wipeMetadataForFakeClientTests(fakeCreated.ObjectMeta)
+	// wipe status
+	realCreated.Status = appsv1.DeploymentStatus{}
+	fakeCreated.Status = appsv1.DeploymentStatus{}
+	// TODO: Remove once https://github.com/kubernetes/kubernetes/issues/125671 is fixed.
+	fakeCreated.TypeMeta = metav1.TypeMeta{}
+
+	if diff := cmp.Diff(realCreated, fakeCreated); diff != "" {
+		t.Errorf("Unexpected fake created: (-want +got): %v", diff)
+	}
+
+	// Force apply with a different field manager
+	deploymentUpdate := appsv1ac.Deployment("deployment", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithReplicas(4))
+	updateManager := "m-2"
+	realUpdated, err := client.AppsV1().Deployments("default").Apply(context.TODO(), deploymentUpdate, metav1.ApplyOptions{FieldManager: updateManager, Force: true})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	fakeUpdated, err := fakeClient.AppsV1().Deployments("default").Apply(context.TODO(), deploymentUpdate, metav1.ApplyOptions{FieldManager: updateManager, Force: true})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// wipe metadata except name, namespace, labels and managedFields (but wipe timestamps in managedFields)
+	realUpdated.ObjectMeta = wipeMetadataForFakeClientTests(realUpdated.ObjectMeta)
+	fakeUpdated.ObjectMeta = wipeMetadataForFakeClientTests(fakeUpdated.ObjectMeta)
+	// wipe status
+	realUpdated.Status = appsv1.DeploymentStatus{}
+	fakeUpdated.Status = appsv1.DeploymentStatus{}
+	// TODO: Remove once https://github.com/kubernetes/kubernetes/issues/125671 is fixed.
+	fakeUpdated.TypeMeta = metav1.TypeMeta{}
+
+	if diff := cmp.Diff(realUpdated, fakeUpdated); diff != "" {
+		t.Errorf("Unexpected fake updated: (-want +got): %v", diff)
+	}
+}
+
+var wipeTime = metav1.NewTime(time.Date(2000, 1, 1, 0, 0, 0, 0, time.FixedZone("EDT", -4*60*60)))
+
+func wipeMetadataForFakeClientTests(meta metav1.ObjectMeta) metav1.ObjectMeta {
+	wipedManagedFields := make([]metav1.ManagedFieldsEntry, len(meta.ManagedFields))
+	copy(meta.ManagedFields, wipedManagedFields)
+	for _, mf := range wipedManagedFields {
+		mf.Time = &wipeTime
+	}
+	return metav1.ObjectMeta{
+		Name:          meta.Name,
+		Namespace:     meta.Namespace,
+		Labels:        meta.Labels,
+		ManagedFields: wipedManagedFields,
+	}
+}
+
 func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry, expect string) {
 	t.Helper()
 	for i := range managedFields {
@@ -4440,4 +4782,120 @@ func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry
 	if len(diff) > 0 {
 		t.Fatalf("Want:\n%s\nGot:\n%s\nDiff:\n%s", string(want), string(got), diff)
 	}
+}
+
+// TestCreateOnApplyFailsWithForbidden makes sure that PATCH requests with the apply content type
+// will not create the object if the user does not have both patch and create permissions.
+func TestCreateOnApplyFailsWithForbidden(t *testing.T) {
+	// Enable RBAC so we can exercise authorization errors.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, append([]string{"--authorization-mode=RBAC"}, framework.DefaultTestServerFlags()...), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	pandaConfig := restclient.CopyConfig(server.ClientConfig)
+	pandaConfig.Impersonate.UserName = "panda"
+	pandaClient := clientset.NewForConfigOrDie(pandaConfig)
+
+	errPatch := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errPatch, `pods "test-pod" is forbidden: User "panda" cannot patch resource "pods" in API group "" in the namespace "default"`)
+
+	createPodRBACAndWait(t, adminClient, "patch")
+
+	errCreate := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errCreate, `pods "test-pod" is forbidden: User "panda" cannot create resource "pods" in API group "" in the namespace "default"`)
+
+	createPodRBACAndWait(t, adminClient, "create")
+
+	errNone := ssaPod(pandaClient)
+	require.NoError(t, errNone, "pod create via SSA should succeed now that RBAC is correct")
+}
+
+func requireForbiddenPodErr(t *testing.T, err error, message string) {
+	t.Helper()
+
+	require.Truef(t, apierrors.IsForbidden(err), "Expected forbidden error but got: %v", err)
+
+	wantStatusErr := &apierrors.StatusError{ErrStatus: metav1.Status{
+		Status:  "Failure",
+		Message: message,
+		Reason:  "Forbidden",
+		Details: &metav1.StatusDetails{
+			Name: "test-pod",
+			Kind: "pods",
+		},
+		Code: http.StatusForbidden,
+	}}
+	require.Equal(t, wantStatusErr, err, "unexpected status error")
+}
+
+func ssaPod(client *clientset.Clientset) error {
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"spec": {
+				"containers": [{
+					"name":  "test-container",
+					"image": "test-image"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	return err
+}
+
+func createPodRBACAndWait(t *testing.T, client *clientset.Clientset, verb string) {
+	t.Helper()
+
+	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{verb},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = client.RbacV1().RoleBindings("default").Create(context.TODO(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: rbacv1.UserKind,
+				Name: "panda",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     fmt.Sprintf("can-%s-pods", verb),
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
+		"panda",
+		"default",
+		verb,
+		"",
+		schema.GroupResource{Resource: "pods"},
+		true,
+	)
 }

@@ -40,20 +40,22 @@ var apiservicesKind = v1beta1.SchemeGroupVersion.WithKind("APIService")
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
 func (c *FakeAPIServices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.APIService, err error) {
+	emptyResult := &v1beta1.APIService{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(apiservicesResource, name), &v1beta1.APIService{})
+		Invokes(testing.NewRootGetActionWithOptions(apiservicesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.APIService), err
 }
 
 // List takes label and field selectors, and returns the list of APIServices that match those selectors.
 func (c *FakeAPIServices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
+	emptyResult := &v1beta1.APIServiceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(apiservicesResource, apiservicesKind, opts), &v1beta1.APIServiceList{})
+		Invokes(testing.NewRootListActionWithOptions(apiservicesResource, apiservicesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -72,36 +74,39 @@ func (c *FakeAPIServices) List(ctx context.Context, opts v1.ListOptions) (result
 // Watch returns a watch.Interface that watches the requested aPIServices.
 func (c *FakeAPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(apiservicesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(apiservicesResource, opts))
 }
 
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
 func (c *FakeAPIServices) Create(ctx context.Context, aPIService *v1beta1.APIService, opts v1.CreateOptions) (result *v1beta1.APIService, err error) {
+	emptyResult := &v1beta1.APIService{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &v1beta1.APIService{})
+		Invokes(testing.NewRootCreateActionWithOptions(apiservicesResource, aPIService, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.APIService), err
 }
 
 // Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
 func (c *FakeAPIServices) Update(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
+	emptyResult := &v1beta1.APIService{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(apiservicesResource, aPIService), &v1beta1.APIService{})
+		Invokes(testing.NewRootUpdateActionWithOptions(apiservicesResource, aPIService, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.APIService), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (*v1beta1.APIService, error) {
+func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
+	emptyResult := &v1beta1.APIService{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &v1beta1.APIService{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(apiservicesResource, "status", aPIService, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.APIService), err
 }
@@ -115,7 +120,7 @@ func (c *FakeAPIServices) Delete(ctx context.Context, name string, opts v1.Delet
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeAPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(apiservicesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(apiservicesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.APIServiceList{})
 	return err
@@ -123,10 +128,11 @@ func (c *FakeAPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 
 // Patch applies the patch and returns the patched aPIService.
 func (c *FakeAPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.APIService, err error) {
+	emptyResult := &v1beta1.APIService{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, pt, data, subresources...), &v1beta1.APIService{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(apiservicesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.APIService), err
 }

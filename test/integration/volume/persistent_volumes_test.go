@@ -30,14 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
-	fakecloud "k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -570,6 +572,180 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	t.Log("volumes released")
 }
 
+// TestPersistentVolumeClaimVolumeAttirbutesClassName test binding using volume attributes
+// class name.
+func TestPersistentVolumeClaimVolumeAttirbutesClassName(t *testing.T) {
+	var (
+		err           error
+		modes         = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+		reclaim       = v1.PersistentVolumeReclaimRetain
+		namespaceName = "pvc-volume-attributes-class-name"
+
+		classEmpty  = ""
+		classGold   = "gold"
+		classSilver = "silver"
+
+		pv       = createCSIPV("pv", "1G", modes, reclaim)
+		pvGold   = createCSIPV("pv-gold", "1G", modes, reclaim)
+		pv2Gold  = createCSIPV("pv2-gold", "1G", modes, reclaim)
+		pvSilver = createCSIPV("pv-silver", "1G", modes, reclaim)
+
+		pvc      = createPVC("pvc", namespaceName, "1G", modes, "")
+		pvcEmpty = createPVC("pvc", namespaceName, "1G", modes, "")
+		pvcGold  = createPVC("pvc-gold", namespaceName, "1G", modes, "")
+	)
+
+	// prepare PVs and PVCs
+	pv.Spec.VolumeAttributesClassName = nil
+	pvGold.Spec.VolumeAttributesClassName = &classGold
+	pv2Gold.Spec.VolumeAttributesClassName = &classGold
+	pvSilver.Spec.VolumeAttributesClassName = &classSilver
+
+	pvc.Spec.VolumeAttributesClassName = nil
+	pvcEmpty.Spec.VolumeAttributesClassName = &classEmpty
+	pvcGold.Spec.VolumeAttributesClassName = &classGold
+
+	testCases := []struct {
+		featureEnabled   bool
+		name             string
+		volumes          []*v1.PersistentVolume
+		claim            *v1.PersistentVolumeClaim
+		expectVolumeName string
+	}{
+		{
+			featureEnabled:   true,
+			name:             "claim with nil class bind to a pv",
+			volumes:          []*v1.PersistentVolume{pv, pvGold, pvSilver},
+			claim:            pvc,
+			expectVolumeName: pv.Name,
+		},
+		{
+			featureEnabled:   true,
+			name:             "claim with empty class bind to a pv",
+			volumes:          []*v1.PersistentVolume{pv, pvGold, pvSilver},
+			claim:            pvcEmpty,
+			expectVolumeName: pv.Name,
+		},
+		{
+			featureEnabled:   true,
+			name:             "claim bind to a pv with same class name",
+			volumes:          []*v1.PersistentVolume{pv, pvGold, pvSilver},
+			claim:            pvcGold,
+			expectVolumeName: pvGold.Name,
+		},
+		{
+			featureEnabled: true,
+			name:           "claim bind to a user-asked pv with same class name",
+			volumes:        []*v1.PersistentVolume{pv, pvGold, pv2Gold, pvSilver},
+			claim: func() *v1.PersistentVolumeClaim {
+				pvcGoldClone := pvcGold.DeepCopy()
+				pvcGoldClone.Spec.VolumeName = pv2Gold.Name
+				return pvcGoldClone
+			}(),
+			expectVolumeName: pv2Gold.Name,
+		},
+		{
+			featureEnabled:   false,
+			name:             "claim bind to a pv due to class name is dropped by kube-apiserver",
+			volumes:          []*v1.PersistentVolume{pvGold},
+			claim:            pvcGold,
+			expectVolumeName: pvGold.Name,
+		},
+		{
+			featureEnabled:   false,
+			name:             "claim with nil class bind to a pv",
+			volumes:          []*v1.PersistentVolume{pv},
+			claim:            pvc,
+			expectVolumeName: pv.Name,
+		},
+		{
+			featureEnabled:   false,
+			name:             "claim with empty class bind to a pv",
+			volumes:          []*v1.PersistentVolume{pv},
+			claim:            pvcEmpty,
+			expectVolumeName: pv.Name,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.featureEnabled)
+			s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+			defer s.TearDownFn()
+
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
+			testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
+			defer watchPV.Stop()
+			defer watchPVC.Stop()
+
+			ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+			defer framework.DeleteNamespaceOrDie(testClient, ns, t)
+
+			// NOTE: This test cannot run in parallel, because it is creating and deleting
+			// non-namespaced objects (PersistenceVolumes).
+			defer func() {
+				_ = testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+			}()
+
+			informers.Start(tCtx.Done())
+			go controller.Run(tCtx)
+
+			for _, volume := range tc.volumes {
+				_, err = testClient.CoreV1().PersistentVolumes().Create(context.TODO(), volume, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create PersistentVolume: %v", err)
+				}
+			}
+			t.Log("volumes created")
+
+			_, err = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), tc.claim, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
+			}
+			t.Log("claim created")
+
+			waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
+			t.Log("volume bound")
+
+			waitForPersistentVolumeClaimPhase(testClient, tc.claim.Name, ns.Name, watchPVC, v1.ClaimBound)
+			t.Log("claim bound")
+
+			gotClaim, err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), tc.claim.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error getting pvc: %v", err)
+			}
+			if !tc.featureEnabled {
+				if gotClaim.Spec.VolumeAttributesClassName != nil || gotClaim.Status.CurrentVolumeAttributesClassName != nil {
+					t.Fatalf("unexpected volume class name on claim %q", gotClaim.Name)
+				}
+			}
+
+			for _, volume := range tc.volumes {
+				gotVolume, err := testClient.CoreV1().PersistentVolumes().Get(context.TODO(), volume.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Unexpected error getting pv: %v", err)
+				}
+				if !tc.featureEnabled {
+					if gotVolume.Spec.VolumeAttributesClassName != nil {
+						t.Fatalf("unexpected volume class name on volume %q", gotVolume.Name)
+					}
+				}
+				if volume.Name == tc.expectVolumeName {
+					if gotVolume.Spec.ClaimRef == nil {
+						t.Fatalf("%s PV should be bound", volume.Name)
+					}
+					if gotVolume.Spec.ClaimRef.Namespace != tc.claim.Namespace || gotVolume.Spec.ClaimRef.Name != tc.claim.Name {
+						t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", tc.claim.Namespace, tc.claim.Name, gotVolume.Spec.ClaimRef.Namespace, gotVolume.Spec.ClaimRef.Name)
+					}
+				} else if gotVolume.Spec.ClaimRef != nil {
+					t.Fatalf("%s PV shouldn't be bound", volume.Name)
+				}
+			}
+		})
+	}
+}
+
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
@@ -882,6 +1058,34 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
+	// Watch all events in the namespace, and save them to artifacts for debugging.
+	// TODO: This is a temporary solution to debug flaky tests `panic: test timed out after 10m0s`.
+	// We should remove this once https://github.com/kubernetes/kubernetes/issues/124136 is fixed.
+	go func() {
+		w, err := testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return
+		}
+		for {
+			select {
+			case event, ok := <-w.ResultChan():
+				if !ok {
+					klog.Info("Event watch channel closed")
+					w, err = testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
+					if err != nil {
+						klog.ErrorS(err, "Failed to restart event watch")
+						return
+					}
+					continue
+				}
+				reportToArtifacts(t.Name()+"-events.text", event.Object)
+			case <-tCtx.Done():
+				w.Stop()
+				return
+			}
+		}
+	}()
+
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -914,7 +1118,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Wait until the controller provisions and binds all of them
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhaseAndReportIt(t, watchPVC, v1.ClaimBound)
 		klog.V(1).Infof("%d claims bound", i+1)
 	}
 	klog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
@@ -1298,6 +1502,21 @@ func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.Persistent
 	}
 }
 
+func waitForAnyPersistentVolumeClaimPhaseAndReportIt(t *testing.T, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
+	for {
+		event := <-w.ResultChan()
+		reportToArtifacts(t.Name()+"-watched-pvcs.text", event)
+		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
+		if !ok {
+			continue
+		}
+		if claim.Status.Phase == phase {
+			klog.V(2).Infof("claim %q is %s", claim.Name, phase)
+			break
+		}
+	}
+}
+
 func waitForPersistentVolumeClaimStorageClass(t *testing.T, claimName, scName string, w watch.Interface, duration time.Duration) (*v1.PersistentVolumeClaim, bool) {
 	stopTimer := time.NewTimer(duration)
 	defer stopTimer.Stop()
@@ -1353,7 +1572,6 @@ func createClients(ctx context.Context, namespaceName string, t *testing.T, s *k
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.Cloud{}
 	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
 	ctrl, err := persistentvolumecontroller.NewController(
 		ctx,
@@ -1361,7 +1579,6 @@ func createClients(ctx context.Context, namespaceName string, t *testing.T, s *k
 			KubeClient:                binderClient,
 			SyncPeriod:                getSyncPeriod(syncPeriod),
 			VolumePlugins:             plugins,
-			Cloud:                     cloud,
 			VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 			ClassInformer:             informers.Storage().V1().StorageClasses(),
@@ -1433,6 +1650,18 @@ func createPVCWithNilStorageClass(name, namespace, cap string, mode []v1.Persist
 		Spec: v1.PersistentVolumeClaimSpec{
 			Resources:   v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)}},
 			AccessModes: mode,
+		},
+	}
+}
+
+func createCSIPV(name, cap string, mode []v1.PersistentVolumeAccessMode, reclaim v1.PersistentVolumeReclaimPolicy) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource:        v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "mock-driver", VolumeHandle: "volume-handle"}},
+			Capacity:                      v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)},
+			AccessModes:                   mode,
+			PersistentVolumeReclaimPolicy: reclaim,
 		},
 	}
 }

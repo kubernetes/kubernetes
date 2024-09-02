@@ -385,7 +385,7 @@ func TestAddRemove(t *testing.T) {
 	require.NotNil(t, initialDocument, "initial document should parse")
 	require.NotNil(t, secondDocument, "second document should parse")
 	assert.Len(t, initialDocument.Items, len(apis.Items), "initial document should have set number of groups")
-	assert.Len(t, secondDocument.Items, 0, "second document should have no groups")
+	assert.Empty(t, secondDocument.Items, "second document should have no groups")
 }
 
 // Show that updating an existing service replaces and does not add the entry

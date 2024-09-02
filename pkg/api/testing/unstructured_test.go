@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -132,6 +134,17 @@ func TestRoundTrip(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRoundtripToUnstructured(t *testing.T) {
+	skipped := sets.New[schema.GroupVersionKind]()
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			skipped.Insert(gvk)
+		}
+	}
+
+	roundtrip.RoundtripToUnstructured(t, legacyscheme.Scheme, FuzzerFuncs, skipped)
 }
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {

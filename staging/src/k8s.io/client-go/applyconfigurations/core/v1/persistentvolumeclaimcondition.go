@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PersistentVolumeClaimConditionApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimCondition type for use
+// PersistentVolumeClaimConditionApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimCondition type for use
 // with apply.
 type PersistentVolumeClaimConditionApplyConfiguration struct {
 	Type               *v1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type PersistentVolumeClaimConditionApplyConfiguration struct {
 	Message            *string                                `json:"message,omitempty"`
 }
 
-// PersistentVolumeClaimConditionApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimCondition type for use with
+// PersistentVolumeClaimConditionApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimCondition type for use with
 // apply.
 func PersistentVolumeClaimCondition() *PersistentVolumeClaimConditionApplyConfiguration {
 	return &PersistentVolumeClaimConditionApplyConfiguration{}

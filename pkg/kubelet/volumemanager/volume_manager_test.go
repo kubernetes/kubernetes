@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/mount-utils"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -44,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -94,15 +94,17 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-			stopCh := runVolumeManager(manager)
-			defer close(stopCh)
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
+			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+			go manager.Run(tCtx, sourcesReady)
 
 			podManager.SetPods([]*v1.Pod{pod})
 
 			// Fake node status update
 			go simulateVolumeInUseUpdate(
 				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-				stopCh,
+				tCtx.Done(),
 				manager)
 
 			err = manager.WaitForAttachAndMount(context.Background(), pod)
@@ -218,8 +220,10 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
 
-	stopCh := runVolumeManager(manager)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	go manager.Run(tCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
 
@@ -250,15 +254,17 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-	stopCh := runVolumeManager(manager)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	go manager.Run(tCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-		stopCh,
+		tCtx.Done(),
 		manager)
 
 	// delayed claim binding
@@ -338,15 +344,17 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 
 		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-		stopCh := runVolumeManager(manager)
-		defer close(stopCh)
+		tCtx := ktesting.Init(t)
+		defer tCtx.Cancel("test has completed")
+		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+		go manager.Run(tCtx, sourcesReady)
 
 		podManager.SetPods([]*v1.Pod{pod})
 
 		// Fake node status update
 		go simulateVolumeInUseUpdate(
 			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-			stopCh,
+			tCtx.Done(),
 			manager)
 
 		err = manager.WaitForAttachAndMount(context.Background(), pod)
@@ -415,7 +423,6 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		hostutil.NewFakeHostUtil(nil),
 		"",
 		fakeRecorder,
-		false, /* keepTerminatedPodVolumes */
 		fakePathHandler)
 
 	return vm
@@ -537,13 +544,4 @@ func delayClaimBecomesBound(
 		Phase: v1.ClaimBound,
 	}
 	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(context.TODO(), volumeClaim, metav1.UpdateOptions{})
-}
-
-func runVolumeManager(manager VolumeManager) chan struct{} {
-	stopCh := make(chan struct{})
-	//readyCh := make(chan bool, 1)
-	//readyCh <- true
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
-	go manager.Run(sourcesReady, stopCh)
-	return stopCh
 }

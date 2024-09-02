@@ -94,10 +94,34 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: true,
 			expectedAvailable: false,
 		},
+		{
+			option:            DistributeCPUsAcrossNUMAOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            DistributeCPUsAcrossNUMAOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
+		},
+		{
+			option:            DistributeCPUsAcrossCoresOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            DistributeCPUsAcrossCoresOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)
 			err := CheckPolicyOptionAvailable(testCase.option)
 			isEnabled := (err == nil)
 			if isEnabled != testCase.expectedAvailable {
@@ -163,14 +187,59 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			topoMgrPolicy := topologymanager.NewNonePolicy()
 			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
 				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
-
 			}
 			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
 			err := ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
 			gotError := (err != nil)
+			if gotError != testCase.expectedErr {
+				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
+			}
+		})
+	}
+}
+
+func TestPolicyOptionsCompatibility(t *testing.T) {
+	// take feature gate into the consideration
+	testCases := []struct {
+		description   string
+		featureGate   featuregate.Feature
+		policyOptions map[string]string
+		expectedErr   bool
+	}{
+		{
+			description: "FullPhysicalCPUsOnly set to true only",
+			featureGate: pkgfeatures.CPUManagerPolicyBetaOptions,
+			policyOptions: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			expectedErr: false,
+		},
+		{
+			description: "DistributeCPUsAcrossCores set to true only",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				DistributeCPUsAcrossCoresOption: "true",
+			},
+			expectedErr: false,
+		},
+		{
+			description: "FullPhysicalCPUsOnly and DistributeCPUsAcrossCores options can not coexist",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				FullPCPUsOnlyOption:             "true",
+				DistributeCPUsAcrossCoresOption: "true",
+			},
+			expectedErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, true)
+			_, err := NewStaticPolicyOptions(testCase.policyOptions)
+			gotError := err != nil
 			if gotError != testCase.expectedErr {
 				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
 			}

@@ -228,6 +228,42 @@ No changes
 - [Add runtime handler field to ImageSpec struct](https://github.com/kubernetes/kubernetes/pull/121121)
   - Added `runtime_handler` field to type `ImageSpec`
 
+- [Add container filesystem to the ImageFsInfoResponse](https://github.com/kubernetes/kubernetes/pull/120914)
+  - Added `container_filesystems` field to type `ImageFsInfoResponse`
+
+### v1.30
+
+`git diff v1.29.0 v1.30.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [Recursive Read-only (RRO) mounts](https://github.com/kubernetes/kubernetes/pull/123272)
+  - Added RuntimeHandler and RuntimeHandlerFeatures type
+  - Added `recursive_read_only` field to type `Mount`
+  - Added `runtime_handlers` field to type `StatusResponse`
+
+- [Add user_namespaces field to RuntimeHandlerFeatures](https://github.com/kubernetes/kubernetes/pull/123356)
+  - Added `user_namespaces` field to type `RuntimeHandlerFeatures`
+
+- [Add image_id to CRI Container message](https://github.com/kubernetes/kubernetes/pull/123508)
+  - Added `image_id` field to type `Container`
+
+- [Add image_id to CRI ContainerStatus message](https://github.com/kubernetes/kubernetes/pull/123583)
+  - Added `image_id` field to type `ContainerStatus`
+
+### v1.31
+
+`git diff v1.30.0 v1.31.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [KEP-3619: Add NodeStatus.Features.SupplementalGroupsPolicy API and e2e](https://github.com/kubernetes/kubernetes/pull/125470)
+  - Added `features` field to the type `StatusResponse` for the runtime to kubelet handshake on what features are supported
+
+- [KEP-3619: Fine-grained SupplementalGroups control](https://github.com/kubernetes/kubernetes/pull/117842)
+  - Added `supplemental_groups_policy` field to types `LinuxContainerSecurityContext` and `LinuxSandboxSecurityContext`
+  - Added `user` field to the type `ContainerStatus` to represent actual user for the container 
+
+- [[KEP-4639] Add OCI VolumeSource CRI API](https://github.com/kubernetes/kubernetes/pull/125659)
+  - Added `image` field to the type `Mount` to represent the OCI VolumeSource 
+
+
 ## Community, discussion, contribution, and support
 
 Learn how to engage with the Kubernetes community on the [community

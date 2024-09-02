@@ -43,20 +43,22 @@ var storageversionsKind = v1alpha1.SchemeGroupVersion.WithKind("StorageVersion")
 
 // Get takes name of the storageVersion, and returns the corresponding storageVersion object, and an error if there is any.
 func (c *FakeStorageVersions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersion, err error) {
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(storageversionsResource, name), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootGetActionWithOptions(storageversionsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
 
 // List takes label and field selectors, and returns the list of StorageVersions that match those selectors.
 func (c *FakeStorageVersions) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.StorageVersionList, err error) {
+	emptyResult := &v1alpha1.StorageVersionList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(storageversionsResource, storageversionsKind, opts), &v1alpha1.StorageVersionList{})
+		Invokes(testing.NewRootListActionWithOptions(storageversionsResource, storageversionsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,36 +77,39 @@ func (c *FakeStorageVersions) List(ctx context.Context, opts v1.ListOptions) (re
 // Watch returns a watch.Interface that watches the requested storageVersions.
 func (c *FakeStorageVersions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(storageversionsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(storageversionsResource, opts))
 }
 
 // Create takes the representation of a storageVersion and creates it.  Returns the server's representation of the storageVersion, and an error, if there is any.
 func (c *FakeStorageVersions) Create(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.CreateOptions) (result *v1alpha1.StorageVersion, err error) {
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storageversionsResource, storageVersion), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootCreateActionWithOptions(storageversionsResource, storageVersion, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
 
 // Update takes the representation of a storageVersion and updates it. Returns the server's representation of the storageVersion, and an error, if there is any.
 func (c *FakeStorageVersions) Update(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.UpdateOptions) (result *v1alpha1.StorageVersion, err error) {
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storageversionsResource, storageVersion), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootUpdateActionWithOptions(storageversionsResource, storageVersion, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStorageVersions) UpdateStatus(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.UpdateOptions) (*v1alpha1.StorageVersion, error) {
+func (c *FakeStorageVersions) UpdateStatus(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.UpdateOptions) (result *v1alpha1.StorageVersion, err error) {
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(storageversionsResource, "status", storageVersion), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(storageversionsResource, "status", storageVersion, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
@@ -118,7 +123,7 @@ func (c *FakeStorageVersions) Delete(ctx context.Context, name string, opts v1.D
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeStorageVersions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageversionsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(storageversionsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.StorageVersionList{})
 	return err
@@ -126,10 +131,11 @@ func (c *FakeStorageVersions) DeleteCollection(ctx context.Context, opts v1.Dele
 
 // Patch applies the patch and returns the patched storageVersion.
 func (c *FakeStorageVersions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersion, err error) {
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, name, pt, data, subresources...), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
@@ -147,10 +153,11 @@ func (c *FakeStorageVersions) Apply(ctx context.Context, storageVersion *apiserv
 	if name == nil {
 		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }
@@ -169,10 +176,11 @@ func (c *FakeStorageVersions) ApplyStatus(ctx context.Context, storageVersion *a
 	if name == nil {
 		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.StorageVersion{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.StorageVersion), err
 }

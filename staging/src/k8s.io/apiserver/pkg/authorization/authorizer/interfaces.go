@@ -20,6 +20,8 @@ import (
 	"context"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -62,6 +64,16 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
+
+	// ParseFieldSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the field selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetFieldSelector() (fields.Requirements, error)
+
+	// ParseLabelSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the label selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetLabelSelector() (labels.Requirements, error)
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -100,6 +112,11 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
+
+	FieldSelectorRequirements fields.Requirements
+	FieldSelectorParsingErr   error
+	LabelSelectorRequirements labels.Requirements
+	LabelSelectorParsingErr   error
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -144,6 +161,14 @@ func (a AttributesRecord) IsResourceRequest() bool {
 
 func (a AttributesRecord) GetPath() string {
 	return a.Path
+}
+
+func (a AttributesRecord) GetFieldSelector() (fields.Requirements, error) {
+	return a.FieldSelectorRequirements, a.FieldSelectorParsingErr
+}
+
+func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
+	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
 }
 
 type Decision int

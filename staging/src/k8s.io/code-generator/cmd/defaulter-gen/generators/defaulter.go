@@ -165,7 +165,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 		if len(signature.Results) != 0 {
 			continue
 		}
-		inType := signature.Parameters[0]
+		inType := signature.Parameters[0].Type
 		if inType.Kind != types.Pointer {
 			continue
 		}

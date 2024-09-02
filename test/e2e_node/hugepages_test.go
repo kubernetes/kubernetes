@@ -230,7 +230,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.BeFalse())
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("hugepages resource should not be present"))
 	})
 
 	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
@@ -250,7 +250,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("hugepages resource should be present"))
 	})
 
 	ginkgo.When("start the pod", func() {

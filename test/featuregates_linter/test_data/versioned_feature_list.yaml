@@ -1,0 +1,16 @@
+- name: RelaxedEnvironmentVariableValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+- name: VolumeAttributesClass
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"

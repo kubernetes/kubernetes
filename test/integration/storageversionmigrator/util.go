@@ -26,9 +26,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,32 +46,29 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
+	endpointsdiscovery "k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/discovery"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 	"k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook/converter"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 	utilnet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -104,6 +104,11 @@ rules:
     - group: ""
       resources: ["secrets"]
     verbs: ["patch"]
+  - level: Metadata
+    resources:
+    - group: "stable.example.com"
+      resources: ["testcrds"]
+    users: ["system:serviceaccount:kube-system:storage-version-migrator-controller"]
 `,
 		"initialEncryptionConfig": `
 kind: EncryptionConfiguration
@@ -245,6 +250,7 @@ type svmTest struct {
 	client                      clientset.Interface
 	clientConfig                *rest.Config
 	dynamicClient               *dynamic.DynamicClient
+	discoveryClient             *discovery.DiscoveryClient
 	storageConfig               *storagebackend.Config
 	server                      *kubeapiservertesting.TestServer
 	apiextensionsclient         *apiextensionsclientset.Clientset
@@ -268,81 +274,32 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		"--audit-log-version", "audit.k8s.io/v1",
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
+		"--authorization-mode=RBAC",
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
+
+	kubeConfigFile := createKubeConfigFileForRestConfig(t, server.ClientConfig)
+
+	kcm := kubecontrollermanagertesting.StartTestServerOrDie(ctx, []string{
+		"--kubeconfig=" + kubeConfigFile,
+		"--controllers=garbagecollector,svm",     // these are the only controllers needed for this test
+		"--use-service-account-credentials=true", // exercise RBAC of SVM controller
+		"--leader-elect=false",                   // KCM leader election calls os.Exit when it ends, so it is easier to just turn it off altogether
+	})
 
 	clientSet, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
-
-	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
 	rvDiscoveryClient, err := discovery.NewDiscoveryClientForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("failed to create discovery client: %v", err)
-	}
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	restMapper.Reset()
-	metadataClient, err := metadata.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("failed to create metadataClient: %v", err)
 	}
 	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("error in create dynamic client: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
-	alwaysStarted := make(chan struct{})
-	close(alwaysStarted)
-
-	gc, err := garbagecollector.NewGarbageCollector(
-		ctx,
-		clientSet,
-		metadataClient,
-		restMapper,
-		garbagecollector.DefaultIgnoredResources(),
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-		alwaysStarted,
-	)
-	if err != nil {
-		t.Fatalf("error while creating garbage collector: %v", err)
-
-	}
-	startGC := func() {
-		syncPeriod := 5 * time.Second
-		go wait.Until(func() {
-			restMapper.Reset()
-		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, 1)
-		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
-	}
-
-	svmController := storageversionmigrator.NewSVMController(
-		ctx,
-		clientSet,
-		dynamicClient,
-		sharedInformers.Storagemigration().V1alpha1().StorageVersionMigrations(),
-		names.StorageVersionMigratorController,
-		restMapper,
-		gc.GetDependencyGraphBuilder(),
-	)
-
-	rvController := storageversionmigrator.NewResourceVersionController(
-		ctx,
-		clientSet,
-		rvDiscoveryClient,
-		metadataClient,
-		sharedInformers.Storagemigration().V1alpha1().StorageVersionMigrations(),
-		restMapper,
-	)
-
-	// Start informer and controllers
-	sharedInformers.Start(ctx.Done())
-	startGC()
-	go svmController.Run(ctx)
-	go rvController.Run(ctx)
 
 	svmTest := &svmTest{
 		storageConfig:               storageConfig,
@@ -350,12 +307,26 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		client:                      clientSet,
 		clientConfig:                server.ClientConfig,
 		dynamicClient:               dynamicClient,
+		discoveryClient:             rvDiscoveryClient,
 		policyFile:                  policyFile,
 		logFile:                     logFile,
 		filePathForEncryptionConfig: filePathForEncryptionConfig,
 	}
 
 	t.Cleanup(func() {
+		var validCodes = sets.New[int32](http.StatusOK, http.StatusConflict) // make sure SVM controller never creates
+		_ = svmTest.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool {
+			if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
+				return false
+			}
+			if !validCodes.Has(event.Code) {
+				t.Errorf("svm controller had invalid response code for event: %#v", event)
+				return true
+			}
+			return false
+		})
+
+		kcm.TearDownFn()
 		server.TearDownFn()
 		utiltesting.CloseAndRemove(t, svmTest.logFile)
 		utiltesting.CloseAndRemove(t, svmTest.policyFile)
@@ -366,6 +337,18 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 	})
 
 	return svmTest
+}
+
+func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) string {
+	t.Helper()
+
+	clientConfig := kubeconfig.CreateKubeConfig(restConfig)
+
+	kubeConfigFile := filepath.Join(t.TempDir(), "kubeconfig.yaml")
+	if err := clientcmd.WriteToFile(*clientConfig, kubeConfigFile); err != nil {
+		t.Fatal(err)
+	}
+	return kubeConfigFile
 }
 
 func createEncryptionConfig(t *testing.T, encryptionConfig string) (
@@ -484,29 +467,6 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 	}
 }
 
-// func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string) (
-// 	*svmv1alpha1.StorageVersionMigration,
-// 	error,
-// ) {
-// 	t.Helper()
-// 	svmResource := &svmv1alpha1.StorageVersionMigration{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: name,
-// 		},
-// 		Spec: svmv1alpha1.StorageVersionMigrationSpec{
-// 			Resource: svmv1alpha1.GroupVersionResource{
-// 				Group:    "",
-// 				Version:  "v1",
-// 				Resource: "secrets",
-// 			},
-// 		},
-// 	}
-//
-// 	return svm.client.StoragemigrationV1alpha1().
-// 		StorageVersionMigrations().
-// 		Create(ctx, svmResource, metav1.CreateOptions{})
-// }
-
 func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gvr svmv1alpha1.GroupVersionResource) (
 	*svmv1alpha1.StorageVersionMigration,
 	error,
@@ -624,82 +584,133 @@ func (svm *svmTest) waitForResourceMigration(
 ) bool {
 	t.Helper()
 
-	var isMigrated bool
+	var triggerOnce sync.Once
+
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		wait.ForeverTestTimeout,
+		5*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
 			svmResource, err := svm.getSVM(ctx, t, svmName)
 			if err != nil {
 				t.Fatalf("Failed to get SVM resource: %v", err)
 			}
+
+			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationFailed) {
+				t.Logf("%q SVM has failed migration, %#v", svmName, svmResource.Status.Conditions)
+				return false, fmt.Errorf("SVM has failed migration")
+			}
+
 			if svmResource.Status.ResourceVersion == "" {
+				t.Logf("%q SVM has no resourceVersion", svmName)
 				return false, nil
 			}
 
 			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationSucceeded) {
-				isMigrated = true
+				t.Logf("%q SVM has completed migration", svmName)
+				return true, nil
 			}
+
+			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationRunning) {
+				t.Logf("%q SVM migration is running, %#v", svmName, svmResource.Status.Conditions)
+				return false, nil
+			}
+
+			t.Logf("%q SVM has not started migration, %#v", svmName, svmResource.Status.Conditions)
 
 			// We utilize the LastSyncResourceVersion of the Garbage Collector (GC) to ensure that the cache is up-to-date before proceeding with the migration.
 			// However, in a quiet cluster, the GC may not be updated unless there is some activity or the watch receives a bookmark event after every 10 minutes.
 			// To expedite the update of the GC cache, we create a dummy secret and then promptly delete it.
 			// This action forces the GC to refresh its cache, enabling us to proceed with the migration.
-			_, err = svm.createSecret(ctx, t, triggerSecretName, defaultNamespace)
-			if err != nil {
-				t.Fatalf("Failed to create secret: %v", err)
-			}
-			err = svm.client.CoreV1().Secrets(defaultNamespace).Delete(ctx, triggerSecretName, metav1.DeleteOptions{})
-			if err != nil {
-				t.Fatalf("Failed to delete secret: %v", err)
-			}
-
-			stream, err := os.Open(svm.logFile.Name())
-			if err != nil {
-				t.Fatalf("Failed to open audit log file: %v", err)
-			}
-			defer func() {
-				if err := stream.Close(); err != nil {
-					t.Errorf("error	while closing audit log file: %v", err)
+			// At this point we know that the RV has been set on the SVM resource, so the trigger will always have a higher RV.
+			// We only need to do this once.
+			triggerOnce.Do(func() {
+				_, err = svm.createSecret(ctx, t, triggerSecretName, defaultNamespace)
+				if err != nil {
+					t.Fatalf("Failed to create secret: %v", err)
 				}
-			}()
+				err = svm.client.CoreV1().Secrets(defaultNamespace).Delete(ctx, triggerSecretName, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete secret: %v", err)
+				}
+			})
 
-			missingReport, err := utils.CheckAuditLines(
-				stream,
-				[]utils.AuditEvent{
-					{
-						Level:             auditinternal.LevelMetadata,
-						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s?fieldManager=storage-version-migrator-controller", defaultNamespace, name),
-						Verb:              "patch",
-						Code:              200,
-						User:              "system:apiserver",
-						Resource:          "secrets",
-						Namespace:         "default",
-						AuthorizeDecision: "allow",
-						RequestObject:     false,
-						ResponseObject:    false,
-					},
-				},
-				auditv1.SchemeGroupVersion,
-			)
-			if err != nil {
-				t.Fatalf("Failed to check audit log: %v", err)
-			}
-			if (len(missingReport.MissingEvents) != 0) && (expectedEvents < missingReport.NumEventsChecked) {
-				isMigrated = false
-			}
-
-			return isMigrated, nil
+			return false, nil
 		},
 	)
 	if err != nil {
+		t.Logf("Failed to wait for resource migration for SVM %q with secret %q: %v", svmName, name, err)
 		return false
 	}
 
-	return isMigrated
+	err = wait.PollUntilContextTimeout(
+		ctx,
+		500*time.Millisecond,
+		wait.ForeverTestTimeout,
+		true,
+		func(_ context.Context) (bool, error) {
+			want := utils.AuditEvent{
+				Level:             auditinternal.LevelMetadata,
+				Stage:             auditinternal.StageResponseComplete,
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s?fieldManager=storage-version-migrator-controller", defaultNamespace, name),
+				Verb:              "patch",
+				Code:              http.StatusOK,
+				User:              "system:serviceaccount:kube-system:storage-version-migrator-controller",
+				Resource:          "secrets",
+				Namespace:         "default",
+				AuthorizeDecision: "allow",
+				RequestObject:     false,
+				ResponseObject:    false,
+			}
+
+			if seen := svm.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool { return reflect.DeepEqual(event, want) }); expectedEvents > seen {
+				t.Logf("audit log did not contain %d expected audit events, only has %d", expectedEvents, seen)
+				return false, nil
+			}
+
+			return true, nil
+		},
+	)
+	if err != nil {
+		t.Logf("Failed to wait for audit logs events for SVM %q with secret %q: %v", svmName, name, err)
+		return false
+	}
+
+	return true
+}
+
+func (svm *svmTest) countMatchingAuditEvents(t *testing.T, f func(utils.AuditEvent) bool) int {
+	t.Helper()
+
+	var seen int
+	for _, event := range svm.getAuditEvents(t) {
+		if f(event) {
+			seen++
+		}
+	}
+	return seen
+}
+
+func (svm *svmTest) getAuditEvents(t *testing.T) []utils.AuditEvent {
+	t.Helper()
+
+	stream, err := os.Open(svm.logFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to open audit log file: %v", err)
+	}
+	defer func() {
+		if err := stream.Close(); err != nil {
+			t.Errorf("error while closing audit log file: %v", err)
+		}
+	}()
+
+	missingReport, err := utils.CheckAuditLines(stream, nil, auditv1.SchemeGroupVersion)
+	if err != nil {
+		t.Fatalf("Failed to check audit log: %v", err)
+	}
+
+	return missingReport.AllEvents
 }
 
 func (svm *svmTest) createCRD(
@@ -724,22 +735,25 @@ func (svm *svmTest) createCRD(
 				Plural:   pluralName,
 				Singular: name,
 			},
-			Scope:    apiextensionsv1.NamespaceScoped,
-			Versions: crdVersions,
-			Conversion: &apiextensionsv1.CustomResourceConversion{
-				Strategy: apiextensionsv1.WebhookConverter,
-				Webhook: &apiextensionsv1.WebhookConversion{
-					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						CABundle: certCtx.signingCert,
-						URL: ptr.To(
-							fmt.Sprintf("https://127.0.0.1:%d/%s", servicePort, webhookHandler),
-						),
-					},
-					ConversionReviewVersions: []string{"v1", "v2"},
-				},
-			},
+			Scope:                 apiextensionsv1.NamespaceScoped,
+			Versions:              crdVersions,
 			PreserveUnknownFields: false,
 		},
+	}
+
+	if certCtx != nil {
+		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+			Strategy: apiextensionsv1.WebhookConverter,
+			Webhook: &apiextensionsv1.WebhookConversion{
+				ClientConfig: &apiextensionsv1.WebhookClientConfig{
+					CABundle: certCtx.signingCert,
+					URL: ptr.To(
+						fmt.Sprintf("https://127.0.0.1:%d/%s", servicePort, webhookHandler),
+					),
+				},
+				ConversionReviewVersions: []string{"v1", "v2"},
+			},
+		}
 	}
 
 	apiextensionsclient, err := apiextensionsclientset.NewForConfig(svm.clientConfig)
@@ -757,26 +771,82 @@ func (svm *svmTest) updateCRD(
 	t *testing.T,
 	crdName string,
 	updatesCRDVersions []apiextensionsv1.CustomResourceDefinitionVersion,
-) *apiextensionsv1.CustomResourceDefinition {
+	expectedServingVersions []string,
+	expectedStorageVersion string,
+) {
 	t.Helper()
 
 	var err error
-	_, err = crdintegration.UpdateV1CustomResourceDefinitionWithRetry(svm.apiextensionsclient, crdName, func(c *apiextensionsv1.CustomResourceDefinition) {
+	crd, err := crdintegration.UpdateV1CustomResourceDefinitionWithRetry(svm.apiextensionsclient, crdName, func(c *apiextensionsv1.CustomResourceDefinition) {
 		c.Spec.Versions = updatesCRDVersions
 	})
 	if err != nil {
 		t.Fatalf("Failed to update CRD: %v", err)
 	}
 
-	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crdName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get CRD: %v", err)
-	}
-
-	return crd
+	svm.waitForCRDUpdate(ctx, t, crd.Spec.Names.Kind, expectedServingVersions, expectedStorageVersion)
 }
 
-func (svm *svmTest) createCR(ctx context.Context, t *testing.T, crName, version string) *unstructured.Unstructured {
+func (svm *svmTest) waitForCRDUpdate(
+	ctx context.Context,
+	t *testing.T,
+	crdKind string,
+	expectedServingVersions []string,
+	expectedStorageVersion string,
+) {
+	t.Helper()
+
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		500*time.Millisecond,
+		time.Second*60,
+		true,
+		func(ctx context.Context) (bool, error) {
+			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
+			if err != nil {
+				return false, fmt.Errorf("failed to get server groups and resources: %w", err)
+			}
+			for _, api := range apiGroups {
+				if api.Name == crdGroup {
+					var servingVersions []string
+					for _, apiVersion := range api.Versions {
+						servingVersions = append(servingVersions, apiVersion.Version)
+					}
+					sort.Strings(servingVersions)
+
+					// Check if the serving versions are as expected
+					if reflect.DeepEqual(expectedServingVersions, servingVersions) {
+						expectedHash := endpointsdiscovery.StorageVersionHash(crdGroup, expectedStorageVersion, crdKind)
+						resourceList, err := svm.discoveryClient.ServerResourcesForGroupVersion(crdGroup + "/" + api.PreferredVersion.Version)
+						if err != nil {
+							return false, fmt.Errorf("failed to get server resources for group version: %w", err)
+						}
+
+						// Check if the storage version is as expected
+						for _, resource := range resourceList.APIResources {
+							if resource.Kind == crdKind {
+								if resource.StorageVersionHash == expectedHash {
+									return true, nil
+								}
+							}
+						}
+					}
+				}
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Failed to update a CRD: Name: %s, Err: %v", crdName, err)
+	}
+}
+
+type testingT interface {
+	Helper()
+	Fatalf(format string, args ...any)
+}
+
+func (svm *svmTest) createCR(ctx context.Context, t testingT, crName, version string) *unstructured.Unstructured {
 	t.Helper()
 
 	crdResource := schema.GroupVersionResource{
@@ -835,7 +905,7 @@ func (svm *svmTest) listCR(ctx context.Context, t *testing.T, version string) er
 	return err
 }
 
-func (svm *svmTest) deleteCR(ctx context.Context, t *testing.T, name, version string) {
+func (svm *svmTest) deleteCR(ctx context.Context, t testingT, name, version string) {
 	t.Helper()
 	crdResource := schema.GroupVersionResource{
 		Group:    crdGroup,
@@ -850,7 +920,9 @@ func (svm *svmTest) deleteCR(ctx context.Context, t *testing.T, name, version st
 
 func (svm *svmTest) createConversionWebhook(ctx context.Context, t *testing.T, certCtx *certContext) context.CancelFunc {
 	t.Helper()
-	http.HandleFunc(fmt.Sprintf("/%s", webhookHandler), converter.ServeExampleConvert)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc(fmt.Sprintf("/%s", webhookHandler), converter.ServeExampleConvert)
 
 	block, _ := pem.Decode(certCtx.key)
 	if block == nil {
@@ -871,7 +943,8 @@ func (svm *svmTest) createConversionWebhook(ctx context.Context, t *testing.T, c
 	}
 
 	server := &http.Server{
-		Addr: fmt.Sprintf("127.0.0.1:%d", servicePort),
+		Addr:    fmt.Sprintf("127.0.0.1:%d", servicePort),
+		Handler: mux,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{
 				{
@@ -997,28 +1070,52 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 	return obj.GetAPIVersion() == fmt.Sprintf("%s/%s", crdGroup, version)
 }
 
-func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName string) bool {
+func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, triggerCRName string) bool {
 	t.Helper()
+
+	var triggerOnce sync.Once
 
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		1*time.Minute,
+		5*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
-			triggerCR := svm.createCR(ctx, t, "triggercr", "v1")
-			svm.deleteCR(ctx, t, triggerCR.GetName(), "v1")
 			svmResource, err := svm.getSVM(ctx, t, crdSVMName)
 			if err != nil {
 				t.Fatalf("Failed to get SVM resource: %v", err)
 			}
+
+			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationFailed) {
+				t.Logf("%q SVM has failed migration, %#v", crdSVMName, svmResource.Status.Conditions)
+				return false, fmt.Errorf("SVM has failed migration")
+			}
+
 			if svmResource.Status.ResourceVersion == "" {
+				t.Logf("%q SVM has no resourceVersion", crdSVMName)
 				return false, nil
 			}
 
 			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationSucceeded) {
+				t.Logf("%q SVM has completed migration", crdSVMName)
 				return true, nil
 			}
+
+			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationRunning) {
+				t.Logf("%q SVM migration is running, %#v", crdSVMName, svmResource.Status.Conditions)
+				return false, nil
+			}
+
+			t.Logf("%q SVM has not started migration, %#v", crdSVMName, svmResource.Status.Conditions)
+
+			// at this point we know that the RV has been set on the SVM resource,
+			// and we need to make sure that the GC list RV has caught up to that without waiting for a watch bookmark.
+			// we cannot trigger this any earlier as the rest mapper of the RV controller can be delayed
+			// and thus may not have observed the new CRD yet.  we only need to do this once.
+			triggerOnce.Do(func() {
+				triggerCR := svm.createCR(ctx, t, triggerCRName, "v1")
+				svm.deleteCR(ctx, t, triggerCR.GetName(), "v1")
+			})
 
 			return false, nil
 		},
@@ -1032,7 +1129,7 @@ type versions struct {
 	isRVUpdated bool
 }
 
-func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, crVersions map[string]versions) {
+func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, crVersions map[string]versions, getCRVersion string) {
 	t.Helper()
 
 	for crName, version := range crVersions {
@@ -1050,12 +1147,53 @@ func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, c
 		}
 
 		// validate resourceVersion and generation
-		crVersion := svm.getCR(ctx, t, crName, "v2").GetResourceVersion()
-		if version.isRVUpdated && crVersion == version.rv {
+		crVersion := svm.getCR(ctx, t, crName, getCRVersion).GetResourceVersion()
+		isRVUnchanged := crVersion == version.rv
+		if version.isRVUpdated && isRVUnchanged {
 			t.Fatalf("ResourceVersion of CR %s should not be equal. Expected: %s, Got: %s", crName, version.rv, crVersion)
+		}
+		if !version.isRVUpdated && !isRVUnchanged {
+			t.Fatalf("ResourceVersion of CR %s should be equal. Expected: %s, Got: %s", crName, version.rv, crVersion)
 		}
 		if obj.GetGeneration() != version.generation {
 			t.Fatalf("Generation of CR %s should be equal. Expected: %d, Got: %d", crName, version.generation, obj.GetGeneration())
 		}
 	}
 }
+
+func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(ctx)
+
+	noFailT := ignoreFailures{} // these create and delete requests are not coordinated with the rest of the test and can fail
+
+	const workers = 10
+	wg.Add(workers)
+	for i := range workers {
+		i := i
+		go func() {
+			defer wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				_ = svm.createCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")
+				svm.deleteCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")
+			}
+		}()
+	}
+
+	t.Cleanup(func() {
+		cancel()
+		wg.Wait()
+	})
+}
+
+type ignoreFailures struct{}
+
+func (ignoreFailures) Helper()                           {}
+func (ignoreFailures) Fatalf(format string, args ...any) {}

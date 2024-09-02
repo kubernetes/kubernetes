@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +44,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -102,8 +100,8 @@ type Controller struct {
 	nodeUpdateChannels []chan nodeUpdateItem
 	podUpdateChannels  []chan podUpdateItem
 
-	nodeUpdateQueue workqueue.Interface
-	podUpdateQueue  workqueue.Interface
+	nodeUpdateQueue workqueue.TypedInterface[nodeUpdateItem]
+	podUpdateQueue  workqueue.TypedInterface[podUpdateItem]
 }
 
 func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
@@ -129,22 +127,20 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
+	pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	newStatus := pod.Status.DeepCopy()
+	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
+		Type:    v1.DisruptionTarget,
+		Status:  v1.ConditionTrue,
+		Reason:  "DeletionByTaintManager",
+		Message: "Taint manager: deleting due to NoExecute taint",
+	})
+	if updated {
+		if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
 			return err
-		}
-		newStatus := pod.Status.DeepCopy()
-		updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByTaintManager",
-			Message: "Taint manager: deleting due to NoExecute taint",
-		})
-		if updated {
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-				return err
-			}
 		}
 	}
 	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
@@ -220,8 +216,8 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 		},
 		taintedNodes: make(map[string][]v1.Taint),
 
-		nodeUpdateQueue: workqueue.NewWithConfig(workqueue.QueueConfig{Name: "noexec_taint_node"}),
-		podUpdateQueue:  workqueue.NewWithConfig(workqueue.QueueConfig{Name: "noexec_taint_pod"}),
+		nodeUpdateQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[nodeUpdateItem]{Name: "noexec_taint_node"}),
+		podUpdateQueue:  workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[podUpdateItem]{Name: "noexec_taint_pod"}),
 	}
 	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
 
@@ -312,15 +308,14 @@ func (tc *Controller) Run(ctx context.Context) {
 	// into channels.
 	go func(stopCh <-chan struct{}) {
 		for {
-			item, shutdown := tc.nodeUpdateQueue.Get()
+			nodeUpdate, shutdown := tc.nodeUpdateQueue.Get()
 			if shutdown {
 				break
 			}
-			nodeUpdate := item.(nodeUpdateItem)
 			hash := hash(nodeUpdate.nodeName, UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				tc.nodeUpdateQueue.Done(item)
+				tc.nodeUpdateQueue.Done(nodeUpdate)
 				return
 			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 				// tc.nodeUpdateQueue.Done is called by the nodeUpdateChannels worker
@@ -330,7 +325,7 @@ func (tc *Controller) Run(ctx context.Context) {
 
 	go func(stopCh <-chan struct{}) {
 		for {
-			item, shutdown := tc.podUpdateQueue.Get()
+			podUpdate, shutdown := tc.podUpdateQueue.Get()
 			if shutdown {
 				break
 			}
@@ -338,11 +333,10 @@ func (tc *Controller) Run(ctx context.Context) {
 			// between node worker setting tc.taintedNodes and pod worker reading this to decide
 			// whether to delete pod.
 			// It's possible that even without this assumption this code is still correct.
-			podUpdate := item.(podUpdateItem)
 			hash := hash(podUpdate.nodeName, UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				tc.podUpdateQueue.Done(item)
+				tc.podUpdateQueue.Done(podUpdate)
 				return
 			case tc.podUpdateChannels[hash] <- podUpdate:
 				// tc.podUpdateQueue.Done is called by the podUpdateChannels worker

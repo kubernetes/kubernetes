@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -source=types.go -destination=testing/provider_mock.go -package=testing DevicesProvider,PodsProvider,CPUsProvider,MemoryProvider
+//go:generate mockery
 package podresources
 
 import (

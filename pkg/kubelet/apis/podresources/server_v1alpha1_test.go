@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,9 +40,6 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 			DeviceIds:    []string{"dev0", "dev1"},
 		},
 	}
-
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 
 	for _, tc := range []struct {
 		desc             string
@@ -127,12 +123,12 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
-			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 
-			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).AnyTimes()
-			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:    mockPodsProvider,

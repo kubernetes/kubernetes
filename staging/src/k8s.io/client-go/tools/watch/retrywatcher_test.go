@@ -289,6 +289,42 @@ func TestRetryWatcher(t *testing.T) {
 			},
 		},
 		{
+			name:      "fails on Forbidden",
+			initialRV: "5",
+			watchClient: &cache.ListWatch{
+				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+					return func(options metav1.ListOptions) (watch.Interface, error) {
+						return nil, apierrors.NewForbidden(schema.GroupResource{}, "", errors.New("unknown"))
+					}
+				}(),
+			},
+			watchCount: 1,
+			expected: []watch.Event{
+				{
+					Type:   watch.Error,
+					Object: &apierrors.NewForbidden(schema.GroupResource{}, "", errors.New("unknown")).ErrStatus,
+				},
+			},
+		},
+		{
+			name:      "fails on Unauthorized",
+			initialRV: "5",
+			watchClient: &cache.ListWatch{
+				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+					return func(options metav1.ListOptions) (watch.Interface, error) {
+						return nil, apierrors.NewUnauthorized("")
+					}
+				}(),
+			},
+			watchCount: 1,
+			expected: []watch.Event{
+				{
+					Type:   watch.Error,
+					Object: &apierrors.NewUnauthorized("").ErrStatus,
+				},
+			},
+		},
+		{
 			name:      "recovers from timeout error",
 			initialRV: "5",
 			watchClient: &cache.ListWatch{
@@ -585,6 +621,8 @@ func TestRetryWatcherToFinishWithUnreadEvents(t *testing.T) {
 	// Give the watcher a chance to get to sending events (blocking)
 	time.Sleep(10 * time.Millisecond)
 
+	watcher.Stop()
+	// Verify a second stop does not cause a panic
 	watcher.Stop()
 
 	maxTime := time.Second

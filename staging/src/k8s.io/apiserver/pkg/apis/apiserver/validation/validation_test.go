@@ -43,11 +43,11 @@ import (
 )
 
 var (
-	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	testCases := []struct {
 		name              string
@@ -693,80 +693,98 @@ func TestValidateIssuerDiscoveryURL(t *testing.T) {
 	fldPath := field.NewPath("issuer", "discoveryURL")
 
 	testCases := []struct {
-		name      string
-		in        string
-		issuerURL string
-		want      string
+		name                          string
+		in                            string
+		issuerURL                     string
+		want                          string
+		structuredAuthnFeatureEnabled bool
 	}{
 		{
-			name: "url is empty",
-			in:   "",
-			want: "",
+			name:                          "url is empty",
+			in:                            "",
+			want:                          "",
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "url parse error",
-			in:   "https://oidc.oidc-namespace.svc:invalid-port",
-			want: `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc:invalid-port": parse "https://oidc.oidc-namespace.svc:invalid-port": invalid port ":invalid-port" after host`,
+			name:                          "url parse error",
+			in:                            "https://oidc.oidc-namespace.svc:invalid-port",
+			want:                          `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc:invalid-port": parse "https://oidc.oidc-namespace.svc:invalid-port": invalid port ":invalid-port" after host`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "url is not https",
-			in:   "http://oidc.oidc-namespace.svc",
-			want: `issuer.discoveryURL: Invalid value: "http://oidc.oidc-namespace.svc": URL scheme must be https`,
+			name:                          "url is not https",
+			in:                            "http://oidc.oidc-namespace.svc",
+			want:                          `issuer.discoveryURL: Invalid value: "http://oidc.oidc-namespace.svc": URL scheme must be https`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "url user info is not allowed",
-			in:   "https://user:pass@oidc.oidc-namespace.svc",
-			want: `issuer.discoveryURL: Invalid value: "https://user:pass@oidc.oidc-namespace.svc": URL must not contain a username or password`,
+			name:                          "url user info is not allowed",
+			in:                            "https://user:pass@oidc.oidc-namespace.svc",
+			want:                          `issuer.discoveryURL: Invalid value: "https://user:pass@oidc.oidc-namespace.svc": URL must not contain a username or password`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "url raw query is not allowed",
-			in:   "https://oidc.oidc-namespace.svc?query",
-			want: `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc?query": URL must not contain a query`,
+			name:                          "url raw query is not allowed",
+			in:                            "https://oidc.oidc-namespace.svc?query",
+			want:                          `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc?query": URL must not contain a query`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "url fragment is not allowed",
-			in:   "https://oidc.oidc-namespace.svc#fragment",
-			want: `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc#fragment": URL must not contain a fragment`,
+			name:                          "url fragment is not allowed",
+			in:                            "https://oidc.oidc-namespace.svc#fragment",
+			want:                          `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc#fragment": URL must not contain a fragment`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "valid url",
+			name:                          "valid url",
+			in:                            "https://oidc.oidc-namespace.svc",
+			want:                          "",
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:                          "valid url with path",
+			in:                            "https://oidc.oidc-namespace.svc/path",
+			want:                          "",
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:                          "discovery url same as issuer url",
+			issuerURL:                     "https://issuer-url",
+			in:                            "https://issuer-url",
+			want:                          `issuer.discoveryURL: Invalid value: "https://issuer-url": discoveryURL must be different from URL`,
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:                          "discovery url same as issuer url, with trailing slash",
+			issuerURL:                     "https://issuer-url",
+			in:                            "https://issuer-url/",
+			want:                          `issuer.discoveryURL: Invalid value: "https://issuer-url/": discoveryURL must be different from URL`,
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:                          "discovery url same as issuer url, with multiple trailing slashes",
+			issuerURL:                     "https://issuer-url",
+			in:                            "https://issuer-url///",
+			want:                          `issuer.discoveryURL: Invalid value: "https://issuer-url///": discoveryURL must be different from URL`,
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:                          "discovery url same as issuer url, issuer url with trailing slash",
+			issuerURL:                     "https://issuer-url/",
+			in:                            "https://issuer-url",
+			want:                          `issuer.discoveryURL: Invalid value: "https://issuer-url": discoveryURL must be different from URL`,
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name: "discovery url set but structured authn feature disabled",
 			in:   "https://oidc.oidc-namespace.svc",
-			want: "",
-		},
-		{
-			name: "valid url with path",
-			in:   "https://oidc.oidc-namespace.svc/path",
-			want: "",
-		},
-		{
-			name:      "discovery url same as issuer url",
-			issuerURL: "https://issuer-url",
-			in:        "https://issuer-url",
-			want:      `issuer.discoveryURL: Invalid value: "https://issuer-url": discoveryURL must be different from URL`,
-		},
-		{
-			name:      "discovery url same as issuer url, with trailing slash",
-			issuerURL: "https://issuer-url",
-			in:        "https://issuer-url/",
-			want:      `issuer.discoveryURL: Invalid value: "https://issuer-url/": discoveryURL must be different from URL`,
-		},
-		{
-			name:      "discovery url same as issuer url, with multiple trailing slashes",
-			issuerURL: "https://issuer-url",
-			in:        "https://issuer-url///",
-			want:      `issuer.discoveryURL: Invalid value: "https://issuer-url///": discoveryURL must be different from URL`,
-		},
-		{
-			name:      "discovery url same as issuer url, issuer url with trailing slash",
-			issuerURL: "https://issuer-url/",
-			in:        "https://issuer-url",
-			want:      `issuer.discoveryURL: Invalid value: "https://issuer-url": discoveryURL must be different from URL`,
+			want: `issuer.discoveryURL: Invalid value: "https://oidc.oidc-namespace.svc": discoveryURL is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateIssuerDiscoveryURL(tt.issuerURL, tt.in, fldPath).ToAggregate()
+			got := validateIssuerDiscoveryURL(tt.issuerURL, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("URL validation mismatch (-want +got):\n%s", d)
 			}
@@ -779,10 +797,11 @@ func TestValidateAudiences(t *testing.T) {
 	audienceMatchPolicyFldPath := field.NewPath("issuer", "audienceMatchPolicy")
 
 	testCases := []struct {
-		name        string
-		in          []string
-		matchPolicy string
-		want        string
+		name                          string
+		in                            []string
+		matchPolicy                   string
+		want                          string
+		structuredAuthnFeatureEnabled bool
 	}{
 		{
 			name: "audiences is empty",
@@ -812,27 +831,36 @@ func TestValidateAudiences(t *testing.T) {
 			want:        "",
 		},
 		{
-			name:        "duplicate audience",
-			in:          []string{"audience", "audience"},
-			matchPolicy: "MatchAny",
-			want:        `issuer.audiences[1]: Duplicate value: "audience"`,
+			name:                          "duplicate audience",
+			in:                            []string{"audience", "audience"},
+			matchPolicy:                   "MatchAny",
+			want:                          `issuer.audiences[1]: Duplicate value: "audience"`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name: "match policy not set with multiple audiences",
-			in:   []string{"audience1", "audience2"},
-			want: `issuer.audienceMatchPolicy: Invalid value: "": audienceMatchPolicy must be MatchAny for multiple audiences`,
+			name:                          "match policy not set with multiple audiences",
+			in:                            []string{"audience1", "audience2"},
+			want:                          `issuer.audienceMatchPolicy: Invalid value: "": audienceMatchPolicy must be MatchAny for multiple audiences`,
+			structuredAuthnFeatureEnabled: true,
 		},
 		{
-			name:        "valid multiple audiences",
+			name:                          "valid multiple audiences",
+			in:                            []string{"audience1", "audience2"},
+			matchPolicy:                   "MatchAny",
+			want:                          "",
+			structuredAuthnFeatureEnabled: true,
+		},
+		{
+			name:        "multiple audiences set when structured authn feature is disabled",
 			in:          []string{"audience1", "audience2"},
 			matchPolicy: "MatchAny",
-			want:        "",
+			want:        `issuer.audiences: Invalid value: []string{"audience1", "audience2"}: multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateAudiences(tt.in, api.AudienceMatchPolicyType(tt.matchPolicy), fldPath, audienceMatchPolicyFldPath).ToAggregate()
+			got := validateAudiences(tt.in, api.AudienceMatchPolicyType(tt.matchPolicy), fldPath, audienceMatchPolicyFldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("Audiences validation mismatch (-want +got):\n%s", d)
 			}
@@ -1336,6 +1364,69 @@ func TestValidateClaimMappings(t *testing.T) {
 			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
 		},
 		{
+			name: "extra mapping key prefix is k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix is kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix with ak8s.io, *.ak8s.io, bkubernetes.io, *.bkubernetes.io are still valid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "bkubernetes.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.bkubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
+		},
+		{
 			name: "valid claim mappings but uses email without verification",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
@@ -1599,7 +1690,7 @@ type (
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
@@ -2476,7 +2567,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)
 			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
 			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
 				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")

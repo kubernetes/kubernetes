@@ -58,7 +58,7 @@ type Waiter interface {
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-	WaitForKubelet() error
+	WaitForKubelet(healthzAddress string, healthzPort int32) error
 	// SetTimeout adjusts the timeout to the specified duration
 	SetTimeout(timeout time.Duration)
 }
@@ -243,14 +243,19 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 }
 
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'.
-func (w *KubeWaiter) WaitForKubelet() error {
+func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
 	var (
 		lastError       error
 		start           = time.Now()
-		healthzEndpoint = fmt.Sprintf("http://localhost:%d/healthz", constants.KubeletHealthzPort)
+		healthzEndpoint = fmt.Sprintf("http://%s:%d/healthz", healthzAddress, healthzPort)
 	)
 
-	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet. This can take up to %v\n", w.timeout)
+	if healthzPort == 0 {
+		fmt.Println("[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
+		return nil
+	}
+	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
+		healthzEndpoint, w.timeout)
 
 	formatError := func(cause string) error {
 		return errors.Errorf("The HTTP call equal to 'curl -sSL %s' returned %s\n",

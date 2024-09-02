@@ -127,7 +127,7 @@ func (s *ProcSMapsRollup) parseLine(line string) error {
 	}
 
 	v := strings.TrimSpace(kv[1])
-	v = strings.TrimRight(v, " kB")
+	v = strings.TrimSuffix(v, " kB")
 
 	vKBytes, err := strconv.ParseUint(v, 10, 64)
 	if err != nil {
@@ -135,12 +135,12 @@ func (s *ProcSMapsRollup) parseLine(line string) error {
 	}
 	vBytes := vKBytes * 1024
 
-	s.addValue(k, v, vKBytes, vBytes)
+	s.addValue(k, vBytes)
 
 	return nil
 }
 
-func (s *ProcSMapsRollup) addValue(k string, vString string, vUint uint64, vUintBytes uint64) {
+func (s *ProcSMapsRollup) addValue(k string, vUintBytes uint64) {
 	switch k {
 	case "Rss":
 		s.Rss += vUintBytes

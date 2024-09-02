@@ -376,13 +376,13 @@ func TestBuiltinResolution(t *testing.T) {
 // with the practical defaults.
 // `self` is defined as the object being evaluated against.
 func simpleCompileCEL(schema *spec.Schema, expression string) (cel.Program, error) {
-	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Env(environment.NewExpressions)
+	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Env(environment.NewExpressions)
 	if err != nil {
 		return nil, err
 	}
 	declType := celopenapi.SchemaDeclType(schema, true).MaybeAssignTypeName("selfType")
 	rt := commoncel.NewDeclTypeProvider(declType)
-	opts, err := rt.EnvOptions(env.TypeProvider())
+	opts, err := rt.EnvOptions(env.CELTypeProvider())
 	if err != nil {
 		return nil, err
 	}

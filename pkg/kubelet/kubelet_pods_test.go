@@ -1974,7 +1974,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedEnvironmentVariableValidation, tc.enableRelaxedEnvironmentVariableValidation)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedEnvironmentVariableValidation, tc.enableRelaxedEnvironmentVariableValidation)
 
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -2154,7 +2154,7 @@ func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.Cont
 		},
 		LastTerminationState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
-				Reason:   "ContainerStatusUnknown",
+				Reason:   kubecontainer.ContainerReasonStatusUnknown,
 				Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 				ExitCode: 137,
 			},
@@ -2618,7 +2618,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 			"all regular containers succeeded and restartable init container succeeded with restart always, but the pod is terminal",
 		},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, test.podIsTerminal)
@@ -3020,7 +3020,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 			"backoff crashloop with non-zero restartable init container, main containers succeeded",
 		},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, false)
@@ -3267,13 +3267,12 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		unreadyContainer                           []string
 		previousStatus                             v1.PodStatus
 		isPodTerminal                              bool
-		enablePodDisruptionConditions              bool
 		expected                                   v1.PodStatus
-		expectedPodDisruptionCondition             v1.PodCondition
+		expectedPodDisruptionCondition             *v1.PodCondition
 		expectedPodReadyToStartContainersCondition v1.PodCondition
 	}{
 		{
-			name: "pod disruption condition is copied over and the phase is set to failed when deleted; PodDisruptionConditions enabled",
+			name: "pod disruption condition is copied over and the phase is set to failed when deleted",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -3301,8 +3300,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					LastTransitionTime: normalized_now,
 				}},
 			},
-			isPodTerminal:                 true,
-			enablePodDisruptionConditions: true,
+			isPodTerminal: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodFailed,
 				HostIP:   "127.0.0.1",
@@ -3319,7 +3317,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
 			},
-			expectedPodDisruptionCondition: v1.PodCondition{
+			expectedPodDisruptionCondition: &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				Status:             v1.ConditionTrue,
 				LastTransitionTime: normalized_now,
@@ -3705,8 +3703,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet
@@ -3719,8 +3716,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				if enablePodReadyToStartContainersCondition {
 					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
 				}
-				if test.enablePodDisruptionConditions {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
+				if test.expectedPodDisruptionCondition != nil {
+					expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
 				}
 				if !apiequality.Semantic.DeepEqual(*expected, actual) {
 					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
@@ -3731,7 +3728,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 }
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -4545,7 +4542,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	nowTime := time.Now()
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
@@ -4758,6 +4755,124 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 		t.Logf("TestCase: %q", tdesc)
 		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, testPodStatus, tc.OldStatus, tPod.Spec.Containers, false, false)
 		assert.Equal(t, tc.Expected, cStatuses)
+	}
+}
+
+func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
+	nowTime := time.Now()
+	testContainerName := "ctr0"
+	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
+	testContainer := v1.Container{
+		Name:  testContainerName,
+		Image: "img",
+	}
+	testContainerStatus := v1.ContainerStatus{
+		Name: testContainerName,
+	}
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "123456",
+			Name:      "foo",
+			Namespace: "bar",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{testContainer},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{testContainerStatus},
+		},
+	}
+	testPodStaus := func(user *kubecontainer.ContainerUser) *kubecontainer.PodStatus {
+		testKubeContainerStatus := kubecontainer.Status{
+			Name:      testContainerName,
+			ID:        testContainerID,
+			Image:     "img",
+			State:     kubecontainer.ContainerStateRunning,
+			StartedAt: nowTime,
+			User:      user,
+		}
+		return &kubecontainer.PodStatus{
+			ID:                testPod.UID,
+			Name:              testPod.Name,
+			Namespace:         testPod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{&testKubeContainerStatus},
+		}
+	}
+	expectedContainerStatuses := func(user *v1.ContainerUser) []v1.ContainerStatus {
+		return []v1.ContainerStatus{
+			{
+				Name:        testContainerName,
+				ContainerID: testContainerID.String(),
+				Image:       "img",
+				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				User:        user,
+			},
+		}
+	}
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.statusManager = status.NewFakeManager()
+
+	for tdesc, tc := range map[string]struct {
+		testPodStatus           *kubecontainer.PodStatus
+		featureEnabled          bool
+		expectedContainerStatus []v1.ContainerStatus
+	}{
+		"nil user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(nil),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"empty user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(&kubecontainer.ContainerUser{}),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"linux user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(&kubecontainer.ContainerUser{
+				Linux: &kubecontainer.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"nil user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(nil),
+			true,
+			expectedContainerStatuses(nil),
+		},
+		"empty user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(&kubecontainer.ContainerUser{}),
+			true,
+			expectedContainerStatuses(&v1.ContainerUser{}),
+		},
+		"linux user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(&kubecontainer.ContainerUser{
+				Linux: &kubecontainer.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+			true,
+			expectedContainerStatuses(&v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+		},
+	} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
+		tPod := testPod.DeepCopy()
+		t.Logf("TestCase: %q", tdesc)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, false, false)
+		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}
 }
 
@@ -5996,9 +6111,9 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 	}
 
 	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
-	assert.Equal(t, 0, len(pullSecrets))
+	assert.Empty(t, pullSecrets)
 
-	assert.Equal(t, 1, len(fakeRecorder.Events))
+	assert.Len(t, fakeRecorder.Events, 1)
 	event := <-fakeRecorder.Events
 	assert.Equal(t, event, expectedEvent)
 }

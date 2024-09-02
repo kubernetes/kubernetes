@@ -22,36 +22,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
 	validPodTemplateSpec = api.PodTemplateSpec{
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 	}
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          pointer.String("Asia/Shanghai"),
+		TimeZone:          ptr.To("Asia/Shanghai"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
 				Template:       validPodTemplateSpec,
 				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(10),
-				Parallelism:    pointer.Int32(10),
+				Completions:    ptr.To[int32](10),
+				Parallelism:    ptr.To[int32](10),
 			},
 		},
 	}
 	cronjobSpecWithTZinSchedule = batch.CronJobSpec{
 		Schedule:          "CRON_TZ=UTC 5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          pointer.String("Asia/DoesNotExist"),
+		TimeZone:          ptr.To("Asia/DoesNotExist"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
 				Template: validPodTemplateSpec,

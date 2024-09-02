@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	corev1 "k8s.io/code-generator/examples/apiserver/apis/core/v1"
 	examplev1 "k8s.io/code-generator/examples/apiserver/apis/example/v1"
 	secondexamplev1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
 	thirdexamplev1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
@@ -33,6 +34,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
+	corev1.AddToScheme,
 	examplev1.AddToScheme,
 	secondexamplev1.AddToScheme,
 	thirdexamplev1.AddToScheme,

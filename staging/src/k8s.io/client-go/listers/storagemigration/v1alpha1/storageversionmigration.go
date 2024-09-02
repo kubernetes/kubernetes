@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type StorageVersionMigrationLister interface {
 
 // storageVersionMigrationLister implements the StorageVersionMigrationLister interface.
 type storageVersionMigrationLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha1.StorageVersionMigration]
 }
 
 // NewStorageVersionMigrationLister returns a new StorageVersionMigrationLister.
 func NewStorageVersionMigrationLister(indexer cache.Indexer) StorageVersionMigrationLister {
-	return &storageVersionMigrationLister{indexer: indexer}
-}
-
-// List lists all StorageVersionMigrations in the indexer.
-func (s *storageVersionMigrationLister) List(selector labels.Selector) (ret []*v1alpha1.StorageVersionMigration, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.StorageVersionMigration))
-	})
-	return ret, err
-}
-
-// Get retrieves the StorageVersionMigration from the index for a given name.
-func (s *storageVersionMigrationLister) Get(name string) (*v1alpha1.StorageVersionMigration, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("storageversionmigration"), name)
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), nil
+	return &storageVersionMigrationLister{listers.New[*v1alpha1.StorageVersionMigration](indexer, v1alpha1.Resource("storageversionmigration"))}
 }

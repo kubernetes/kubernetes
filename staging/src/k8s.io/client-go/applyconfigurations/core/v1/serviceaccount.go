@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceAccountApplyConfiguration represents an declarative configuration of the ServiceAccount type for use
+// ServiceAccountApplyConfiguration represents a declarative configuration of the ServiceAccount type for use
 // with apply.
 type ServiceAccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ServiceAccountApplyConfiguration struct {
 	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty"`
 }
 
-// ServiceAccount constructs an declarative configuration of the ServiceAccount type for use with
+// ServiceAccount constructs a declarative configuration of the ServiceAccount type for use with
 // apply.
 func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 	b := &ServiceAccountApplyConfiguration{}
@@ -88,7 +88,7 @@ func extractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManage
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithKind(value string) *ServiceAccountApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -96,7 +96,7 @@ func (b *ServiceAccountApplyConfiguration) WithKind(value string) *ServiceAccoun
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithAPIVersion(value string) *ServiceAccountApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -105,7 +105,7 @@ func (b *ServiceAccountApplyConfiguration) WithAPIVersion(value string) *Service
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithName(value string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -114,7 +114,7 @@ func (b *ServiceAccountApplyConfiguration) WithName(value string) *ServiceAccoun
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithGenerateName(value string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -123,7 +123,7 @@ func (b *ServiceAccountApplyConfiguration) WithGenerateName(value string) *Servi
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithNamespace(value string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -132,7 +132,7 @@ func (b *ServiceAccountApplyConfiguration) WithNamespace(value string) *ServiceA
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithUID(value types.UID) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -141,7 +141,7 @@ func (b *ServiceAccountApplyConfiguration) WithUID(value types.UID) *ServiceAcco
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithResourceVersion(value string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -150,7 +150,7 @@ func (b *ServiceAccountApplyConfiguration) WithResourceVersion(value string) *Se
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithGeneration(value int64) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -159,7 +159,7 @@ func (b *ServiceAccountApplyConfiguration) WithGeneration(value int64) *ServiceA
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -168,7 +168,7 @@ func (b *ServiceAccountApplyConfiguration) WithCreationTimestamp(value metav1.Ti
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -177,7 +177,7 @@ func (b *ServiceAccountApplyConfiguration) WithDeletionTimestamp(value metav1.Ti
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ServiceAccountApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -187,11 +187,11 @@ func (b *ServiceAccountApplyConfiguration) WithDeletionGracePeriodSeconds(value 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ServiceAccountApplyConfiguration) WithLabels(entries map[string]string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -202,11 +202,11 @@ func (b *ServiceAccountApplyConfiguration) WithLabels(entries map[string]string)
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ServiceAccountApplyConfiguration) WithAnnotations(entries map[string]string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -220,7 +220,7 @@ func (b *ServiceAccountApplyConfiguration) WithOwnerReferences(values ...*v1.Own
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -231,7 +231,7 @@ func (b *ServiceAccountApplyConfiguration) WithOwnerReferences(values ...*v1.Own
 func (b *ServiceAccountApplyConfiguration) WithFinalizers(values ...string) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -274,4 +274,10 @@ func (b *ServiceAccountApplyConfiguration) WithImagePullSecrets(values ...*Local
 func (b *ServiceAccountApplyConfiguration) WithAutomountServiceAccountToken(value bool) *ServiceAccountApplyConfiguration {
 	b.AutomountServiceAccountToken = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ServiceAccountApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Name
 }

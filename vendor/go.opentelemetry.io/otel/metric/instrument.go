@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
@@ -27,6 +16,7 @@ type InstrumentOption interface {
 	Int64CounterOption
 	Int64UpDownCounterOption
 	Int64HistogramOption
+	Int64GaugeOption
 	Int64ObservableCounterOption
 	Int64ObservableUpDownCounterOption
 	Int64ObservableGaugeOption
@@ -34,9 +24,16 @@ type InstrumentOption interface {
 	Float64CounterOption
 	Float64UpDownCounterOption
 	Float64HistogramOption
+	Float64GaugeOption
 	Float64ObservableCounterOption
 	Float64ObservableUpDownCounterOption
 	Float64ObservableGaugeOption
+}
+
+// HistogramOption applies options to histogram instruments.
+type HistogramOption interface {
+	Int64HistogramOption
+	Float64HistogramOption
 }
 
 type descOpt string
@@ -52,6 +49,11 @@ func (o descOpt) applyFloat64UpDownCounter(c Float64UpDownCounterConfig) Float64
 }
 
 func (o descOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64HistogramConfig {
+	c.description = string(o)
+	return c
+}
+
+func (o descOpt) applyFloat64Gauge(c Float64GaugeConfig) Float64GaugeConfig {
 	c.description = string(o)
 	return c
 }
@@ -82,6 +84,11 @@ func (o descOpt) applyInt64UpDownCounter(c Int64UpDownCounterConfig) Int64UpDown
 }
 
 func (o descOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfig {
+	c.description = string(o)
+	return c
+}
+
+func (o descOpt) applyInt64Gauge(c Int64GaugeConfig) Int64GaugeConfig {
 	c.description = string(o)
 	return c
 }
@@ -121,6 +128,11 @@ func (o unitOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64Histogra
 	return c
 }
 
+func (o unitOpt) applyFloat64Gauge(c Float64GaugeConfig) Float64GaugeConfig {
+	c.unit = string(o)
+	return c
+}
+
 func (o unitOpt) applyFloat64ObservableCounter(c Float64ObservableCounterConfig) Float64ObservableCounterConfig {
 	c.unit = string(o)
 	return c
@@ -151,6 +163,11 @@ func (o unitOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfi
 	return c
 }
 
+func (o unitOpt) applyInt64Gauge(c Int64GaugeConfig) Int64GaugeConfig {
+	c.unit = string(o)
+	return c
+}
+
 func (o unitOpt) applyInt64ObservableCounter(c Int64ObservableCounterConfig) Int64ObservableCounterConfig {
 	c.unit = string(o)
 	return c
@@ -170,6 +187,23 @@ func (o unitOpt) applyInt64ObservableGauge(c Int64ObservableGaugeConfig) Int64Ob
 //
 // The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
 func WithUnit(u string) InstrumentOption { return unitOpt(u) }
+
+// WithExplicitBucketBoundaries sets the instrument explicit bucket boundaries.
+//
+// This option is considered "advisory", and may be ignored by API implementations.
+func WithExplicitBucketBoundaries(bounds ...float64) HistogramOption { return bucketOpt(bounds) }
+
+type bucketOpt []float64
+
+func (o bucketOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64HistogramConfig {
+	c.explicitBucketBoundaries = o
+	return c
+}
+
+func (o bucketOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfig {
+	c.explicitBucketBoundaries = o
+	return c
+}
 
 // AddOption applies options to an addition measurement. See
 // [MeasurementOption] for other options that can be used as an AddOption.

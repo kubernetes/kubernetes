@@ -43,6 +43,15 @@ func TestBaseEnvironment(t *testing.T) {
 			},
 		})
 
+	// The escaping happens while construct declType hence we use escaped format here directly.
+	gadgetsType := apiservercel.NewObjectType("Gadget",
+		map[string]*apiservercel.DeclField{
+			"__namespace__": {
+				Name: "__namespace__",
+				Type: apiservercel.StringType,
+			},
+		})
+
 	cases := []struct {
 		name                    string
 		typeVersionCombinations []envTypeAndVersion
@@ -251,6 +260,42 @@ func TestBaseEnvironment(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "recognizeKeywordAsFieldName disabled",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version.MajorMinor(1, 30), NewExpressions},
+				// always enabled for StoredExpressions
+			},
+			invalidExpressions: []string{"gadget.namespace == 'buzz'"},
+			activation:         map[string]any{"gadget": map[string]any{"namespace": "buzz"}},
+			opts: []VersionedOptions{
+				{
+					IntroducedVersion: version.MajorMinor(1, 28),
+					DeclTypes:         []*apiservercel.DeclType{gadgetsType},
+					EnvOptions: []cel.EnvOption{
+						cel.Variable("gadget", cel.ObjectType("Gadget")),
+					},
+				},
+			},
+		},
+		{
+			name: "recognizeKeywordAsFieldName enabled",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version.MajorMinor(1, 31), NewExpressions},
+				{version.MajorMinor(1, 30), StoredExpressions},
+			},
+			validExpressions: []string{"gadget.namespace == 'buzz'"},
+			activation:       map[string]any{"gadget": map[string]any{"namespace": "buzz"}},
+			opts: []VersionedOptions{
+				{
+					IntroducedVersion: version.MajorMinor(1, 28),
+					DeclTypes:         []*apiservercel.DeclType{gadgetsType},
+					EnvOptions: []cel.EnvOption{
+						cel.Variable("gadget", cel.ObjectType("Gadget")),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -262,7 +307,7 @@ func TestBaseEnvironment(t *testing.T) {
 			for _, tv := range tc.typeVersionCombinations {
 				t.Run(fmt.Sprintf("version=%s,envType=%s", tv.version.String(), tv.envType), func(t *testing.T) {
 
-					envSet := MustBaseEnvSet(tv.version)
+					envSet := MustBaseEnvSet(tv.version, true)
 					if tc.opts != nil {
 						var err error
 						envSet, err = envSet.Extend(tc.opts...)

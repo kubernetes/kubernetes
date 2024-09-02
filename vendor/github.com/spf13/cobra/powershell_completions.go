@@ -28,8 +28,8 @@ import (
 func genPowerShellComp(buf io.StringWriter, name string, includeDesc bool) {
 	// Variables should not contain a '-' or ':' character
 	nameForVar := name
-	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
-	nameForVar = strings.Replace(nameForVar, ":", "_", -1)
+	nameForVar = strings.ReplaceAll(nameForVar, "-", "_")
+	nameForVar = strings.ReplaceAll(nameForVar, ":", "_")
 
 	compCmd := ShellCompRequestCmd
 	if !includeDesc {
@@ -47,7 +47,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
 `+"    $_ -replace '\\s|#|@|\\$|;|,|''|\\{|\\}|\\(|\\)|\"|`|\\||<|>|&','`$&'"+`
 }
 
-[scriptblock]$__%[2]sCompleterBlock = {
+[scriptblock]${__%[2]sCompleterBlock} = {
     param(
             $WordToComplete,
             $CommandAst,
@@ -122,7 +122,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
 
     __%[1]s_debug "Calling $RequestComp"
     # First disable ActiveHelp which is not supported for Powershell
-    $env:%[10]s=0
+    ${env:%[10]s}=0
 
     #call the command store the output in $out and redirect stderr and stdout to null
     # $Out is an array contains each line per element
@@ -279,7 +279,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
     }
 }
 
-Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock $__%[2]sCompleterBlock
+Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock ${__%[2]sCompleterBlock}
 `, name, nameForVar, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
 		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder, activeHelpEnvVar(name)))

@@ -158,16 +158,16 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			klog.V(6).Infof("%s has a receiver", f.Name)
 			continue
 		}
-		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
+		if len(signature.Parameters) != 3 || signature.Parameters[2].Type.Name != scopeName {
 			klog.V(6).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
-		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
+		if len(signature.Results) != 1 || signature.Results[0].Type.Name != errorName {
 			klog.V(6).Infof("%s has wrong results", f.Name)
 			continue
 		}
-		inType := signature.Parameters[0]
-		outType := signature.Parameters[1]
+		inType := signature.Parameters[0].Type
+		outType := signature.Parameters[1].Type
 		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
 			klog.V(6).Infof("%s has wrong parameter types", f.Name)
 			continue

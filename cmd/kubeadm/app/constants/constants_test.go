@@ -50,32 +50,6 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 	}
 }
 
-func TestGetSuperAdminKubeConfigPath(t *testing.T) {
-	expected := filepath.Join(KubernetesDir, SuperAdminKubeConfigFileName)
-	actual := GetSuperAdminKubeConfigPath()
-
-	if actual != expected {
-		t.Errorf(
-			"failed GetSuperAdminKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
-			expected,
-			actual,
-		)
-	}
-}
-
-func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
-	expected := filepath.FromSlash("/etc/kubernetes/bootstrap-kubelet.conf")
-	actual := GetBootstrapKubeletKubeConfigPath()
-
-	if actual != expected {
-		t.Errorf(
-			"failed GetBootstrapKubeletKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
-			expected,
-			actual,
-		)
-	}
-}
-
 func TestGetKubeletKubeConfigPath(t *testing.T) {
 	expected := filepath.FromSlash("/etc/kubernetes/kubelet.conf")
 	actual := GetKubeletKubeConfigPath()
@@ -124,11 +98,15 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
+func TestEtcdSupportedVersionLength(t *testing.T) {
+	const max = 4
+	if len(SupportedEtcdVersion) > max {
+		t.Fatalf("SupportedEtcdVersion must not include more than %d versions", max)
+	}
+}
+
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
-		13: "3.2.24",
-		14: "3.3.10",
-		15: "3.3.10",
 		16: "3.3.17-0",
 		17: "3.4.3-0",
 		18: "3.4.3-0",
@@ -147,7 +125,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 		{
 			kubernetesVersion: "1.10.1",
-			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedVersion:   version.MustParseSemantic("3.3.17-0"),
 			expectedWarning:   true,
 			expectedError:     false,
 		},
@@ -258,7 +236,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 		{
 			name:           "invalid versionInfo; placeholder version is returned",
 			versionInfo:    &apimachineryversion.Info{},
-			expectedResult: defaultKubernetesPlaceholderVersion,
+			expectedResult: DefaultKubernetesPlaceholderVersion,
 		},
 		{
 			name:           "valid skew of -1",

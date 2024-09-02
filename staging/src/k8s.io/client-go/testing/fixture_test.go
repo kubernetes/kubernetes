@@ -19,20 +19,25 @@ package testing
 import (
 	"fmt"
 	"math/rand"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/ptr"
 )
 
 func getArbitraryResource(s schema.GroupVersionResource, name, namespace string) *unstructured.Unstructured {
@@ -275,6 +280,158 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.EqualError(t, err, `nodes "node-1" not found`)
 }
 
+func TestApplyCreate(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k": "v"}}`)
+	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager"})
+	handled, configMap, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Fatalf("Failed to create a resource with apply: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+}
+
+func TestApplyNoMeta(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
+	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager"})
+	handled, configMap, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Fatalf("Failed to create a resource with apply: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, "cm-1", cm.Name)
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+}
+
+func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	action := NewCreateAction(cmResource, "default", &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cm-1",
+		},
+		Data: map[string]string{
+			"k0": "v0",
+		},
+	})
+	handled, _, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to create resource: %v", err)
+	}
+
+	// Apply with test-manager-1
+	// Expect data to be shared with initial create
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k1": "v1"}}`)
+	applyAction := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager-1"})
+	handled, configMap, err := reaction(applyAction)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to apply resource: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v1"}, cm.Data)
+
+	// Apply conflicting with test-manager-2, expect apply to fail
+	patch = []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k1": "xyz"}}`)
+	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager-2"})
+	handled, _, err = reaction(applyAction)
+	assert.True(t, handled)
+	if assert.Error(t, err) {
+		assert.Equal(t, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1", err.Error())
+	}
+
+	// Apply with test-manager-2
+	// Expect data to be shared with initial create and test-manager-1
+	patch = []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k2": "v2"}}`)
+	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager-2"})
+	handled, configMap, err = reaction(applyAction)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to apply resource: %v", err)
+	}
+	cm = configMap.(*v1.ConfigMap)
+	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"}, cm.Data)
+
+	// Apply with test-manager-1
+	// Expect owned data to be updated
+	patch = []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k1": "v101"}}`)
+	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager-1"})
+	handled, configMap, err = reaction(applyAction)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to apply resource: %v", err)
+	}
+	cm = configMap.(*v1.ConfigMap)
+	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v101", "k2": "v2"}, cm.Data)
+
+	// Force apply with test-manager-2
+	// Expect data owned by test-manager-1 to be updated, expect data already owned but not in apply configuration to be removed
+	patch = []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k1": "v202"}}`)
+	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager-2", Force: ptr.To(true)})
+	handled, configMap, err = reaction(applyAction)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to apply resource: %v", err)
+	}
+	cm = configMap.(*v1.ConfigMap)
+	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v202"}, cm.Data)
+
+	// Update with test-manager-1 to perform a force update of the entire resource
+	reaction = ObjectReaction(o)
+	updateAction := NewUpdateActionWithOptions(cmResource, "default", &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cm-1",
+		},
+		Data: map[string]string{
+			"k99": "v99",
+		},
+	}, metav1.UpdateOptions{FieldManager: "test-manager-1"})
+	handled, configMap, err = reaction(updateAction)
+	assert.True(t, handled)
+	if err != nil {
+		t.Errorf("Failed to apply resource: %v", err)
+	}
+	typedCm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, map[string]string{"k99": "v99"}, typedCm.Data)
+}
+
 func TestGetWithExactMatch(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
@@ -408,3 +565,99 @@ func Test_resourceCovers(t *testing.T) {
 		})
 	}
 }
+
+func configMapTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
+	parser, err := typed.NewParser(configMapTypedSchema)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse schema: %v", err))
+	}
+
+	return TypeConverter{Scheme: scheme, TypeResolver: parser}
+}
+
+var configMapTypedSchema = typed.YAMLObject(`types:
+- name: io.k8s.api.core.v1.ConfigMap
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: data
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+  map:
+    fields:
+    - name: creationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: managedFields
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: fieldsType
+      type:
+        scalar: string
+    - name: fieldsV1
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+    - name: manager
+      type:
+        scalar: string
+    - name: operation
+      type:
+        scalar: string
+    - name: subresource
+      type:
+        scalar: string
+    - name: time
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+  scalar: untyped
+- name: __untyped_deduced_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable
+`)

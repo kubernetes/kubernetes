@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// EventSourceApplyConfiguration represents an declarative configuration of the EventSource type for use
+// EventSourceApplyConfiguration represents a declarative configuration of the EventSource type for use
 // with apply.
 type EventSourceApplyConfiguration struct {
 	Component *string `json:"component,omitempty"`
 	Host      *string `json:"host,omitempty"`
 }
 
-// EventSourceApplyConfiguration constructs an declarative configuration of the EventSource type for use with
+// EventSourceApplyConfiguration constructs a declarative configuration of the EventSource type for use with
 // apply.
 func EventSource() *EventSourceApplyConfiguration {
 	return &EventSourceApplyConfiguration{}

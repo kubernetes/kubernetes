@@ -26,6 +26,17 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
+kube::util::require-jq
+
+if [[ $# == 0 ]]; then
+  # Doing it this way is MUCH faster than simply saying "all", and there doesn't
+  # seem to be a simpler way to express "this whole workspace".
+  packages=()
+  kube::util::read-array packages < <(
+      go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+  )
+  set -- "${packages[@]}"
+fi
 
 ret=0
 TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"

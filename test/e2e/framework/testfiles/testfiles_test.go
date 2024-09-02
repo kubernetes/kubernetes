@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -49,13 +50,13 @@ func TestEmbeddedFileSource(t *testing.T) {
 	// read a file which exists and compare the contents
 	b, err := s.ReadTestFile(fooPath)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, fooContents, string(b))
 
 	// read a non-existent file and ensure that the returned value is empty and error is nil
 	// Note: this is done so that the next file source can be tried by the caller
 	b, err = s.ReadTestFile(notExistsPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, b)
 
 	// describing the test filesystem should list down all files

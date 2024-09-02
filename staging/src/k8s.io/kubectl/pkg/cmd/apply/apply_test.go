@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -59,8 +60,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
-	utilpointer "k8s.io/utils/pointer"
-	"k8s.io/utils/strings/slices"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -2087,6 +2087,9 @@ func TestForceApply(t *testing.T) {
 		"post":        1,
 	}
 
+	// Set the patch retry back off period to something low, so the test can run more quickly
+	patchRetryBackOffPeriod = 1 * time.Millisecond
+
 	for _, testingOpenAPISchema := range testingOpenAPISchemas {
 		for _, openAPIFeatureToggle := range applyFeatureToggles {
 
@@ -2112,7 +2115,7 @@ func TestForceApply(t *testing.T) {
 								var bodyRC io.ReadCloser
 								if isScaledDownToZero {
 									rcObj := readReplicationControllerFromFile(t, filenameRC)
-									rcObj.Spec.Replicas = utilpointer.Int32Ptr(0)
+									rcObj.Spec.Replicas = ptr.To[int32](0)
 									rcBytes, err := runtime.Encode(codec, rcObj)
 									if err != nil {
 										t.Fatal(err)
@@ -3429,7 +3432,7 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc serverside-applied (server dry run)\n", outbuff.String())
-		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		assert.Len(t, serverSideData, 1, "unexpected creation")
 		require.Nil(t, serverSideData[pathSecret], "secret was created")
 	})
 
@@ -3446,7 +3449,7 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc configured (dry run)\n", outbuff.String())
-		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		assert.Len(t, serverSideData, 1, "unexpected creation")
 		require.Nil(t, serverSideData[pathSecret], "secret was created")
 	})
 }
