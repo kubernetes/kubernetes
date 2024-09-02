@@ -101,7 +101,7 @@ type RESTClient struct {
 
 	// warningHandler is shared among all requests created by this client.
 	// If not set, defaultWarningHandler is used.
-	warningHandler WarningHandler
+	warningHandler WarningHandlerWithContext
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
