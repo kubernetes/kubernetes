@@ -107,10 +107,10 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 	var healthzCheck string
 	if r.enableHTTPS {
 		healthzCheck = fmt.Sprintf(
-			"curl -sk -o %v -I -w \"%%{http_code}\" https://127.0.0.1:%v/healthz", nullDev, r.healthzPort)
+			"curl -sk -o %v -I -w \"%%{http_code}\" https://localhost:%v/healthz", nullDev, r.healthzPort)
 	} else {
 		healthzCheck = fmt.Sprintf(
-			"curl -s -o %v -I -w \"%%{http_code}\" http://127.0.0.1:%v/healthz", nullDev, r.healthzPort)
+			"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
 
 	}
 
