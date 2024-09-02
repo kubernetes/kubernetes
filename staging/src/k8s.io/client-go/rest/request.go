@@ -100,7 +100,7 @@ func defaultRequestRetryFn(maxRetries int) WithRetry {
 type Request struct {
 	c *RESTClient
 
-	warningHandler WarningHandler
+	warningHandler WarningHandlerWithContext
 
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
@@ -240,8 +240,17 @@ func (r *Request) BackOff(manager BackoffManager) *Request {
 }
 
 // WarningHandler sets the handler this client uses when warning headers are encountered.
-// If set to nil, this client will use the default warning handler (see SetDefaultWarningHandler).
+// If set to nil, this client will use the default warning handler (see [SetDefaultWarningHandler]).
+//
+//logcheck:context // WarningHandlerWithContext should be used instead of WarningHandler in code which supports contextual logging.
 func (r *Request) WarningHandler(handler WarningHandler) *Request {
+	r.warningHandler = warningLoggerNopContext{l: handler}
+	return r
+}
+
+// WarningHandlerWithContext sets the handler this client uses when warning headers are encountered.
+// If set to nil, this client will use the default warning handler (see [SetDefaultWarningHandlerWithContext]).
+func (r *Request) WarningHandlerWithContext(handler WarningHandlerWithContext) *Request {
 	r.warningHandler = handler
 	return r
 }
@@ -745,7 +754,7 @@ func (r *Request) watchInternal(ctx context.Context) (watch.Interface, runtime.D
 		resp, err := client.Do(req)
 		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			return r.newStreamWatcher(resp)
+			return r.newStreamWatcher(ctx, resp)
 		}
 
 		done, transformErr := func() (bool, error) {
@@ -938,7 +947,7 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface, negoti
 	}
 }
 
-func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, runtime.Decoder, error) {
+func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (watch.Interface, runtime.Decoder, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -949,7 +958,7 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, runtim
 		return nil, nil, err
 	}
 
-	handleWarnings(resp.Header, r.warningHandler)
+	handleWarnings(ctx, resp.Header, r.warningHandler)
 
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
@@ -1036,7 +1045,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 		switch {
 		case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
-			handleWarnings(resp.Header, r.warningHandler)
+			handleWarnings(ctx, resp.Header, r.warningHandler)
 			return resp.Body, nil
 
 		default:
@@ -1331,7 +1340,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
-				warnings:    handleWarnings(resp.Header, r.warningHandler),
+				warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
 			}
 		}
 	}
@@ -1350,7 +1359,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
 			err:         err,
-			warnings:    handleWarnings(resp.Header, r.warningHandler),
+			warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
 		}
 	}
 
@@ -1359,7 +1368,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
-		warnings:    handleWarnings(resp.Header, r.warningHandler),
+		warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
 	}
 }
 

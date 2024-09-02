@@ -4066,15 +4066,24 @@ func TestRequestLogging(t *testing.T) {
 	testcases := map[string]struct {
 		v              int
 		body           any
+		response       *http.Response
 		expectedOutput string
 	}{
 		"no-output": {
 			v:    7,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 		},
 		"output": {
 			v:    8,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4082,6 +4091,10 @@ func TestRequestLogging(t *testing.T) {
 		"io-reader": {
 			v:    8,
 			body: strings.NewReader("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			// Cannot log the request body!
 			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4089,9 +4102,33 @@ func TestRequestLogging(t *testing.T) {
 		"truncate": {
 			v:    8,
 			body: []byte(strings.Repeat("a", 2000)),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `, strings.Repeat("a", 1024)),
+		},
+		"warnings": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Warning": []string{
+						`299 request-test "warning 1"`,
+						`299 request-test-2 "warning 2"`,
+						`300 request-test-3 "ignore code 300"`,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+<location>] "Warning" logger="TestLogger" message="warning 1"
+<location>] "Warning" logger="TestLogger" message="warning 2"
+`,
 		},
 	}
 
@@ -4106,12 +4143,10 @@ func TestRequestLogging(t *testing.T) {
 			var fs flag.FlagSet
 			klog.InitFlags(&fs)
 			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
 
 			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("pong")),
-				}, nil
+				return tc.response, nil
 			})
 
 			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
