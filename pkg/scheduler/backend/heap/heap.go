@@ -85,6 +85,9 @@ func (h *data[T]) Len() int { return len(h.queue) }
 // Swap implements swapping of two elements in the heap. This is a part of standard
 // heap interface and should never be called directly.
 func (h *data[T]) Swap(i, j int) {
+	if i < 0 || j < 0 {
+		return
+	}
 	h.queue[i], h.queue[j] = h.queue[j], h.queue[i]
 	item := h.items[h.queue[i]]
 	item.index = i
@@ -102,6 +105,9 @@ func (h *data[T]) Push(kv interface{}) {
 
 // Pop is supposed to be called by container/heap.Pop only.
 func (h *data[T]) Pop() interface{} {
+	if len(h.queue) == 0 {
+		return nil
+	}
 	key := h.queue[len(h.queue)-1]
 	h.queue = h.queue[0 : len(h.queue)-1]
 	item, ok := h.items[key]

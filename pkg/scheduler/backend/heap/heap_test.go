@@ -94,6 +94,11 @@ func TestHeapBasic(t *testing.T) {
 		}
 		prevNum = num
 	}
+
+	_, err := h.Pop()
+	if err == nil {
+		t.Errorf("expected Pop() to error on empty heap")
+	}
 }
 
 // TestHeap_AddOrUpdate_Add tests add capabilities of Heap.AddOrUpdate
