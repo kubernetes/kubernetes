@@ -357,6 +357,7 @@ func (c *dynamicResourceClient) watchList(ctx context.Context, opts metav1.ListO
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Timeout(timeout).
 		WatchList(ctx).
+		WithCustomDecoder(unstructured.UnstructuredJSONScheme).
 		Into(result)
 
 	return result, err
