@@ -681,27 +681,38 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 
-			if memoryState1.TotalMemSize != memoryState2.TotalMemSize || memoryState1.SystemReserved != memoryState2.SystemReserved || memoryState1.Allocatable != memoryState2.Allocatable {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+			if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
+				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
 
-			totalFree1 := uint64(0)
-			totalReserved1 := uint64(0)
-			totalFree2 := uint64(0)
-			totalReserved2 := uint64(0)
-			for _, nodeId := range nodeState1.Cells {
-				totalFree1 += ms1[nodeId].MemoryMap[resourceName].Free
-				totalReserved1 += ms1[nodeId].MemoryMap[resourceName].Reserved
-				totalFree2 += ms2[nodeId].MemoryMap[resourceName].Free
-				totalReserved2 += ms2[nodeId].MemoryMap[resourceName].Reserved
-			}
-
-			if totalFree1 != totalFree2 || totalReserved1 != totalReserved2 {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+			if memoryState1.SystemReserved != memoryState2.SystemReserved {
+				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "SystemReserved", "SystemReserved1", memoryState1.SystemReserved, "SystemReserved2", memoryState2.SystemReserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
 
+			if memoryState1.Allocatable != memoryState2.Allocatable {
+				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "Allocatable", "Allocatable1", memoryState1.Allocatable, "Allocatable2", memoryState2.Allocatable, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
+
+			tmpState1 := state.MemoryTable{}
+			tmpState2 := state.MemoryTable{}
+			for _, nodeID := range nodeState1.Cells {
+				tmpState1.Free += ms1[nodeID].MemoryMap[resourceName].Free
+				tmpState1.Reserved += ms1[nodeID].MemoryMap[resourceName].Reserved
+				tmpState2.Free += ms2[nodeID].MemoryMap[resourceName].Free
+				tmpState2.Reserved += ms2[nodeID].MemoryMap[resourceName].Reserved
+			}
+
+			if tmpState1.Free != tmpState2.Free {
+				klog.InfoS("Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "free", "free1", tmpState1.Free, "free2", tmpState2.Free, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
+			if tmpState1.Reserved != tmpState2.Reserved {
+				klog.InfoS("Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "reserved", "reserved1", tmpState1.Reserved, "reserved2", tmpState2.Reserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
 		}
 	}
 	return true
