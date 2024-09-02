@@ -1489,6 +1489,7 @@ func TestDoRequestNewWay(t *testing.T) {
 
 // This test assumes that the client implementation backs off exponentially, for an individual request.
 func TestBackoffLifecycle(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		count++
@@ -1517,17 +1518,33 @@ func TestBackoffLifecycle(t *testing.T) {
 		)}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
-		now := clock.Now()
-		request.DoRaw(context.Background())
-		elapsed := clock.Since(now)
-		if clock.Since(now) != thisBackoff {
-			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// This is allowed to fail ("the server was unable to return a response in the time allotted, but may still be processing the request").
+			_, _ = request.DoRaw(ctx)
+		}()
+
+		// Poll until DoRaw is sleeping.
+		for {
+			if clock.HasWaiters() {
+				break
+			}
+			time.Sleep(time.Millisecond)
 		}
+
+		// Fast-forward the fake clock to ensure that DoRaw returns.
+		// This will block and eventually time out if the backoff
+		// is more that thisBackoff. We cannot test anymore that the
+		// backoff isn't less than thisBackoff.
+		clock.Step(thisBackoff)
+		<-done
 	}
 }
 
@@ -1535,14 +1552,14 @@ type testBackoffManager struct {
 	sleeps []time.Duration
 }
 
-func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 }
 
-func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	return time.Duration(0)
 }
 
-func (b *testBackoffManager) Sleep(d time.Duration) {
+func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
 	b.sleeps = append(b.sleeps, d)
 }
 
@@ -1568,7 +1585,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
 
 	c := testRESTClient(t, testServer)
-	c.createBackoffMgr = func() BackoffManager { return backoff }
+	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -2998,7 +3015,6 @@ const retryTestKey retryTestKeyType = iota
 // metric calls are invoked appropriately in right order.
 type withRateLimiterBackoffManagerAndMetrics struct {
 	flowcontrol.RateLimiter
-	*NoBackoff
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
@@ -3014,7 +3030,7 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Wait(ctx context.Context) err
 	return nil
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.CalculateBackoff")
 
 	waitFor := lb.calculateBackoffFn(lb.calculateBackoffSeq)
@@ -3022,11 +3038,11 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *u
 	return waitFor
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.UpdateBackoff")
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) Sleep(d time.Duration) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) SleepWithContext(ctx context.Context, d time.Duration) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.Sleep")
 	lb.sleepsGot = append(lb.sleepsGot, d.String())
 }
@@ -3207,7 +3223,6 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		t.Run(test.name, func(t *testing.T) {
 			interceptor := &withRateLimiterBackoffManagerAndMetrics{
 				RateLimiter:        flowcontrol.NewFakeAlwaysRateLimiter(),
-				NoBackoff:          &NoBackoff{},
 				calculateBackoffFn: test.calculateBackoffFn,
 			}
 
