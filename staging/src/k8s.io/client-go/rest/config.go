@@ -129,9 +129,22 @@ type Config struct {
 	RateLimiter flowcontrol.RateLimiter
 
 	// WarningHandler handles warnings in server responses.
-	// If not set, the default warning handler is used.
-	// See documentation for SetDefaultWarningHandler() for details.
+	// If this and WarningHandlerWithContext are not set, the
+	// default warning handler is used. If both are set,
+	// WarningHandlerWithContext is used.
+	//
+	// See documentation for [SetDefaultWarningHandler] for details.
+	//
+	//logcheck:context // WarningHandlerWithContext should be used instead of WarningHandler in code which supports contextual logging.
 	WarningHandler WarningHandler
+
+	// WarningHandlerWithContext handles warnings in server responses.
+	// If this and WarningHandler are not set, the
+	// default warning handler is used. If both are set,
+	// WarningHandlerWithContext is used.
+	//
+	// See documentation for [SetDefaultWarningHandler] for details.
+	WarningHandlerWithContext WarningHandlerWithContext
 
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
@@ -381,10 +394,25 @@ func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RES
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
-		restClient.warningHandler = config.WarningHandler
-	}
+	maybeSetWarningHandler(restClient, config.WarningHandler, config.WarningHandlerWithContext)
 	return restClient, err
+}
+
+// maybeSetWarningHandler sets the handlerWithContext if non-nil,
+// otherwise the handler with a wrapper if non-nil,
+// and does nothing if both are nil.
+//
+// May be called for a nil client.
+func maybeSetWarningHandler(c *RESTClient, handler WarningHandler, handlerWithContext WarningHandlerWithContext) {
+	if c == nil {
+		return
+	}
+	switch {
+	case handlerWithContext != nil:
+		c.warningHandler = handlerWithContext
+	case handler != nil:
+		c.warningHandler = warningLoggerNopContext{l: handler}
+	}
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -448,9 +476,7 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
-		restClient.warningHandler = config.WarningHandler
-	}
+	maybeSetWarningHandler(restClient, config.WarningHandler, config.WarningHandlerWithContext)
 	return restClient, err
 }
 
@@ -616,15 +642,16 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAData:     config.TLSClientConfig.CAData,
 			NextProtos: config.TLSClientConfig.NextProtos,
 		},
-		RateLimiter:        config.RateLimiter,
-		WarningHandler:     config.WarningHandler,
-		UserAgent:          config.UserAgent,
-		DisableCompression: config.DisableCompression,
-		QPS:                config.QPS,
-		Burst:              config.Burst,
-		Timeout:            config.Timeout,
-		Dial:               config.Dial,
-		Proxy:              config.Proxy,
+		RateLimiter:               config.RateLimiter,
+		WarningHandler:            config.WarningHandler,
+		WarningHandlerWithContext: config.WarningHandlerWithContext,
+		UserAgent:                 config.UserAgent,
+		DisableCompression:        config.DisableCompression,
+		QPS:                       config.QPS,
+		Burst:                     config.Burst,
+		Timeout:                   config.Timeout,
+		Dial:                      config.Dial,
+		Proxy:                     config.Proxy,
 	}
 }
 
@@ -658,17 +685,18 @@ func CopyConfig(config *Config) *Config {
 			CAData:     config.TLSClientConfig.CAData,
 			NextProtos: config.TLSClientConfig.NextProtos,
 		},
-		UserAgent:          config.UserAgent,
-		DisableCompression: config.DisableCompression,
-		Transport:          config.Transport,
-		WrapTransport:      config.WrapTransport,
-		QPS:                config.QPS,
-		Burst:              config.Burst,
-		RateLimiter:        config.RateLimiter,
-		WarningHandler:     config.WarningHandler,
-		Timeout:            config.Timeout,
-		Dial:               config.Dial,
-		Proxy:              config.Proxy,
+		UserAgent:                 config.UserAgent,
+		DisableCompression:        config.DisableCompression,
+		Transport:                 config.Transport,
+		WrapTransport:             config.WrapTransport,
+		QPS:                       config.QPS,
+		Burst:                     config.Burst,
+		RateLimiter:               config.RateLimiter,
+		WarningHandler:            config.WarningHandler,
+		WarningHandlerWithContext: config.WarningHandlerWithContext,
+		Timeout:                   config.Timeout,
+		Dial:                      config.Dial,
+		Proxy:                     config.Proxy,
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()

@@ -4066,15 +4066,24 @@ func TestRequestLogging(t *testing.T) {
 	testcases := map[string]struct {
 		v              int
 		body           any
+		response       *http.Response
 		expectedOutput string
 	}{
 		"no-output": {
 			v:    7,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 		},
 		"output": {
 			v:    8,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4082,6 +4091,10 @@ func TestRequestLogging(t *testing.T) {
 		"io-reader": {
 			v:    8,
 			body: strings.NewReader("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			// Cannot log the request body!
 			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4089,9 +4102,33 @@ func TestRequestLogging(t *testing.T) {
 		"truncate": {
 			v:    8,
 			body: []byte(strings.Repeat("a", 2000)),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `, strings.Repeat("a", 1024)),
+		},
+		"warnings": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Warning": []string{
+						`299 request-test "warning 1"`,
+						`299 request-test-2 "warning 2"`,
+						`300 request-test-3 "ignore code 300"`,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+warnings.go] "Warning: warning 1" logger="TestLogger"
+warnings.go] "Warning: warning 2" logger="TestLogger"
+`,
 		},
 	}
 
@@ -4106,12 +4143,10 @@ func TestRequestLogging(t *testing.T) {
 			var fs flag.FlagSet
 			klog.InitFlags(&fs)
 			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
 
 			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("pong")),
-				}, nil
+				return tc.response, nil
 			})
 
 			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
@@ -4128,11 +4163,49 @@ func TestRequestLogging(t *testing.T) {
 			// Compare log output:
 			// - strip date/time/pid from each line (fixed length header)
 			// - replace <location> with the actual call location
+			// - strip line number from warnings.go (might change)
 			state.Restore()
 			expectedOutput := strings.ReplaceAll(tc.expectedOutput, "<location>", fmt.Sprintf("%s:%d", path.Base(file), line+1))
 			actualOutput := buffer.String()
 			actualOutput = regexp.MustCompile(`(?m)^.{30}`).ReplaceAllString(actualOutput, "")
+			actualOutput = regexp.MustCompile(`(?m)^warnings\.go:\d+`).ReplaceAllString(actualOutput, "warnings.go")
 			assert.Equal(t, expectedOutput, actualOutput)
 		})
 	}
+}
+
+func TestRequestWarningHandler(t *testing.T) {
+	t.Run("no-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithLogging{}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(handler))
+		assert.NotNil(t, request.warningHandler)
+		request.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
+		assert.Equal(t, []string{"message"}, handler.messages)
+	})
+
+	t.Run("with-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithContext{}
+		assert.Equal(t, request, request.WarningHandlerWithContext(handler))
+		assert.Equal(t, request.warningHandler, handler)
+	})
+
+	t.Run("nil-no-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(nil))
+		assert.Nil(t, request.warningHandler)
+	})
+
+	t.Run("nil-with-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		assert.Equal(t, request, request.WarningHandlerWithContext(nil))
+		assert.Nil(t, request.warningHandler)
+	})
 }
