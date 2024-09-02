@@ -231,7 +231,7 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return err
 	}
 
-	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
+	klog.FromContext(ctx).V(4).Info("Got a Retry-After response", "delay", r.retryAfter.Wait, "attempt", r.retryAfter.Attempt, "url", request.URL())
 	return nil
 }
 
