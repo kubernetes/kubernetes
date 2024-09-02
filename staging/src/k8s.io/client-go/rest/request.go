@@ -844,6 +844,11 @@ func (r WatchListResult) WithCustomDecoder(d runtime.Decoder) WatchListResult {
 	return r
 }
 
+type watcherWithObjectDecoder interface {
+	watch.Interface
+	ObjectDecoder() runtime.Decoder
+}
+
 // WatchList establishes a stream to get a consistent snapshot of data
 // from the server as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#proposal
 //
@@ -863,13 +868,18 @@ func (r *Request) WatchList(ctx context.Context) WatchListResult {
 	if err != nil {
 		return WatchListResult{err: err}
 	}
-	return r.handleWatchList(ctx, w)
+	defer w.Stop()
+
+	watcherWithObjectDecoder, ok := w.(watcherWithObjectDecoder)
+	if !ok {
+		return WatchListResult{err: fmt.Errorf("programmer error: watchList requires r.Watch to expose additonal method for getting an object decoder")}
+	}
+
+	return r.handleWatchList(ctx, watcherWithObjectDecoder)
 }
 
 // handleWatchList holds the actual logic for easier unit testing.
-// Note that this function will close the passed watch.
-func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchListResult {
-	defer w.Stop()
+func (r *Request) handleWatchList(ctx context.Context, w watcherWithObjectDecoder) WatchListResult {
 	var lastKey string
 	var items []runtime.Object
 
@@ -913,6 +923,7 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 						items:                        items,
 						initialEventsEndBookmarkRV:   meta.GetResourceVersion(),
 						initialEventsRawEmbeddedList: rawEmbeddedList,
+						decoder:                      w.ObjectDecoder(),
 					}
 				}
 			default:
@@ -938,12 +949,24 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error)
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
-	return watch.NewStreamWatcher(
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
-		// use 500 to indicate that the cause of the error is unknown - other error codes
-		// are more specific to HTTP interactions, and set a reason
-		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
-	), nil
+	return &streamWatcherWithDecoder{
+		StreamWatcher: watch.NewStreamWatcher(
+			restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+			// use 500 to indicate that the cause of the error is unknown - other error codes
+			// are more specific to HTTP interactions, and set a reason
+			errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
+		),
+		objectDecoder: objectDecoder,
+	}, nil
+}
+
+type streamWatcherWithDecoder struct {
+	*watch.StreamWatcher
+	objectDecoder runtime.Decoder
+}
+
+func (r *streamWatcherWithDecoder) ObjectDecoder() runtime.Decoder {
+	return r.objectDecoder
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
