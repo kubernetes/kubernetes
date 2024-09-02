@@ -1165,7 +1165,15 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	if err != nil {
 		return false
 	}
-	return len(checkpoints) == 0
+
+	// Currently, the checkpoint file name for the device plugin is only kubelet_internal_checkpoint.
+	// If there are any changes in the future, corresponding adjustments will be needed.
+	for _, checkpointName := range checkpoints {
+		if checkpointName == kubeletDeviceManagerCheckpoint {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
