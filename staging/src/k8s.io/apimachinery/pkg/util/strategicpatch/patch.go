@@ -952,7 +952,7 @@ func mergeKeyValueEqual(left, right interface{}, mergeKey string) (bool, error) 
 	if !ok {
 		return false, mergepatch.ErrNoMergeKey(typedRight, mergeKey)
 	}
-	return mergeKeyLeft == mergeKeyRight, nil
+	return reflect.DeepEqual(mergeKeyLeft, mergeKeyRight), nil
 }
 
 // extractKey trims the prefix and return the original key
