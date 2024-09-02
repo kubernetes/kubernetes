@@ -40,7 +40,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -130,7 +129,7 @@ const (
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute
 
-	// ControlPlaneLabel is valid for kubeadm based clusters like kops ONLY
+	// ControlPlaneLabel is valid label for kubeadm based clusters like kops ONLY
 	ControlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
@@ -711,11 +710,29 @@ func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]str
 
 // GetControlPlaneNodes returns a list of control plane nodes
 func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
-	selector := labels.Set{ControlPlaneLabel: ""}.AsSelector()
-	cpNodes, err := c.CoreV1().Nodes().
-		List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
-	ExpectNoError(err, "error reading control-plane nodes")
-	return cpNodes
+	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	ExpectNoError(err, "error reading all nodes")
+
+	var cpNodes v1.NodeList
+
+	for _, node := range allNodes.Items {
+		// Check for the control plane label
+		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
+			cpNodes.Items = append(cpNodes.Items, node)
+			continue
+		}
+
+		// Check for the specific taint
+		for _, taint := range node.Spec.Taints {
+			// NOTE the taint key is the same as the control plane label
+			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+				cpNodes.Items = append(cpNodes.Items, node)
+				continue
+			}
+		}
+	}
+
+	return &cpNodes
 }
 
 // GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
