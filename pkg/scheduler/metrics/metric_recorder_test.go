@@ -131,6 +131,9 @@ func TestInFlightEventAsync(t *testing.T) {
 
 	// It adds -4 and flushes the metric to the channel.
 	r.ObserveInFlightEventsAsync(podAddLabel, -4)
+	if len(r.aggregatedInflightEventMetric) != 0 {
+		t.Errorf("aggregatedInflightEventMetric should be cleared, but got: %v", r.aggregatedInflightEventMetric)
+	}
 
 	got := []gaugeVecMetric{}
 	for {

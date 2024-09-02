@@ -149,7 +149,7 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "inflight_events",
-			Help:           "Number of events recorded in the scheduling queue.",
+			Help:           "Number of events currently tracked in the scheduling queue.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"event"})
 	Goroutines = metrics.NewGaugeVec(
