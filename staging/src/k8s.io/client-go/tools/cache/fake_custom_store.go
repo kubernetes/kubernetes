@@ -23,7 +23,6 @@ type FakeCustomStore struct {
 	DeleteFunc   func(obj interface{}) error
 	ListFunc     func() []interface{}
 	ListKeysFunc func() []string
-	CountFunc    func() int64
 	GetFunc      func(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKeyFunc func(key string) (item interface{}, exists bool, err error)
 	ReplaceFunc  func(list []interface{}, resourceVersion string) error
@@ -68,14 +67,6 @@ func (f *FakeCustomStore) ListKeys() []string {
 		return f.ListKeysFunc()
 	}
 	return nil
-}
-
-// Count calls the custom Count function if defined
-func (f *FakeCustomStore) Count() int64 {
-	if f.CountFunc != nil {
-		return f.CountFunc()
-	}
-	return 0
 }
 
 // Get calls the custom Get function if defined

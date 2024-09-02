@@ -526,14 +526,6 @@ func (f *DeltaFIFO) ListKeys() []string {
 	return list
 }
 
-// Count returns a count of all the keys of the objects currently
-// in the FIFO.
-func (f *DeltaFIFO) Count() int64 {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	return int64(len(f.items))
-}
-
 // Get returns the complete list of deltas for the requested item,
 // or sets exists=false.
 // You should treat the items returned inside the deltas as immutable.

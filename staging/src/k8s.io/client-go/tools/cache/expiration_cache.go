@@ -142,11 +142,6 @@ func (c *ExpirationCache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
 }
 
-// Count returns a count of all keys in the expiration cache.
-func (c *ExpirationCache) Count() int64 {
-	return c.cacheStorage.Count()
-}
-
 // Add timestamps an item and inserts it into the cache, overwriting entries
 // that might exist under the same key.
 func (c *ExpirationCache) Add(obj interface{}) error {

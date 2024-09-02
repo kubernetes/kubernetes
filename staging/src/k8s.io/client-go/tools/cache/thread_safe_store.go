@@ -45,7 +45,6 @@ type ThreadSafeStore interface {
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
-	Count() int64
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	IndexKeys(indexName, indexedValue string) ([]string, error)
@@ -57,6 +56,8 @@ type ThreadSafeStore interface {
 	AddIndexers(newIndexers Indexers) error
 	// Resync is a no-op and is deprecated
 	Resync() error
+	// Count returns a count
+	Count() int64
 }
 
 // storeIndex implements the indexing functionality for Store interface
