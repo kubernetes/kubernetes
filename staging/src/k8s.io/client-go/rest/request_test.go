@@ -2451,6 +2451,7 @@ func TestRequestPreflightCheck(t *testing.T) {
 }
 
 func TestThrottledLogger(t *testing.T) {
+	logger := klog.Background()
 	now := time.Now()
 	oldClock := globalThrottledLogger.clock
 	defer func() {
@@ -2465,7 +2466,7 @@ func TestThrottledLogger(t *testing.T) {
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
@@ -4148,6 +4149,7 @@ func TestRequestLogging(t *testing.T) {
 	}
 
 	for name, tc := range testcases {
+		//nolint:logcheck // Intentionally testing with plain klog here.
 		t.Run(name, func(t *testing.T) {
 			state := klog.CaptureState()
 			defer state.Restore()
