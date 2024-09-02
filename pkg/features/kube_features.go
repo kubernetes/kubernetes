@@ -248,7 +248,8 @@ const (
 	//
 	// Allows using event-driven PLEG (pod lifecycle event generator) through kubelet
 	// which avoids frequent relisting of containers which helps optimize performance.
-	EventedPLEG featuregate.Feature = "EventedPLEG"
+	EventedPLEG    featuregate.Feature = "EventedPLEG"
+	EventedPLEGDup featuregate.Feature = "EventedPLEGDup"
 
 	// owner: @andrewsykim @SergeyKanzhelev
 	// GA: v1.20
@@ -1029,6 +1030,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
 	EventedPLEG: {Default: false, PreRelease: featuregate.Alpha},
+
+	EventedPLEGDup: {Default: false, PreRelease: featuregate.Alpha},
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 

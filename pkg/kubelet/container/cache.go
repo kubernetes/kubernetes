@@ -103,7 +103,7 @@ func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.T
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 		// Set the value in the cache only if it's not present already
 		// or the timestamp in the cache is older than the current update timestamp
 		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {

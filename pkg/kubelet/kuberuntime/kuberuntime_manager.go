@@ -1562,7 +1562,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 
-		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 			if resp.Timestamp == 0 {
 				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
 				// then the pod status we get will not have the timestamp set.
@@ -1589,7 +1589,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 		// Get statuses of all containers visible in the pod.
 		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {

@@ -732,7 +732,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	eventChannel := make(chan *pleg.PodLifecycleEvent, plegChannelCapacity)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 		// adjust Generic PLEG relisting period and threshold to higher value when Evented PLEG is turned on
 		genericRelistDuration := &pleg.RelistDuration{
 			RelistPeriod:    eventedPlegRelistPeriod,
@@ -761,7 +761,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
 	}
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
@@ -1691,7 +1691,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	kl.pleg.Start()
 
 	// Start eventedPLEG only if EventedPLEG feature gate is enabled.
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEGDup) {
 		kl.eventedPleg.Start()
 	}
 
