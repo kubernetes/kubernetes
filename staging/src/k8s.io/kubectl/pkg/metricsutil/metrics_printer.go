@@ -32,7 +32,7 @@ var (
 		v1.ResourceCPU,
 		v1.ResourceMemory,
 	}
-	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
+	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU(%)", "MEMORY(bytes)", "MEMORY(%)"}
 	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
