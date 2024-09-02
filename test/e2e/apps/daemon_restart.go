@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -399,7 +400,10 @@ func getControlPlaneNodes(ctx context.Context, c clientset.Interface) (nodes *v1
 	testfwk.Filter(nodes, func(node v1.Node) bool {
 		_, isMaster := node.Labels["node-role.kubernetes.io/master"]
 		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
-		return isMaster || isControlPlane
+		// There are deployments that does not label nodes with the node-role entry
+		// but still adds the taint to the nodes.
+		isTaintedControlPlane := taintutils.TaintKeyExists(node.Spec.Taints, "node-role.kubernetes.io/control-plane")
+		return isMaster || isControlPlane || isTaintedControlPlane
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable control plane nodes in the cluster")
