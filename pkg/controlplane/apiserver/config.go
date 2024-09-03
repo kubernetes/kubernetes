@@ -147,10 +147,10 @@ func BuildGenericConfig(
 		return
 	}
 
-	versionedInformers = kcpinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+	versionedInformers = kcpinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
 	// TODO(embik): this creates flowcontrol for system:admin, but that's probably wrong.
-	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient.Cluster(LocalAdminCluster.Path()), clientgoinformers.NewSharedInformerFactory(clientgoExternalClient.Cluster(LocalAdminCluster.Path()), 10*time.Minute)); lastErr != nil {
+	if lastErr = s.Features.ApplyTo(genericConfig, clusterClient.Cluster(LocalAdminCluster.Path()), clientgoinformers.NewSharedInformerFactory(clusterClient.Cluster(LocalAdminCluster.Path()), 10*time.Minute)); lastErr != nil {
 		return
 	}
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, resourceConfig, legacyscheme.Scheme); lastErr != nil {

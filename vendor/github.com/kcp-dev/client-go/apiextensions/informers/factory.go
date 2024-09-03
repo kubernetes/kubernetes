@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	clientset "github.com/kcp-dev/client-go/apiextensions/client"
+	apiextensionsinformers "github.com/kcp-dev/client-go/apiextensions/informers/apiextensions"
 	"github.com/kcp-dev/client-go/apiextensions/informers/internalinterfaces"
 )
 
@@ -266,6 +267,12 @@ type SharedInformerFactory interface {
 
 	// InformerFor returns the SharedIndexInformer for obj.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) kcpcache.ScopeableSharedIndexInformer
+
+	Apiextensions() apiextensionsinformers.ClusterInterface
+}
+
+func (f *sharedInformerFactory) Apiextensions() apiextensionsinformers.ClusterInterface {
+	return apiextensionsinformers.New(f, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Cluster(clusterName logicalcluster.Name) ScopedDynamicSharedInformerFactory {

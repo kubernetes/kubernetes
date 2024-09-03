@@ -8,6 +8,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -18,8 +19,8 @@ type apiBindingAwareCRDRESTOptionsGetter struct {
 	crd      *apiextensionsv1.CustomResourceDefinition
 }
 
-func (t apiBindingAwareCRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	ret, err := t.delegate.GetRESTOptions(resource)
+func (t apiBindingAwareCRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource, obj runtime.Object) (generic.RESTOptions, error) {
+	ret, err := t.delegate.GetRESTOptions(resource, obj)
 	if err != nil {
 		return ret, err
 	}

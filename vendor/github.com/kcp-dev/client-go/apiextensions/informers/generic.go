@@ -27,6 +27,8 @@ import (
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v3"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	upstreaminformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -80,6 +82,12 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericClusterInformer, error) {
 	switch resource {
+	// Group=apiextensions.k8s.io, Version=V1
+	case apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"):
+		return &genericClusterInformer{resource: resource.GroupResource(), informer: f.Apiextensions().V1().CustomResourceDefinitions().Informer()}, nil
+	// Group=apiextensions.k8s.io, Version=V1beta1
+	case apiextensionsv1beta1.SchemeGroupVersion.WithResource("customresourcedefinitions"):
+		return &genericClusterInformer{resource: resource.GroupResource(), informer: f.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()}, nil
 	}
 
 	return nil, fmt.Errorf("no informer found for %v", resource)

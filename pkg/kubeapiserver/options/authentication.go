@@ -685,7 +685,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 			versionedInformer.Core().V1().ServiceAccounts().Lister(),
 		)
 	}
-	authenticatorConfig.SecretsWriter = extclient.CoreV1()
+	authenticatorConfig.SecretsWriter = extclient.CoreV1().Secrets()
 
 	if authenticatorConfig.BootstrapToken {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(

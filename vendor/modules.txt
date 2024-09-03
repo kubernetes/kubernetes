@@ -394,14 +394,18 @@ github.com/karrick/godirwalk
 github.com/kcp-dev/apimachinery/v2/pkg/cache
 github.com/kcp-dev/apimachinery/v2/pkg/client
 github.com/kcp-dev/apimachinery/v2/third_party/informers
-# github.com/kcp-dev/client-go v0.0.0-20240902174011-56e1000cc9ce
+# github.com/kcp-dev/client-go v0.0.0-20240903163341-318c14d7636e
 ## explicit; go 1.22.0
 github.com/kcp-dev/client-go/apiextensions/client
 github.com/kcp-dev/client-go/apiextensions/client/typed/apiextensions/v1
+github.com/kcp-dev/client-go/apiextensions/client/typed/apiextensions/v1beta1
 github.com/kcp-dev/client-go/apiextensions/informers
+github.com/kcp-dev/client-go/apiextensions/informers/apiextensions
 github.com/kcp-dev/client-go/apiextensions/informers/apiextensions/v1
+github.com/kcp-dev/client-go/apiextensions/informers/apiextensions/v1beta1
 github.com/kcp-dev/client-go/apiextensions/informers/internalinterfaces
 github.com/kcp-dev/client-go/apiextensions/listers/apiextensions/v1
+github.com/kcp-dev/client-go/apiextensions/listers/apiextensions/v1beta1
 github.com/kcp-dev/client-go/dynamic
 github.com/kcp-dev/client-go/informers
 github.com/kcp-dev/client-go/informers/admissionregistration
