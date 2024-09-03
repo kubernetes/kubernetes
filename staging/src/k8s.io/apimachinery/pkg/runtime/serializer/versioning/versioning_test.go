@@ -17,6 +17,7 @@ limitations under the License.
 package versioning
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -111,7 +112,7 @@ func TestNestedEncode(t *testing.T) {
 		schema.GroupVersion{Group: "other"}, nil,
 		"TestNestedEncode",
 	)
-	if err := codec.Encode(n, io.Discard); err != n2.nestedErr {
+	if err := codec.Encode(n, io.Discard); !errors.Is(err, n2.nestedErr) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if n.nestedCalled || !n2.nestedCalled {
@@ -134,7 +135,7 @@ func TestNestedEncodeError(t *testing.T) {
 		schema.GroupVersion{Group: "other", Version: "v2"}, nil,
 		"TestNestedEncodeError",
 	)
-	if err := codec.Encode(n, io.Discard); err != n.nestedErr {
+	if err := codec.Encode(n, io.Discard); !errors.Is(err, n.nestedErr) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if n.GroupVersionKind() != gvk1 {
@@ -370,7 +371,11 @@ func TestDirectCodecEncode(t *testing.T) {
 		Encoder:     &serializer,
 		ObjectTyper: &typer,
 	}
-	c.Encode(&testDecodable{}, io.Discard)
+
+	if err := c.Encode(&testDecodable{}, io.Discard); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if e, a := "expected_group", serializer.encodingObjGVK.Group; e != a {
 		t.Errorf("expected group to be %v, got %v", e, a)
 	}
