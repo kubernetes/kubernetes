@@ -643,7 +643,7 @@ func autoConvert_v1alpha1_Mutation_To_admissionregistration_Mutation(in *v1alpha
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
 	out.MessageExpression = in.MessageExpression
 	out.ReinvocationPolicy = (*admissionregistration.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
-	out.PatchType = (*admissionregistration.PatchType)(unsafe.Pointer(in.PatchType))
+	out.PatchType = admissionregistration.PatchType(in.PatchType)
 	return nil
 }
 
@@ -658,7 +658,7 @@ func autoConvert_admissionregistration_Mutation_To_v1alpha1_Mutation(in *admissi
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
 	out.MessageExpression = in.MessageExpression
 	out.ReinvocationPolicy = (*admissionregistrationv1.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
-	out.PatchType = (*v1alpha1.PatchType)(unsafe.Pointer(in.PatchType))
+	out.PatchType = v1alpha1.PatchType(in.PatchType)
 	return nil
 }
 

@@ -202,7 +202,7 @@ message MatchResources {
   optional string matchPolicy = 7;
 }
 
-// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.
+// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 message MutatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
@@ -293,8 +293,8 @@ message MutatingAdmissionPolicySpec {
   // Required.
   optional MatchResources matchConstraints = 2;
 
-  // Mutations contain CEL expressions which is used to apply the mutation.
-  // Mutations may not be empty; a minimum of one Mutations is required.
+  // Mutations contain CEL expressions which are used to apply the mutation.
+  // Mutations may not be empty; a minimum of one mutation is required.
   // +listType=atomic
   // +optional
   repeated Mutation mutations = 3;
@@ -366,7 +366,7 @@ message Mutation {
   // +optional
   optional string message = 2;
 
-  // Reason represents a machine-readable description of why this validation failed.
+  // reason represents a machine-readable description of why this validation failed.
   // If this is the first validation in the list to fail, this reason, as well as the
   // corresponding HTTP response code, are used in the
   // HTTP response to the client.
@@ -408,6 +408,9 @@ message Mutation {
 
   // patchType indicates the patch strategy used.
   // Allowed values are "ApplyConfiguration" and "JSONPatch".
+  // "ApplyConfiguration" is to use structured merge algorithm stated [here](https://github.com/kubernetes-sigs/structured-merge-diff)
+  // to mutate the incoming object.
+  // "JSONPatch" is to use [JSON patch](https://jsonpatch.com/) to perform the mutation of the object.
   // +required
   optional string patchType = 6;
 }

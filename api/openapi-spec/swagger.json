@@ -955,7 +955,7 @@
       "x-kubernetes-map-type": "atomic"
     },
     "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy": {
-      "description": "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.",
+      "description": "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -1125,7 +1125,7 @@
           "description": "MatchConstraints specifies what resources this policy is designed to validate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. Required."
         },
         "mutations": {
-          "description": "Mutations contain CEL expressions which is used to apply the mutation. Mutations may not be empty; a minimum of one Mutations is required.",
+          "description": "Mutations contain CEL expressions which are used to apply the mutation. Mutations may not be empty; a minimum of one mutation is required.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Mutation"
           },
@@ -1155,11 +1155,11 @@
           "type": "string"
         },
         "patchType": {
-          "description": "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\".",
+          "description": "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\". \"ApplyConfiguration\" is to use structured merge algorithm stated [here](https://github.com/kubernetes-sigs/structured-merge-diff) to mutate the incoming object. \"JSONPatch\" is to use [JSON patch](https://jsonpatch.com/) to perform the mutation of the object.",
           "type": "string"
         },
         "reason": {
-          "description": "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
+          "description": "reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
           "type": "string"
         },
         "reinvocationPolicy": {

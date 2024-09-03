@@ -322,11 +322,6 @@ func (in *Mutation) DeepCopyInto(out *Mutation) {
 		*out = new(admissionregistrationv1.ReinvocationPolicyType)
 		**out = **in
 	}
-	if in.PatchType != nil {
-		in, out := &in.PatchType, &out.PatchType
-		*out = new(PatchType)
-		**out = **in
-	}
 	return
 }
 

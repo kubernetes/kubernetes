@@ -3085,7 +3085,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicy(ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.",
+				Description: "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -3329,7 +3329,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Mutations contain CEL expressions which is used to apply the mutation. Mutations may not be empty; a minimum of one Mutations is required.",
+							Description: "Mutations contain CEL expressions which are used to apply the mutation. Mutations may not be empty; a minimum of one mutation is required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -3405,7 +3405,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Mutation(ref common.Referen
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
+							Description: "reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3427,10 +3427,10 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Mutation(ref common.Referen
 					},
 					"patchType": {
 						SchemaProps: spec.SchemaProps{
-							Description: "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\".\n\nPossible enum values:\n - `\"ApplyConfiguration\"` indicates that the mutation is using apply configuration to mutate the object.\n - `\"JSONPatchPatchType\"` indicates that the object is mutated through JSONPatch.",
+							Description: "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\". \"ApplyConfiguration\" is to use structured merge algorithm stated [here](https://github.com/kubernetes-sigs/structured-merge-diff) to mutate the incoming object. \"JSONPatch\" is to use [JSON patch](https://jsonpatch.com/) to perform the mutation of the object.\n\nPossible enum values:\n - `\"PatchTypeApplyConfiguration\"` indicates that the mutation is using apply configuration to mutate the object.\n - `\"PatchTypeJSONPatch\"` indicates that the object is mutated through JSONPatch.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"ApplyConfiguration", "JSONPatchPatchType"},
+							Enum:        []interface{}{"PatchTypeApplyConfiguration", "PatchTypeJSONPatch"},
 						},
 					},
 				},
