@@ -528,8 +528,14 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// persistently.
 		//
 		// Claims are treated as "allocated" if they are in the assume cache
-		// or currently their allocation is in-flight.
-		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
+		// or currently their allocation is in-flight. This does not change
+		// during filtering, so we can determine that once.
+		claimLister := &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}
+		allocatedClaims, err := claimLister.ListAllAllocated()
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, staticClaimLister(allocatedClaims), pl.classLister, pl.sliceLister)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
@@ -560,6 +566,12 @@ func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.Resource
 		}
 	}
 	return allocated, nil
+}
+
+type staticClaimLister []*resourceapi.ResourceClaim
+
+func (cl staticClaimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
+	return cl, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
