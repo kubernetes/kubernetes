@@ -448,12 +448,12 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 	r.graph.lock.RLock()
 	defer r.graph.lock.RUnlock()
 
-	nodeVertex, exists := r.graph.getVertex_rlocked(nodeVertexType, "", nodeName)
+	nodeVertex, exists := r.graph.getVertexRLocked(nodeVertexType, "", nodeName)
 	if !exists {
 		return false, fmt.Errorf("unknown node '%s' cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
-	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
+	startingVertex, exists := r.graph.getVertexRLocked(startingType, startingNamespace, startingName)
 	if !exists {
 		return false, fmt.Errorf("node '%s' cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
