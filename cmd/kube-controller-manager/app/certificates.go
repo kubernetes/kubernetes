@@ -23,14 +23,21 @@ import (
 	"context"
 	"fmt"
 
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
+	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
@@ -200,16 +207,9 @@ func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 }
 
 func startRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	var (
-		rootCA []byte
-		err    error
-	)
-	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
-		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
-		}
-	} else {
-		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	if err != nil {
+		return nil, true, err
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
@@ -223,4 +223,78 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 	}
 	go sac.Run(ctx, 1)
 	return nil, true, nil
+}
+
+func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                 names.KubeAPIServerClusterTrustBundlePublisherController,
+		initFunc:             newKubeAPIServerSignerClusterTrustBundledPublisherController,
+		requiredFeatureGates: []featuregate.Feature{features.ClusterTrustBundle},
+	}
+}
+
+func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if len(rootCA) == 0 || !utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		return nil, false, nil
+	}
+
+	apiserverSignerClient := controllerContext.ClientBuilder.ClientOrDie("kube-apiserver-serving-clustertrustbundle-publisher")
+	ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient)
+	if err != nil {
+		return nil, false, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
+	}
+
+	if !ctbAvailable {
+		return nil, false, nil
+	}
+
+	servingSigners, err := dynamiccertificates.NewStaticCAContent("kube-apiserver-serving", rootCA)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+	}
+
+	ctbPublisher, err := ctbpublisher.NewClusterTrustBundlePublisher(
+		"kubernetes.io/kube-apiserver-serving",
+		servingSigners,
+		apiserverSignerClient,
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("error creating kube-apiserver-serving signer certificates publisher: %w", err)
+	}
+
+	go ctbPublisher.Run(ctx)
+	return nil, true, nil
+}
+
+func clusterTrustBundlesAvailable(client kubernetes.Interface) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersion(certificatesv1alpha1.SchemeGroupVersion.String())
+
+	if resList != nil {
+		// even in case of an error above there might be a partial list for APIs that
+		// were already successfully discovered
+		for _, r := range resList.APIResources {
+			if r.Name == "clustertrustbundles" {
+				return true, nil
+			}
+		}
+	}
+	return false, err
+}
+
+func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
+	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
+		return controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData, nil
+	}
+
+	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
+	}
+	return rootCA, nil
+
 }

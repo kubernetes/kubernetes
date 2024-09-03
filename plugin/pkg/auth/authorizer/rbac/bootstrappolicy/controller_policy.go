@@ -453,6 +453,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "kube-apiserver-serving-clustertrustbundle-publisher"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/kube-apiserver-serving").RuleOrDie(),
+				rbacv1helpers.NewRule("create", "update", "delete", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
 		Rules: []rbacv1.PolicyRule{
