@@ -468,10 +468,14 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.24"
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
   - default: true
     lockToDefault: true
     preRelease: GA
@@ -876,10 +880,14 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.21"
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.23"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.24"
 - name: TopologyManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false

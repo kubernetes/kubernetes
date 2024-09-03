@@ -210,7 +210,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	MinDomainsInPodTopologySpread: {
 		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.25"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 	},
 	MultiCIDRServiceAllocator: {
@@ -370,7 +371,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	TopologyAwareHints: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 	TopologyManagerPolicyAlphaOptions: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
