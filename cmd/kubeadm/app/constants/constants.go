@@ -403,6 +403,9 @@ const (
 	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	KubeControllerManagerPort = 10257
+	// KubeAPIServerPort is the default port for the apiserver.
+	// May be overridden by a flag at startup.
+	KubeAPIServerPort = 6443
 
 	// EtcdAdvertiseClientUrlsAnnotationKey is the annotation key on every etcd pod, describing the
 	// advertise client URLs

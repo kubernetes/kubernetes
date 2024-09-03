@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -60,25 +61,43 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	}
 
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, []kubeadmapi.EnvVar{})
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{
+		BindPort: kubeadmconstants.KubeAPIServerPort,
+	}, []kubeadmapi.EnvVar{})
 
 	var tests = []struct {
-		name          string
-		staticPodName string
-		env           []v1.EnvVar
+		name                 string
+		staticPodName        string
+		expectLivenessProbe  bool
+		expectReadinessProbe bool
+		expectStartupProbe   bool
+		probePort            int32
+		env                  []v1.EnvVar
 	}{
 		{
-			name:          "KubeAPIServer",
-			staticPodName: kubeadmconstants.KubeAPIServer,
+			name:                 "KubeAPIServer",
+			staticPodName:        kubeadmconstants.KubeAPIServer,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: true,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.KubeAPIServerPort,
 		},
 		{
-			name:          "KubeControllerManager",
-			staticPodName: kubeadmconstants.KubeControllerManager,
+			name:                 "KubeControllerManager",
+			staticPodName:        kubeadmconstants.KubeControllerManager,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: false,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.KubeControllerManagerPort,
 		},
 		{
-			name:          "KubeScheduler",
-			staticPodName: kubeadmconstants.KubeScheduler,
-			env:           []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
+			name:                 "KubeScheduler",
+			staticPodName:        kubeadmconstants.KubeScheduler,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: true,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.KubeSchedulerPort,
+			env:                  []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
 		},
 	}
 
@@ -95,6 +114,27 @@ func TestGetStaticPodSpecs(t *testing.T) {
 						t.Errorf("expected env: %v, got: %v", tc.env, spec.Spec.Containers[0].Env)
 					}
 				}
+
+				if tc.expectLivenessProbe != (spec.Spec.Containers[0].LivenessProbe != nil) {
+					t.Errorf("expected livenessProbe: %v, got: %v", tc.expectLivenessProbe, (spec.Spec.Containers[0].LivenessProbe != nil))
+				}
+				if tc.expectReadinessProbe != (spec.Spec.Containers[0].ReadinessProbe != nil) {
+					t.Errorf("expected readinessProbe: %v, got: %v", tc.expectReadinessProbe, (spec.Spec.Containers[0].ReadinessProbe != nil))
+				}
+				if tc.expectStartupProbe != (spec.Spec.Containers[0].StartupProbe != nil) {
+					t.Errorf("expected startupProbe: %v, got: %v", tc.expectStartupProbe, (spec.Spec.Containers[0].StartupProbe != nil))
+				}
+
+				if spec.Spec.Containers[0].LivenessProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port) {
+					t.Errorf("expected livenessProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port)
+				}
+				if spec.Spec.Containers[0].ReadinessProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port) {
+					t.Errorf("expected readinessProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port)
+				}
+				if spec.Spec.Containers[0].StartupProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port) {
+					t.Errorf("expected startupProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port)
+				}
+
 			} else {
 				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
