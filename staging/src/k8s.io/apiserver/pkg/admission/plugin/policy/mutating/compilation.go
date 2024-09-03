@@ -78,6 +78,9 @@ func CompileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariable
 	if issues != nil {
 		return nil, fmt.Errorf("cannot compile CEL expression: %v", issues)
 	}
+	if ast.OutputType().Kind() != cel.StructKind {
+		return nil, fmt.Errorf("must evaluate to struct type")
+	}
 	program, err := env.Program(ast)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initiate program: %w", err)
