@@ -206,6 +206,7 @@ const (
 	// owner: @andrewsykim
 	// alpha: v1.23
 	// beta: v1.29
+	// GA: v1.31
 	//
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
