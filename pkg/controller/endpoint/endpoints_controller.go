@@ -537,7 +537,16 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(ctx, newEndpoints, metav1.CreateOptions{})
 	} else {
 		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(ctx, newEndpoints, metav1.UpdateOptions{})
+		var updatedEndpoints *v1.Endpoints
+		updatedEndpoints, err = e.client.CoreV1().Endpoints(service.Namespace).Update(ctx, newEndpoints, metav1.UpdateOptions{})
+		// a webhook could potentially cause endpoints update operation became noop and return same resourceVersion.
+		// see https://github.com/kubernetes/kubernetes/issues/126578#issuecomment-2314368183
+		if err == nil && updatedEndpoints.ResourceVersion != currentEndpoints.ResourceVersion {
+			// If the current endpoints is updated we track the old resource version, so
+			// if we obtain this resource version again from the lister we know is outdated
+			// and we need to retry later to wait for the informer cache to be up-to-date.
+			e.staleEndpointsTracker.Stale(currentEndpoints)
+		}
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {
@@ -560,12 +569,6 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 
 		return err
-	}
-	// If the current endpoints is updated we track the old resource version, so
-	// if we obtain this resource version again from the lister we know is outdated
-	// and we need to retry later to wait for the informer cache to be up-to-date.
-	if !createEndpoints {
-		e.staleEndpointsTracker.Stale(currentEndpoints)
 	}
 	return nil
 }
