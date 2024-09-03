@@ -166,22 +166,6 @@ const (
 	// This prevents watch cache from being starved by other watches.
 	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
 
-	// owner: @apelisse, @lavalamp
-	// alpha: v1.14
-	// beta: v1.16
-	// stable: v1.22
-	//
-	// Server-side apply. Merging happens on the server.
-	ServerSideApply featuregate.Feature = "ServerSideApply"
-
-	// owner: @kevindelgado
-	// kep: https://kep.k8s.io/2885
-	// alpha: v1.23
-	// beta: v1.24
-	//
-	// Enables server-side field validation.
-	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
-
 	// owner: @enj
 	// beta: v1.29
 	//
@@ -360,10 +344,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
 
 	SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
-
-	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 
