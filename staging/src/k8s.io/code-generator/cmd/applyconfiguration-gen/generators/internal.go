@@ -74,6 +74,8 @@ func (g *internalGenerator) GenerateType(c *generator.Context, _ *types.Type, w 
 		"schemaYAML":    string(schemaYAML),
 		"smdParser":     smdParser,
 		"smdNewParser":  smdNewParser,
+		"fmtSprintf":    fmtSprintf,
+		"syncOnce":      syncOnce,
 		"yamlObject":    yamlObject,
 		"yamlUnmarshal": yamlUnmarshal,
 	})
@@ -87,13 +89,13 @@ func Parser() *{{.smdParser|raw}} {
 		var err error
 		parser, err = {{.smdNewParser|raw}}(schemaYAML)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to parse schema: %v", err))
+			panic({{.fmtSprintf|raw}}("Failed to parse schema: %v", err))
 		}
 	})
 	return parser
 }
 
-var parserOnce sync.Once
+var parserOnce {{.syncOnce|raw}}
 var parser *{{.smdParser|raw}}
 var schemaYAML = {{.yamlObject|raw}}(` + "`{{.schemaYAML}}`" + `)
 `

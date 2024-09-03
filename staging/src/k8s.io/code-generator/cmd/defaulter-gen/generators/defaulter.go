@@ -823,7 +823,7 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	})
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	g.generateDefaulter(t, callTree, sw)
+	g.generateDefaulter(c, t, callTree, sw)
 	return sw.Error()
 }
 
@@ -833,9 +833,9 @@ func defaultingArgsFromType(inType *types.Type) generator.Args {
 	}
 }
 
-func (g *genDefaulter) generateDefaulter(inType *types.Type, callTree *callNode, sw *generator.SnippetWriter) {
+func (g *genDefaulter) generateDefaulter(c *generator.Context, inType *types.Type, callTree *callNode, sw *generator.SnippetWriter) {
 	sw.Do("func $.inType|objectdefaultfn$(in *$.inType|raw$) {\n", defaultingArgsFromType(inType))
-	callTree.WriteMethod("in", 0, nil, sw)
+	callTree.WriteMethod(c, "in", 0, nil, sw)
 	sw.Do("}\n\n", nil)
 }
 
@@ -996,15 +996,19 @@ func getTypeZeroValue(t string) (interface{}, error) {
 	return defaultZero, nil
 }
 
-func (n *callNode) writeDefaulter(varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
+func (n *callNode) writeDefaulter(c *generator.Context, varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
 	if n.defaultValue.IsEmpty() {
 		return
 	}
+
+	jsonUnmarshalType := c.Universe.Type(types.Name{Package: "encoding/json", Name: "Unmarshal"})
+
 	args := generator.Args{
-		"defaultValue": n.defaultValue.Resolved(),
-		"varName":      varName,
-		"index":        index,
-		"varTopType":   n.defaultTopLevelType,
+		"defaultValue":  n.defaultValue.Resolved(),
+		"varName":       varName,
+		"index":         index,
+		"varTopType":    n.defaultTopLevelType,
+		"jsonUnmarshal": jsonUnmarshalType,
 	}
 
 	variablePlaceholder := ""
@@ -1101,13 +1105,13 @@ func (n *callNode) writeDefaulter(varName string, index string, isVarPointer boo
 		// This applies to maps with non-primitive values (eg: map[string]SubStruct)
 		if n.key {
 			sw.Do("$.mapDefaultVar$ := $.varName$[$.index$]\n", args)
-			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
+			sw.Do("if err := $.jsonUnmarshal|raw$([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
 		} else {
 			variablePointer := variablePlaceholder
 			if !isVarPointer {
 				variablePointer = "&" + variablePointer
 			}
-			sw.Do(fmt.Sprintf("if err := json.Unmarshal([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
+			sw.Do(fmt.Sprintf("if err := $.jsonUnmarshal|raw$([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
 		}
 		sw.Do("panic(err)\n", nil)
 		sw.Do("}\n", nil)
@@ -1121,7 +1125,7 @@ func (n *callNode) writeDefaulter(varName string, index string, isVarPointer boo
 // WriteMethod performs an in-order traversal of the calltree, generating loops and if blocks as necessary
 // to correctly turn the call tree into a method body that invokes all calls on all child nodes of the call tree.
 // Depth is used to generate local variables at the proper depth.
-func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode, sw *generator.SnippetWriter) {
+func (n *callNode) WriteMethod(c *generator.Context, varName string, depth int, ancestors []*callNode, sw *generator.SnippetWriter) {
 	// if len(n.call) > 0 {
 	// 	sw.Do(fmt.Sprintf("// %s\n", callPath(append(ancestors, n)).String()), nil)
 	// }
@@ -1153,10 +1157,10 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 			}
 		}
 
-		n.writeDefaulter(varName, index, isPointer, sw)
+		n.writeDefaulter(c, varName, index, isPointer, sw)
 		n.writeCalls(local, true, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(local, depth+1, append(ancestors, n), sw)
+			n.children[i].WriteMethod(c, local, depth+1, append(ancestors, n), sw)
 		}
 		sw.Do("}\n", nil)
 	case n.key:
@@ -1165,14 +1169,14 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 			index = index + "_" + ancestors[len(ancestors)-1].field
 			vars["index"] = index
 			sw.Do("for $.index$ := range $.var$ {\n", vars)
-			n.writeDefaulter(varName, index, isPointer, sw)
+			n.writeDefaulter(c, varName, index, isPointer, sw)
 			sw.Do("}\n", nil)
 		}
 	default:
-		n.writeDefaulter(varName, index, isPointer, sw)
+		n.writeDefaulter(c, varName, index, isPointer, sw)
 		n.writeCalls(varName, isPointer, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(varName, depth, append(ancestors, n), sw)
+			n.children[i].WriteMethod(c, varName, depth, append(ancestors, n), sw)
 		}
 	}
 
