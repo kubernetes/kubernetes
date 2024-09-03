@@ -628,6 +628,7 @@ const (
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4369
 	// alpha: v1.30
+	// beta: v1.32
 	//
 	// Allow almost all printable ASCII characters in environment variables
 	RelaxedEnvironmentVariableValidation featuregate.Feature = "RelaxedEnvironmentVariableValidation"
