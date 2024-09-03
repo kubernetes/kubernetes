@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CronJobLister helps list CronJobs.
@@ -30,7 +30,7 @@ import (
 type CronJobLister interface {
 	// List lists all CronJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.CronJob, err error)
+	List(selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
 	// CronJobs returns an object that can list and get CronJobs.
 	CronJobs(namespace string) CronJobNamespaceLister
 	CronJobListerExpansion
@@ -38,17 +38,17 @@ type CronJobLister interface {
 
 // cronJobLister implements the CronJobLister interface.
 type cronJobLister struct {
-	listers.ResourceIndexer[*v1beta1.CronJob]
+	listers.ResourceIndexer[*batchv1beta1.CronJob]
 }
 
 // NewCronJobLister returns a new CronJobLister.
 func NewCronJobLister(indexer cache.Indexer) CronJobLister {
-	return &cronJobLister{listers.New[*v1beta1.CronJob](indexer, v1beta1.Resource("cronjob"))}
+	return &cronJobLister{listers.New[*batchv1beta1.CronJob](indexer, batchv1beta1.Resource("cronjob"))}
 }
 
 // CronJobs returns an object that can list and get CronJobs.
 func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
-	return cronJobNamespaceLister{listers.NewNamespaced[*v1beta1.CronJob](s.ResourceIndexer, namespace)}
+	return cronJobNamespaceLister{listers.NewNamespaced[*batchv1beta1.CronJob](s.ResourceIndexer, namespace)}
 }
 
 // CronJobNamespaceLister helps list and get CronJobs.
@@ -56,15 +56,15 @@ func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
 type CronJobNamespaceLister interface {
 	// List lists all CronJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.CronJob, err error)
+	List(selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
 	// Get retrieves the CronJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.CronJob, error)
+	Get(name string) (*batchv1beta1.CronJob, error)
 	CronJobNamespaceListerExpansion
 }
 
 // cronJobNamespaceLister implements the CronJobNamespaceLister
 // interface.
 type cronJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.CronJob]
+	listers.ResourceIndexer[*batchv1beta1.CronJob]
 }

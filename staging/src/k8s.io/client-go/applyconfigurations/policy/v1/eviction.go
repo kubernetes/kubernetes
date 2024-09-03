@@ -20,19 +20,19 @@ package v1
 
 import (
 	policyv1 "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	DeleteOptions                        *metav1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
 // Eviction constructs a declarative configuration of the Eviction type for use with
@@ -155,7 +155,7 @@ func (b *EvictionApplyConfiguration) WithGeneration(value int64) *EvictionApplyC
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *EvictionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *EvictionApplyConfiguration {
+func (b *EvictionApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *EvictionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *E
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *EvictionApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *EvictionApplyConfiguration {
+func (b *EvictionApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *EvictionApplyConfiguration) WithAnnotations(entries map[string]string) 
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *EvictionApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *EvictionApplyConfiguration {
+func (b *EvictionApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,14 +236,14 @@ func (b *EvictionApplyConfiguration) WithFinalizers(values ...string) *EvictionA
 
 func (b *EvictionApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
 // WithDeleteOptions sets the DeleteOptions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeleteOptions field is set to the value of the last call.
-func (b *EvictionApplyConfiguration) WithDeleteOptions(value *v1.DeleteOptionsApplyConfiguration) *EvictionApplyConfiguration {
+func (b *EvictionApplyConfiguration) WithDeleteOptions(value *metav1.DeleteOptionsApplyConfiguration) *EvictionApplyConfiguration {
 	b.DeleteOptions = value
 	return b
 }

@@ -19,11 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	"net/http"
+	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
-	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type ApiregistrationV1beta1Interface interface {
@@ -85,7 +85,7 @@ func New(c rest.Interface) *ApiregistrationV1beta1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1beta1.SchemeGroupVersion
+	gv := apiregistrationv1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

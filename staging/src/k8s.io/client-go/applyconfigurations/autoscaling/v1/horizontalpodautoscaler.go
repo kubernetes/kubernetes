@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiautoscalingv1 "k8s.io/api/autoscaling/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // HorizontalPodAutoscalerApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscaler type for use
 // with apply.
 type HorizontalPodAutoscalerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler constructs a declarative configuration of the HorizontalPodAutoscaler type for use with
@@ -58,18 +58,18 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "")
 }
 
 // ExtractHorizontalPodAutoscalerStatus is the same as ExtractHorizontalPodAutoscaler except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "status")
 }
 
-func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
 	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *HorizontalPodAutoscalerApplyConfiguration) WithGeneration(value int64) 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerApplyConfiguration) WithCreationTimestamp(value metav1.Time) *HorizontalPodAutoscalerApplyConfiguration {
+func (b *HorizontalPodAutoscalerApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *HorizontalPodAutoscalerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *HorizontalPodAutoscalerApplyConfiguration) WithCreationTimestamp(value 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *HorizontalPodAutoscalerApplyConfiguration {
+func (b *HorizontalPodAutoscalerApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *HorizontalPodAutoscalerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *HorizontalPodAutoscalerApplyConfiguration) WithAnnotations(entries map[
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *HorizontalPodAutoscalerApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *HorizontalPodAutoscalerApplyConfiguration {
+func (b *HorizontalPodAutoscalerApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *HorizontalPodAutoscalerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *HorizontalPodAutoscalerApplyConfiguration) WithFinalizers(values ...str
 
 func (b *HorizontalPodAutoscalerApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type DaemonSetsGetter interface {
 
 // DaemonSetInterface has methods to work with DaemonSet resources.
 type DaemonSetInterface interface {
-	Create(ctx context.Context, daemonSet *v1.DaemonSet, opts metav1.CreateOptions) (*v1.DaemonSet, error)
-	Update(ctx context.Context, daemonSet *v1.DaemonSet, opts metav1.UpdateOptions) (*v1.DaemonSet, error)
+	Create(ctx context.Context, daemonSet *appsv1.DaemonSet, opts metav1.CreateOptions) (*appsv1.DaemonSet, error)
+	Update(ctx context.Context, daemonSet *appsv1.DaemonSet, opts metav1.UpdateOptions) (*appsv1.DaemonSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, daemonSet *v1.DaemonSet, opts metav1.UpdateOptions) (*v1.DaemonSet, error)
+	UpdateStatus(ctx context.Context, daemonSet *appsv1.DaemonSet, opts metav1.UpdateOptions) (*appsv1.DaemonSet, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.DaemonSet, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.DaemonSetList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*appsv1.DaemonSet, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*appsv1.DaemonSetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DaemonSet, err error)
-	Apply(ctx context.Context, daemonSet *appsv1.DaemonSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaemonSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *appsv1.DaemonSet, err error)
+	Apply(ctx context.Context, daemonSet *applyconfigurationsappsv1.DaemonSetApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.DaemonSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, daemonSet *appsv1.DaemonSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaemonSet, err error)
+	ApplyStatus(ctx context.Context, daemonSet *applyconfigurationsappsv1.DaemonSetApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	*gentype.ClientWithListAndApply[*v1.DaemonSet, *v1.DaemonSetList, *appsv1.DaemonSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1.DaemonSet, *appsv1.DaemonSetList, *applyconfigurationsappsv1.DaemonSetApplyConfiguration]
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *AppsV1Client, namespace string) *daemonSets {
 	return &daemonSets{
-		gentype.NewClientWithListAndApply[*v1.DaemonSet, *v1.DaemonSetList, *appsv1.DaemonSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1.DaemonSet, *appsv1.DaemonSetList, *applyconfigurationsappsv1.DaemonSetApplyConfiguration](
 			"daemonsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.DaemonSet { return &v1.DaemonSet{} },
-			func() *v1.DaemonSetList { return &v1.DaemonSetList{} }),
+			func() *appsv1.DaemonSet { return &appsv1.DaemonSet{} },
+			func() *appsv1.DaemonSetList { return &appsv1.DaemonSetList{} }),
 	}
 }

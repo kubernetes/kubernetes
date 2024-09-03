@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PersistentVolumeClaimLister helps list PersistentVolumeClaims.
@@ -30,7 +30,7 @@ import (
 type PersistentVolumeClaimLister interface {
 	// List lists all PersistentVolumeClaims in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)
+	List(selector labels.Selector) (ret []*corev1.PersistentVolumeClaim, err error)
 	// PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 	PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister
 	PersistentVolumeClaimListerExpansion
@@ -38,17 +38,17 @@ type PersistentVolumeClaimLister interface {
 
 // persistentVolumeClaimLister implements the PersistentVolumeClaimLister interface.
 type persistentVolumeClaimLister struct {
-	listers.ResourceIndexer[*v1.PersistentVolumeClaim]
+	listers.ResourceIndexer[*corev1.PersistentVolumeClaim]
 }
 
 // NewPersistentVolumeClaimLister returns a new PersistentVolumeClaimLister.
 func NewPersistentVolumeClaimLister(indexer cache.Indexer) PersistentVolumeClaimLister {
-	return &persistentVolumeClaimLister{listers.New[*v1.PersistentVolumeClaim](indexer, v1.Resource("persistentvolumeclaim"))}
+	return &persistentVolumeClaimLister{listers.New[*corev1.PersistentVolumeClaim](indexer, corev1.Resource("persistentvolumeclaim"))}
 }
 
 // PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister {
-	return persistentVolumeClaimNamespaceLister{listers.NewNamespaced[*v1.PersistentVolumeClaim](s.ResourceIndexer, namespace)}
+	return persistentVolumeClaimNamespaceLister{listers.NewNamespaced[*corev1.PersistentVolumeClaim](s.ResourceIndexer, namespace)}
 }
 
 // PersistentVolumeClaimNamespaceLister helps list and get PersistentVolumeClaims.
@@ -56,15 +56,15 @@ func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) P
 type PersistentVolumeClaimNamespaceLister interface {
 	// List lists all PersistentVolumeClaims in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)
+	List(selector labels.Selector) (ret []*corev1.PersistentVolumeClaim, err error)
 	// Get retrieves the PersistentVolumeClaim from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PersistentVolumeClaim, error)
+	Get(name string) (*corev1.PersistentVolumeClaim, error)
 	PersistentVolumeClaimNamespaceListerExpansion
 }
 
 // persistentVolumeClaimNamespaceLister implements the PersistentVolumeClaimNamespaceLister
 // interface.
 type persistentVolumeClaimNamespaceLister struct {
-	listers.ResourceIndexer[*v1.PersistentVolumeClaim]
+	listers.ResourceIndexer[*corev1.PersistentVolumeClaim]
 }

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 // CronJobSpecApplyConfiguration represents a declarative configuration of the CronJobSpec type for use
@@ -28,7 +28,7 @@ type CronJobSpecApplyConfiguration struct {
 	Schedule                   *string                            `json:"schedule,omitempty"`
 	TimeZone                   *string                            `json:"timeZone,omitempty"`
 	StartingDeadlineSeconds    *int64                             `json:"startingDeadlineSeconds,omitempty"`
-	ConcurrencyPolicy          *v1.ConcurrencyPolicy              `json:"concurrencyPolicy,omitempty"`
+	ConcurrencyPolicy          *batchv1.ConcurrencyPolicy         `json:"concurrencyPolicy,omitempty"`
 	Suspend                    *bool                              `json:"suspend,omitempty"`
 	JobTemplate                *JobTemplateSpecApplyConfiguration `json:"jobTemplate,omitempty"`
 	SuccessfulJobsHistoryLimit *int32                             `json:"successfulJobsHistoryLimit,omitempty"`
@@ -68,7 +68,7 @@ func (b *CronJobSpecApplyConfiguration) WithStartingDeadlineSeconds(value int64)
 // WithConcurrencyPolicy sets the ConcurrencyPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ConcurrencyPolicy field is set to the value of the last call.
-func (b *CronJobSpecApplyConfiguration) WithConcurrencyPolicy(value v1.ConcurrencyPolicy) *CronJobSpecApplyConfiguration {
+func (b *CronJobSpecApplyConfiguration) WithConcurrencyPolicy(value batchv1.ConcurrencyPolicy) *CronJobSpecApplyConfiguration {
 	b.ConcurrencyPolicy = &value
 	return b
 }

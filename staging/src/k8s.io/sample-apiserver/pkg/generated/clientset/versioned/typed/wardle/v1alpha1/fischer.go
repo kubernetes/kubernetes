@@ -19,14 +19,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	applyconfigurationwardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -38,32 +38,32 @@ type FischersGetter interface {
 
 // FischerInterface has methods to work with Fischer resources.
 type FischerInterface interface {
-	Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (*v1alpha1.Fischer, error)
-	Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (*v1alpha1.Fischer, error)
+	Create(ctx context.Context, fischer *wardlev1alpha1.Fischer, opts v1.CreateOptions) (*wardlev1alpha1.Fischer, error)
+	Update(ctx context.Context, fischer *wardlev1alpha1.Fischer, opts v1.UpdateOptions) (*wardlev1alpha1.Fischer, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Fischer, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*wardlev1alpha1.Fischer, error)
+	List(ctx context.Context, opts v1.ListOptions) (*wardlev1alpha1.FischerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error)
-	Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *wardlev1alpha1.Fischer, err error)
+	Apply(ctx context.Context, fischer *applyconfigurationwardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *wardlev1alpha1.Fischer, err error)
 	FischerExpansion
 }
 
 // fischers implements FischerInterface
 type fischers struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.Fischer, *v1alpha1.FischerList, *wardlev1alpha1.FischerApplyConfiguration]
+	*gentype.ClientWithListAndApply[*wardlev1alpha1.Fischer, *wardlev1alpha1.FischerList, *applyconfigurationwardlev1alpha1.FischerApplyConfiguration]
 }
 
 // newFischers returns a Fischers
 func newFischers(c *WardleV1alpha1Client) *fischers {
 	return &fischers{
-		gentype.NewClientWithListAndApply[*v1alpha1.Fischer, *v1alpha1.FischerList, *wardlev1alpha1.FischerApplyConfiguration](
+		gentype.NewClientWithListAndApply[*wardlev1alpha1.Fischer, *wardlev1alpha1.FischerList, *applyconfigurationwardlev1alpha1.FischerApplyConfiguration](
 			"fischers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.Fischer { return &v1alpha1.Fischer{} },
-			func() *v1alpha1.FischerList { return &v1alpha1.FischerList{} }),
+			func() *wardlev1alpha1.Fischer { return &wardlev1alpha1.Fischer{} },
+			func() *wardlev1alpha1.FischerList { return &wardlev1alpha1.FischerList{} }),
 	}
 }

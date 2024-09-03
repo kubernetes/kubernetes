@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PersistentVolumeSpecApplyConfiguration represents a declarative configuration of the PersistentVolumeSpec type for use
 // with apply.
 type PersistentVolumeSpecApplyConfiguration struct {
-	Capacity                                 *v1.ResourceList `json:"capacity,omitempty"`
+	Capacity                                 *corev1.ResourceList `json:"capacity,omitempty"`
 	PersistentVolumeSourceApplyConfiguration `json:",inline"`
-	AccessModes                              []v1.PersistentVolumeAccessMode       `json:"accessModes,omitempty"`
+	AccessModes                              []corev1.PersistentVolumeAccessMode   `json:"accessModes,omitempty"`
 	ClaimRef                                 *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty"`
-	PersistentVolumeReclaimPolicy            *v1.PersistentVolumeReclaimPolicy     `json:"persistentVolumeReclaimPolicy,omitempty"`
+	PersistentVolumeReclaimPolicy            *corev1.PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 	StorageClassName                         *string                               `json:"storageClassName,omitempty"`
 	MountOptions                             []string                              `json:"mountOptions,omitempty"`
-	VolumeMode                               *v1.PersistentVolumeMode              `json:"volumeMode,omitempty"`
+	VolumeMode                               *corev1.PersistentVolumeMode          `json:"volumeMode,omitempty"`
 	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
 	VolumeAttributesClassName                *string                               `json:"volumeAttributesClassName,omitempty"`
 }
@@ -46,7 +46,7 @@ func PersistentVolumeSpec() *PersistentVolumeSpecApplyConfiguration {
 // WithCapacity sets the Capacity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Capacity field is set to the value of the last call.
-func (b *PersistentVolumeSpecApplyConfiguration) WithCapacity(value v1.ResourceList) *PersistentVolumeSpecApplyConfiguration {
+func (b *PersistentVolumeSpecApplyConfiguration) WithCapacity(value corev1.ResourceList) *PersistentVolumeSpecApplyConfiguration {
 	b.Capacity = &value
 	return b
 }
@@ -230,7 +230,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithCSI(value *CSIPersistentVol
 // WithAccessModes adds the given value to the AccessModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AccessModes field.
-func (b *PersistentVolumeSpecApplyConfiguration) WithAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeSpecApplyConfiguration {
+func (b *PersistentVolumeSpecApplyConfiguration) WithAccessModes(values ...corev1.PersistentVolumeAccessMode) *PersistentVolumeSpecApplyConfiguration {
 	for i := range values {
 		b.AccessModes = append(b.AccessModes, values[i])
 	}
@@ -248,7 +248,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithClaimRef(value *ObjectRefer
 // WithPersistentVolumeReclaimPolicy sets the PersistentVolumeReclaimPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PersistentVolumeReclaimPolicy field is set to the value of the last call.
-func (b *PersistentVolumeSpecApplyConfiguration) WithPersistentVolumeReclaimPolicy(value v1.PersistentVolumeReclaimPolicy) *PersistentVolumeSpecApplyConfiguration {
+func (b *PersistentVolumeSpecApplyConfiguration) WithPersistentVolumeReclaimPolicy(value corev1.PersistentVolumeReclaimPolicy) *PersistentVolumeSpecApplyConfiguration {
 	b.PersistentVolumeReclaimPolicy = &value
 	return b
 }
@@ -274,7 +274,7 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithMountOptions(values ...stri
 // WithVolumeMode sets the VolumeMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VolumeMode field is set to the value of the last call.
-func (b *PersistentVolumeSpecApplyConfiguration) WithVolumeMode(value v1.PersistentVolumeMode) *PersistentVolumeSpecApplyConfiguration {
+func (b *PersistentVolumeSpecApplyConfiguration) WithVolumeMode(value corev1.PersistentVolumeMode) *PersistentVolumeSpecApplyConfiguration {
 	b.VolumeMode = &value
 	return b
 }

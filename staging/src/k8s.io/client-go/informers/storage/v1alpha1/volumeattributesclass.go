@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	apistoragev1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // VolumeAttributesClasses.
 type VolumeAttributesClassInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.VolumeAttributesClassLister
+	Lister() storagev1alpha1.VolumeAttributesClassLister
 }
 
 type volumeAttributesClassInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredVolumeAttributesClassInformer(client kubernetes.Interface, resyn
 				return client.StorageV1alpha1().VolumeAttributesClasses().Watch(context.TODO(), options)
 			},
 		},
-		&storagev1alpha1.VolumeAttributesClass{},
+		&apistoragev1alpha1.VolumeAttributesClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *volumeAttributesClassInformer) defaultInformer(client kubernetes.Interf
 }
 
 func (f *volumeAttributesClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1alpha1.VolumeAttributesClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistoragev1alpha1.VolumeAttributesClass{}, f.defaultInformer)
 }
 
-func (f *volumeAttributesClassInformer) Lister() v1alpha1.VolumeAttributesClassLister {
-	return v1alpha1.NewVolumeAttributesClassLister(f.Informer().GetIndexer())
+func (f *volumeAttributesClassInformer) Lister() storagev1alpha1.VolumeAttributesClassLister {
+	return storagev1alpha1.NewVolumeAttributesClassLister(f.Informer().GetIndexer())
 }

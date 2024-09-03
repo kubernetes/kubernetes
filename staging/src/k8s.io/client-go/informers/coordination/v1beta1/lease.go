@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
+	apicoordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/coordination/v1beta1"
+	coordinationv1beta1 "k8s.io/client-go/listers/coordination/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Leases.
 type LeaseInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.LeaseLister
+	Lister() coordinationv1beta1.LeaseLister
 }
 
 type leaseInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, res
 				return client.CoordinationV1beta1().Leases(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&coordinationv1beta1.Lease{},
+		&apicoordinationv1beta1.Lease{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *leaseInformer) defaultInformer(client kubernetes.Interface, resyncPerio
 }
 
 func (f *leaseInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&coordinationv1beta1.Lease{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicoordinationv1beta1.Lease{}, f.defaultInformer)
 }
 
-func (f *leaseInformer) Lister() v1beta1.LeaseLister {
-	return v1beta1.NewLeaseLister(f.Informer().GetIndexer())
+func (f *leaseInformer) Lister() coordinationv1beta1.LeaseLister {
+	return coordinationv1beta1.NewLeaseLister(f.Informer().GetIndexer())
 }

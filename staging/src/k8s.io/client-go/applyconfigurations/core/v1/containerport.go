@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ContainerPortApplyConfiguration represents a declarative configuration of the ContainerPort type for use
 // with apply.
 type ContainerPortApplyConfiguration struct {
-	Name          *string      `json:"name,omitempty"`
-	HostPort      *int32       `json:"hostPort,omitempty"`
-	ContainerPort *int32       `json:"containerPort,omitempty"`
-	Protocol      *v1.Protocol `json:"protocol,omitempty"`
-	HostIP        *string      `json:"hostIP,omitempty"`
+	Name          *string          `json:"name,omitempty"`
+	HostPort      *int32           `json:"hostPort,omitempty"`
+	ContainerPort *int32           `json:"containerPort,omitempty"`
+	Protocol      *corev1.Protocol `json:"protocol,omitempty"`
+	HostIP        *string          `json:"hostIP,omitempty"`
 }
 
 // ContainerPortApplyConfiguration constructs a declarative configuration of the ContainerPort type for use with
@@ -65,7 +65,7 @@ func (b *ContainerPortApplyConfiguration) WithContainerPort(value int32) *Contai
 // WithProtocol sets the Protocol field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Protocol field is set to the value of the last call.
-func (b *ContainerPortApplyConfiguration) WithProtocol(value v1.Protocol) *ContainerPortApplyConfiguration {
+func (b *ContainerPortApplyConfiguration) WithProtocol(value corev1.Protocol) *ContainerPortApplyConfiguration {
 	b.Protocol = &value
 	return b
 }

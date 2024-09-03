@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -32,7 +32,7 @@ import (
 type EndpointSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	AddressType                      *v1beta1.AddressType             `json:"addressType,omitempty"`
+	AddressType                      *discoveryv1beta1.AddressType    `json:"addressType,omitempty"`
 	Endpoints                        []EndpointApplyConfiguration     `json:"endpoints,omitempty"`
 	Ports                            []EndpointPortApplyConfiguration `json:"ports,omitempty"`
 }
@@ -59,18 +59,18 @@ func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEndpointSlice(endpointSlice *v1beta1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+func ExtractEndpointSlice(endpointSlice *discoveryv1beta1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
 	return extractEndpointSlice(endpointSlice, fieldManager, "")
 }
 
 // ExtractEndpointSliceStatus is the same as ExtractEndpointSlice except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractEndpointSliceStatus(endpointSlice *v1beta1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+func ExtractEndpointSliceStatus(endpointSlice *discoveryv1beta1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
 	return extractEndpointSlice(endpointSlice, fieldManager, "status")
 }
 
-func extractEndpointSlice(endpointSlice *v1beta1.EndpointSlice, fieldManager string, subresource string) (*EndpointSliceApplyConfiguration, error) {
+func extractEndpointSlice(endpointSlice *discoveryv1beta1.EndpointSlice, fieldManager string, subresource string) (*EndpointSliceApplyConfiguration, error) {
 	b := &EndpointSliceApplyConfiguration{}
 	err := managedfields.ExtractInto(endpointSlice, internal.Parser().Type("io.k8s.api.discovery.v1beta1.EndpointSlice"), fieldManager, b, subresource)
 	if err != nil {
@@ -245,7 +245,7 @@ func (b *EndpointSliceApplyConfiguration) ensureObjectMetaApplyConfigurationExis
 // WithAddressType sets the AddressType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AddressType field is set to the value of the last call.
-func (b *EndpointSliceApplyConfiguration) WithAddressType(value v1beta1.AddressType) *EndpointSliceApplyConfiguration {
+func (b *EndpointSliceApplyConfiguration) WithAddressType(value discoveryv1beta1.AddressType) *EndpointSliceApplyConfiguration {
 	b.AddressType = &value
 	return b
 }

@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ComponentStatusApplyConfiguration represents a declarative configuration of the ComponentStatus type for use
 // with apply.
 type ComponentStatusApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Conditions                           []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ComponentStatus constructs a declarative configuration of the ComponentStatus type for use with
@@ -56,18 +56,18 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+func ExtractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	return extractComponentStatus(componentStatus, fieldManager, "")
 }
 
 // ExtractComponentStatusStatus is the same as ExtractComponentStatus except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractComponentStatusStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+func ExtractComponentStatusStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	return extractComponentStatus(componentStatus, fieldManager, "status")
 }
 
-func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
+func extractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
 	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
 	if err != nil {
@@ -153,7 +153,7 @@ func (b *ComponentStatusApplyConfiguration) WithGeneration(value int64) *Compone
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ComponentStatusApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -162,7 +162,7 @@ func (b *ComponentStatusApplyConfiguration) WithCreationTimestamp(value metav1.T
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ComponentStatusApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -210,7 +210,7 @@ func (b *ComponentStatusApplyConfiguration) WithAnnotations(entries map[string]s
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -234,7 +234,7 @@ func (b *ComponentStatusApplyConfiguration) WithFinalizers(values ...string) *Co
 
 func (b *ComponentStatusApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

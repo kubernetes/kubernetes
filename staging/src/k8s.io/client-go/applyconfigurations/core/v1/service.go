@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
 type ServiceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ServiceStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Service constructs a declarative configuration of the Service type for use with
@@ -58,18 +58,18 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractService(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "")
 }
 
 // ExtractServiceStatus is the same as ExtractService except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceStatus(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "status")
 }
 
-func extractService(service *apicorev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
+func extractService(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
 	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *ServiceApplyConfiguration) WithGeneration(value int64) *ServiceApplyCon
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ServiceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *ServiceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Se
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ServiceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *ServiceApplyConfiguration) WithAnnotations(entries map[string]string) *
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ServiceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *ServiceApplyConfiguration) WithFinalizers(values ...string) *ServiceApp
 
 func (b *ServiceApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

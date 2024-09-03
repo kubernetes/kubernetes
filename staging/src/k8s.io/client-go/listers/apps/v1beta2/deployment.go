@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DeploymentLister helps list Deployments.
@@ -30,7 +30,7 @@ import (
 type DeploymentLister interface {
 	// List lists all Deployments in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Deployment, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.Deployment, err error)
 	// Deployments returns an object that can list and get Deployments.
 	Deployments(namespace string) DeploymentNamespaceLister
 	DeploymentListerExpansion
@@ -38,17 +38,17 @@ type DeploymentLister interface {
 
 // deploymentLister implements the DeploymentLister interface.
 type deploymentLister struct {
-	listers.ResourceIndexer[*v1beta2.Deployment]
+	listers.ResourceIndexer[*appsv1beta2.Deployment]
 }
 
 // NewDeploymentLister returns a new DeploymentLister.
 func NewDeploymentLister(indexer cache.Indexer) DeploymentLister {
-	return &deploymentLister{listers.New[*v1beta2.Deployment](indexer, v1beta2.Resource("deployment"))}
+	return &deploymentLister{listers.New[*appsv1beta2.Deployment](indexer, appsv1beta2.Resource("deployment"))}
 }
 
 // Deployments returns an object that can list and get Deployments.
 func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceLister {
-	return deploymentNamespaceLister{listers.NewNamespaced[*v1beta2.Deployment](s.ResourceIndexer, namespace)}
+	return deploymentNamespaceLister{listers.NewNamespaced[*appsv1beta2.Deployment](s.ResourceIndexer, namespace)}
 }
 
 // DeploymentNamespaceLister helps list and get Deployments.
@@ -56,15 +56,15 @@ func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceList
 type DeploymentNamespaceLister interface {
 	// List lists all Deployments in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Deployment, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.Deployment, err error)
 	// Get retrieves the Deployment from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.Deployment, error)
+	Get(name string) (*appsv1beta2.Deployment, error)
 	DeploymentNamespaceListerExpansion
 }
 
 // deploymentNamespaceLister implements the DeploymentNamespaceLister
 // interface.
 type deploymentNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta2.Deployment]
+	listers.ResourceIndexer[*appsv1beta2.Deployment]
 }

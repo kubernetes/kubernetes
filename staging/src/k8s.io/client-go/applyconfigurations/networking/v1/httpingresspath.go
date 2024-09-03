@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 )
 
 // HTTPIngressPathApplyConfiguration represents a declarative configuration of the HTTPIngressPath type for use
 // with apply.
 type HTTPIngressPathApplyConfiguration struct {
 	Path     *string                           `json:"path,omitempty"`
-	PathType *v1.PathType                      `json:"pathType,omitempty"`
+	PathType *networkingv1.PathType            `json:"pathType,omitempty"`
 	Backend  *IngressBackendApplyConfiguration `json:"backend,omitempty"`
 }
 
@@ -47,7 +47,7 @@ func (b *HTTPIngressPathApplyConfiguration) WithPath(value string) *HTTPIngressP
 // WithPathType sets the PathType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PathType field is set to the value of the last call.
-func (b *HTTPIngressPathApplyConfiguration) WithPathType(value v1.PathType) *HTTPIngressPathApplyConfiguration {
+func (b *HTTPIngressPathApplyConfiguration) WithPathType(value networkingv1.PathType) *HTTPIngressPathApplyConfiguration {
 	b.PathType = &value
 	return b
 }

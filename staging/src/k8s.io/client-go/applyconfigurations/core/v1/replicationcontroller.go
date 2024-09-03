@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ReplicationControllerApplyConfiguration represents a declarative configuration of the ReplicationController type for use
 // with apply.
 type ReplicationControllerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicationController constructs a declarative configuration of the ReplicationController type for use with
@@ -58,18 +58,18 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "")
 }
 
 // ExtractReplicationControllerStatus is the same as ExtractReplicationController except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractReplicationControllerStatus(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "status")
 }
 
-func extractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
+func extractReplicationController(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *ReplicationControllerApplyConfiguration) WithGeneration(value int64) *R
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ReplicationControllerApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *ReplicationControllerApplyConfiguration) WithCreationTimestamp(value me
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ReplicationControllerApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *ReplicationControllerApplyConfiguration) WithAnnotations(entries map[st
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ReplicationControllerApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *ReplicationControllerApplyConfiguration) WithFinalizers(values ...strin
 
 func (b *ReplicationControllerApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

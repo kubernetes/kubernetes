@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractVolumeAttributesClass(volumeAttributesClass *v1beta1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
+func ExtractVolumeAttributesClass(volumeAttributesClass *storagev1beta1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
 	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "")
 }
 
 // ExtractVolumeAttributesClassStatus is the same as ExtractVolumeAttributesClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractVolumeAttributesClassStatus(volumeAttributesClass *v1beta1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
+func ExtractVolumeAttributesClassStatus(volumeAttributesClass *storagev1beta1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
 	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "status")
 }
 
-func extractVolumeAttributesClass(volumeAttributesClass *v1beta1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
+func extractVolumeAttributesClass(volumeAttributesClass *storagev1beta1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
 	b := &VolumeAttributesClassApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttributesClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.VolumeAttributesClass"), fieldManager, b, subresource)
 	if err != nil {

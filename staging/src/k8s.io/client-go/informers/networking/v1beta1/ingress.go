@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	apinetworkingv1beta1 "k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/networking/v1beta1"
+	networkingv1beta1 "k8s.io/client-go/listers/networking/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Ingresses.
 type IngressInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.IngressLister
+	Lister() networkingv1beta1.IngressLister
 }
 
 type ingressInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredIngressInformer(client kubernetes.Interface, namespace string, r
 				return client.NetworkingV1beta1().Ingresses(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&networkingv1beta1.Ingress{},
+		&apinetworkingv1beta1.Ingress{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *ingressInformer) defaultInformer(client kubernetes.Interface, resyncPer
 }
 
 func (f *ingressInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networkingv1beta1.Ingress{}, f.defaultInformer)
+	return f.factory.InformerFor(&apinetworkingv1beta1.Ingress{}, f.defaultInformer)
 }
 
-func (f *ingressInformer) Lister() v1beta1.IngressLister {
-	return v1beta1.NewIngressLister(f.Informer().GetIndexer())
+func (f *ingressInformer) Lister() networkingv1beta1.IngressLister {
+	return networkingv1beta1.NewIngressLister(f.Informer().GetIndexer())
 }

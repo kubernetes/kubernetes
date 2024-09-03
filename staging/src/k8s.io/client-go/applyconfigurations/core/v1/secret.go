@@ -20,22 +20,22 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // SecretApplyConfiguration represents a declarative configuration of the Secret type for use
 // with apply.
 type SecretApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool              `json:"immutable,omitempty"`
-	Data                             map[string][]byte  `json:"data,omitempty"`
-	StringData                       map[string]string  `json:"stringData,omitempty"`
-	Type                             *corev1.SecretType `json:"type,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Immutable                            *bool              `json:"immutable,omitempty"`
+	Data                                 map[string][]byte  `json:"data,omitempty"`
+	StringData                           map[string]string  `json:"stringData,omitempty"`
+	Type                                 *corev1.SecretType `json:"type,omitempty"`
 }
 
 // Secret constructs a declarative configuration of the Secret type for use with
@@ -158,7 +158,7 @@ func (b *SecretApplyConfiguration) WithGeneration(value int64) *SecretApplyConfi
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *SecretApplyConfiguration) WithCreationTimestamp(value metav1.Time) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -167,7 +167,7 @@ func (b *SecretApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Sec
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *SecretApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -215,7 +215,7 @@ func (b *SecretApplyConfiguration) WithAnnotations(entries map[string]string) *S
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *SecretApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -239,7 +239,7 @@ func (b *SecretApplyConfiguration) WithFinalizers(values ...string) *SecretApply
 
 func (b *SecretApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

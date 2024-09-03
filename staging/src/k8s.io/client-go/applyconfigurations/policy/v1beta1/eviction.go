@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+func ExtractEviction(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
 	return extractEviction(eviction, fieldManager, "")
 }
 
 // ExtractEvictionStatus is the same as ExtractEviction except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractEvictionStatus(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+func ExtractEvictionStatus(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
 	return extractEviction(eviction, fieldManager, "status")
 }
 
-func extractEviction(eviction *v1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
+func extractEviction(eviction *policyv1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
 	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
 	if err != nil {

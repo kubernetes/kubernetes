@@ -19,16 +19,16 @@ limitations under the License.
 package v2beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	apiautoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v2beta2 "k8s.io/client-go/listers/autoscaling/v2beta2"
+	autoscalingv2beta2 "k8s.io/client-go/listers/autoscaling/v2beta2"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // HorizontalPodAutoscalers.
 type HorizontalPodAutoscalerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2beta2.HorizontalPodAutoscalerLister
+	Lister() autoscalingv2beta2.HorizontalPodAutoscalerLister
 }
 
 type horizontalPodAutoscalerInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredHorizontalPodAutoscalerInformer(client kubernetes.Interface, nam
 				return client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&autoscalingv2beta2.HorizontalPodAutoscaler{},
+		&apiautoscalingv2beta2.HorizontalPodAutoscaler{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *horizontalPodAutoscalerInformer) defaultInformer(client kubernetes.Inte
 }
 
 func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&autoscalingv2beta2.HorizontalPodAutoscaler{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiautoscalingv2beta2.HorizontalPodAutoscaler{}, f.defaultInformer)
 }
 
-func (f *horizontalPodAutoscalerInformer) Lister() v2beta2.HorizontalPodAutoscalerLister {
-	return v2beta2.NewHorizontalPodAutoscalerLister(f.Informer().GetIndexer())
+func (f *horizontalPodAutoscalerInformer) Lister() autoscalingv2beta2.HorizontalPodAutoscalerLister {
+	return autoscalingv2beta2.NewHorizontalPodAutoscalerLister(f.Informer().GetIndexer())
 }

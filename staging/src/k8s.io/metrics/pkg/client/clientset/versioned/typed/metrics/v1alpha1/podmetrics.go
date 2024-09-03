@@ -19,12 +19,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
@@ -36,26 +36,26 @@ type PodMetricsesGetter interface {
 
 // PodMetricsInterface has methods to work with PodMetrics resources.
 type PodMetricsInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PodMetrics, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PodMetricsList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*metricsv1alpha1.PodMetrics, error)
+	List(ctx context.Context, opts v1.ListOptions) (*metricsv1alpha1.PodMetricsList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	PodMetricsExpansion
 }
 
 // podMetricses implements PodMetricsInterface
 type podMetricses struct {
-	*gentype.ClientWithList[*v1alpha1.PodMetrics, *v1alpha1.PodMetricsList]
+	*gentype.ClientWithList[*metricsv1alpha1.PodMetrics, *metricsv1alpha1.PodMetricsList]
 }
 
 // newPodMetricses returns a PodMetricses
 func newPodMetricses(c *MetricsV1alpha1Client, namespace string) *podMetricses {
 	return &podMetricses{
-		gentype.NewClientWithList[*v1alpha1.PodMetrics, *v1alpha1.PodMetricsList](
+		gentype.NewClientWithList[*metricsv1alpha1.PodMetrics, *metricsv1alpha1.PodMetricsList](
 			"pods",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.PodMetrics { return &v1alpha1.PodMetrics{} },
-			func() *v1alpha1.PodMetricsList { return &v1alpha1.PodMetricsList{} }),
+			func() *metricsv1alpha1.PodMetrics { return &metricsv1alpha1.PodMetrics{} },
+			func() *metricsv1alpha1.PodMetricsList { return &metricsv1alpha1.PodMetricsList{} }),
 	}
 }

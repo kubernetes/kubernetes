@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
+	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -37,33 +37,33 @@ type FoosGetter interface {
 
 // FooInterface has methods to work with Foo resources.
 type FooInterface interface {
-	Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (*v1alpha1.Foo, error)
-	Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
+	Create(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.CreateOptions) (*samplecontrollerv1alpha1.Foo, error)
+	Update(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.UpdateOptions) (*samplecontrollerv1alpha1.Foo, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
+	UpdateStatus(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.UpdateOptions) (*samplecontrollerv1alpha1.Foo, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Foo, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FooList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*samplecontrollerv1alpha1.Foo, error)
+	List(ctx context.Context, opts v1.ListOptions) (*samplecontrollerv1alpha1.FooList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *samplecontrollerv1alpha1.Foo, err error)
 	FooExpansion
 }
 
 // foos implements FooInterface
 type foos struct {
-	*gentype.ClientWithList[*v1alpha1.Foo, *v1alpha1.FooList]
+	*gentype.ClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList]
 }
 
 // newFoos returns a Foos
 func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 	return &foos{
-		gentype.NewClientWithList[*v1alpha1.Foo, *v1alpha1.FooList](
+		gentype.NewClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList](
 			"foos",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.Foo { return &v1alpha1.Foo{} },
-			func() *v1alpha1.FooList { return &v1alpha1.FooList{} }),
+			func() *samplecontrollerv1alpha1.Foo { return &samplecontrollerv1alpha1.Foo{} },
+			func() *samplecontrollerv1alpha1.FooList { return &samplecontrollerv1alpha1.FooList{} }),
 	}
 }

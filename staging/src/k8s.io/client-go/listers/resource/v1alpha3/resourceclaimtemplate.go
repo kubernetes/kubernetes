@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ResourceClaimTemplateLister helps list ResourceClaimTemplates.
@@ -30,7 +30,7 @@ import (
 type ResourceClaimTemplateLister interface {
 	// List lists all ResourceClaimTemplates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha3.ResourceClaimTemplate, err error)
+	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
 	// ResourceClaimTemplates returns an object that can list and get ResourceClaimTemplates.
 	ResourceClaimTemplates(namespace string) ResourceClaimTemplateNamespaceLister
 	ResourceClaimTemplateListerExpansion
@@ -38,17 +38,17 @@ type ResourceClaimTemplateLister interface {
 
 // resourceClaimTemplateLister implements the ResourceClaimTemplateLister interface.
 type resourceClaimTemplateLister struct {
-	listers.ResourceIndexer[*v1alpha3.ResourceClaimTemplate]
+	listers.ResourceIndexer[*resourcev1alpha3.ResourceClaimTemplate]
 }
 
 // NewResourceClaimTemplateLister returns a new ResourceClaimTemplateLister.
 func NewResourceClaimTemplateLister(indexer cache.Indexer) ResourceClaimTemplateLister {
-	return &resourceClaimTemplateLister{listers.New[*v1alpha3.ResourceClaimTemplate](indexer, v1alpha3.Resource("resourceclaimtemplate"))}
+	return &resourceClaimTemplateLister{listers.New[*resourcev1alpha3.ResourceClaimTemplate](indexer, resourcev1alpha3.Resource("resourceclaimtemplate"))}
 }
 
 // ResourceClaimTemplates returns an object that can list and get ResourceClaimTemplates.
 func (s *resourceClaimTemplateLister) ResourceClaimTemplates(namespace string) ResourceClaimTemplateNamespaceLister {
-	return resourceClaimTemplateNamespaceLister{listers.NewNamespaced[*v1alpha3.ResourceClaimTemplate](s.ResourceIndexer, namespace)}
+	return resourceClaimTemplateNamespaceLister{listers.NewNamespaced[*resourcev1alpha3.ResourceClaimTemplate](s.ResourceIndexer, namespace)}
 }
 
 // ResourceClaimTemplateNamespaceLister helps list and get ResourceClaimTemplates.
@@ -56,15 +56,15 @@ func (s *resourceClaimTemplateLister) ResourceClaimTemplates(namespace string) R
 type ResourceClaimTemplateNamespaceLister interface {
 	// List lists all ResourceClaimTemplates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha3.ResourceClaimTemplate, err error)
+	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
 	// Get retrieves the ResourceClaimTemplate from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha3.ResourceClaimTemplate, error)
+	Get(name string) (*resourcev1alpha3.ResourceClaimTemplate, error)
 	ResourceClaimTemplateNamespaceListerExpansion
 }
 
 // resourceClaimTemplateNamespaceLister implements the ResourceClaimTemplateNamespaceLister
 // interface.
 type resourceClaimTemplateNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha3.ResourceClaimTemplate]
+	listers.ResourceIndexer[*resourcev1alpha3.ResourceClaimTemplate]
 }

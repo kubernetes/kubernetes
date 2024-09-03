@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,34 +30,34 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*v1.MutatingWebhookConfiguration))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.MutatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*admissionregistrationv1.MutatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*v1.MutatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*admissionregistrationv1.MutatingWebhookConfigurationList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*v1.ValidatingAdmissionPolicy))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*admissionregistrationv1.ValidatingAdmissionPolicy))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingAdmissionPolicyBinding{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyBinding(obj.(*v1.ValidatingAdmissionPolicyBinding))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingAdmissionPolicyBinding{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBinding(obj.(*admissionregistrationv1.ValidatingAdmissionPolicyBinding))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingAdmissionPolicyBindingList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyBindingList(obj.(*v1.ValidatingAdmissionPolicyBindingList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingAdmissionPolicyBindingList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBindingList(obj.(*admissionregistrationv1.ValidatingAdmissionPolicyBindingList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingAdmissionPolicyList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*v1.ValidatingAdmissionPolicyList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingAdmissionPolicyList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*admissionregistrationv1.ValidatingAdmissionPolicyList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*v1.ValidatingWebhookConfiguration))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*admissionregistrationv1.ValidatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*v1.ValidatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*admissionregistrationv1.ValidatingWebhookConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfiguration) {
+func SetObjectDefaults_MutatingWebhookConfiguration(in *admissionregistrationv1.MutatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_MutatingWebhook(a)
@@ -71,14 +71,14 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfig
 	}
 }
 
-func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1.MutatingWebhookConfigurationList) {
+func SetObjectDefaults_MutatingWebhookConfigurationList(in *admissionregistrationv1.MutatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_MutatingWebhookConfiguration(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1.ValidatingAdmissionPolicy) {
+func SetObjectDefaults_ValidatingAdmissionPolicy(in *admissionregistrationv1.ValidatingAdmissionPolicy) {
 	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
 	if in.Spec.MatchConstraints != nil {
 		SetDefaults_MatchResources(in.Spec.MatchConstraints)
@@ -93,7 +93,7 @@ func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1.ValidatingAdmissionPolic
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1.ValidatingAdmissionPolicyBinding) {
+func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *admissionregistrationv1.ValidatingAdmissionPolicyBinding) {
 	if in.Spec.MatchResources != nil {
 		SetDefaults_MatchResources(in.Spec.MatchResources)
 		for i := range in.Spec.MatchResources.ResourceRules {
@@ -107,21 +107,21 @@ func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1.ValidatingAdmissi
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyBindingList(in *v1.ValidatingAdmissionPolicyBindingList) {
+func SetObjectDefaults_ValidatingAdmissionPolicyBindingList(in *admissionregistrationv1.ValidatingAdmissionPolicyBindingList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingAdmissionPolicyBinding(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyList(in *v1.ValidatingAdmissionPolicyList) {
+func SetObjectDefaults_ValidatingAdmissionPolicyList(in *admissionregistrationv1.ValidatingAdmissionPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingAdmissionPolicy(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookConfiguration) {
+func SetObjectDefaults_ValidatingWebhookConfiguration(in *admissionregistrationv1.ValidatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_ValidatingWebhook(a)
@@ -135,7 +135,7 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookCo
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfigurationList(in *v1.ValidatingWebhookConfigurationList) {
+func SetObjectDefaults_ValidatingWebhookConfigurationList(in *admissionregistrationv1.ValidatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingWebhookConfiguration(a)

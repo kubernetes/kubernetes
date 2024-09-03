@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -39,7 +39,7 @@ type StorageClassApplyConfiguration struct {
 	ReclaimPolicy                    *corev1.PersistentVolumeReclaimPolicy                              `json:"reclaimPolicy,omitempty"`
 	MountOptions                     []string                                                           `json:"mountOptions,omitempty"`
 	AllowVolumeExpansion             *bool                                                              `json:"allowVolumeExpansion,omitempty"`
-	VolumeBindingMode                *v1beta1.VolumeBindingMode                                         `json:"volumeBindingMode,omitempty"`
+	VolumeBindingMode                *storagev1beta1.VolumeBindingMode                                  `json:"volumeBindingMode,omitempty"`
 	AllowedTopologies                []applyconfigurationscorev1.TopologySelectorTermApplyConfiguration `json:"allowedTopologies,omitempty"`
 }
 
@@ -64,18 +64,18 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStorageClass(storageClass *v1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+func ExtractStorageClass(storageClass *storagev1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
 	return extractStorageClass(storageClass, fieldManager, "")
 }
 
 // ExtractStorageClassStatus is the same as ExtractStorageClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractStorageClassStatus(storageClass *v1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+func ExtractStorageClassStatus(storageClass *storagev1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
 	return extractStorageClass(storageClass, fieldManager, "status")
 }
 
-func extractStorageClass(storageClass *v1beta1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
+func extractStorageClass(storageClass *storagev1beta1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
 	b := &StorageClassApplyConfiguration{}
 	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.StorageClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -297,7 +297,7 @@ func (b *StorageClassApplyConfiguration) WithAllowVolumeExpansion(value bool) *S
 // WithVolumeBindingMode sets the VolumeBindingMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VolumeBindingMode field is set to the value of the last call.
-func (b *StorageClassApplyConfiguration) WithVolumeBindingMode(value v1beta1.VolumeBindingMode) *StorageClassApplyConfiguration {
+func (b *StorageClassApplyConfiguration) WithVolumeBindingMode(value storagev1beta1.VolumeBindingMode) *StorageClassApplyConfiguration {
 	b.VolumeBindingMode = &value
 	return b
 }

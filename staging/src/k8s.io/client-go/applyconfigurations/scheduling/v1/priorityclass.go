@@ -21,22 +21,22 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PriorityClassApplyConfiguration represents a declarative configuration of the PriorityClass type for use
 // with apply.
 type PriorityClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Value                            *int32                   `json:"value,omitempty"`
-	GlobalDefault                    *bool                    `json:"globalDefault,omitempty"`
-	Description                      *string                  `json:"description,omitempty"`
-	PreemptionPolicy                 *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Value                                *int32                   `json:"value,omitempty"`
+	GlobalDefault                        *bool                    `json:"globalDefault,omitempty"`
+	Description                          *string                  `json:"description,omitempty"`
+	PreemptionPolicy                     *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // PriorityClass constructs a declarative configuration of the PriorityClass type for use with
@@ -157,7 +157,7 @@ func (b *PriorityClassApplyConfiguration) WithGeneration(value int64) *PriorityC
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PriorityClassApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -166,7 +166,7 @@ func (b *PriorityClassApplyConfiguration) WithCreationTimestamp(value metav1.Tim
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PriorityClassApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -214,7 +214,7 @@ func (b *PriorityClassApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PriorityClassApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -238,7 +238,7 @@ func (b *PriorityClassApplyConfiguration) WithFinalizers(values ...string) *Prio
 
 func (b *PriorityClassApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apirbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RoleApplyConfiguration represents a declarative configuration of the Role type for use
 // with apply.
 type RoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Rules                                []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }
 
 // Role constructs a declarative configuration of the Role type for use with
@@ -57,18 +57,18 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRole(role *apirbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+func ExtractRole(role *rbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
 	return extractRole(role, fieldManager, "")
 }
 
 // ExtractRoleStatus is the same as ExtractRole except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractRoleStatus(role *apirbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+func ExtractRoleStatus(role *rbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
 	return extractRole(role, fieldManager, "status")
 }
 
-func extractRole(role *apirbacv1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
+func extractRole(role *rbacv1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
 	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1.Role"), fieldManager, b, subresource)
 	if err != nil {
@@ -155,7 +155,7 @@ func (b *RoleApplyConfiguration) WithGeneration(value int64) *RoleApplyConfigura
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *RoleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RoleApplyConfiguration {
+func (b *RoleApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *RoleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RoleA
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *RoleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RoleApplyConfiguration {
+func (b *RoleApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *RoleApplyConfiguration) WithAnnotations(entries map[string]string) *Rol
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *RoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RoleApplyConfiguration {
+func (b *RoleApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,7 +236,7 @@ func (b *RoleApplyConfiguration) WithFinalizers(values ...string) *RoleApplyConf
 
 func (b *RoleApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

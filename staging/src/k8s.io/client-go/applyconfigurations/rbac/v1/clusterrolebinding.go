@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apirbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ClusterRoleBindingApplyConfiguration represents a declarative configuration of the ClusterRoleBinding type for use
 // with apply.
 type ClusterRoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                         []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Subjects                             []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	RoleRef                              *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
 }
 
 // ClusterRoleBinding constructs a declarative configuration of the ClusterRoleBinding type for use with
@@ -57,18 +57,18 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractClusterRoleBinding(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+func ExtractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
 	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "")
 }
 
 // ExtractClusterRoleBindingStatus is the same as ExtractClusterRoleBinding except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractClusterRoleBindingStatus(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+func ExtractClusterRoleBindingStatus(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
 	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "status")
 }
 
-func extractClusterRoleBinding(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
+func extractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
 	b := &ClusterRoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRoleBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *ClusterRoleBindingApplyConfiguration) WithGeneration(value int64) *Clus
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ClusterRoleBindingApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ClusterRoleBindingApplyConfiguration {
+func (b *ClusterRoleBindingApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ClusterRoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *ClusterRoleBindingApplyConfiguration) WithCreationTimestamp(value metav
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ClusterRoleBindingApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ClusterRoleBindingApplyConfiguration {
+func (b *ClusterRoleBindingApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ClusterRoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *ClusterRoleBindingApplyConfiguration) WithAnnotations(entries map[strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ClusterRoleBindingApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ClusterRoleBindingApplyConfiguration {
+func (b *ClusterRoleBindingApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ClusterRoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *ClusterRoleBindingApplyConfiguration) WithFinalizers(values ...string) 
 
 func (b *ClusterRoleBindingApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

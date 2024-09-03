@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // MutatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the MutatingWebhookConfiguration type for use
 // with apply.
 type MutatingWebhookConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                         []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Webhooks                             []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // MutatingWebhookConfiguration constructs a declarative configuration of the MutatingWebhookConfiguration type for use with
@@ -56,18 +56,18 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "")
 }
 
 // ExtractMutatingWebhookConfigurationStatus is the same as ExtractMutatingWebhookConfiguration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "status")
 }
 
-func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {
@@ -153,7 +153,7 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithGeneration(value in
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *MutatingWebhookConfigurationApplyConfiguration) WithCreationTimestamp(value metav1.Time) *MutatingWebhookConfigurationApplyConfiguration {
+func (b *MutatingWebhookConfigurationApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *MutatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -162,7 +162,7 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithCreationTimestamp(v
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *MutatingWebhookConfigurationApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *MutatingWebhookConfigurationApplyConfiguration {
+func (b *MutatingWebhookConfigurationApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *MutatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -210,7 +210,7 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithAnnotations(entries
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *MutatingWebhookConfigurationApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *MutatingWebhookConfigurationApplyConfiguration {
+func (b *MutatingWebhookConfigurationApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *MutatingWebhookConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -234,7 +234,7 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithFinalizers(values .
 
 func (b *MutatingWebhookConfigurationApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

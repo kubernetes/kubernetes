@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
+	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type DaemonSetsGetter interface {
 
 // DaemonSetInterface has methods to work with DaemonSet resources.
 type DaemonSetInterface interface {
-	Create(ctx context.Context, daemonSet *v1beta1.DaemonSet, opts v1.CreateOptions) (*v1beta1.DaemonSet, error)
-	Update(ctx context.Context, daemonSet *v1beta1.DaemonSet, opts v1.UpdateOptions) (*v1beta1.DaemonSet, error)
+	Create(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSet, opts v1.CreateOptions) (*extensionsv1beta1.DaemonSet, error)
+	Update(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSet, opts v1.UpdateOptions) (*extensionsv1beta1.DaemonSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, daemonSet *v1beta1.DaemonSet, opts v1.UpdateOptions) (*v1beta1.DaemonSet, error)
+	UpdateStatus(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSet, opts v1.UpdateOptions) (*extensionsv1beta1.DaemonSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.DaemonSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.DaemonSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*extensionsv1beta1.DaemonSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*extensionsv1beta1.DaemonSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.DaemonSet, err error)
-	Apply(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.DaemonSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *extensionsv1beta1.DaemonSet, err error)
+	Apply(ctx context.Context, daemonSet *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *extensionsv1beta1.DaemonSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.DaemonSet, err error)
+	ApplyStatus(ctx context.Context, daemonSet *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *extensionsv1beta1.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	*gentype.ClientWithListAndApply[*v1beta1.DaemonSet, *v1beta1.DaemonSetList, *extensionsv1beta1.DaemonSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*extensionsv1beta1.DaemonSet, *extensionsv1beta1.DaemonSetList, *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration]
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *ExtensionsV1beta1Client, namespace string) *daemonSets {
 	return &daemonSets{
-		gentype.NewClientWithListAndApply[*v1beta1.DaemonSet, *v1beta1.DaemonSetList, *extensionsv1beta1.DaemonSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*extensionsv1beta1.DaemonSet, *extensionsv1beta1.DaemonSetList, *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration](
 			"daemonsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.DaemonSet { return &v1beta1.DaemonSet{} },
-			func() *v1beta1.DaemonSetList { return &v1beta1.DaemonSetList{} }),
+			func() *extensionsv1beta1.DaemonSet { return &extensionsv1beta1.DaemonSet{} },
+			func() *extensionsv1beta1.DaemonSetList { return &extensionsv1beta1.DaemonSetList{} }),
 	}
 }

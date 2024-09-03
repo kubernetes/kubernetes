@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	apistoragev1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // VolumeAttachments.
 type VolumeAttachmentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.VolumeAttachmentLister
+	Lister() storagev1alpha1.VolumeAttachmentLister
 }
 
 type volumeAttachmentInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeri
 				return client.StorageV1alpha1().VolumeAttachments().Watch(context.TODO(), options)
 			},
 		},
-		&storagev1alpha1.VolumeAttachment{},
+		&apistoragev1alpha1.VolumeAttachment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *volumeAttachmentInformer) defaultInformer(client kubernetes.Interface, 
 }
 
 func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1alpha1.VolumeAttachment{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistoragev1alpha1.VolumeAttachment{}, f.defaultInformer)
 }
 
-func (f *volumeAttachmentInformer) Lister() v1alpha1.VolumeAttachmentLister {
-	return v1alpha1.NewVolumeAttachmentLister(f.Informer().GetIndexer())
+func (f *volumeAttachmentInformer) Lister() storagev1alpha1.VolumeAttachmentLister {
+	return storagev1alpha1.NewVolumeAttachmentLister(f.Informer().GetIndexer())
 }

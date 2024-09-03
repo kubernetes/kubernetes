@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PersistentVolumeStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeStatus type for use
 // with apply.
 type PersistentVolumeStatusApplyConfiguration struct {
-	Phase                   *v1.PersistentVolumePhase `json:"phase,omitempty"`
-	Message                 *string                   `json:"message,omitempty"`
-	Reason                  *string                   `json:"reason,omitempty"`
-	LastPhaseTransitionTime *metav1.Time              `json:"lastPhaseTransitionTime,omitempty"`
+	Phase                   *corev1.PersistentVolumePhase `json:"phase,omitempty"`
+	Message                 *string                       `json:"message,omitempty"`
+	Reason                  *string                       `json:"reason,omitempty"`
+	LastPhaseTransitionTime *metav1.Time                  `json:"lastPhaseTransitionTime,omitempty"`
 }
 
 // PersistentVolumeStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeStatus type for use with
@@ -41,7 +41,7 @@ func PersistentVolumeStatus() *PersistentVolumeStatusApplyConfiguration {
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *PersistentVolumeStatusApplyConfiguration) WithPhase(value v1.PersistentVolumePhase) *PersistentVolumeStatusApplyConfiguration {
+func (b *PersistentVolumeStatusApplyConfiguration) WithPhase(value corev1.PersistentVolumePhase) *PersistentVolumeStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }

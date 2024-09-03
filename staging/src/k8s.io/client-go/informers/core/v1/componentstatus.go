@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ComponentStatuses.
 type ComponentStatusInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ComponentStatusLister
+	Lister() corev1.ComponentStatusLister
 }
 
 type componentStatusInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredComponentStatusInformer(client kubernetes.Interface, resyncPerio
 				return client.CoreV1().ComponentStatuses().Watch(context.TODO(), options)
 			},
 		},
-		&corev1.ComponentStatus{},
+		&apicorev1.ComponentStatus{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *componentStatusInformer) defaultInformer(client kubernetes.Interface, r
 }
 
 func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ComponentStatus{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.ComponentStatus{}, f.defaultInformer)
 }
 
-func (f *componentStatusInformer) Lister() v1.ComponentStatusLister {
-	return v1.NewComponentStatusLister(f.Informer().GetIndexer())
+func (f *componentStatusInformer) Lister() corev1.ComponentStatusLister {
+	return corev1.NewComponentStatusLister(f.Informer().GetIndexer())
 }

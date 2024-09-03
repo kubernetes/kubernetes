@@ -19,13 +19,13 @@ limitations under the License.
 package v2beta2
 
 import (
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 )
 
 // MetricSpecApplyConfiguration represents a declarative configuration of the MetricSpec type for use
 // with apply.
 type MetricSpecApplyConfiguration struct {
-	Type              *v2beta2.MetricSourceType                        `json:"type,omitempty"`
+	Type              *autoscalingv2beta2.MetricSourceType             `json:"type,omitempty"`
 	Object            *ObjectMetricSourceApplyConfiguration            `json:"object,omitempty"`
 	Pods              *PodsMetricSourceApplyConfiguration              `json:"pods,omitempty"`
 	Resource          *ResourceMetricSourceApplyConfiguration          `json:"resource,omitempty"`
@@ -42,7 +42,7 @@ func MetricSpec() *MetricSpecApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *MetricSpecApplyConfiguration) WithType(value v2beta2.MetricSourceType) *MetricSpecApplyConfiguration {
+func (b *MetricSpecApplyConfiguration) WithType(value autoscalingv2beta2.MetricSourceType) *MetricSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }

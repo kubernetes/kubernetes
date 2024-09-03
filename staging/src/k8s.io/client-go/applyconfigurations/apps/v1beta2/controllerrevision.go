@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -59,18 +59,18 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractControllerRevision(controllerRevision *v1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+func ExtractControllerRevision(controllerRevision *appsv1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
 	return extractControllerRevision(controllerRevision, fieldManager, "")
 }
 
 // ExtractControllerRevisionStatus is the same as ExtractControllerRevision except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractControllerRevisionStatus(controllerRevision *v1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+func ExtractControllerRevisionStatus(controllerRevision *appsv1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
 	return extractControllerRevision(controllerRevision, fieldManager, "status")
 }
 
-func extractControllerRevision(controllerRevision *v1beta2.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
+func extractControllerRevision(controllerRevision *appsv1beta2.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
 	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta2.ControllerRevision"), fieldManager, b, subresource)
 	if err != nil {

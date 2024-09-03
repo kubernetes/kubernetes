@@ -20,21 +20,21 @@ package v1
 
 import (
 	discoveryv1 "k8s.io/api/discovery/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // EndpointSliceApplyConfiguration represents a declarative configuration of the EndpointSlice type for use
 // with apply.
 type EndpointSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	AddressType                      *discoveryv1.AddressType         `json:"addressType,omitempty"`
-	Endpoints                        []EndpointApplyConfiguration     `json:"endpoints,omitempty"`
-	Ports                            []EndpointPortApplyConfiguration `json:"ports,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	AddressType                          *discoveryv1.AddressType         `json:"addressType,omitempty"`
+	Endpoints                            []EndpointApplyConfiguration     `json:"endpoints,omitempty"`
+	Ports                                []EndpointPortApplyConfiguration `json:"ports,omitempty"`
 }
 
 // EndpointSlice constructs a declarative configuration of the EndpointSlice type for use with
@@ -157,7 +157,7 @@ func (b *EndpointSliceApplyConfiguration) WithGeneration(value int64) *EndpointS
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *EndpointSliceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *EndpointSliceApplyConfiguration {
+func (b *EndpointSliceApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *EndpointSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -166,7 +166,7 @@ func (b *EndpointSliceApplyConfiguration) WithCreationTimestamp(value metav1.Tim
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *EndpointSliceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *EndpointSliceApplyConfiguration {
+func (b *EndpointSliceApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *EndpointSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -214,7 +214,7 @@ func (b *EndpointSliceApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *EndpointSliceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *EndpointSliceApplyConfiguration {
+func (b *EndpointSliceApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *EndpointSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -238,7 +238,7 @@ func (b *EndpointSliceApplyConfiguration) WithFinalizers(values ...string) *Endp
 
 func (b *EndpointSliceApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

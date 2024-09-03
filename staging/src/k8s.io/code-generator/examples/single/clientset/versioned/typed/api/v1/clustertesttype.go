@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/code-generator/examples/single/api/v1"
-	apiv1 "k8s.io/code-generator/examples/single/applyconfiguration/api/v1"
+	apiv1 "k8s.io/code-generator/examples/single/api/v1"
+	applyconfigurationapiv1 "k8s.io/code-generator/examples/single/applyconfiguration/api/v1"
 	scheme "k8s.io/code-generator/examples/single/clientset/versioned/scheme"
 )
 
@@ -39,19 +39,19 @@ type ClusterTestTypesGetter interface {
 
 // ClusterTestTypeInterface has methods to work with ClusterTestType resources.
 type ClusterTestTypeInterface interface {
-	Create(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.CreateOptions) (*v1.ClusterTestType, error)
-	Update(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (*v1.ClusterTestType, error)
+	Create(ctx context.Context, clusterTestType *apiv1.ClusterTestType, opts metav1.CreateOptions) (*apiv1.ClusterTestType, error)
+	Update(ctx context.Context, clusterTestType *apiv1.ClusterTestType, opts metav1.UpdateOptions) (*apiv1.ClusterTestType, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (*v1.ClusterTestType, error)
+	UpdateStatus(ctx context.Context, clusterTestType *apiv1.ClusterTestType, opts metav1.UpdateOptions) (*apiv1.ClusterTestType, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterTestType, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiv1.ClusterTestType, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*apiv1.ClusterTestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error)
-	Apply(ctx context.Context, clusterTestType *apiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apiv1.ClusterTestType, err error)
+	Apply(ctx context.Context, clusterTestType *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *apiv1.ClusterTestType, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, clusterTestType *apiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error)
+	ApplyStatus(ctx context.Context, clusterTestType *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *apiv1.ClusterTestType, err error)
 	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -60,19 +60,19 @@ type ClusterTestTypeInterface interface {
 
 // clusterTestTypes implements ClusterTestTypeInterface
 type clusterTestTypes struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *apiv1.ClusterTestTypeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*apiv1.ClusterTestType, *apiv1.ClusterTestTypeList, *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration]
 }
 
 // newClusterTestTypes returns a ClusterTestTypes
 func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 	return &clusterTestTypes{
-		gentype.NewClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *apiv1.ClusterTestTypeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*apiv1.ClusterTestType, *apiv1.ClusterTestTypeList, *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration](
 			"clustertesttypes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterTestType { return &v1.ClusterTestType{} },
-			func() *v1.ClusterTestTypeList { return &v1.ClusterTestTypeList{} }),
+			func() *apiv1.ClusterTestType { return &apiv1.ClusterTestType{} },
+			func() *apiv1.ClusterTestTypeList { return &apiv1.ClusterTestTypeList{} }),
 	}
 }
 

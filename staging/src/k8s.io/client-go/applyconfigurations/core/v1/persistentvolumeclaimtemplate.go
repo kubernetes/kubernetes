@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PersistentVolumeClaimTemplateApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimTemplate type for use
 // with apply.
 type PersistentVolumeClaimTemplateApplyConfiguration struct {
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // PersistentVolumeClaimTemplateApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimTemplate type for use with
@@ -94,7 +94,7 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithGeneration(value i
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PersistentVolumeClaimTemplateApplyConfiguration {
+func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PersistentVolumeClaimTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -103,7 +103,7 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithCreationTimestamp(
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PersistentVolumeClaimTemplateApplyConfiguration {
+func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PersistentVolumeClaimTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -151,7 +151,7 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithAnnotations(entrie
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PersistentVolumeClaimTemplateApplyConfiguration {
+func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PersistentVolumeClaimTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -175,7 +175,7 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithFinalizers(values 
 
 func (b *PersistentVolumeClaimTemplateApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

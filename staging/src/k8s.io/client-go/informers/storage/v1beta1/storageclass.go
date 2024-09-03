@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apistoragev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	storagev1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // StorageClasses.
 type StorageClassInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.StorageClassLister
+	Lister() storagev1beta1.StorageClassLister
 }
 
 type storageClassInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod t
 				return client.StorageV1beta1().StorageClasses().Watch(context.TODO(), options)
 			},
 		},
-		&storagev1beta1.StorageClass{},
+		&apistoragev1beta1.StorageClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *storageClassInformer) defaultInformer(client kubernetes.Interface, resy
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1beta1.StorageClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistoragev1beta1.StorageClass{}, f.defaultInformer)
 }
 
-func (f *storageClassInformer) Lister() v1beta1.StorageClassLister {
-	return v1beta1.NewStorageClassLister(f.Informer().GetIndexer())
+func (f *storageClassInformer) Lister() storagev1beta1.StorageClassLister {
+	return storagev1beta1.NewStorageClassLister(f.Informer().GetIndexer())
 }

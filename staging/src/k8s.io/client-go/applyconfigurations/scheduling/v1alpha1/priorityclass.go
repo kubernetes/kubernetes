@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -60,18 +60,18 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPriorityClass(priorityClass *v1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+func ExtractPriorityClass(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
 	return extractPriorityClass(priorityClass, fieldManager, "")
 }
 
 // ExtractPriorityClassStatus is the same as ExtractPriorityClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPriorityClassStatus(priorityClass *v1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+func ExtractPriorityClassStatus(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
 	return extractPriorityClass(priorityClass, fieldManager, "status")
 }
 
-func extractPriorityClass(priorityClass *v1alpha1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
+func extractPriorityClass(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
 	b := &PriorityClassApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b, subresource)
 	if err != nil {

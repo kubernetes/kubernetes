@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // LimitRangeApplyConfiguration represents a declarative configuration of the LimitRange type for use
 // with apply.
 type LimitRangeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // LimitRange constructs a declarative configuration of the LimitRange type for use with
@@ -57,18 +57,18 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+func ExtractLimitRange(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	return extractLimitRange(limitRange, fieldManager, "")
 }
 
 // ExtractLimitRangeStatus is the same as ExtractLimitRange except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractLimitRangeStatus(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+func ExtractLimitRangeStatus(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	return extractLimitRange(limitRange, fieldManager, "status")
 }
 
-func extractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
+func extractLimitRange(limitRange *corev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
 	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
 	if err != nil {
@@ -155,7 +155,7 @@ func (b *LimitRangeApplyConfiguration) WithGeneration(value int64) *LimitRangeAp
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *LimitRangeApplyConfiguration) WithCreationTimestamp(value metav1.Time) *LimitRangeApplyConfiguration {
+func (b *LimitRangeApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *LimitRangeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *LimitRangeApplyConfiguration) WithCreationTimestamp(value metav1.Time) 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *LimitRangeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *LimitRangeApplyConfiguration {
+func (b *LimitRangeApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *LimitRangeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *LimitRangeApplyConfiguration) WithAnnotations(entries map[string]string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *LimitRangeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *LimitRangeApplyConfiguration {
+func (b *LimitRangeApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *LimitRangeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,7 +236,7 @@ func (b *LimitRangeApplyConfiguration) WithFinalizers(values ...string) *LimitRa
 
 func (b *LimitRangeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // SchedulingApplyConfiguration represents a declarative configuration of the Scheduling type for use
 // with apply.
 type SchedulingApplyConfiguration struct {
-	NodeSelector map[string]string                 `json:"nodeSelector,omitempty"`
-	Tolerations  []v1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
+	NodeSelector map[string]string                     `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
 
 // SchedulingApplyConfiguration constructs a declarative configuration of the Scheduling type for use with
@@ -52,7 +52,7 @@ func (b *SchedulingApplyConfiguration) WithNodeSelector(entries map[string]strin
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *SchedulingApplyConfiguration) WithTolerations(values ...*v1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
+func (b *SchedulingApplyConfiguration) WithTolerations(values ...*corev1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTolerations")

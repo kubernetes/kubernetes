@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodDisruptionBudgetLister helps list PodDisruptionBudgets.
@@ -30,7 +30,7 @@ import (
 type PodDisruptionBudgetLister interface {
 	// List lists all PodDisruptionBudgets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error)
+	List(selector labels.Selector) (ret []*policyv1beta1.PodDisruptionBudget, err error)
 	// PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 	PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister
 	PodDisruptionBudgetListerExpansion
@@ -38,17 +38,17 @@ type PodDisruptionBudgetLister interface {
 
 // podDisruptionBudgetLister implements the PodDisruptionBudgetLister interface.
 type podDisruptionBudgetLister struct {
-	listers.ResourceIndexer[*v1beta1.PodDisruptionBudget]
+	listers.ResourceIndexer[*policyv1beta1.PodDisruptionBudget]
 }
 
 // NewPodDisruptionBudgetLister returns a new PodDisruptionBudgetLister.
 func NewPodDisruptionBudgetLister(indexer cache.Indexer) PodDisruptionBudgetLister {
-	return &podDisruptionBudgetLister{listers.New[*v1beta1.PodDisruptionBudget](indexer, v1beta1.Resource("poddisruptionbudget"))}
+	return &podDisruptionBudgetLister{listers.New[*policyv1beta1.PodDisruptionBudget](indexer, policyv1beta1.Resource("poddisruptionbudget"))}
 }
 
 // PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister {
-	return podDisruptionBudgetNamespaceLister{listers.NewNamespaced[*v1beta1.PodDisruptionBudget](s.ResourceIndexer, namespace)}
+	return podDisruptionBudgetNamespaceLister{listers.NewNamespaced[*policyv1beta1.PodDisruptionBudget](s.ResourceIndexer, namespace)}
 }
 
 // PodDisruptionBudgetNamespaceLister helps list and get PodDisruptionBudgets.
@@ -56,15 +56,15 @@ func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDi
 type PodDisruptionBudgetNamespaceLister interface {
 	// List lists all PodDisruptionBudgets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error)
+	List(selector labels.Selector) (ret []*policyv1beta1.PodDisruptionBudget, err error)
 	// Get retrieves the PodDisruptionBudget from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.PodDisruptionBudget, error)
+	Get(name string) (*policyv1beta1.PodDisruptionBudget, error)
 	PodDisruptionBudgetNamespaceListerExpansion
 }
 
 // podDisruptionBudgetNamespaceLister implements the PodDisruptionBudgetNamespaceLister
 // interface.
 type podDisruptionBudgetNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.PodDisruptionBudget]
+	listers.ResourceIndexer[*policyv1beta1.PodDisruptionBudget]
 }

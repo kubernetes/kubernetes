@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ImageVolumeSourceApplyConfiguration represents a declarative configuration of the ImageVolumeSource type for use
 // with apply.
 type ImageVolumeSourceApplyConfiguration struct {
-	Reference  *string        `json:"reference,omitempty"`
-	PullPolicy *v1.PullPolicy `json:"pullPolicy,omitempty"`
+	Reference  *string            `json:"reference,omitempty"`
+	PullPolicy *corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
 // ImageVolumeSourceApplyConfiguration constructs a declarative configuration of the ImageVolumeSource type for use with
@@ -46,7 +46,7 @@ func (b *ImageVolumeSourceApplyConfiguration) WithReference(value string) *Image
 // WithPullPolicy sets the PullPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullPolicy field is set to the value of the last call.
-func (b *ImageVolumeSourceApplyConfiguration) WithPullPolicy(value v1.PullPolicy) *ImageVolumeSourceApplyConfiguration {
+func (b *ImageVolumeSourceApplyConfiguration) WithPullPolicy(value corev1.PullPolicy) *ImageVolumeSourceApplyConfiguration {
 	b.PullPolicy = &value
 	return b
 }

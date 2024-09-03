@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PersistentVolumeApplyConfiguration represents a declarative configuration of the PersistentVolume type for use
 // with apply.
 type PersistentVolumeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PersistentVolumeSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *PersistentVolumeSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PersistentVolume constructs a declarative configuration of the PersistentVolume type for use with
@@ -57,18 +57,18 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+func ExtractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
 	return extractPersistentVolume(persistentVolume, fieldManager, "")
 }
 
 // ExtractPersistentVolumeStatus is the same as ExtractPersistentVolume except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPersistentVolumeStatus(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+func ExtractPersistentVolumeStatus(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
 	return extractPersistentVolume(persistentVolume, fieldManager, "status")
 }
 
-func extractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
+func extractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
 	b := &PersistentVolumeApplyConfiguration{}
 	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *PersistentVolumeApplyConfiguration) WithGeneration(value int64) *Persis
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PersistentVolumeApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PersistentVolumeApplyConfiguration {
+func (b *PersistentVolumeApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PersistentVolumeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *PersistentVolumeApplyConfiguration) WithCreationTimestamp(value metav1.
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PersistentVolumeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PersistentVolumeApplyConfiguration {
+func (b *PersistentVolumeApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PersistentVolumeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *PersistentVolumeApplyConfiguration) WithAnnotations(entries map[string]
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PersistentVolumeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PersistentVolumeApplyConfiguration {
+func (b *PersistentVolumeApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PersistentVolumeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *PersistentVolumeApplyConfiguration) WithFinalizers(values ...string) *P
 
 func (b *PersistentVolumeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

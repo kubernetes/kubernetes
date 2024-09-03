@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
+	applyconfigurationsadmissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,34 +38,36 @@ type ValidatingWebhookConfigurationsGetter interface {
 
 // ValidatingWebhookConfigurationInterface has methods to work with ValidatingWebhookConfiguration resources.
 type ValidatingWebhookConfigurationInterface interface {
-	Create(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
-	Update(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
+	Create(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
+	Update(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1beta1.ValidatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error)
-	Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1beta1.ValidatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, validatingWebhookConfiguration *applyconfigurationsadmissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1beta1.ValidatingWebhookConfiguration, err error)
 	ValidatingWebhookConfigurationExpansion
 }
 
 // validatingWebhookConfigurations implements ValidatingWebhookConfigurationInterface
 type validatingWebhookConfigurations struct {
-	*gentype.ClientWithListAndApply[*v1beta1.ValidatingWebhookConfiguration, *v1beta1.ValidatingWebhookConfigurationList, *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*admissionregistrationv1beta1.ValidatingWebhookConfiguration, *admissionregistrationv1beta1.ValidatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration]
 }
 
 // newValidatingWebhookConfigurations returns a ValidatingWebhookConfigurations
 func newValidatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *validatingWebhookConfigurations {
 	return &validatingWebhookConfigurations{
-		gentype.NewClientWithListAndApply[*v1beta1.ValidatingWebhookConfiguration, *v1beta1.ValidatingWebhookConfigurationList, *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*admissionregistrationv1beta1.ValidatingWebhookConfiguration, *admissionregistrationv1beta1.ValidatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration](
 			"validatingwebhookconfigurations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.ValidatingWebhookConfiguration { return &v1beta1.ValidatingWebhookConfiguration{} },
-			func() *v1beta1.ValidatingWebhookConfigurationList {
-				return &v1beta1.ValidatingWebhookConfigurationList{}
+			func() *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+				return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{}
+			},
+			func() *admissionregistrationv1beta1.ValidatingWebhookConfigurationList {
+				return &admissionregistrationv1beta1.ValidatingWebhookConfigurationList{}
 			}),
 	}
 }

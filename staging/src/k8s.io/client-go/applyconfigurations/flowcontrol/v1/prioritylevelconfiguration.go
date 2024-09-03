@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiflowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
 type PriorityLevelConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PriorityLevelConfiguration constructs a declarative configuration of the PriorityLevelConfiguration type for use with
@@ -57,18 +57,18 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
 }
 
 // ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
 }
 
-func extractPriorityLevelConfiguration(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *PriorityLevelConfigurationApplyConfiguration) WithGeneration(value int6
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PriorityLevelConfigurationApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PriorityLevelConfigurationApplyConfiguration {
+func (b *PriorityLevelConfigurationApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PriorityLevelConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *PriorityLevelConfigurationApplyConfiguration) WithCreationTimestamp(val
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PriorityLevelConfigurationApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PriorityLevelConfigurationApplyConfiguration {
+func (b *PriorityLevelConfigurationApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PriorityLevelConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *PriorityLevelConfigurationApplyConfiguration) WithAnnotations(entries m
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PriorityLevelConfigurationApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PriorityLevelConfigurationApplyConfiguration {
+func (b *PriorityLevelConfigurationApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PriorityLevelConfigurationApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *PriorityLevelConfigurationApplyConfiguration) WithFinalizers(values ...
 
 func (b *PriorityLevelConfigurationApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // EmptyDirVolumeSourceApplyConfiguration represents a declarative configuration of the EmptyDirVolumeSource type for use
 // with apply.
 type EmptyDirVolumeSourceApplyConfiguration struct {
-	Medium    *v1.StorageMedium  `json:"medium,omitempty"`
-	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
+	Medium    *corev1.StorageMedium `json:"medium,omitempty"`
+	SizeLimit *resource.Quantity    `json:"sizeLimit,omitempty"`
 }
 
 // EmptyDirVolumeSourceApplyConfiguration constructs a declarative configuration of the EmptyDirVolumeSource type for use with
@@ -39,7 +39,7 @@ func EmptyDirVolumeSource() *EmptyDirVolumeSourceApplyConfiguration {
 // WithMedium sets the Medium field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Medium field is set to the value of the last call.
-func (b *EmptyDirVolumeSourceApplyConfiguration) WithMedium(value v1.StorageMedium) *EmptyDirVolumeSourceApplyConfiguration {
+func (b *EmptyDirVolumeSourceApplyConfiguration) WithMedium(value corev1.StorageMedium) *EmptyDirVolumeSourceApplyConfiguration {
 	b.Medium = &value
 	return b
 }

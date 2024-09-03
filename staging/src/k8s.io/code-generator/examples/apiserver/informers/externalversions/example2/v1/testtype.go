@@ -19,24 +19,24 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	example2v1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
+	apisexample2v1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
 	versioned "k8s.io/code-generator/examples/apiserver/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/apiserver/informers/externalversions/internalinterfaces"
-	v1 "k8s.io/code-generator/examples/apiserver/listers/example2/v1"
+	example2v1 "k8s.io/code-generator/examples/apiserver/listers/example2/v1"
 )
 
 // TestTypeInformer provides access to a shared informer and lister for
 // TestTypes.
 type TestTypeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.TestTypeLister
+	Lister() example2v1.TestTypeLister
 }
 
 type testTypeInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, r
 				return client.SecondExampleV1().TestTypes(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&example2v1.TestType{},
+		&apisexample2v1.TestType{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *testTypeInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *testTypeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&example2v1.TestType{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisexample2v1.TestType{}, f.defaultInformer)
 }
 
-func (f *testTypeInformer) Lister() v1.TestTypeLister {
-	return v1.NewTestTypeLister(f.Informer().GetIndexer())
+func (f *testTypeInformer) Lister() example2v1.TestTypeLister {
+	return example2v1.NewTestTypeLister(f.Informer().GetIndexer())
 }

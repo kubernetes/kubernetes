@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apibatchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CronJobApplyConfiguration represents a declarative configuration of the CronJob type for use
 // with apply.
 type CronJobApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CronJobSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *CronJobStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *CronJobSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *CronJobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CronJob constructs a declarative configuration of the CronJob type for use with
@@ -58,18 +58,18 @@ func CronJob(name, namespace string) *CronJobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCronJob(cronJob *apibatchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+func ExtractCronJob(cronJob *batchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
 	return extractCronJob(cronJob, fieldManager, "")
 }
 
 // ExtractCronJobStatus is the same as ExtractCronJob except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCronJobStatus(cronJob *apibatchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+func ExtractCronJobStatus(cronJob *batchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
 	return extractCronJob(cronJob, fieldManager, "status")
 }
 
-func extractCronJob(cronJob *apibatchv1.CronJob, fieldManager string, subresource string) (*CronJobApplyConfiguration, error) {
+func extractCronJob(cronJob *batchv1.CronJob, fieldManager string, subresource string) (*CronJobApplyConfiguration, error) {
 	b := &CronJobApplyConfiguration{}
 	err := managedfields.ExtractInto(cronJob, internal.Parser().Type("io.k8s.api.batch.v1.CronJob"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *CronJobApplyConfiguration) WithGeneration(value int64) *CronJobApplyCon
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CronJobApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CronJobApplyConfiguration {
+func (b *CronJobApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CronJobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *CronJobApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Cr
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CronJobApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CronJobApplyConfiguration {
+func (b *CronJobApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CronJobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *CronJobApplyConfiguration) WithAnnotations(entries map[string]string) *
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CronJobApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CronJobApplyConfiguration {
+func (b *CronJobApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CronJobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *CronJobApplyConfiguration) WithFinalizers(values ...string) *CronJobApp
 
 func (b *CronJobApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

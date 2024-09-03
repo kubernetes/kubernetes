@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type SecretsGetter interface {
 
 // SecretInterface has methods to work with Secret resources.
 type SecretInterface interface {
-	Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (*v1.Secret, error)
-	Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (*v1.Secret, error)
+	Create(ctx context.Context, secret *corev1.Secret, opts metav1.CreateOptions) (*corev1.Secret, error)
+	Update(ctx context.Context, secret *corev1.Secret, opts metav1.UpdateOptions) (*corev1.Secret, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Secret, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecretList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Secret, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.SecretList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error)
-	Apply(ctx context.Context, secret *corev1.SecretApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Secret, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.Secret, err error)
+	Apply(ctx context.Context, secret *applyconfigurationscorev1.SecretApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.Secret, err error)
 	SecretExpansion
 }
 
 // secrets implements SecretInterface
 type secrets struct {
-	*gentype.ClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1.SecretApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.Secret, *corev1.SecretList, *applyconfigurationscorev1.SecretApplyConfiguration]
 }
 
 // newSecrets returns a Secrets
 func newSecrets(c *CoreV1Client, namespace string) *secrets {
 	return &secrets{
-		gentype.NewClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1.SecretApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.Secret, *corev1.SecretList, *applyconfigurationscorev1.SecretApplyConfiguration](
 			"secrets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Secret { return &v1.Secret{} },
-			func() *v1.SecretList { return &v1.SecretList{} }),
+			func() *corev1.Secret { return &corev1.Secret{} },
+			func() *corev1.SecretList { return &corev1.SecretList{} }),
 	}
 }

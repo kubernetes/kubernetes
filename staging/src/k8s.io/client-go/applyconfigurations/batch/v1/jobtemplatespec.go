@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // JobTemplateSpecApplyConfiguration represents a declarative configuration of the JobTemplateSpec type for use
 // with apply.
 type JobTemplateSpecApplyConfiguration struct {
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *JobSpecApplyConfiguration `json:"spec,omitempty"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *JobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // JobTemplateSpecApplyConfiguration constructs a declarative configuration of the JobTemplateSpec type for use with
@@ -94,7 +94,7 @@ func (b *JobTemplateSpecApplyConfiguration) WithGeneration(value int64) *JobTemp
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *JobTemplateSpecApplyConfiguration) WithCreationTimestamp(value metav1.Time) *JobTemplateSpecApplyConfiguration {
+func (b *JobTemplateSpecApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *JobTemplateSpecApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -103,7 +103,7 @@ func (b *JobTemplateSpecApplyConfiguration) WithCreationTimestamp(value metav1.T
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *JobTemplateSpecApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *JobTemplateSpecApplyConfiguration {
+func (b *JobTemplateSpecApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *JobTemplateSpecApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -151,7 +151,7 @@ func (b *JobTemplateSpecApplyConfiguration) WithAnnotations(entries map[string]s
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *JobTemplateSpecApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *JobTemplateSpecApplyConfiguration {
+func (b *JobTemplateSpecApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *JobTemplateSpecApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -175,7 +175,7 @@ func (b *JobTemplateSpecApplyConfiguration) WithFinalizers(values ...string) *Jo
 
 func (b *JobTemplateSpecApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

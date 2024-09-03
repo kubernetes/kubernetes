@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiappsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ReplicaSetApplyConfiguration represents a declarative configuration of the ReplicaSet type for use
 // with apply.
 type ReplicaSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ReplicaSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ReplicaSetSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicaSet constructs a declarative configuration of the ReplicaSet type for use with
@@ -58,18 +58,18 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicaSet(replicaSet *apiappsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+func ExtractReplicaSet(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return extractReplicaSet(replicaSet, fieldManager, "")
 }
 
 // ExtractReplicaSetStatus is the same as ExtractReplicaSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractReplicaSetStatus(replicaSet *apiappsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+func ExtractReplicaSetStatus(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return extractReplicaSet(replicaSet, fieldManager, "status")
 }
 
-func extractReplicaSet(replicaSet *apiappsv1.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
+func extractReplicaSet(replicaSet *appsv1.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
 	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1.ReplicaSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *ReplicaSetApplyConfiguration) WithGeneration(value int64) *ReplicaSetAp
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ReplicaSetApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ReplicaSetApplyConfiguration {
+func (b *ReplicaSetApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ReplicaSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *ReplicaSetApplyConfiguration) WithCreationTimestamp(value metav1.Time) 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ReplicaSetApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ReplicaSetApplyConfiguration {
+func (b *ReplicaSetApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ReplicaSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *ReplicaSetApplyConfiguration) WithAnnotations(entries map[string]string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ReplicaSetApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ReplicaSetApplyConfiguration {
+func (b *ReplicaSetApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ReplicaSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *ReplicaSetApplyConfiguration) WithFinalizers(values ...string) *Replica
 
 func (b *ReplicaSetApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

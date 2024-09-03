@@ -20,21 +20,21 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ConfigMapApplyConfiguration represents a declarative configuration of the ConfigMap type for use
 // with apply.
 type ConfigMapApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool             `json:"immutable,omitempty"`
-	Data                             map[string]string `json:"data,omitempty"`
-	BinaryData                       map[string][]byte `json:"binaryData,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Immutable                            *bool             `json:"immutable,omitempty"`
+	Data                                 map[string]string `json:"data,omitempty"`
+	BinaryData                           map[string][]byte `json:"binaryData,omitempty"`
 }
 
 // ConfigMap constructs a declarative configuration of the ConfigMap type for use with
@@ -157,7 +157,7 @@ func (b *ConfigMapApplyConfiguration) WithGeneration(value int64) *ConfigMapAppl
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ConfigMapApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -166,7 +166,7 @@ func (b *ConfigMapApplyConfiguration) WithCreationTimestamp(value metav1.Time) *
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ConfigMapApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -214,7 +214,7 @@ func (b *ConfigMapApplyConfiguration) WithAnnotations(entries map[string]string)
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ConfigMapApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -238,7 +238,7 @@ func (b *ConfigMapApplyConfiguration) WithFinalizers(values ...string) *ConfigMa
 
 func (b *ConfigMapApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

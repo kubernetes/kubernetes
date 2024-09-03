@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // NetworkPolicyApplyConfiguration represents a declarative configuration of the NetworkPolicy type for use
 // with apply.
 type NetworkPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // NetworkPolicy constructs a declarative configuration of the NetworkPolicy type for use with
@@ -57,18 +57,18 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+func ExtractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
 	return extractNetworkPolicy(networkPolicy, fieldManager, "")
 }
 
 // ExtractNetworkPolicyStatus is the same as ExtractNetworkPolicy except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNetworkPolicyStatus(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+func ExtractNetworkPolicyStatus(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
 	return extractNetworkPolicy(networkPolicy, fieldManager, "status")
 }
 
-func extractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
+func extractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -155,7 +155,7 @@ func (b *NetworkPolicyApplyConfiguration) WithGeneration(value int64) *NetworkPo
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *NetworkPolicyApplyConfiguration) WithCreationTimestamp(value metav1.Time) *NetworkPolicyApplyConfiguration {
+func (b *NetworkPolicyApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *NetworkPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *NetworkPolicyApplyConfiguration) WithCreationTimestamp(value metav1.Tim
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *NetworkPolicyApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *NetworkPolicyApplyConfiguration {
+func (b *NetworkPolicyApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *NetworkPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *NetworkPolicyApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *NetworkPolicyApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *NetworkPolicyApplyConfiguration {
+func (b *NetworkPolicyApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *NetworkPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,7 +236,7 @@ func (b *NetworkPolicyApplyConfiguration) WithFinalizers(values ...string) *Netw
 
 func (b *NetworkPolicyApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

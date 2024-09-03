@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -61,18 +61,18 @@ func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfigur
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSIStorageCapacity(cSIStorageCapacity *v1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+func ExtractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
 	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "")
 }
 
 // ExtractCSIStorageCapacityStatus is the same as ExtractCSIStorageCapacity except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCSIStorageCapacityStatus(cSIStorageCapacity *v1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+func ExtractCSIStorageCapacityStatus(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
 	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "status")
 }
 
-func extractCSIStorageCapacity(cSIStorageCapacity *v1alpha1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
+func extractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
 	b := &CSIStorageCapacityApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1alpha1.CSIStorageCapacity"), fieldManager, b, subresource)
 	if err != nil {

@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apirbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RoleBindingApplyConfiguration represents a declarative configuration of the RoleBinding type for use
 // with apply.
 type RoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                         []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Subjects                             []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	RoleRef                              *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
 }
 
 // RoleBinding constructs a declarative configuration of the RoleBinding type for use with
@@ -58,18 +58,18 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
 	return extractRoleBinding(roleBinding, fieldManager, "")
 }
 
 // ExtractRoleBindingStatus is the same as ExtractRoleBinding except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractRoleBindingStatus(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBindingStatus(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
 	return extractRoleBinding(roleBinding, fieldManager, "status")
 }
 
-func extractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
+func extractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.RoleBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *RoleBindingApplyConfiguration) WithGeneration(value int64) *RoleBinding
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *RoleBindingApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RoleBindingApplyConfiguration {
+func (b *RoleBindingApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *RoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *RoleBindingApplyConfiguration) WithCreationTimestamp(value metav1.Time)
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *RoleBindingApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RoleBindingApplyConfiguration {
+func (b *RoleBindingApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *RoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *RoleBindingApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *RoleBindingApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RoleBindingApplyConfiguration {
+func (b *RoleBindingApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *RoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *RoleBindingApplyConfiguration) WithFinalizers(values ...string) *RoleBi
 
 func (b *RoleBindingApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

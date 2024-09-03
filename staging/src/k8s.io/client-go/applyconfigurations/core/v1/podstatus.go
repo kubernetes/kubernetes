@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PodStatusApplyConfiguration represents a declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
-	Phase                      *v1.PodPhase                               `json:"phase,omitempty"`
+	Phase                      *corev1.PodPhase                           `json:"phase,omitempty"`
 	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
 	Message                    *string                                    `json:"message,omitempty"`
 	Reason                     *string                                    `json:"reason,omitempty"`
@@ -38,9 +38,9 @@ type PodStatusApplyConfiguration struct {
 	StartTime                  *metav1.Time                               `json:"startTime,omitempty"`
 	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty"`
 	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty"`
-	QOSClass                   *v1.PodQOSClass                            `json:"qosClass,omitempty"`
+	QOSClass                   *corev1.PodQOSClass                        `json:"qosClass,omitempty"`
 	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
-	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty"`
+	Resize                     *corev1.PodResizeStatus                    `json:"resize,omitempty"`
 	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 
@@ -53,7 +53,7 @@ func PodStatus() *PodStatusApplyConfiguration {
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithPhase(value v1.PodPhase) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithPhase(value corev1.PodPhase) *PodStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -174,7 +174,7 @@ func (b *PodStatusApplyConfiguration) WithContainerStatuses(values ...*Container
 // WithQOSClass sets the QOSClass field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the QOSClass field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithQOSClass(value v1.PodQOSClass) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithQOSClass(value corev1.PodQOSClass) *PodStatusApplyConfiguration {
 	b.QOSClass = &value
 	return b
 }
@@ -195,7 +195,7 @@ func (b *PodStatusApplyConfiguration) WithEphemeralContainerStatuses(values ...*
 // WithResize sets the Resize field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resize field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithResize(value v1.PodResizeStatus) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithResize(value corev1.PodResizeStatus) *PodStatusApplyConfiguration {
 	b.Resize = &value
 	return b
 }
