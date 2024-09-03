@@ -21,9 +21,9 @@ import (
 	"bytes"
 	"reflect"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"github.com/go-jose/go-jose/v3/json"
 
-	"gopkg.in/square/go-jose.v2"
+	"github.com/go-jose/go-jose/v3"
 )
 
 // Builder is a utility for making JSON Web Tokens. Calls can be chained, and
@@ -36,7 +36,7 @@ type Builder interface {
 	Claims(i interface{}) Builder
 	// Token builds a JSONWebToken from provided data.
 	Token() (*JSONWebToken, error)
-	// FullSerialize serializes a token using the full serialization format.
+	// FullSerialize serializes a token using the JWS/JWE JSON Serialization format.
 	FullSerialize() (string, error)
 	// CompactSerialize serializes a token using the compact serialization format.
 	CompactSerialize() (string, error)
@@ -53,7 +53,7 @@ type NestedBuilder interface {
 	Claims(i interface{}) NestedBuilder
 	// Token builds a NestedJSONWebToken from provided data.
 	Token() (*NestedJSONWebToken, error)
-	// FullSerialize serializes a token using the full serialization format.
+	// FullSerialize serializes a token using the JSON Serialization format.
 	FullSerialize() (string, error)
 	// CompactSerialize serializes a token using the compact serialization format.
 	CompactSerialize() (string, error)

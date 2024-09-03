@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/uuid"
-	"gopkg.in/square/go-jose.v2/jwt"
 
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"

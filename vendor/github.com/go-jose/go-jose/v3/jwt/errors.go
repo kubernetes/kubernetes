@@ -20,34 +20,34 @@ package jwt
 import "errors"
 
 // ErrUnmarshalAudience indicates that aud claim could not be unmarshalled.
-var ErrUnmarshalAudience = errors.New("square/go-jose/jwt: expected string or array value to unmarshal to Audience")
+var ErrUnmarshalAudience = errors.New("go-jose/go-jose/jwt: expected string or array value to unmarshal to Audience")
 
 // ErrUnmarshalNumericDate indicates that JWT NumericDate could not be unmarshalled.
-var ErrUnmarshalNumericDate = errors.New("square/go-jose/jwt: expected number value to unmarshal NumericDate")
+var ErrUnmarshalNumericDate = errors.New("go-jose/go-jose/jwt: expected number value to unmarshal NumericDate")
 
 // ErrInvalidClaims indicates that given claims have invalid type.
-var ErrInvalidClaims = errors.New("square/go-jose/jwt: expected claims to be value convertible into JSON object")
+var ErrInvalidClaims = errors.New("go-jose/go-jose/jwt: expected claims to be value convertible into JSON object")
 
 // ErrInvalidIssuer indicates invalid iss claim.
-var ErrInvalidIssuer = errors.New("square/go-jose/jwt: validation failed, invalid issuer claim (iss)")
+var ErrInvalidIssuer = errors.New("go-jose/go-jose/jwt: validation failed, invalid issuer claim (iss)")
 
 // ErrInvalidSubject indicates invalid sub claim.
-var ErrInvalidSubject = errors.New("square/go-jose/jwt: validation failed, invalid subject claim (sub)")
+var ErrInvalidSubject = errors.New("go-jose/go-jose/jwt: validation failed, invalid subject claim (sub)")
 
 // ErrInvalidAudience indicated invalid aud claim.
-var ErrInvalidAudience = errors.New("square/go-jose/jwt: validation failed, invalid audience claim (aud)")
+var ErrInvalidAudience = errors.New("go-jose/go-jose/jwt: validation failed, invalid audience claim (aud)")
 
 // ErrInvalidID indicates invalid jti claim.
-var ErrInvalidID = errors.New("square/go-jose/jwt: validation failed, invalid ID claim (jti)")
+var ErrInvalidID = errors.New("go-jose/go-jose/jwt: validation failed, invalid ID claim (jti)")
 
 // ErrNotValidYet indicates that token is used before time indicated in nbf claim.
-var ErrNotValidYet = errors.New("square/go-jose/jwt: validation failed, token not valid yet (nbf)")
+var ErrNotValidYet = errors.New("go-jose/go-jose/jwt: validation failed, token not valid yet (nbf)")
 
 // ErrExpired indicates that token is used after expiry time indicated in exp claim.
-var ErrExpired = errors.New("square/go-jose/jwt: validation failed, token is expired (exp)")
+var ErrExpired = errors.New("go-jose/go-jose/jwt: validation failed, token is expired (exp)")
 
 // ErrIssuedInTheFuture indicates that the iat field is in the future.
-var ErrIssuedInTheFuture = errors.New("square/go-jose/jwt: validation field, token issued in the future (iat)")
+var ErrIssuedInTheFuture = errors.New("go-jose/go-jose/jwt: validation field, token issued in the future (iat)")
 
 // ErrInvalidContentType indicates that token requires JWT cty header.
-var ErrInvalidContentType = errors.New("square/go-jose/jwt: expected content type to be JWT (cty header)")
+var ErrInvalidContentType = errors.New("go-jose/go-jose/jwt: expected content type to be JWT (cty header)")
