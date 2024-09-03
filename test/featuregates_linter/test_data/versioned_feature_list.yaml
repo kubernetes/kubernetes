@@ -39,13 +39,13 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.26"
+    version: "1.27"
 - name: ClusterTrustBundleProjection
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.28"
+    version: "1.29"
 - name: ContainerCheckpoint
   versionedSpecs:
   - default: false

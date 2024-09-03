@@ -78,13 +78,13 @@ const (
 	AuthorizeNodeWithSelectors featuregate.Feature = "AuthorizeNodeWithSelectors"
 
 	// owner: @ahmedtd
-	// alpha: v1.26
+	// alpha: v1.27
 	//
 	// Enable ClusterTrustBundle objects and Kubelet integration.
 	ClusterTrustBundle featuregate.Feature = "ClusterTrustBundle"
 
 	// owner: @ahmedtd
-	// alpha: v1.28
+	// alpha: v1.29
 	//
 	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
 	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
