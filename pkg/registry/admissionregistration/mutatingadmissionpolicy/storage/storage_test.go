@@ -118,7 +118,7 @@ func TestWatch(t *testing.T) {
 }
 
 func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPolicy {
-	applyConfigurationPatchType := admissionregistration.ApplyConfigurationPatchType
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
 	return &admissionregistration.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -139,7 +139,7 @@ func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPoli
 								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
 							}
 						}`,
-					PatchType: &applyConfigurationPatchType,
+					PatchType: applyConfigurationPatchType,
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{
@@ -184,8 +184,11 @@ func newMutatingAdmissionPolicy(name string) *admissionregistration.MutatingAdmi
 			},
 			Mutations: []admissionregistration.Mutation{
 				{
-					// TODO cici: update the expression
-					Expression: "object.spec.replicas <= params.maxReplicas",
+					Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{

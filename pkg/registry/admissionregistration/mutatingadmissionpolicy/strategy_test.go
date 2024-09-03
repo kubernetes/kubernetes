@@ -51,7 +51,7 @@ func TestMutatingAdmissionPolicyStrategy(t *testing.T) {
 }
 func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPolicy {
 	ignore := admissionregistration.Ignore
-	applyConfigurationPatchType := admissionregistration.ApplyConfigurationPatchType
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
 	return &admissionregistration.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -63,8 +63,12 @@ func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPoli
 			},
 			Mutations: []admissionregistration.Mutation{
 				{
-					Expression: "{\"spec\":{\"replicas\": 1}}",
-					PatchType:  &applyConfigurationPatchType,
+					Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+					PatchType: applyConfigurationPatchType,
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{

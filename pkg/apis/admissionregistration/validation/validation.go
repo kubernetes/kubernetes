@@ -1469,6 +1469,10 @@ func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Muta
 	if !supportedPatchType.Has(string(m.PatchType)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("patchType"), m.PatchType, supportedPatchType.List()))
 	}
+	// TODO: remove this check when the implementation of JSONPatch support added
+	if m.PatchType == admissionregistration.PatchTypeJSONPatch {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("patchType"), m.PatchType, "the JSONPatch support has not yet implemented."))
+	}
 	return allErrors
 }
 
