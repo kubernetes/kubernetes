@@ -440,13 +440,22 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+
+	rootCACertRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("create", "update").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+		eventsRule(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		rootCACertRules = append(rootCACertRules,
+			rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/kube-apiserver-serving").RuleOrDie(),
+			rbacv1helpers.NewRule("create", "patch", "update").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+		)
+	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "root-ca-cert-publisher"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("create", "update").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
-			eventsRule(),
-		},
+		Rules:      rootCACertRules,
 	})
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
 		Rules: []rbacv1.PolicyRule{

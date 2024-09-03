@@ -20,16 +20,20 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	certalpha1listers "k8s.io/client-go/listers/certificates/v1alpha1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -126,14 +130,14 @@ func TestConfigMapCreation(t *testing.T) {
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
 			nsInformer := informers.Core().V1().Namespaces()
-			controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA)
+			controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA, "testSigner")
 			if err != nil {
 				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}
 
 			cmStore := cmInformer.Informer().GetStore()
 
-			controller.syncHandler = controller.syncNamespace
+			controller.configMapsSyncer = controller.syncNamespace
 
 			for _, s := range tc.ExistingConfigMaps {
 				cmStore.Add(s)
@@ -156,8 +160,8 @@ func TestConfigMapCreation(t *testing.T) {
 				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
 			}
 			ctx := context.TODO()
-			for controller.queue.Len() != 0 {
-				controller.processNextWorkItem(ctx)
+			for controller.configMapQueue.Len() != 0 {
+				controller.processNextWorkItem(ctx, controller.configMapQueue, controller.configMapsSyncer)
 			}
 
 			actions := client.Actions()
@@ -272,4 +276,267 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 			tc.ExpectActions(t, client.Actions())
 		})
 	}
+}
+
+const testSigner = "testSigner"
+
+func TestCTBCreation(t *testing.T) {
+	checkCreatedTestSignerBundle := func(t *testing.T, actions []clienttesting.Action) {
+		createAction := expectAction[clienttesting.CreateAction](t, actions, "create")
+
+		ctb, ok := createAction.GetObject().(*certificatesv1alpha1.ClusterTrustBundle)
+		if !ok {
+			t.Fatalf("expected ClusterTrustBundle create, got %v", createAction.GetObject())
+		}
+
+		if ctb.Spec.SignerName != testSigner {
+			t.Fatalf("expected signer name %q, got %q", testSigner, ctb.Spec.SignerName)
+		}
+	}
+
+	checkUpdatedTestSignerBundle := func(t *testing.T, actions []clienttesting.Action) {
+		updateAction := expectAction[clienttesting.UpdateAction](t, actions, "update")
+
+		ctb, ok := updateAction.GetObject().(*certificatesv1alpha1.ClusterTrustBundle)
+		if !ok {
+			t.Fatalf("expected ClusterTrustBundle update, got %v", updateAction.GetObject())
+		}
+
+		if ctb.Spec.SignerName != testSigner {
+			t.Fatalf("expected signer name %q, got %q", testSigner, ctb.Spec.SignerName)
+		}
+
+		if ctb.Spec.TrustBundle != "rootcapemdata" {
+			t.Fatalf("expected trust bundle payload 'rootcapemdata', got %q", ctb.Spec.TrustBundle)
+		}
+	}
+
+	checkDeletedTestSignerBundle := func(t *testing.T, actions []clienttesting.Action) {
+		deleteAction := expectAction[clienttesting.DeleteCollectionAction](t, actions, "delete-collection")
+
+		if fieldRestrictions := deleteAction.GetListRestrictions().Fields.String(); fieldRestrictions != "spec.signerName=testSigner" {
+			t.Fatalf("expected field selector 'spec.signerName=testSigner', got %v", fieldRestrictions)
+		}
+	}
+
+	for _, tt := range []struct {
+		name          string
+		existingCTBs  []runtime.Object
+		expectActions func(t *testing.T, actions []clienttesting.Action)
+		wantErr       bool
+	}{
+		{
+			name:          "no CTBs exist",
+			expectActions: checkCreatedTestSignerBundle,
+		},
+		{
+			name: "no CTBs for the current signer exist",
+			existingCTBs: []runtime.Object{
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nosigner",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						TrustBundle: "somedatahere",
+					},
+				},
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "signer:one",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  "signer",
+						TrustBundle: "signerdata",
+					},
+				},
+			},
+			expectActions: checkCreatedTestSignerBundle,
+		},
+		{
+			name: "CTB for the signer exists with different content",
+			existingCTBs: []runtime.Object{
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testSigner:name",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  testSigner,
+						TrustBundle: "olddata",
+					},
+				},
+			},
+			expectActions: checkUpdatedTestSignerBundle,
+		},
+		{
+			name: "multiple CTBs for the signer",
+			existingCTBs: []runtime.Object{
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testSigner:name",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  testSigner,
+						TrustBundle: "rootcapemdata",
+					},
+				},
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testSigner:name2",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  testSigner,
+						TrustBundle: "rootcapemdata",
+					},
+				},
+			},
+			expectActions: checkDeletedTestSignerBundle,
+		},
+		{
+			name: "CTB at the correct state - noop",
+			existingCTBs: []runtime.Object{
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nosigner",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						TrustBundle: "somedatahere",
+					},
+				},
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "signer:one",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  "signer",
+						TrustBundle: "signerdata",
+					},
+				},
+				&certificatesv1alpha1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testSigner:name",
+					},
+					Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+						SignerName:  testSigner,
+						TrustBundle: "rootcapemdata",
+					},
+				},
+			},
+			expectActions: func(t *testing.T, actions []clienttesting.Action) {
+				actions = filterOutListWatch(actions)
+				if len(actions) != 0 {
+					t.Fatalf("expected no actions, got %v", actions)
+				}
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			fakeClient := fakeKubeClientSetWithCTBList(t, tt.existingCTBs...)
+
+			// TODO: move the below into a construct function?
+			ctbInformer := setupSignerNameFilteredCTBInformer(fakeClient, testSigner)
+			go ctbInformer.Run(testCtx.Done())
+
+			syncWait := make(chan struct{})
+			go func() {
+				for !ctbInformer.HasSynced() {
+					select {
+					case <-testCtx.Done():
+						return
+					case <-time.After(10 * time.Millisecond):
+					}
+				}
+				syncWait <- struct{}{}
+			}()
+
+			select {
+			case <-testCtx.Done():
+				t.Fatalf("timed out waiting for informer to sync")
+			case <-syncWait:
+			}
+
+			p := &Publisher{
+				client:          fakeClient,
+				ctbLister:       certalpha1listers.NewClusterTrustBundleLister(ctbInformer.GetIndexer()),
+				ctbListerSynced: func() bool { return true },
+				signerName:      testSigner,
+				rootCA:          []byte("rootcapemdata"),
+
+				trustBundleQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+					workqueue.DefaultTypedControllerRateLimiter[string](),
+					workqueue.TypedRateLimitingQueueConfig[string]{
+						Name: "test_root_ca_cert_publisher_cluster_trust_bundles",
+					},
+				),
+			}
+
+			if err := p.syncClusterTrustBundle(testCtx, "testSigner"); (err != nil) != tt.wantErr {
+				t.Errorf("syncClusterTrustBundle() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			tt.expectActions(t, fakeClient.Actions())
+		})
+	}
+}
+
+func fakeKubeClientSetWithCTBList(t *testing.T, ctbs ...runtime.Object) *fake.Clientset {
+	fakeClient := fake.NewSimpleClientset(ctbs...)
+	fakeClient.PrependReactor("list", "clustertrustbundles", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		listAction, ok := action.(clienttesting.ListAction)
+		if !ok {
+			t.Fatalf("expected list action, got %v", action)
+		}
+
+		// fakeClient does not implement field selector, we have to do it manually
+		listRestrictions := listAction.GetListRestrictions()
+		if listRestrictions.Fields == nil || listRestrictions.Fields.String() != "spec.signerName=testSigner" {
+			return false, nil, nil
+		}
+
+		retList := &certificatesv1alpha1.ClusterTrustBundleList{}
+		for _, ctb := range ctbs {
+			ctbObj, ok := ctb.(*certificatesv1alpha1.ClusterTrustBundle)
+			if !ok {
+				continue
+			}
+			if ctbObj.Spec.SignerName == testSigner {
+				retList.Items = append(retList.Items, *ctbObj)
+			}
+		}
+
+		return true, retList, nil
+	})
+
+	return fakeClient
+}
+
+func expectAction[A clienttesting.Action](t *testing.T, actions []clienttesting.Action, verb string) A {
+	filteredActions := filterOutListWatch(actions)
+	if len(filteredActions) != 1 {
+		t.Fatalf("expected 1 action, got %v", filteredActions)
+	}
+
+	if filteredActions[0].GetVerb() != verb {
+		t.Fatalf("expected action with verb %q, got %q", verb, filteredActions[0].GetVerb())
+	}
+
+	retAction, ok := filteredActions[0].(A)
+	if !ok {
+		t.Fatalf("expected %T action, got %v", *new(A), filteredActions[0])
+	}
+
+	return retAction
+}
+
+func filterOutListWatch(actions []clienttesting.Action) []clienttesting.Action {
+	var filtered []clienttesting.Action
+	for _, a := range actions {
+		if a.Matches("list", "clustertrustbundles") || a.Matches("watch", "clustertrustbundles") {
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	return filtered
 }
