@@ -784,6 +784,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		plugins                         schedulerapi.PluginSet
 		want                            map[framework.GVK]framework.ActionType
 		enableInPlacePodVerticalScaling bool
+		enableSchedulerQueueingHints    bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -894,10 +895,27 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			enableInPlacePodVerticalScaling: true,
 		},
+		{
+			name:    "plugins with default profile (queueingHint: enabled)",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[framework.GVK]framework.ActionType{
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
+				framework.Node:                  framework.All,
+				framework.CSINode:               framework.All - framework.Delete,
+				framework.CSIDriver:             framework.All - framework.Delete,
+				framework.CSIStorageCapacity:    framework.All - framework.Delete,
+				framework.PersistentVolume:      framework.All - framework.Delete,
+				framework.PersistentVolumeClaim: framework.All - framework.Delete,
+				framework.StorageClass:          framework.All - framework.Delete,
+			},
+			enableInPlacePodVerticalScaling: true,
+			enableSchedulerQueueingHints:    true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.enableSchedulerQueueingHints)
 
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
