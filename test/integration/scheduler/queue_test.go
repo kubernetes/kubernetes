@@ -202,6 +202,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		// wantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 		wantRequeuedPods sets.Set[string]
 		// enableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
+		// By default, it's {true, false}
 		enableSchedulingQueueHint []bool
 	}{
 		{
@@ -223,8 +224,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod2"),
 		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -255,17 +255,16 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod2"),
 		},
 		{
 			name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node is updated",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 will be rejected by the NodeAffinity plugin.
-				st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}).Container("image").Obj(),
+				st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 				// - Pod2 will be rejected by the NodeAffinity plugin.
-				st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}).Container("image").Obj(),
+				st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
 				// Trigger a NodeUpdate event to change label.
@@ -276,8 +275,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod1"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod1"),
 		},
 		{
 			name:         "Pod updated with toleration requeued to activeQ",
@@ -294,8 +292,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod1"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod1"),
 		},
 		{
 			name:         "Pod got resource scaled down requeued to activeQ",
@@ -312,8 +309,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod1"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod1"),
 		},
 		{
 			name:         "Updating pod condition doesn't retry scheduling if the Pod was rejected by TaintToleration",
@@ -358,29 +354,29 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				// - Pod1 will be rejected by the NodeAffinity plugin and NodeResourcesFit plugin.
-				st.MakePod().Label("unscheduled", "plugins").Name("pod1").NodeAffinityIn("metadata.name", []string{"fake-node"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+				st.MakePod().Label("unscheduled", "plugins").Name("pod1").NodeAffinityIn("metadata.name", []string{"fake-node"}, st.NodeSelectorTypeMatchFields).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
-				// Trigger a NodeDeleted event.
-				// It will not requeue pod1 to activeQ,
-				// because both NodeAffinity and NodeResourceFit don't register Node/delete event.
-				err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node", metav1.DeleteOptions{})
-				if err != nil {
-					return fmt.Errorf("failed to delete fake-node node")
+				// Because of preCheck, we cannot determine which unschedulable plugins are registered for pod1.
+				// So, not the ideal way as the integration test though,
+				// here we check the unschedulable plugins by directly using the SchedulingQueue function for now.
+				// We can change here to assess unschedPlugin by triggering cluster events like other test cases
+				// after QHint is graduated and preCheck is removed.
+				pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod("pod1", testCtx.NS.Name)
+				if !ok || pInfo == nil {
+					return fmt.Errorf("pod1 is not found in the scheduling queue")
 				}
 
-				// Trigger a NodeCreated event.
-				// It will requeue  pod1 to activeQ, because QHint of NodeAffinity return Queue.
-				// It makes sure PreFilter plugins returned PreFilterResult takes an effect for sure,
-				// because NodeResourceFit QHint returns QueueSkip for this event actually.
-				node := st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
-				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-					return fmt.Errorf("failed to create a new node: %w", err)
+				if pInfo.Pod.Name != "pod1" {
+					return fmt.Errorf("unexpected pod info: %#v", pInfo)
+				}
+
+				if pInfo.UnschedulablePlugins.Difference(sets.New(names.NodeAffinity, names.NodeResourcesFit)).Len() != 0 {
+					return fmt.Errorf("unexpected unschedulable plugin(s) is registered in pod1: %v", pInfo.UnschedulablePlugins.UnsortedList())
 				}
 
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
 		},
 		{
 			name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
@@ -401,8 +397,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{false, true},
+			wantRequeuedPods: sets.New("pod2"),
 		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label to make it match the podAntiAffinity",
@@ -515,6 +510,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		if len(tt.enableSchedulingQueueHint) == 0 {
+			tt.enableSchedulingQueueHint = []bool{true, false}
+		}
+
 		for _, featureEnabled := range tt.enableSchedulingQueueHint {
 			t.Run(fmt.Sprintf("%s [SchedulerQueueingHints enabled: %v]", tt.name, featureEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, featureEnabled)

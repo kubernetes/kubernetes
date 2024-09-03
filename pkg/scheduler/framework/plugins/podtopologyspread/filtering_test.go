@@ -806,7 +806,7 @@ func TestPreFilterState(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy honored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -845,7 +845,7 @@ func TestPreFilterState(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2708,7 +2708,7 @@ func TestSingleConstraint(t *testing.T) {
 			// the fact that node-a fits can prove the underlying logic works
 			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("node", []string{"node-a", "node-y"}).
+				NodeAffinityIn("node", []string{"node-a", "node-y"}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2951,7 +2951,7 @@ func TestSingleConstraint(t *testing.T) {
 			// pods spread across node as 1/1/0/~0~
 			name: "NodeAffinityPolicy honored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2977,7 +2977,7 @@ func TestSingleConstraint(t *testing.T) {
 			// pods spread across node as 1/1/0/~1~
 			name: "NodeAffinityPolicy ignored with labelSelectors",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
