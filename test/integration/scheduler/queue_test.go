@@ -374,7 +374,68 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{false, true},
+		},
+		{
+			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label to make it match the podAntiAffinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPod:   st.MakePod().Name("pod1").Label("anti1", "anti1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
+			pods: []*v1.Pod{
+				// - Pod2 and pod3 will be rejected by the PodAffinity plugin.
+				st.MakePod().Name("pod2").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod3").Label("anti2", "anti2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			},
+
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Delete the pod's label 'anti1' which will make it match pod2's antiAffinity.
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update pod1: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPod:   st.MakePod().Name("pod1").Container("image").Node("fake-node").Obj(),
+			pods: []*v1.Pod{
+				// - Pod2 and pod3 will be rejected by the PodAffinity plugin.
+				st.MakePod().Name("pod2").PodAffinityExists("aaa", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod3").PodAffinityExists("bbb", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+			},
+
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Add label to the pod which will make it match pod2's nodeAffinity.
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update pod1: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+
+		{
+			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the label of the node to make it match the pod affinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			pods: []*v1.Pod{
+				// - pod1 and pod2 will be rejected by the PodAffinity plugin.
+				st.MakePod().Name("pod1").PodAffinityExists("bbb", "zone", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod2").PodAffinityExists("ccc", "region", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+			},
+
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Add label to the node which will make it match pod1's podAffinity.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("zone", "zone1").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update pod1: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
 		},
 	}
 
