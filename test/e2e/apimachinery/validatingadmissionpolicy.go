@@ -367,8 +367,8 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 					// If the warnings are empty, touch the policy to retry type checking
 					if len(policy.Status.TypeChecking.ExpressionWarnings) == 0 {
 						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).WithLabels(map[string]string{
-							"touched": time.Now().String(),
-							"random":  fmt.Sprintf("%d", rand.Int()),
+							"touched": fmt.Sprintf("a%d", time.Now().UnixMilli()),
+							"random":  fmt.Sprintf("a%d", rand.Int()),
 						})
 						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: "validatingadmissionpolicy-e2e"})
 						return false, err
