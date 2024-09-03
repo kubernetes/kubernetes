@@ -217,6 +217,7 @@ aliases:
     - mrunalp
     - klueska
     - SergeyKanzhelev
+    - tallclair
   # emeretus:
   # - dashpole
   # - vishh
@@ -253,6 +254,7 @@ aliases:
     - rphillips
     - kannon92
     - ffromani
+    - tallclair
   sig-network-approvers:
     - andrewsykim
     - aojea

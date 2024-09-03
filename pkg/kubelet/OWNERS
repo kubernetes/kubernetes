@@ -7,7 +7,6 @@ emeritus_approvers:
   - vishh
 reviewers:
   - sig-node-reviewers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dreviewers
-  - tallclair
 labels:
   - area/kubelet
   - sig/node
