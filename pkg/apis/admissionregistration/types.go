@@ -1169,7 +1169,7 @@ type MatchCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
 
-// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.
+// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
 	metav1.TypeMeta
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -1209,8 +1209,8 @@ type MutatingAdmissionPolicySpec struct {
 	// Required.
 	MatchConstraints *MatchResources
 
-	// Mutations contain CEL expressions which is used to apply the mutation.
-	// Mutations may not be empty; a minimum of one Mutations is required.
+	// Mutations contain CEL expressions which are used to apply the mutation.
+	// Mutations may not be empty; a minimum of one mutation is required.
 	// +listType=atomic
 	// +optional
 	Mutations []Mutation
@@ -1280,7 +1280,7 @@ type Mutation struct {
 	// If unset, the message is "failed Expression: {Expression}".
 	// +optional
 	Message string
-	// Reason represents a machine-readable description of why this validation failed.
+	// reason represents a machine-readable description of why this validation failed.
 	// If this is the first validation in the list to fail, this reason, as well as the
 	// corresponding HTTP response code, are used in the
 	// HTTP response to the client.
@@ -1319,8 +1319,11 @@ type Mutation struct {
 	ReinvocationPolicy *ReinvocationPolicyType
 	// patchType indicates the patch strategy used.
 	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// "ApplyConfiguration" is to use structured merge algorithm stated [here](https://github.com/kubernetes-sigs/structured-merge-diff)
+	// to mutate the incoming object.
+	// "JSONPatch" is to use [JSON patch](https://jsonpatch.com/) to perform the mutation of the object.
 	// +required
-	PatchType *PatchType
+	PatchType PatchType
 }
 
 // PatchType specifies what type of strategy the admission mutation uses.
@@ -1328,10 +1331,10 @@ type Mutation struct {
 type PatchType string
 
 const (
-	// ApplyConfigurationPatchType indicates that the mutation is using apply configuration to mutate the object.
-	ApplyConfigurationPatchType PatchType = "ApplyConfiguration"
-	// JSONPatchPatchType indicates that the object is mutated through JSONPatch.
-	JSONPatchPatchType PatchType = "JSONPatchPatchType"
+	// PatchTypeApplyConfiguration indicates that the mutation is using apply configuration to mutate the object.
+	PatchTypeApplyConfiguration PatchType = "PatchTypeApplyConfiguration"
+	// PatchTypeJSONPatch indicates that the object is mutated through JSONPatch.
+	PatchTypeJSONPatch PatchType = "PatchTypeJSONPatch"
 )
 
 // +genclient

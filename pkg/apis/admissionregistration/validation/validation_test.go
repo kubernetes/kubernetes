@@ -4243,7 +4243,7 @@ func get65MatchConditions() []admissionregistration.MatchCondition {
 }
 
 func TestValidateMutatingAdmissionPolicy(t *testing.T) {
-	applyConfigurationPatchType := admissionregistration.ApplyConfigurationPatchType
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
 	tests := []struct {
 		name          string
 		config        *admissionregistration.MutatingAdmissionPolicy
@@ -4269,7 +4269,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}(),
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -4281,13 +4281,15 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				Name: "config",
 			},
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
-				FailurePolicy: func() *admissionregistration.FailurePolicyType {
-					r := admissionregistration.FailurePolicyType("other")
-					return &r
-				}(),
+				Mutations: []admissionregistration.Mutation{
+					{
+						Expression: "object.x < 100",
+						PatchType:  "other",
+					},
+				},
 			},
 		},
-		expectedError: `spec.failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+		expectedError: `spec.mutations[0].patchType: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 	}, {
 		name: "API version is required in ParamKind",
 		config: &admissionregistration.MutatingAdmissionPolicy{
@@ -4297,7 +4299,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				ParamKind: &admissionregistration.ParamKind{
 					Kind:       "Example",
@@ -4315,7 +4317,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				ParamKind: &admissionregistration.ParamKind{
 					APIVersion: "test.example.com/v1",
@@ -4332,7 +4334,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				ParamKind: &admissionregistration.ParamKind{
 					Kind:       "Example",
@@ -4350,7 +4352,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				ParamKind: &admissionregistration.ParamKind{
 					APIVersion: "!!!/v1",
@@ -4378,7 +4380,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 					Reason: func() *metav1.StatusReason {
 						r := metav1.StatusReason("other")
 						return &r
@@ -4397,7 +4399,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -4412,7 +4414,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{},
 			},
@@ -4427,7 +4429,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4461,7 +4463,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4480,7 +4482,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4499,7 +4501,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -4519,7 +4521,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				FailurePolicy: func() *admissionregistration.FailurePolicyType {
 					r := admissionregistration.FailurePolicyType("Fail")
@@ -4587,7 +4589,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4613,7 +4615,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4639,7 +4641,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4669,7 +4671,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}(),
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -4704,7 +4706,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4730,7 +4732,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4760,7 +4762,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}(),
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -4795,7 +4797,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4821,7 +4823,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4848,7 +4850,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				Mutations: []admissionregistration.Mutation{{
 					Expression:        "true",
 					MessageExpression: "object.x in [1, 2, ",
-					PatchType:         &applyConfigurationPatchType,
+					PatchType:         applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4875,7 +4877,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				Mutations: []admissionregistration.Mutation{{
 					Expression:        "true",
 					MessageExpression: "0 == 0",
-					PatchType:         &applyConfigurationPatchType,
+					PatchType:         applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -4929,7 +4931,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "true",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -4977,7 +4979,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5021,7 +5023,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5046,7 +5048,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 }
 
 func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
-	applyConfigurationPatchType := admissionregistration.ApplyConfigurationPatchType
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
 	tests := []struct {
 		name          string
 		oldconfig     *admissionregistration.MutatingAdmissionPolicy
@@ -5065,7 +5067,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}(),
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -5098,7 +5100,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5127,7 +5129,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}(),
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 				MatchConstraints: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -5202,7 +5204,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5243,7 +5245,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5287,7 +5289,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5328,7 +5330,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 				}},
 				Mutations: []admissionregistration.Mutation{{
 					Expression: "object.x < 100",
-					PatchType:  &applyConfigurationPatchType,
+					PatchType:  applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -5362,7 +5364,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 					{
 						Expression:        `true`,
 						MessageExpression: "'test'",
-						PatchType:         &applyConfigurationPatchType,
+						PatchType:         applyConfigurationPatchType,
 					},
 				}),
 			config: mutatingAdmissionPolicyWithExpressions(
@@ -5371,7 +5373,7 @@ func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
 					{
 						Expression:        `true`,
 						MessageExpression: "string(test())",
-						PatchType:         &applyConfigurationPatchType,
+						PatchType:         applyConfigurationPatchType,
 					},
 				}),
 			expectedError: `undeclared reference to 'test'`,

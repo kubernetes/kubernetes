@@ -511,6 +511,11 @@ var supportedValidationPolicyReason = sets.NewString(
 	string(metav1.StatusReasonRequestEntityTooLarge),
 )
 
+var supportedPatchType = sets.NewString(
+	string(admissionregistration.PatchTypeApplyConfiguration),
+	string(admissionregistration.PatchTypeJSONPatch),
+)
+
 func hasWildcardOperation(operations []admissionregistration.OperationType) bool {
 	for _, o := range operations {
 		if o == admissionregistration.OperationAll {
@@ -1458,8 +1463,11 @@ func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Muta
 	if m.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*m.ReinvocationPolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *m.ReinvocationPolicy, supportedReinvocationPolicies.List()))
 	}
-	if m.PatchType == nil {
+	if m.PatchType == "" {
 		allErrors = append(allErrors, field.Required(fldPath.Child("patchType"), "patchType must be specified"))
+	}
+	if !supportedPatchType.Has(string(m.PatchType)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("patchType"), m.PatchType, supportedPatchType.List()))
 	}
 	return allErrors
 }
@@ -1471,7 +1479,7 @@ func convertInternalMutationToVersionedMuatation(m *admissionregistration.Mutati
 		MessageExpression:  m.MessageExpression,
 		Reason:             m.Reason,
 		ReinvocationPolicy: (*v1alpha1.ReinvocationPolicyType)(m.ReinvocationPolicy),
-		PatchType:          (*v1alpha1.PatchType)(m.PatchType),
+		PatchType:          (v1alpha1.PatchType)(m.PatchType),
 	}
 }
 
