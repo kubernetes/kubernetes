@@ -421,7 +421,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
+func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
@@ -472,27 +472,6 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 			expectedErr:  false,
 		},
-		"skip-updates-not-toleration": {
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "ns-1",
-				}},
-			oldObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "ns-1",
-				}},
-			newObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "ns-1",
-					Labels:    map[string]string{"foo": "bar"},
-				},
-			},
-			expectedHint: framework.QueueSkip,
-			expectedErr:  false,
-		},
 		"queue-on-toleration-added": {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -530,7 +509,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			actualHint, err := p.(*TaintToleration).isSchedulableAfterPodChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*TaintToleration).isSchedulableAfterPodTolerationChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				if err == nil {
 					t.Errorf("unexpected success")
