@@ -429,7 +429,7 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.30"
+    version: "1.31"
 - name: MatchLabelKeysInPodTopologySpread
   versionedSpecs:
   - default: false
