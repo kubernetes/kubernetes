@@ -45,6 +45,7 @@ import (
 	certificatesv1alpha1 "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
+	coordinationV1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -67,7 +68,7 @@ import (
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
-	resourcev1alpha2 "k8s.io/client-go/kubernetes/typed/resource/v1alpha2"
+	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
@@ -113,7 +114,7 @@ func (h *hack) NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interfa
 	panic("programmer error: using a cluster-unaware clientset, need to cast this to use the cluster-aware one!")
 }
 
-func (h *hack) ResourceV1alpha2() resourcev1alpha2.ResourceV1alpha2Interface {
+func (h *hack) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface {
 	panic("programmer error: using a cluster-unaware clientset, need to cast this to use the cluster-aware one!")
 }
 
@@ -194,6 +195,10 @@ func (h *hack) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Inte
 }
 
 func (h *hack) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
+	panic("programmer error: using a cluster-unaware clientset, need to cast this to use the cluster-aware one!")
+}
+
+func (h *hack) CoordinationV1alpha1() coordinationV1alpha1.CoordinationV1alpha1Interface {
 	panic("programmer error: using a cluster-unaware clientset, need to cast this to use the cluster-aware one!")
 }
 

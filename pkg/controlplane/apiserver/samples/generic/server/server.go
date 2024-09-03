@@ -131,7 +131,7 @@ func NewOptions() *options.Options {
 	s.SecureServing.ServerCert.CertDirectory = filepath.Join(wd, ".sample-minimal-controlplane")
 
 	// Wire ServiceAccount authentication without relying on pods and nodes.
-	s.Authentication.ServiceAccounts.OptionalTokenGetter = genericTokenGetter
+	s.Authentication.ServiceAccounts.OptionalTokenGetter = genericTokenClusterGetter
 
 	return s
 }

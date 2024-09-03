@@ -29,6 +29,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/otel/attribute"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/kcp"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -143,7 +145,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return storage.GetCurrentResourceVersionFromStorage(ctx, s, newListFunc, resourcePrefix, w.objectType)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
 	return s

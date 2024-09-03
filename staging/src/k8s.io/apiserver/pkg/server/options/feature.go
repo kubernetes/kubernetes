@@ -21,11 +21,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	kcpinformers "github.com/kcp-dev/client-go/informers"
+	kcpclient "github.com/kcp-dev/client-go/kubernetes"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 )
 
 type FeatureOptions struct {
@@ -61,7 +61,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 }
 
-func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interface, informers informers.SharedInformerFactory) error {
+func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kcpclient.ClusterInterface, informers kcpinformers.SharedInformerFactory) error {
 	if o == nil {
 		return nil
 	}
