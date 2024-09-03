@@ -255,6 +255,27 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
+			name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
+			pods: []*v1.Pod{
+				// - Pod1 will be rejected by the NodeAffinity plugin.
+				st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}).Container("image").Obj(),
+				// - Pod2 will be rejected by the NodeAffinity plugin.
+				st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeUpdate event to change label.
+				// It causes pod1 to be requeued.
+				// It causes pod2 not to be requeued.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node1").Label("group", "b").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to remove taints off the node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{false, true},
+		},
+		{
 			name:         "Pod updated with toleration requeued to activeQ",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
 			pods: []*v1.Pod{
