@@ -101,7 +101,7 @@ func (v *mutatingAdmissionPolicyBindingStrategy) WarningsOnCreate(ctx context.Co
 func (v *mutatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is true for MutatingAdmissionPolicyBinding; this means you may create one with a PUT request.
+// AllowCreateOnUpdate is false for MutatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
 func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
 	return false
 }

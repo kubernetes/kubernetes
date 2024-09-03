@@ -4268,8 +4268,12 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 					return &r
 				}(),
 				Mutations: []admissionregistration.Mutation{{
-					Expression: "object.x < 100",
-					PatchType:  applyConfigurationPatchType,
+					Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+					PatchType: applyConfigurationPatchType,
 				}},
 			},
 		},
@@ -4283,13 +4287,38 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicySpec{
 				Mutations: []admissionregistration.Mutation{
 					{
-						Expression: "object.x < 100",
-						PatchType:  "other",
+						Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+						PatchType: "other",
 					},
 				},
 			},
 		},
-		expectedError: `spec.mutations[0].patchType: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+		expectedError: `spec.mutations[0].patchType: Unsupported value: "other": supported values: "PatchTypeApplyConfiguration", "PatchTypeJSONPatch"`,
+	}, {
+		// TODO: remove the test after JSONPatch support is added
+		name: "patchType validation - not yet supported type",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{
+					{
+						Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+						PatchType: "PatchTypeJSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].patchType: Invalid value: "PatchTypeJSONPatch": the JSONPatch support has not yet implemented.`,
 	}, {
 		name: "API version is required in ParamKind",
 		config: &admissionregistration.MutatingAdmissionPolicy{
@@ -4388,7 +4417,6 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}},
 			},
 		},
-
 		expectedError: `spec.mutations[0].reason: Unsupported value: "other"`,
 	}, {
 		name: "MatchConstraints is required",
@@ -4403,7 +4431,6 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				}},
 			},
 		},
-
 		expectedError: `spec.matchConstraints: Required value`,
 	}, {
 		name: "matchConstraints.resourceRules is required",

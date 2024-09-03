@@ -45,7 +45,7 @@ func TestCompilation(t *testing.T) {
 			policy: &Policy{
 				Spec: v1alpha1.MutatingAdmissionPolicySpec{Mutations: []v1alpha1.Mutation{
 					{
-						PatchType: ptr.To(v1alpha1.ApplyConfigurationPatchType),
+						PatchType: v1alpha1.ApplyConfigurationPatchType,
 						Expression: `Object{
 							spec: Object.spec{
 								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
@@ -66,7 +66,7 @@ func TestCompilation(t *testing.T) {
 			policy: &Policy{
 				Spec: v1alpha1.MutatingAdmissionPolicySpec{Mutations: []v1alpha1.Mutation{
 					{
-						PatchType: ptr.To(v1alpha1.ApplyConfigurationPatchType),
+						PatchType: v1alpha1.ApplyConfigurationPatchType,
 						Expression: `Object{
 							spec: Object.spec{
 								replicas: oldObject.spec.replicas % 2 == 0?oldObject.spec.replicas + 1:oldObject.spec.replicas

@@ -61,10 +61,9 @@ type evaluator struct {
 }
 
 func CompileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariableDeclarations) (cel.Program, error) {
-	if mutation.PatchType == nil {
-		return nil, fmt.Errorf("patch type is not set")
-	} else if *mutation.PatchType != v1alpha1.ApplyConfigurationPatchType {
-		return nil, fmt.Errorf("unsupported mutation type %q", *mutation.PatchType)
+	// TODO: edit when JSONPatch is supported
+	if mutation.PatchType != v1alpha1.ApplyConfigurationPatchType {
+		return nil, fmt.Errorf("unsupported mutation type %q", mutation.PatchType)
 	}
 
 	envSet, err := createEnvSet(vars)
