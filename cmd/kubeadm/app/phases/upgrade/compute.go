@@ -94,7 +94,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			" nodes to the same version of Kubernetes", strings.Join(verMsg, ", "))
 	}
 
-	// Get the lastest cluster version
+	// Get the latest cluster version
 	clusterVersion, err := getLatestClusterVersion(kubeAPIServerVersions)
 	if err != nil {
 		return upgrades, err

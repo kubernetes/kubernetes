@@ -78,7 +78,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptoken.AllowBoostrapTokensToGetNodes(client); err != nil {
+	if err := nodebootstraptoken.AllowBootstrapTokensToGetNodes(client); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -186,7 +186,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 	return errorsutil.NewAggregate(errs)
 }
 
-// unupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+// unupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
 //
 // NB. This function can only be called after the current control plane instance has been upgraded already.
 // Because it determines whether the other control plane instances have been upgraded by checking whether
@@ -325,7 +325,7 @@ func UpdateKubeletLocalMode(cfg *kubeadmapi.InitConfiguration, dryRun bool) erro
 		return err
 	}
 
-	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndoint.
+	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
 	if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
 		klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, cfg.ControlPlaneEndpoint)
 		return nil

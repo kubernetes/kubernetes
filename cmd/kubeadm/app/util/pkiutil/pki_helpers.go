@@ -517,7 +517,7 @@ func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error)
 	return x509.ParseCertificateRequest(csrBytes)
 }
 
-// EncodeCertPEM returns PEM-endcoded certificate data
+// EncodeCertPEM returns PEM-encoded certificate data
 func EncodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
 		Type:  CertificateBlockType,
@@ -526,7 +526,7 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-// EncodeCertBundlePEM returns PEM-endcoded certificate bundle
+// EncodeCertBundlePEM returns PEM-encoded certificate bundle
 func EncodeCertBundlePEM(certs []*x509.Certificate) ([]byte, error) {
 	buf := bytes.Buffer{}
 
