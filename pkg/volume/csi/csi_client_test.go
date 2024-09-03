@@ -66,10 +66,10 @@ func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *f
 	}
 }
 
-func newFakeCsiDriverClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) *fakeCsiDriverClient {
+func newFakeCsiDriverClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumeCondition bool) *fakeCsiDriverClient {
 	return &fakeCsiDriverClient{
 		t:          t,
-		nodeClient: fake.NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet),
+		nodeClient: fake.NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumeCondition),
 	}
 }
 
@@ -100,16 +100,21 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		VolumeId:   volID,
 		VolumePath: targetPath,
 	}
+	fakeResp := &csipbv1.NodeGetVolumeStatsResponse{}
+	if c.nodeClient.SetVolumeStats {
+		fakeResp = getRawVolumeInfo()
+	}
+	if c.nodeClient.SetVolumecondition {
+		fakeResp.VolumeCondition = &csipbv1.VolumeCondition{
+			Abnormal: true,
+			Message:  "Volume is abnormal",
+		}
+	}
+	c.nodeClient.SetNodeVolumeStatsResp(fakeResp)
 
-	c.nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
 	if err != nil {
 		return nil, err
-	}
-
-	usages := resp.GetUsage()
-	if usages == nil {
-		return nil, nil
 	}
 
 	metrics := &volume.Metrics{}
@@ -124,6 +129,10 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		metrics.Abnormal, metrics.Message = &abnormal, &message
 	}
 
+	usages := resp.GetUsage()
+	if !isSupportNodeVolumeCondition && usages == nil {
+		return nil, errors.New("volume usage is nil")
+	}
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -377,8 +386,8 @@ func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet b
 	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
 }
 
-func setupClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) csiClient {
-	return newFakeCsiDriverClientWithVolumeStatsAndCondition(t, volumeStatsSet, volumeConditionSet)
+func setupClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumecondition bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeStatsAndCondition(t, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumecondition)
 }
 
 func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
@@ -839,13 +848,17 @@ func TestVolumeHealthEnable(t *testing.T) {
 	tests := []struct {
 		name               string
 		volumeStatsSet     bool
+		setVolumeStat      bool
+		setVolumecondition bool
 		volumeConditionSet bool
 		volumeData         VolumeStatsOptions
 		success            bool
 	}{
 		{
-			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=on",
+			name:               "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeCondition=on, setVolumecondition=on",
 			volumeStatsSet:     true,
+			setVolumeStat:      true,
+			setVolumecondition: true,
 			volumeConditionSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -855,8 +868,10 @@ func TestVolumeHealthEnable(t *testing.T) {
 			success: true,
 		},
 		{
-			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=off",
+			name:               "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeCondition=off, setVolumecondition=off",
 			volumeStatsSet:     true,
+			setVolumeStat:      true,
+			setVolumecondition: false,
 			volumeConditionSet: false,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -865,6 +880,30 @@ func TestVolumeHealthEnable(t *testing.T) {
 			},
 			success: true,
 		},
+		{
+			name:               "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeCondition=on, setVolumecondition=on",
+			volumeStatsSet:     false,
+			setVolumeStat:      false,
+			setVolumecondition: true,
+			volumeConditionSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+		{
+			name:               "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeCondition=off, setVolumecondition=off",
+			setVolumeStat:      false,
+			volumeConditionSet: false,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: false,
+		},
 	}
 
 	for _, tc := range tests {
@@ -872,24 +911,24 @@ func TestVolumeHealthEnable(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, tc.volumeConditionSet)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, tc.volumeConditionSet, tc.setVolumeStat, tc.setVolumecondition)
 			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
-			if tc.success {
-				assert.Nil(t, err)
+			if err != nil && tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 			}
-
-			if metrics == nil {
-				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
-			} else {
-				if tc.volumeConditionSet {
-					assert.NotNil(t, metrics.Abnormal)
-					assert.NotNil(t, metrics.Message)
+			if tc.success {
+				if metrics == nil {
+					t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
 				} else {
-					assert.Nil(t, metrics.Abnormal)
-					assert.Nil(t, metrics.Message)
+					if tc.volumeConditionSet {
+						assert.NotNil(t, metrics.Abnormal)
+						assert.NotNil(t, metrics.Message)
+					} else {
+						assert.Nil(t, metrics.Abnormal)
+						assert.Nil(t, metrics.Message)
+					}
 				}
 			}
-
 		})
 	}
 }
@@ -919,7 +958,7 @@ func TestVolumeHealthDisable(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false, true, false)
 			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if tc.success {
 				assert.Nil(t, err)

@@ -80,6 +80,8 @@ type NodeClient struct {
 	expansionSet             bool
 	volumeStatsSet           bool
 	volumeConditionSet       bool
+	SetVolumeStats           bool
+	SetVolumecondition       bool
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
@@ -110,13 +112,16 @@ func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeCl
 func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
 	return &NodeClient{
 		volumeStatsSet: volumeStatsSet,
+		SetVolumeStats: true,
 	}
 }
 
-func NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet bool) *NodeClient {
+func NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet, setVolumeStats, setVolumeCondition bool) *NodeClient {
 	return &NodeClient{
 		volumeStatsSet:     volumeStatsSet,
 		volumeConditionSet: volumeConditionSet,
+		SetVolumeStats:     setVolumeStats,
+		SetVolumecondition: setVolumeCondition,
 	}
 }
 

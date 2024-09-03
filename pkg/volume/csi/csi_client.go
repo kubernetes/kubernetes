@@ -612,10 +612,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 	if err != nil {
 		return nil, err
 	}
-	usages := resp.GetUsage()
-	if usages == nil {
-		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
-	}
+
 	metrics := &volume.Metrics{
 		Used:       resource.NewQuantity(int64(0), resource.BinarySI),
 		Capacity:   resource.NewQuantity(int64(0), resource.BinarySI),
@@ -625,8 +622,9 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
 
+	var isSupportNodeVolumeCondition bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		isSupportNodeVolumeCondition, err := c.nodeSupportsVolumeCondition(ctx)
+		isSupportNodeVolumeCondition, err = c.nodeSupportsVolumeCondition(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -635,6 +633,12 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 			abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
 			metrics.Abnormal, metrics.Message = &abnormal, &message
 		}
+	}
+
+	usages := resp.GetUsage()
+	// If the driver does not support volume condition and usages is nil, return an error
+	if !isSupportNodeVolumeCondition && usages == nil {
+		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
 	}
 
 	for _, usage := range usages {
