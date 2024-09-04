@@ -224,36 +224,6 @@ func mountCmd(cmd configs.Command) error {
 	return nil
 }
 
-func prepareBindMount(m *configs.Mount, rootfs string, mountFd *int) error {
-	source := m.Source
-	if mountFd != nil {
-		source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
-	}
-
-	stat, err := os.Stat(source)
-	if err != nil {
-		// error out if the source of a bind mount does not exist as we will be
-		// unable to bind anything to it.
-		return err
-	}
-	// ensure that the destination of the bind mount is resolved of symlinks at mount time because
-	// any previous mounts can invalidate the next mount's destination.
-	// this can happen when a user specifies mounts within other mounts to cause breakouts or other
-	// evil stuff to try to escape the container's rootfs.
-	var dest string
-	if dest, err = securejoin.SecureJoin(rootfs, m.Destination); err != nil {
-		return err
-	}
-	if err := checkProcMount(rootfs, dest, source); err != nil {
-		return err
-	}
-	if err := createIfNotExists(dest, stat.IsDir()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 	binds, err := getCgroupMounts(m)
 	if err != nil {
@@ -282,7 +252,8 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 	for _, b := range binds {
 		if c.cgroupns {
 			subsystemPath := filepath.Join(c.root, b.Destination)
-			if err := os.MkdirAll(subsystemPath, 0o755); err != nil {
+			subsystemName := filepath.Base(b.Destination)
+			if err := utils.MkdirAllInRoot(c.root, subsystemPath, 0o755); err != nil {
 				return err
 			}
 			if err := utils.WithProcfd(c.root, b.Destination, func(procfd string) error {
@@ -292,7 +263,7 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 				}
 				var (
 					source = "cgroup"
-					data   = filepath.Base(subsystemPath)
+					data   = subsystemName
 				)
 				if data == "systemd" {
 					data = cgroups.CgroupNamePrefix + data
@@ -322,14 +293,7 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 }
 
 func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
-	dest, err := securejoin.SecureJoin(c.root, m.Destination)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return err
-	}
-	err = utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
+	err := utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
 		return mount(m.Source, m.Destination, procfd, "cgroup2", uintptr(m.Flags), m.Data)
 	})
 	if err == nil || !(errors.Is(err, unix.EPERM) || errors.Is(err, unix.EBUSY)) {
@@ -411,6 +375,81 @@ func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
 	})
 }
 
+var errRootfsToFile = errors.New("config tries to change rootfs to file")
+
+func createMountpoint(rootfs string, m *configs.Mount, mountFd *int, source string) (string, error) {
+	dest, err := securejoin.SecureJoin(rootfs, m.Destination)
+	if err != nil {
+		return "", err
+	}
+	if err := checkProcMount(rootfs, dest, m, source); err != nil {
+		return "", fmt.Errorf("check proc-safety of %s mount: %w", m.Destination, err)
+	}
+
+	switch m.Device {
+	case "bind":
+		source := m.Source
+		if mountFd != nil {
+			source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
+		}
+
+		fi, err := os.Stat(source)
+		if err != nil {
+			// Error out if the source of a bind mount does not exist as we
+			// will be unable to bind anything to it.
+			return "", fmt.Errorf("bind mount source stat: %w", err)
+		}
+		// If the original source is not a directory, make the target a file.
+		if !fi.IsDir() {
+			// Make sure we aren't tricked into trying to make the root a file.
+			if rootfs == dest {
+				return "", fmt.Errorf("%w: file bind mount over rootfs", errRootfsToFile)
+			}
+			// Make the parent directory.
+			destDir, destBase := filepath.Split(dest)
+			destDirFd, err := utils.MkdirAllInRootOpen(rootfs, destDir, 0o755)
+			if err != nil {
+				return "", fmt.Errorf("make parent dir of file bind-mount: %w", err)
+			}
+			defer destDirFd.Close()
+			// Make the target file. We want to avoid opening any file that is
+			// already there because it could be a "bad" file like an invalid
+			// device or hung tty that might cause a DoS, so we use mknodat.
+			// destBase does not contain any "/" components, and mknodat does
+			// not follow trailing symlinks, so we can safely just call mknodat
+			// here.
+			if err := unix.Mknodat(int(destDirFd.Fd()), destBase, unix.S_IFREG|0o644, 0); err != nil {
+				// If we get EEXIST, there was already an inode there and
+				// we can consider that a success.
+				if !errors.Is(err, unix.EEXIST) {
+					err = &os.PathError{Op: "mknod regular file", Path: dest, Err: err}
+					return "", fmt.Errorf("create target of file bind-mount: %w", err)
+				}
+			}
+			// Nothing left to do.
+			return dest, nil
+		}
+
+	case "tmpfs":
+		// If the original target exists, copy the mode for the tmpfs mount.
+		if stat, err := os.Stat(dest); err == nil {
+			dt := fmt.Sprintf("mode=%04o", syscallMode(stat.Mode()))
+			if m.Data != "" {
+				dt = dt + "," + m.Data
+			}
+			m.Data = dt
+
+			// Nothing left to do.
+			return dest, nil
+		}
+	}
+
+	if err := utils.MkdirAllInRoot(rootfs, dest, 0o755); err != nil {
+		return "", err
+	}
+	return dest, nil
+}
+
 func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 	rootfs := c.root
 
@@ -435,53 +474,34 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		} else if !fi.IsDir() {
 			return fmt.Errorf("filesystem %q must be mounted on ordinary directory", m.Device)
 		}
-		if err := os.MkdirAll(dest, 0o755); err != nil {
+		if err := utils.MkdirAllInRoot(rootfs, dest, 0o755); err != nil {
 			return err
 		}
 		// Selinux kernels do not support labeling of /proc or /sys.
 		return mountPropagate(m, rootfs, "", nil)
 	}
 
-	mountLabel := c.label
 	mountFd := c.fd
-	dest, err := securejoin.SecureJoin(rootfs, m.Destination)
+	dest, err := createMountpoint(rootfs, m, mountFd, m.Source)
 	if err != nil {
-		return err
+		return fmt.Errorf("create mount destination for %s mount: %w", m.Destination, err)
 	}
+	mountLabel := c.label
 
 	switch m.Device {
 	case "mqueue":
-		if err := os.MkdirAll(dest, 0o755); err != nil {
-			return err
-		}
 		if err := mountPropagate(m, rootfs, "", nil); err != nil {
 			return err
 		}
 		return label.SetFileLabel(dest, mountLabel)
 	case "tmpfs":
-		if stat, err := os.Stat(dest); err != nil {
-			if err := os.MkdirAll(dest, 0o755); err != nil {
-				return err
-			}
-		} else {
-			dt := fmt.Sprintf("mode=%04o", syscallMode(stat.Mode()))
-			if m.Data != "" {
-				dt = dt + "," + m.Data
-			}
-			m.Data = dt
-		}
-
 		if m.Extensions&configs.EXT_COPYUP == configs.EXT_COPYUP {
 			err = doTmpfsCopyUp(m, rootfs, mountLabel)
 		} else {
 			err = mountPropagate(m, rootfs, mountLabel, nil)
 		}
-
 		return err
 	case "bind":
-		if err := prepareBindMount(m, rootfs, mountFd); err != nil {
-			return err
-		}
 		if err := mountPropagate(m, rootfs, mountLabel, mountFd); err != nil {
 			return err
 		}
@@ -509,12 +529,6 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		}
 		return mountCgroupV1(m, c)
 	default:
-		if err := checkProcMount(rootfs, dest, m.Source); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(dest, 0o755); err != nil {
-			return err
-		}
 		return mountPropagate(m, rootfs, mountLabel, mountFd)
 	}
 	if err := setRecAttr(m, rootfs); err != nil {
@@ -557,11 +571,17 @@ func getCgroupMounts(m *configs.Mount) ([]*configs.Mount, error) {
 	return binds, nil
 }
 
-// checkProcMount checks to ensure that the mount destination is not over the top of /proc.
-// dest is required to be an abs path and have any symlinks resolved before calling this function.
+// Taken from <include/linux/proc_ns.h>. If a file is on a filesystem of type
+// PROC_SUPER_MAGIC, we're guaranteed that only the root of the superblock will
+// have this inode number.
+const procRootIno = 1
+
+// checkProcMount checks to ensure that the mount destination is not over the
+// top of /proc. dest is required to be an abs path and have any symlinks
+// resolved before calling this function.
 //
-// if source is nil, don't stat the filesystem.  This is used for restore of a checkpoint.
-func checkProcMount(rootfs, dest, source string) error {
+// source is "" when doing criu restores.
+func checkProcMount(rootfs, dest string, m *configs.Mount, source string) error {
 	const procPath = "/proc"
 	path, err := filepath.Rel(filepath.Join(rootfs, procPath), dest)
 	if err != nil {
@@ -572,18 +592,39 @@ func checkProcMount(rootfs, dest, source string) error {
 		return nil
 	}
 	if path == "." {
-		// an empty source is pasted on restore
+		// Skip this check for criu restores.
+		// NOTE: This is a special case kept from the original implementation,
+		// only present for the 1.1.z branch to avoid any possible breakage in
+		// a patch release. This check was removed in commit cdff09ab8751
+		// ("rootfs: fix 'can we mount on top of /proc' check") in 1.2, because
+		// it doesn't make sense with the new IsBind()-based checks.
 		if source == "" {
 			return nil
 		}
-		// only allow a mount on-top of proc if it's source is "proc"
-		isproc, err := isProc(source)
-		if err != nil {
-			return err
-		}
-		// pass if the mount is happening on top of /proc and the source of
-		// the mount is a proc filesystem
-		if isproc {
+		// Only allow bind-mounts on top of /proc, and only if the source is a
+		// procfs mount.
+		if m.IsBind() {
+			var fsSt unix.Statfs_t
+			if err := unix.Statfs(source, &fsSt); err != nil {
+				return &os.PathError{Op: "statfs", Path: source, Err: err}
+			}
+			if fsSt.Type == unix.PROC_SUPER_MAGIC {
+				var uSt unix.Stat_t
+				if err := unix.Stat(source, &uSt); err != nil {
+					return &os.PathError{Op: "stat", Path: source, Err: err}
+				}
+				if uSt.Ino != procRootIno {
+					// We cannot error out in this case, because we've
+					// supported these kinds of mounts for a long time.
+					// However, we would expect users to bind-mount the root of
+					// a real procfs on top of /proc in the container. We might
+					// want to block this in the future.
+					logrus.Warnf("bind-mount %v (source %v) is of type procfs but is not the root of a procfs (inode %d). Future versions of runc might block this configuration -- please report an issue to <https://github.com/opencontainers/runc> if you see this warning.", dest, source, uSt.Ino)
+				}
+				return nil
+			}
+		} else if m.Device == "proc" {
+			// Fresh procfs-type mounts are always safe to mount on top of /proc.
 			return nil
 		}
 		return fmt.Errorf("%q cannot be mounted because it is not of type proc", dest)
@@ -615,14 +656,6 @@ func checkProcMount(rootfs, dest, source string) error {
 	}
 
 	return fmt.Errorf("%q cannot be mounted because it is inside /proc", dest)
-}
-
-func isProc(path string) (bool, error) {
-	var s unix.Statfs_t
-	if err := unix.Statfs(path, &s); err != nil {
-		return false, &os.PathError{Op: "statfs", Path: path, Err: err}
-	}
-	return s.Type == unix.PROC_SUPER_MAGIC, nil
 }
 
 func setupDevSymlinks(rootfs string) error {
@@ -726,7 +759,10 @@ func createDeviceNode(rootfs string, node *devices.Device, bind bool) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+	if dest == rootfs {
+		return fmt.Errorf("%w: mknod over rootfs", errRootfsToFile)
+	}
+	if err := utils.MkdirAllInRoot(rootfs, filepath.Dir(dest), 0o755); err != nil {
 		return err
 	}
 	if bind {
@@ -988,26 +1024,6 @@ func chroot() error {
 	}
 	if err := unix.Chdir("/"); err != nil {
 		return &os.PathError{Op: "chdir", Path: "/", Err: err}
-	}
-	return nil
-}
-
-// createIfNotExists creates a file or a directory only if it does not already exist.
-func createIfNotExists(path string, isDir bool) error {
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			if isDir {
-				return os.MkdirAll(path, 0o755)
-			}
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return err
-			}
-			f, err := os.OpenFile(path, os.O_CREATE, 0o755)
-			if err != nil {
-				return err
-			}
-			_ = f.Close()
-		}
 	}
 	return nil
 }
