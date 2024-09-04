@@ -266,13 +266,13 @@ func localNodeSelector(nodeName string) *v1.NodeSelector {
 // allocationResult returns a matcher for one AllocationResult pointer with a list of
 // embedded device allocation results. The order of those results doesn't matter.
 func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRequestAllocationResult) types.GomegaMatcher {
-	return gstruct.PointTo(gstruct.MatchFields(0, gstruct.Fields{
+	return gstruct.MatchFields(0, gstruct.Fields{
 		"Devices": gstruct.MatchFields(0, gstruct.Fields{
 			"Results": gomega.ConsistOf(results), // Order is irrelevant.
 			"Config":  gomega.BeNil(),
 		}),
 		"NodeSelector": matchNodeSelector(selector),
-	}))
+	})
 }
 
 // matchNodeSelector returns a matcher for a node selector. The order
@@ -315,8 +315,8 @@ func matchNodeSelectorRequirement(requirement v1.NodeSelectorRequirement) types.
 	})
 }
 
-func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source resourceapi.AllocationConfigSource, attribute string, results ...resourceapi.DeviceRequestAllocationResult) *resourceapi.AllocationResult {
-	return &resourceapi.AllocationResult{
+func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source resourceapi.AllocationConfigSource, attribute string, results ...resourceapi.DeviceRequestAllocationResult) resourceapi.AllocationResult {
+	return resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: results,
 			Config: []resourceapi.DeviceAllocationConfiguration{
