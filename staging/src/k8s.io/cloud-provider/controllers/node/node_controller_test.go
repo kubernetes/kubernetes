@@ -1598,9 +1598,14 @@ func Test_syncNode(t *testing.T) {
 					// and should be discarded
 					"topology.kubernetes.io/region": "us-other-west",
 					"topology.k8s.io/region":        "us-other-west",
+					"kubernetes.io/region":          "us-other-west",
+					"k8s.io/region":                 "us-other-west",
 					// Should discard labels that already exist
 					"my.custom.label/foo": "bar",
 					"my.custom.label/bar": "foo",
+					// Should add labels that not match regex
+					"app.k8snio/bar": "foo",
+					"k8snio/bar":     "foo",
 				},
 			},
 			existingNode: &v1.Node{
@@ -1661,6 +1666,8 @@ func Test_syncNode(t *testing.T) {
 						"topology.kubernetes.io/zone":              "us-west-1a",
 						"my.custom.label/foo":                      "fizz",
 						"my.custom.label/bar":                      "foo",
+						"app.k8snio/bar":                           "foo",
+						"k8snio/bar":                               "foo",
 					},
 				},
 				Spec: v1.NodeSpec{
