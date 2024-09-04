@@ -101,7 +101,7 @@
             "driver": "driverValue",
             "pool": "poolValue",
             "device": "deviceValue",
-            "adminAccess": true
+            "adminAccess": null
           }
         ],
         "config": [
