@@ -41,21 +41,21 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 
 	f := framework.NewDefaultFramework("volumeattachment")
 
-	/*
-		Release: v1.30
-		Testname: VolumeAttachment, lifecycle
-		Description: Creating an initial VolumeAttachment MUST succeed. Reading the VolumeAttachment
-		MUST succeed with with required name retrieved. Patching a VolumeAttachment MUST
-		succeed with its new label found. Listing VolumeAttachment with a labelSelector
-		MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
-		and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
-		the second VolumentAttachment with a new label MUST succeed with its new label
-		found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
-		with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
-		via deleteCollection MUST succeed and it MUST be confirmed.
-	*/
 	ginkgo.Describe("Conformance", func() {
 
+		/*
+			Release: v1.30
+			Testname: VolumeAttachment, lifecycle
+			Description: Creating an initial VolumeAttachment MUST succeed. Reading the VolumeAttachment
+			MUST succeed with with required name retrieved. Patching a VolumeAttachment MUST
+			succeed with its new label found. Listing VolumeAttachment with a labelSelector
+			MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
+			and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
+			the second VolumentAttachment with a new label MUST succeed with its new label
+			found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
+			with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
+			via deleteCollection MUST succeed and it MUST be confirmed.
+		*/
 		framework.ConformanceIt("should run through the lifecycle of a VolumeAttachment", func(ctx context.Context) {
 
 			vaClient := f.ClientSet.StorageV1().VolumeAttachments()
