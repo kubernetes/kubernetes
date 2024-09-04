@@ -574,7 +574,7 @@ const (
 	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 
 	// owner: @ddebroy, @kannon92
-	// alpha: v1.25
+	// alpha: v1.28
 	// beta: v1.29
 	//
 	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
@@ -912,7 +912,7 @@ const (
 	ImageMaximumGCAge featuregate.Feature = "ImageMaximumGCAge"
 
 	// owner: @saschagrunert
-	// alpha: v1.28
+	// alpha: v1.29
 	//
 	// Enables user namespace support for Pod Security Standards. Enabling this
 	// feature will modify all Pod Security Standard rules to allow setting:

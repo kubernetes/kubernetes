@@ -220,7 +220,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	NewVolumeManagerReconstruction: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 	},
 	NFTablesProxyMode: {
@@ -267,7 +268,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 	},
 	PodReadyToStartContainersCondition: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 	},
 	PodHostIPs: {
@@ -324,6 +325,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.32
 	},
 	SchedulerQueueingHints: {
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
 	},
 	SeparateTaintEvictionController: {
@@ -378,7 +380,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
 	TopologyManagerPolicyBetaOptions: {
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 	},
 	TopologyManagerPolicyOptions: {
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
@@ -417,7 +420,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	SELinuxMountReadWriteOncePod: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 	},
 	LoadBalancerIPMode: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
@@ -428,7 +432,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 	},
 	UserNamespacesPodSecurityStandards: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 	},
 	SELinuxMount: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
