@@ -232,7 +232,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
-	clientBuilder, rootClientBuilder := createClientBuilders(logger, c)
+	clientBuilder, rootClientBuilder := createClientBuilders(c)
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
@@ -869,16 +869,12 @@ func readCA(file string) ([]byte, error) {
 }
 
 // createClientBuilders creates clientBuilder and rootClientBuilder from the given configuration
-func createClientBuilders(logger klog.Logger, c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+
 	rootClientBuilder = clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-			// It's possible another controller process is creating the tokens for us.
-			// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-			logger.Info("Warning: --use-service-account-credentials was specified without providing a --service-account-private-key-file")
-		}
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
 			restclient.AnonymousClientConfig(c.Kubeconfig),
