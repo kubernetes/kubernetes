@@ -22,12 +22,6 @@
     lockToDefault: false
     preRelease: Deprecated
     version: ""
-- name: AnyVolumeDataSource
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: APIListChunking
   versionedSpecs:
   - default: true
@@ -58,24 +52,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: ""
-- name: AppArmor
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: AppArmorFields
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: AuthorizeNodeWithSelectors
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: AuthorizeWithSelectors
   versionedSpecs:
   - default: false
@@ -83,18 +59,6 @@
     preRelease: Alpha
     version: ""
 - name: CloudControllerManagerWebhook
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: ClusterTrustBundle
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: ClusterTrustBundleProjection
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -118,12 +82,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: ContainerCheckpoint
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: ContextualLogging
   versionedSpecs:
   - default: true
@@ -136,65 +94,11 @@
     lockToDefault: false
     preRelease: Alpha
     version: ""
-- name: CPUCFSQuotaPeriod
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: CPUManager
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: CPUManagerPolicyAlphaOptions
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: CPUManagerPolicyBetaOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: CPUManagerPolicyOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: CRDValidationRatcheting
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: CronJobsScheduledAnnotation
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: CrossNamespaceVolumeDataSource
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: CSIMigrationPortworx
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: CSIVolumeHealth
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: ""
 - name: CustomResourceFieldSelectors
   versionedSpecs:
@@ -202,91 +106,13 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: DevicePluginCDIDevices
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: DisableAllocatorDualWrite
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: DisableCloudProviders
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: DisableKubeletCloudCredentialProviders
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Deprecated
     version: ""
-- name: DRAControlPlaneController
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: DynamicResourceAllocation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: EfficientWatchResumption
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: ElasticIndexedJob
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: EventedPLEG
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: ExecProbeTimeout
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: ""
-- name: GracefulNodeShutdown
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: GracefulNodeShutdownBasedOnPodPriority
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: HonorPVReclaimPolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: HPAContainerMetrics
   versionedSpecs:
   - default: true
     lockToDefault: true
@@ -298,125 +124,17 @@
     lockToDefault: false
     preRelease: Alpha
     version: ""
-- name: ImageMaximumGCAge
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ImageVolume
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: ""
-- name: InTreePluginPortworxUnregister
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: JobBackoffLimitPerIndex
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: JobManagedBy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: JobPodFailurePolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: JobPodReplacementPolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: JobSuccessPolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: KMSv1
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Deprecated
-    version: ""
-- name: KubeletCgroupDriverFromCRI
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: KubeletInUserNamespace
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: KubeletPodResourcesDynamicResources
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: KubeletPodResourcesGet
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: KubeletSeparateDiskGC
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: KubeletTracing
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: KubeProxyDrainingTerminatingNodes
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: LoadBalancerIPMode
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: LocalStorageCapacityIsolationFSQuotaMonitoring
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: LogarithmicScaleDown
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: ""
 - name: LoggingAlphaOptions
   versionedSpecs:
@@ -430,89 +148,11 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: MatchLabelKeysInPodAffinity
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: MatchLabelKeysInPodTopologySpread
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: MaxUnavailableStatefulSet
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: MemoryManager
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: MemoryQoS
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: MinDomainsInPodTopologySpread
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: MultiCIDRServiceAllocator
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: ""
-- name: NewVolumeManagerReconstruction
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: NFTablesProxyMode
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: NodeInclusionPolicyInPodTopologySpread
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: NodeLogQuery
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: NodeOutOfServiceVolumeDetach
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: NodeSwap
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
     version: ""
 - name: OpenAPIEnums
   versionedSpecs:
@@ -520,97 +160,7 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: PDBUnhealthyPodEvictionPolicy
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: PersistentVolumeLastPhaseTransitionTime
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: PodAndContainerStatsFromCRI
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: PodDeletionCost
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: PodDisruptionConditions
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: PodHostIPs
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: PodIndexLabel
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: PodLifecycleSleepAction
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: PodReadyToStartContainersCondition
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: PodSchedulingReadiness
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: PortForwardWebsockets
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ProcMountType
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: QOSReserved
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: RecoverVolumeExpansionFailure
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: RecursiveReadOnlyMounts
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
     lockToDefault: false
@@ -628,43 +178,7 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: ResourceHealthStatus
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: RetryGenerateName
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: RotateKubeletServerCertificate
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: RuntimeClassInImageCriAPI
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: SchedulerQueueingHints
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: SELinuxMount
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: SELinuxMountReadWriteOncePod
   versionedSpecs:
   - default: true
     lockToDefault: false
@@ -675,66 +189,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: SeparateTaintEvictionController
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ServiceAccountTokenJTI
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ServiceAccountTokenNodeBinding
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ServiceAccountTokenNodeBindingValidation
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ServiceAccountTokenPodNodeInfo
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ServiceTrafficDistribution
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: SidecarContainers
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: SizeMemoryBackedVolumes
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StatefulSetAutoDeletePVC
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StatefulSetStartOrdinal
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: ""
 - name: StorageNamespaceIndex
   versionedSpecs:
@@ -753,12 +207,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: StorageVersionMigrator
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: ""
 - name: StrictCostEnforcementForVAP
   versionedSpecs:
@@ -784,71 +232,11 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: SupplementalGroupsPolicy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: TopologyAwareHints
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: TopologyManagerPolicyAlphaOptions
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: TopologyManagerPolicyBetaOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: TopologyManagerPolicyOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: TranslateStreamCloseWebsocketRequests
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: UnauthenticatedHTTP2DOSMitigation
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: UnknownVersionInteroperabilityProxy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: UserNamespacesPodSecurityStandards
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: UserNamespacesSupport
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: VolumeCapacityPriority
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: ""
 - name: WatchBookmark
   versionedSpecs:
@@ -873,24 +261,6 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: ""
-- name: WindowsHostNetwork
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: WinDSR
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: WinOverlay
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
     version: ""
 - name: ZeroLimitedNominalConcurrencyShares
   versionedSpecs:
