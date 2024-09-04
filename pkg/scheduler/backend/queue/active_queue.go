@@ -204,7 +204,7 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	aq.schedCycle++
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
-		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1)
+		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
 	}
 
@@ -297,7 +297,7 @@ func (aq *activeQueue) addEventIfPodInFlight(oldPod, newPod *v1.Pod, event frame
 
 	_, ok := aq.inFlightPods[newPod.UID]
 	if ok {
-		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1)
+		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
 			oldObj: oldPod,
@@ -314,7 +314,7 @@ func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event f
 	defer aq.lock.Unlock()
 
 	if len(aq.inFlightPods) != 0 {
-		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1)
+		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
 			oldObj: oldObj,
@@ -346,7 +346,6 @@ func (aq *activeQueue) done(pod types.UID) {
 
 	// Remove the pod from the list.
 	aq.inFlightEvents.Remove(inFlightPod)
-	aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, -1)
 
 	aggrMetricsCounter := map[string]int{}
 	// Remove events which are only referred to by this Pod
@@ -370,8 +369,14 @@ func (aq *activeQueue) done(pod types.UID) {
 	}
 
 	for evLabel, count := range aggrMetricsCounter {
-		aq.metricsRecorder.ObserveInFlightEventsAsync(evLabel, float64(count))
+		aq.metricsRecorder.ObserveInFlightEventsAsync(evLabel, float64(count), false)
 	}
+
+	aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, -1,
+		// If it's the last Pod in inFlightPods, we should force-flush the metrics.
+		// Otherwise, especially in small clusters, which don't get a new Pod frequently,
+		// the metrics might not be flushed for a long time.
+		len(aq.inFlightPods) == 0)
 }
 
 // close closes the activeQueue.

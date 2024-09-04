@@ -116,9 +116,9 @@ func TestInFlightEventAsync(t *testing.T) {
 	}
 
 	podAddLabel := "Pod/Add"
-	r.ObserveInFlightEventsAsync(podAddLabel, 10)
-	r.ObserveInFlightEventsAsync(podAddLabel, -1)
-	r.ObserveInFlightEventsAsync(PodPoppedInFlightEvent, 1)
+	r.ObserveInFlightEventsAsync(podAddLabel, 10, false)
+	r.ObserveInFlightEventsAsync(podAddLabel, -1, false)
+	r.ObserveInFlightEventsAsync(PodPoppedInFlightEvent, 1, false)
 
 	if d := cmp.Diff(r.aggregatedInflightEventMetric, map[gaugeVecMetricKey]int{
 		{metricName: InFlightEvents.Name, labelValue: podAddLabel}:            9,
@@ -130,7 +130,7 @@ func TestInFlightEventAsync(t *testing.T) {
 	r.aggregatedInflightEventMetricLastFlushTime = time.Now().Add(-time.Hour) // to test flush
 
 	// It adds -4 and flushes the metric to the channel.
-	r.ObserveInFlightEventsAsync(podAddLabel, -4)
+	r.ObserveInFlightEventsAsync(podAddLabel, -4, false)
 	if len(r.aggregatedInflightEventMetric) != 0 {
 		t.Errorf("aggregatedInflightEventMetric should be cleared, but got: %v", r.aggregatedInflightEventMetric)
 	}
@@ -163,5 +163,11 @@ func TestInFlightEventAsync(t *testing.T) {
 		},
 	}, cmp.AllowUnexported(gaugeVecMetric{}), cmpopts.IgnoreFields(gaugeVecMetric{}, "metric")); d != "" {
 		t.Errorf("unexpected metrics are sent to aggregatedInflightEventMetricBufferCh: %s", d)
+	}
+
+	// Test force flush
+	r.ObserveInFlightEventsAsync(podAddLabel, 1, true)
+	if len(r.aggregatedInflightEventMetric) != 0 {
+		t.Errorf("aggregatedInflightEventMetric should be force-flushed, but got: %v", r.aggregatedInflightEventMetric)
 	}
 }

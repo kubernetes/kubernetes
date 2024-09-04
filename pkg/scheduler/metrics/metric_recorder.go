@@ -151,15 +151,16 @@ func (r *MetricAsyncRecorder) ObserveQueueingHintDurationAsync(pluginName, event
 }
 
 // ObserveInFlightEventsAsync observes the in_flight_events metric.
+//
 // Note that this function is not goroutine-safe;
 // we don't lock the map deliberately for the performance reason and we assume the queue (i.e., the caller) takes lock before updating the in-flight events.
-func (r *MetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64) {
+func (r *MetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
 	r.aggregatedInflightEventMetric[gaugeVecMetricKey{metricName: InFlightEvents.Name, labelValue: eventLabel}] += int(valueToAdd)
 
 	// Only flush the metric to the channel if the interval is reached.
 	// The values are flushed to Prometheus in the run() function, which runs once the interval time.
 	// Note: we implement this flushing here, not in FlushMetrics, because, if we did so, we would need to implement a lock for the map, which we want to avoid.
-	if time.Since(r.aggregatedInflightEventMetricLastFlushTime) > r.interval {
+	if forceFlush || time.Since(r.aggregatedInflightEventMetricLastFlushTime) > r.interval {
 		for key, value := range r.aggregatedInflightEventMetric {
 			newMetric := &gaugeVecMetric{
 				metric:      InFlightEvents,
