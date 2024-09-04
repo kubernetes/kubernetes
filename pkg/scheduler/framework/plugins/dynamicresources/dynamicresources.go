@@ -97,7 +97,7 @@ type stateData struct {
 	informationsForClaim []informationForClaim
 
 	// nodeAllocations caches the result of Filter for the nodes.
-	nodeAllocations map[string][]*resourceapi.AllocationResult
+	nodeAllocations map[string][]resourceapi.AllocationResult
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -890,7 +890,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string][]*resourceapi.AllocationResult)
+		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
 	s.claims = claims
@@ -999,7 +999,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	}
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
-	var allocations []*resourceapi.AllocationResult
+	var allocations []resourceapi.AllocationResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -1286,7 +1286,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			if index < 0 {
 				return statusError(logger, fmt.Errorf("internal error, claim %s with allocation not found", claim.Name))
 			}
-			allocation := allocations[i]
+			allocation := &allocations[i]
 			state.informationsForClaim[index].allocation = allocation
 
 			// Strictly speaking, we don't need to store the full modified object.
