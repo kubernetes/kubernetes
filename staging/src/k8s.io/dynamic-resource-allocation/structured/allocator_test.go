@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -176,17 +177,6 @@ func claimWithDeviceConfig(name, request, class, driver, attribute string) *reso
 	claim.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
 		{
 			DeviceConfiguration: deviceConfiguration(driver, attribute),
-		},
-	}
-	return claim
-}
-
-// generate allocated ResourceClaim object
-func allocatedClaim(name, request, class string, results ...resourceapi.DeviceRequestAllocationResult) *resourceapi.ResourceClaim {
-	claim := claim(name, request, class)
-	claim.Status.Allocation = &resourceapi.AllocationResult{
-		Devices: resourceapi.DeviceAllocationResult{
-			Results: results,
 		},
 	}
 	return claim
@@ -361,7 +351,7 @@ func TestAllocator(t *testing.T) {
 
 	testcases := map[string]struct {
 		claimsToAllocate []*resourceapi.ResourceClaim
-		allocatedClaims  []*resourceapi.ResourceClaim
+		allocatedDevices []DeviceID
 		classes          []*resourceapi.DeviceClass
 		slices           []*resourceapi.ResourceSlice
 		node             *v1.Node
@@ -708,12 +698,10 @@ func TestAllocator(t *testing.T) {
 		},
 		"already-allocated-devices": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
-			allocatedClaims: objects(
-				allocatedClaim(claim0, req0, classA,
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req1, driverA, pool1, device2),
-				),
-			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
@@ -726,34 +714,16 @@ func TestAllocator(t *testing.T) {
 				c.Spec.Devices.Requests[0].AdminAccess = true
 				return []*resourceapi.ResourceClaim{c}
 			}(),
-			allocatedClaims: objects(
-				allocatedClaim(claim0, req0, classA,
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req1, driverA, pool1, device2),
-				),
-			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
 			expectResults: []any{
 				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
-			},
-		},
-		"already-allocated-for-admin-access": {
-			claimsToAllocate: objects(claim(claim0, req0, classA)),
-			allocatedClaims: objects(
-				allocatedClaim(claim0, req0, classA,
-					deviceAllocationResult(req0, driverA, pool1, device1, true),
-					deviceAllocationResult(req1, driverA, pool1, device2, true),
-				),
-			),
-			classes: objects(class(classA, driverA)),
-			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
-			node:    node(node1, region1),
-
-			expectResults: []any{
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
 			},
 		},
 		"with-constraint": {
@@ -920,23 +890,15 @@ func TestAllocator(t *testing.T) {
 			// Listing objects is deterministic and returns them in the same
 			// order as in the test case. That makes the allocation result
 			// also deterministic.
-			var allocated, toAllocate claimLister
 			var classLister informerLister[resourceapi.DeviceClass]
-			var sliceLister informerLister[resourceapi.ResourceSlice]
-			for _, claim := range tc.claimsToAllocate {
-				toAllocate.claims = append(toAllocate.claims, claim.DeepCopy())
-			}
-			for _, claim := range tc.allocatedClaims {
-				allocated.claims = append(allocated.claims, claim.DeepCopy())
-			}
-			for _, slice := range tc.slices {
-				sliceLister.objs = append(sliceLister.objs, slice.DeepCopy())
-			}
 			for _, class := range tc.classes {
 				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
+			claimsToAllocate := slices.Clone(tc.claimsToAllocate)
+			allocatedDevices := slices.Clone(tc.allocatedDevices)
+			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, toAllocate.claims, allocated, classLister, sliceLister)
+			allocator, err := NewAllocator(ctx, claimsToAllocate, allocatedDevices, classLister, slices)
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)
@@ -948,21 +910,12 @@ func TestAllocator(t *testing.T) {
 			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
-			g.Expect(toAllocate.claims).To(gomega.HaveExactElements(tc.claimsToAllocate))
-			g.Expect(allocated.claims).To(gomega.HaveExactElements(tc.allocatedClaims))
-			g.Expect(sliceLister.objs).To(gomega.ConsistOf(tc.slices))
+			g.Expect(claimsToAllocate).To(gomega.HaveExactElements(tc.claimsToAllocate))
+			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
+			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
 		})
 	}
-}
-
-type claimLister struct {
-	claims []*resourceapi.ResourceClaim
-	err    error
-}
-
-func (l claimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	return l.claims, l.err
 }
 
 type informerLister[T any] struct {

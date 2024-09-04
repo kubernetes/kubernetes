@@ -31,6 +31,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -876,12 +877,15 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// Claims are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
-		claimLister := &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}
-		allocatedClaims, err := claimLister.ListAllAllocated()
+		allocatedDevices := pl.listAllAllocatedDevices()
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		allocator, err := structured.NewAllocator(ctx, allocateClaims, staticClaimLister(allocatedClaims), pl.classLister, pl.sliceLister)
+		slices, err := pl.sliceLister.List(labels.Everything())
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		allocator, err := structured.NewAllocator(ctx, allocateClaims, allocatedDevices, pl.classLister, slices)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
@@ -893,31 +897,28 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	return nil, nil
 }
 
-type claimListerForAssumeCache struct {
-	assumeCache         *assumecache.AssumeCache
-	inFlightAllocations *sync.Map
-}
-
-func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
+func (pl *dynamicResources) listAllAllocatedDevices() []structured.DeviceID {
 	// Probably not worth adding an index for?
-	objs := cl.assumeCache.List(nil)
-	allocated := make([]*resourceapi.ResourceClaim, 0, len(objs))
+	objs := pl.claimAssumeCache.List(nil)
+	var allocated []structured.DeviceID
 	for _, obj := range objs {
 		claim := obj.(*resourceapi.ResourceClaim)
-		if obj, ok := cl.inFlightAllocations.Load(claim.UID); ok {
+		if obj, ok := pl.inFlightAllocations.Load(claim.UID); ok {
 			claim = obj.(*resourceapi.ResourceClaim)
 		}
-		if claim.Status.Allocation != nil {
-			allocated = append(allocated, claim)
+		if claim.Status.Allocation == nil {
+			continue
+		}
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.AdminAccess {
+				// Is not considered as allocated.
+				continue
+			}
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			allocated = append(allocated, deviceID)
 		}
 	}
-	return allocated, nil
-}
-
-type staticClaimLister []*resourceapi.ResourceClaim
-
-func (cl staticClaimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	return cl, nil
+	return allocated
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
