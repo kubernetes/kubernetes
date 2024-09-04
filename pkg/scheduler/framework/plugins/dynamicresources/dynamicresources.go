@@ -280,6 +280,7 @@ type dynamicResources struct {
 	classLister                resourcelisters.DeviceClassLister
 	podSchedulingContextLister resourcelisters.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
 	sliceLister                resourcelisters.ResourceSliceLister
+	celCache                   *structured.CELCache
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -354,6 +355,11 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
 		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
+
+		// This is a LRU cache for compiled CEL expressions. The most
+		// recent 10 of them get reused across different scheduling
+		// cycles.
+		celCache: structured.NewCELCache(10),
 	}
 	if pl.controlPlaneControllerEnabled {
 		pl.podSchedulingContextLister = fh.SharedInformerFactory().Resource().V1alpha3().PodSchedulingContexts().Lister()
@@ -885,7 +891,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		allocator, err := structured.NewAllocator(ctx, allocateClaims, allocatedDevices, pl.classLister, slices)
+		allocator, err := structured.NewAllocator(ctx, allocateClaims, allocatedDevices, pl.classLister, slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

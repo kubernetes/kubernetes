@@ -323,6 +323,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		reflect.TypeOf(&v1.Node{}):                   true,
 	}
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
+	celCache := structured.NewCELCache(10)
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
@@ -352,7 +353,7 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, allocatedDevices, classLister, slices)
+		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, allocatedDevices, classLister, slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

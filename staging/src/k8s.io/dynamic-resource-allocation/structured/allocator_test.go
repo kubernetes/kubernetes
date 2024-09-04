@@ -898,7 +898,7 @@ func TestAllocator(t *testing.T) {
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, claimsToAllocate, allocatedDevices, classLister, slices)
+			allocator, err := NewAllocator(ctx, claimsToAllocate, allocatedDevices, classLister, slices, NewCELCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)
