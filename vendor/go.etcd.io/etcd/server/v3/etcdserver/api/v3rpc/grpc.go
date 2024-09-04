@@ -76,13 +76,10 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, interceptor grpc.UnarySer
 	pb.RegisterLeaseServer(grpcServer, NewQuotaLeaseServer(s))
 	pb.RegisterClusterServer(grpcServer, NewClusterServer(s))
 	pb.RegisterAuthServer(grpcServer, NewAuthServer(s))
-	pb.RegisterMaintenanceServer(grpcServer, NewMaintenanceServer(s))
 
-	// server should register all the services manually
-	// use empty service name for all etcd services' health status,
-	// see https://github.com/grpc/grpc/blob/master/doc/health-checking.md for more
 	hsrv := health.NewServer()
-	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthNotifier := newHealthNotifier(hsrv, s)
+	pb.RegisterMaintenanceServer(grpcServer, NewMaintenanceServer(s, healthNotifier))
 	healthpb.RegisterHealthServer(grpcServer, hsrv)
 
 	// set zero values for metrics registered for this grpc server
