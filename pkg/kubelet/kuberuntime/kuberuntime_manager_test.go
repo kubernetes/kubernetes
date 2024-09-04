@@ -1383,6 +1383,7 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.ContainerStatuses[1].ExitCode = 1
 			},
 			actions: podActions{
 				KillPod:           true,
