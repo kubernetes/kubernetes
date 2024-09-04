@@ -1,0 +1,7 @@
+linux/amd64=debian:stable-slim
+linux/arm=arm32v7/debian:stable-slim
+linux/arm64=arm64v8/debian:stable-slim
+linux/ppc64le=ppc64le/debian:stable-slim
+linux/s390x=s390x/debian:stable-slim
+windows/amd64/1809=REGISTRY/busybox:1.29-2-windows-amd64-1809
+windows/amd64/ltsc2022=REGISTRY/busybox:1.29-2-windows-amd64-ltsc2022
