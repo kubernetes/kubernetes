@@ -328,7 +328,7 @@ const (
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
 	// beta: v1.26
-	// stable: v1.31
+	// GA: v1.31
 	//
 	// Allow users to specify handling of pod failures based on container exit codes
 	// and pod conditions.
@@ -406,7 +406,7 @@ const (
 	// kep: http://kep.k8s.io/3836
 	// alpha: v1.28
 	// beta: v1.30
-	// stable: v1.31
+	// GA: v1.31
 	//
 	// Implement connection draining for terminating nodes for
 	// `externalTrafficPolicy: Cluster` services.
@@ -560,7 +560,7 @@ const (
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
 	// beta: v1.26
-	// stable: v1.31
+	// GA: v1.31
 	//
 	// Enables support for appending a dedicated pod condition indicating that
 	// the pod is being deleted due to a disruption.
@@ -602,7 +602,7 @@ const (
 	// kep: https://kep.k8s.io/3521
 	// alpha: v1.26
 	// beta: v1.27
-	// stable: v1.30
+	// GA: v1.30
 	//
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
@@ -677,7 +677,7 @@ const (
 	// owner: @danielvegamyhre
 	// kep: https://kep.k8s.io/2413
 	// beta: v1.27
-	// stable: v1.31
+	// GA: v1.31
 	//
 	// Allows mutating spec.completions for Indexed job when done in tandem with
 	// spec.parallelism. Specifically, spec.completions is mutable iff spec.completions
@@ -768,7 +768,7 @@ const (
 	// owner: @psch
 	// alpha: v1.26
 	// beta: v1.27
-	// stable: v1.31
+	// GA: v1.31
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
