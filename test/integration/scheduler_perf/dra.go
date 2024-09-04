@@ -277,7 +277,6 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	sliceLister := informerFactory.Resource().V1alpha3().ResourceSlices().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	claimCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
-	claimLister := claimLister{cache: claimCache}
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
@@ -295,6 +294,8 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
 	tCtx.ExpectNoError(err, "list nodes")
+	slices, err := sliceLister.List(labels.Everything())
+	tCtx.ExpectNoError(err, "list slices")
 
 	// Allocate one claim at a time, picking nodes randomly. Each
 	// allocation is stored immediately, using the claim cache to avoid
@@ -306,7 +307,19 @@ claims:
 			continue
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), []*resourceapi.ResourceClaim{claim}, claimLister, classLister, sliceLister)
+		objs := claimCache.List(nil)
+		allocatedDevices := make([]structured.DeviceID, 0, len(objs))
+		for _, obj := range objs {
+			claim := obj.(*resourceapi.ResourceClaim)
+			if claim.Status.Allocation == nil {
+				continue
+			}
+			for _, result := range claim.Status.Allocation.Devices.Results {
+				allocatedDevices = append(allocatedDevices, structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+			}
+		}
+
+		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), []*resourceapi.ResourceClaim{claim}, allocatedDevices, classLister, slices)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {
@@ -326,20 +339,4 @@ claims:
 		}
 		tCtx.Fatalf("Could not allocate claim %d out of %d", i, len(claims.Items))
 	}
-}
-
-type claimLister struct {
-	cache *assumecache.AssumeCache
-}
-
-func (c claimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	objs := c.cache.List(nil)
-	allocatedClaims := make([]*resourceapi.ResourceClaim, 0, len(objs))
-	for _, obj := range objs {
-		claim := obj.(*resourceapi.ResourceClaim)
-		if claim.Status.Allocation != nil {
-			allocatedClaims = append(allocatedClaims, claim)
-		}
-	}
-	return allocatedClaims, nil
 }
