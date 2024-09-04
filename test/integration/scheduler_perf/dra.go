@@ -330,7 +330,7 @@ claims:
 			tCtx.ExpectNoError(err, "allocate claim")
 			if result != nil {
 				claim = claim.DeepCopy()
-				claim.Status.Allocation = result[0]
+				claim.Status.Allocation = &result[0]
 				claim, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "update claim status with allocation")
 				tCtx.ExpectNoError(claimCache.Assume(claim), "assume claim")

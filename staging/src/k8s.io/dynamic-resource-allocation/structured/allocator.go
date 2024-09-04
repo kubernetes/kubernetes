@@ -96,7 +96,7 @@ func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 // additional value. A name can also be useful because log messages do not
 // have a common prefix. V(5) is used for one-time log entries, V(6) for important
 // progress reports, and V(7) for detailed debug output.
-func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []*resourceapi.AllocationResult, finalErr error) {
+func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
@@ -104,7 +104,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(a.claimsToAllocate)),
 		requestData:          make(map[requestIndices]requestData),
-		result:               make([]*resourceapi.AllocationResult, len(a.claimsToAllocate)),
+		result:               make([]internalAllocationResult, len(a.claimsToAllocate)),
 	}
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
 	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
@@ -199,7 +199,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 								return nil, err
 							}
 							if selectable {
-								requestData.allDevices = append(requestData.allDevices, deviceWithID{device: slice.Spec.Devices[deviceIndex].Basic, DeviceID: DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}})
+								device := deviceWithID{
+									id:    DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
+									basic: slice.Spec.Devices[deviceIndex].Basic,
+									slice: slice,
+								}
+								requestData.allDevices = append(requestData.allDevices, device)
 							}
 						}
 					}
@@ -221,16 +226,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 		// If we don't, then we can pre-allocate the result slices for
 		// appending the actual results later.
-		alloc.result[claimIndex] = &resourceapi.AllocationResult{
-			Devices: resourceapi.DeviceAllocationResult{
-				Results: make([]resourceapi.DeviceRequestAllocationResult, 0, numDevicesPerClaim),
-			},
-		}
+		alloc.result[claimIndex].devices = make([]internalDeviceResult, 0, numDevicesPerClaim)
 
 		// Constraints are assumed to be monotonic: once a constraint returns
 		// false, adding more devices will not cause it to return true. This
 		// allows the search to stop early once a constraint returns false.
-		var constraints = make([]constraint, len(claim.Spec.Devices.Constraints))
+		constraints := make([]constraint, len(claim.Spec.Devices.Constraints))
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
@@ -296,8 +297,20 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		return nil, nil
 	}
 
-	for claimIndex, allocationResult := range alloc.result {
+	result := make([]resourceapi.AllocationResult, len(alloc.result))
+	for claimIndex, internalResult := range alloc.result {
 		claim := alloc.claimsToAllocate[claimIndex]
+		allocationResult := &result[claimIndex]
+		allocationResult.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, len(internalResult.devices))
+		for i, internal := range internalResult.devices {
+			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
+				Request:     internal.request,
+				Driver:      internal.id.Driver.String(),
+				Pool:        internal.id.Pool.String(),
+				Device:      internal.id.Device.String(),
+				AdminAccess: &internal.adminAccess,
+			}
+		}
 
 		// Populate configs.
 		for requestIndex := range claim.Spec.Devices.Requests {
@@ -321,14 +334,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(allocationResult)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
 		if err != nil {
 			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
 		allocationResult.NodeSelector = nodeSelector
 	}
 
-	return alloc.result, nil
+	return result, nil
 }
 
 // errStop is a special error that gets returned by allocateOne if it detects
@@ -347,7 +360,7 @@ type allocator struct {
 	requestData          map[requestIndices]requestData // one entry per request
 	allocated            map[DeviceID]bool
 	skippedUnknownDevice bool
-	result               []*resourceapi.AllocationResult
+	result               []internalAllocationResult
 }
 
 // matchKey identifies a device/request pair.
@@ -377,8 +390,20 @@ type requestData struct {
 }
 
 type deviceWithID struct {
-	DeviceID
-	device *draapi.BasicDevice
+	id    DeviceID
+	basic *draapi.BasicDevice
+	slice *draapi.ResourceSlice
+}
+
+type internalAllocationResult struct {
+	devices []internalDeviceResult
+}
+
+type internalDeviceResult struct {
+	request     string
+	id          DeviceID
+	slice       *draapi.ResourceSlice
+	adminAccess bool
 }
 
 type constraint interface {
@@ -533,7 +558,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 		// For "all" devices we already know which ones we need. We
 		// just need to check whether we can use them.
 		deviceWithID := requestData.allDevices[r.deviceIndex]
-		_, _, err := alloc.allocateDevice(r, deviceWithID.device, deviceWithID.DeviceID, true)
+		_, _, err := alloc.allocateDevice(r, deviceWithID, true)
 		if err != nil {
 			return false, err
 		}
@@ -574,7 +599,12 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				}
 
 				// Finally treat as allocated and move on to the next device.
-				allocated, deallocate, err := alloc.allocateDevice(r, slice.Spec.Devices[deviceIndex].Basic, deviceID, false)
+				device := deviceWithID{
+					id:    deviceID,
+					basic: slice.Spec.Devices[deviceIndex].Basic,
+					slice: slice,
+				}
+				allocated, deallocate, err := alloc.allocateDevice(r, device, false)
 				if err != nil {
 					return false, err
 				}
@@ -700,28 +730,28 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDev
 // as if that candidate had been allocated. If allocation cannot continue later
 // and must try something else, then the rollback function can be invoked to
 // restore the previous state.
-func (alloc *allocator) allocateDevice(r deviceIndices, device *draapi.BasicDevice, deviceID DeviceID, must bool) (bool, func(), error) {
+func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, must bool) (bool, func(), error) {
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	request := &claim.Spec.Devices.Requests[r.requestIndex]
 	adminAccess := request.AdminAccess
-	if !adminAccess && alloc.allocated[deviceID] {
-		alloc.logger.V(7).Info("Device in use", "device", deviceID)
+	if !adminAccess && alloc.allocated[device.id] {
+		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
 	}
 
 	// It's available. Now check constraints.
 	for i, constraint := range alloc.constraints[r.claimIndex] {
-		added := constraint.add(request.Name, device, deviceID)
+		added := constraint.add(request.Name, device.basic, device.id)
 		if !added {
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting
 				// all devices. Treat this as an error.
-				return false, nil, fmt.Errorf("claim %s, request %s: cannot add device %s because a claim constraint would not be satisfied", klog.KObj(claim), request.Name, deviceID)
+				return false, nil, fmt.Errorf("claim %s, request %s: cannot add device %s because a claim constraint would not be satisfied", klog.KObj(claim), request.Name, device.id)
 			}
 
 			// Roll back for all previous constraints before we return.
 			for e := 0; e < i; e++ {
-				alloc.constraints[r.claimIndex][e].remove(request.Name, device, deviceID)
+				alloc.constraints[r.claimIndex][e].remove(request.Name, device.basic, device.id)
 			}
 			return false, nil, nil
 		}
@@ -729,47 +759,43 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *draapi.BasicDevi
 
 	// All constraints satisfied. Mark as in use (unless we do admin access)
 	// and record the result.
-	alloc.logger.V(7).Info("Device allocated", "device", deviceID)
+	alloc.logger.V(7).Info("Device allocated", "device", device.id)
 	if !adminAccess {
-		alloc.allocated[deviceID] = true
+		alloc.allocated[device.id] = true
 	}
-	result := resourceapi.DeviceRequestAllocationResult{
-		Request:     request.Name,
-		Driver:      deviceID.Driver.String(),
-		Pool:        deviceID.Pool.String(),
-		Device:      deviceID.Device.String(),
-		AdminAccess: &request.AdminAccess,
+	result := internalDeviceResult{
+		request:     request.Name,
+		id:          device.id,
+		slice:       device.slice,
+		adminAccess: request.AdminAccess,
 	}
-	previousNumResults := len(alloc.result[r.claimIndex].Devices.Results)
-	alloc.result[r.claimIndex].Devices.Results = append(alloc.result[r.claimIndex].Devices.Results, result)
+	previousNumResults := len(alloc.result[r.claimIndex].devices)
+	alloc.result[r.claimIndex].devices = append(alloc.result[r.claimIndex].devices, result)
 
 	return true, func() {
 		for _, constraint := range alloc.constraints[r.claimIndex] {
-			constraint.remove(request.Name, device, deviceID)
+			constraint.remove(request.Name, device.basic, device.id)
 		}
 		if !adminAccess {
-			alloc.allocated[deviceID] = false
+			alloc.allocated[device.id] = false
 		}
 		// Truncate, but keep the underlying slice.
-		alloc.result[r.claimIndex].Devices.Results = alloc.result[r.claimIndex].Devices.Results[:previousNumResults]
-		alloc.logger.V(7).Info("Device deallocated", "device", deviceID)
+		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
+		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
 	}, nil
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(allocation *resourceapi.AllocationResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	nodeSelector := &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{{}},
 	}
 
-	for _, deviceAllocation := range allocation.Devices.Results {
-		slice := alloc.findSlice(deviceAllocation)
-		if slice == nil {
-			return nil, fmt.Errorf("internal error: device %+v not found in pools", deviceAllocation)
-		}
+	for i := range result {
+		slice := result[i].slice
 		if slice.Spec.NodeName != "" {
 			// At least one device is local to one node. This
 			// restricts the allocation to that node.
@@ -805,26 +831,6 @@ func (alloc *allocator) createNodeSelector(allocation *resourceapi.AllocationRes
 
 	// Available everywhere.
 	return nil, nil
-}
-
-func (alloc *allocator) findSlice(deviceAllocation resourceapi.DeviceRequestAllocationResult) *draapi.ResourceSlice {
-	driverName := draapi.MakeUniqueString(deviceAllocation.Driver)
-	poolName := draapi.MakeUniqueString(deviceAllocation.Pool)
-	deviceName := draapi.MakeUniqueString(deviceAllocation.Device)
-	for _, pool := range alloc.pools {
-		if pool.Driver != driverName ||
-			pool.Pool != poolName {
-			continue
-		}
-		for _, slice := range pool.Slices {
-			for _, device := range slice.Spec.Devices {
-				if device.Name == deviceName {
-					return slice
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func addNewNodeSelectorRequirements(from []v1.NodeSelectorRequirement, to *[]v1.NodeSelectorRequirement) {
