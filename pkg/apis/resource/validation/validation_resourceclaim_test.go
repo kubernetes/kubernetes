@@ -408,14 +408,17 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		Allocation: &resource.AllocationResult{
 			Devices: resource.DeviceAllocationResult{
 				Results: []resource.DeviceRequestAllocationResult{{
-					Request: goodName,
-					Driver:  goodName,
-					Pool:    goodName,
-					Device:  goodName,
+					Request:     goodName,
+					Driver:      goodName,
+					Pool:        goodName,
+					Device:      goodName,
+					AdminAccess: ptr.To(false), // Required for new allocations.
 				}},
 			},
 		},
 	}
+	validAllocatedClaimOld := validAllocatedClaim.DeepCopy()
+	validAllocatedClaimOld.Status.Allocation.Devices.Results[0].AdminAccess = nil // Not required in 1.31.
 
 	scenarios := map[string]struct {
 		oldClaim     *resource.ResourceClaim
@@ -439,10 +442,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status.Allocation = &resource.AllocationResult{
 					Devices: resource.DeviceAllocationResult{
 						Results: []resource.DeviceRequestAllocationResult{{
-							Request: goodName,
-							Driver:  goodName,
-							Pool:    goodName,
-							Device:  goodName,
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: ptr.To(false),
 						}},
 					},
 				}
@@ -459,10 +463,31 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status.Allocation = &resource.AllocationResult{
 					Devices: resource.DeviceAllocationResult{
 						Results: []resource.DeviceRequestAllocationResult{{
-							Request: badName,
-							Driver:  goodName,
-							Pool:    goodName,
-							Device:  goodName,
+							Request:     badName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: ptr.To(false),
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-add-allocation-missing-admin-access": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("adminAccess"), ""),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: nil, // Intentionally not set.
 						}},
 					},
 				}
@@ -483,6 +508,20 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"add-reservation": {
 			oldClaim: validAllocatedClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
+					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
+						resource.ResourceClaimConsumerReference{
+							Resource: "pods",
+							Name:     fmt.Sprintf("foo-%d", i),
+							UID:      types.UID(fmt.Sprintf("%d", i)),
+						})
+				}
+				return claim
+			},
+		},
+		"add-reservation-old-claim": {
+			oldClaim: validAllocatedClaimOld,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,

@@ -782,6 +782,17 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +required
 	Device string
+
+	// AdminAccess is a copy of the AdminAccess value in the
+	// request which caused this device to be allocated.
+	//
+	// New allocations are required to have this set. Old allocations made
+	// by Kubernetes 1.31 do not have it yet. Clients which want to
+	// support Kubernetes 1.31 need to look up the request and retrieve
+	// the value from there if this field is not set.
+	//
+	// +required
+	AdminAccess *bool
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
