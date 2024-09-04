@@ -785,6 +785,14 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +required
 	Device string `json:"device" protobuf:"bytes,4,name=device"`
+
+	// AdminAccess indicates that administrative access to the device(s)
+	// was requested. A device where the only allocation is for
+	// administrative access is still available for other allocations.
+	//
+	// +optional
+	// +default=false
+	AdminAccess bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

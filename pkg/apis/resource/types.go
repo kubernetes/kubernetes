@@ -779,6 +779,13 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +required
 	Device string
+
+	// AdminAccess indicates that administrative access to the device(s)
+	// was requested. A device where the only allocation is for
+	// administrative access is still available for other allocations.
+	//
+	// +optional
+	AdminAccess bool
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

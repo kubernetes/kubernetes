@@ -269,6 +269,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			continue
 		}
 		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.AdminAccess {
+				// Ignore, it's not considered allocated.
+				continue
+			}
 			deviceID := DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
 			alloc.allocated[deviceID] = true
 			numAllocated++
@@ -729,10 +733,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 		alloc.allocated[deviceID] = true
 	}
 	result := resourceapi.DeviceRequestAllocationResult{
-		Request: request.Name,
-		Driver:  deviceID.Driver,
-		Pool:    deviceID.Pool,
-		Device:  deviceID.Device,
+		Request:     request.Name,
+		Driver:      deviceID.Driver,
+		Pool:        deviceID.Pool,
+		Device:      deviceID.Device,
+		AdminAccess: request.AdminAccess,
 	}
 	previousNumResults := len(alloc.result[r.claimIndex].Devices.Results)
 	alloc.result[r.claimIndex].Devices.Results = append(alloc.result[r.claimIndex].Devices.Results, result)

@@ -46576,6 +46576,14 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 							Format:      "",
 						},
 					},
+					"adminAccess": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdminAccess indicates that administrative access to the device(s) was requested. A device where the only allocation is for administrative access is still available for other allocations.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},

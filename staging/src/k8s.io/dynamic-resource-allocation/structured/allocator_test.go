@@ -240,13 +240,17 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 	return slice
 }
 
-func deviceAllocationResult(request, driver, pool, device string) resourceapi.DeviceRequestAllocationResult {
-	return resourceapi.DeviceRequestAllocationResult{
+func deviceAllocationResult(request, driver, pool, device string, adminAccess ...bool) resourceapi.DeviceRequestAllocationResult {
+	r := resourceapi.DeviceRequestAllocationResult{
 		Request: request,
 		Driver:  driver,
 		Pool:    pool,
 		Device:  device,
 	}
+	if len(adminAccess) > 0 {
+		r.AdminAccess = adminAccess[0]
+	}
+	return r
 }
 
 // nodeLabelSelector creates a node selector with a label match for "key" in "values".
@@ -715,6 +719,42 @@ func TestAllocator(t *testing.T) {
 			node:    node(node1, region1),
 
 			expectResults: nil,
+		},
+		"admin-access": {
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = true
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			allocatedClaims: objects(
+				allocatedClaim(claim0, req0, classA,
+					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req1, driverA, pool1, device2),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+			},
+		},
+		"already-allocated-for-admin-access": {
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			allocatedClaims: objects(
+				allocatedClaim(claim0, req0, classA,
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+					deviceAllocationResult(req1, driverA, pool1, device2, true),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
+			},
 		},
 		"with-constraint": {
 			claimsToAllocate: objects(claimWithRequests(
