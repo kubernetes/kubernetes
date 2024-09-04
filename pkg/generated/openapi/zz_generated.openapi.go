@@ -46558,8 +46558,15 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 							Format:      "",
 						},
 					},
+					"adminAccess": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdminAccess is a copy of the AdminAccess value in the request which caused this device to be allocated.\n\nNew allocations are required to have this set. Old allocations made by Kubernetes 1.31 do not have it yet. Clients which want to support Kubernetes 1.31 need to look up the request and retrieve the value from there if this field is not set.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"request", "driver", "pool", "device"},
+				Required: []string{"request", "driver", "pool", "device", "adminAccess"},
 			},
 		},
 	}

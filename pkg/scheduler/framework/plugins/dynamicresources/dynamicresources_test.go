@@ -135,10 +135,11 @@ var (
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
-				Driver:  driver,
-				Pool:    nodeName,
-				Device:  "instance-1",
-				Request: "req-1",
+				Driver:      driver,
+				Pool:        nodeName,
+				Device:      "instance-1",
+				Request:     "req-1",
+				AdminAccess: ptr.To(false),
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -176,6 +177,19 @@ func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.Resourc
 	return st.FromResourceClaim(claim).
 		ReservedForPod(pod.Name, types.UID(pod.UID)).
 		Obj()
+}
+
+func adminAccess(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	for i := range claim.Spec.Devices.Requests {
+		claim.Spec.Devices.Requests[i].AdminAccess = true
+	}
+	if claim.Status.Allocation != nil {
+		for i := range claim.Status.Allocation.Devices.Results {
+			claim.Status.Allocation.Devices.Results[i].AdminAccess = ptr.To(true)
+		}
+	}
+	return claim
 }
 
 func breakCELInClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
@@ -552,6 +566,66 @@ func TestPlugin(t *testing.T) {
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+
+		"structured-request-admin-access": {
+			// Because the pending claim asks for admin access, allocation succeeds despite resources
+			// being exhausted.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{adminAccess(structuredClaim(pendingClaim)), structuredClaim(otherAllocatedClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: adminAccess(structuredClaim(allocatedClaim)),
+				},
+				prebind: result{
+					assumedClaim: reserve(adminAccess(structuredClaim(allocatedClaim)), podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+								claim.Status = adminAccess(structuredClaim(inUseClaim)).Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(adminAccess(structuredClaim(allocatedClaim)), podWithClaimName),
+				},
+			},
+		},
+
+		"structured-ignore-allocated-admin-access": {
+			// The allocated claim uses admin access, so a second claim may use
+			// the same device.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim), adminAccess(structuredClaim(otherAllocatedClaim))},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredClaim(allocatedClaim),
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
+								claim.Status = structuredClaim(inUseClaim).Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
 				},
 			},
 		},
