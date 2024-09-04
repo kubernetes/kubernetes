@@ -255,7 +255,6 @@ func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldP
 
 func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaimStatus, claimDeleted bool, requestNames sets.Set[string], fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames)...)
 	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
@@ -279,9 +278,14 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		}
 	}
 
-	// Updates to a populated status.Allocation are not allowed
+	// Updates to a populated status.Allocation are not allowed.
+	// Unmodified fields don't need to be validated again and,
+	// in this particular case, must not be validated again because
+	// validation for new results is tighter than it was before.
 	if oldStatus.Allocation != nil && status.Allocation != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
+	} else if status.Allocation != nil {
+		allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames)...)
 	}
 
 	if !oldStatus.DeallocationRequested &&
@@ -325,11 +329,10 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	return allErrs
 }
 
+// validateAllocationResult enforces constraints for *new* results, which in at
+// least one case (admin access) are more strict than before. Therefore it
+// may not be called to re-validate results which were stored earlier.
 func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
-	if allocation == nil {
-		return nil
-	}
-
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames)...)
 	if allocation.NodeSelector != nil {
@@ -361,6 +364,9 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
+	if result.AdminAccess == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("adminAccess"), ""))
+	}
 	return allErrs
 }
 
