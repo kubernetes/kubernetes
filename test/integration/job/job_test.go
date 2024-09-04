@@ -3970,7 +3970,8 @@ func validateJobsPodsStatusOnlyWithTimeout(ctx context.Context, t testing.TB, cl
 	if err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
-			t.Fatalf("Failed to get updated Job: %v", err)
+			t.Logf("Failed to get updated Job: %v", err)
+			return false, nil
 		}
 		actualCounts = podsByStatus{
 			Active:      int(updatedJob.Status.Active),
