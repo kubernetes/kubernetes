@@ -25,6 +25,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/retry"
@@ -164,6 +166,98 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 			}))
 			framework.ExpectNoError(err, "Timeout while waiting to confirm deletion of all VolumeAttachments")
 		})
+
+		ginkgo.It("should apply changes to a volumeattachment status", func(ctx context.Context) {
+
+			vaClient := f.ClientSet.StorageV1().VolumeAttachments()
+
+			randUID := "e2e-" + utilrand.String(5)
+			vaName := "va-" + randUID
+			pvName := "pv-" + randUID
+
+			nodes, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "failed to list nodes")
+			randNode := rand.Intn(len(nodes.Items))
+			vaNodeName := nodes.Items[randNode].Name
+			vaAttachStatus := false
+
+			ginkgo.By(fmt.Sprintf("Create VolumeAttachment %q on node %q", vaName, vaNodeName))
+			initialVA := NewVolumeAttachment(vaName, pvName, vaNodeName, vaAttachStatus)
+
+			createdVA, err := vaClient.Create(ctx, initialVA, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create VolumeAttachment %q", vaName)
+			gomega.Expect(createdVA.Name).To(gomega.Equal(vaName), "Checking that the created VolumeAttachment has the correct name")
+
+			ginkgo.By(fmt.Sprintf("Patch VolumeAttachment %q on node %q", vaName, vaNodeName))
+			payload := "{\"metadata\":{\"labels\":{\"" + createdVA.Name + "\":\"patched\"}}}"
+			patchedVA, err := vaClient.Patch(ctx, createdVA.Name, types.MergePatchType, []byte(payload), metav1.PatchOptions{})
+			framework.ExpectNoError(err, "failed to patch PV %q", vaName)
+			gomega.Expect(patchedVA.Labels).To(gomega.HaveKeyWithValue(patchedVA.Name, "patched"), "Checking that patched label has been applied")
+			patchedSelector := labels.Set{patchedVA.Name: "patched"}.AsSelector().String()
+
+			ginkgo.By(fmt.Sprintf("Reading %q Status", patchedVA.Name))
+			vaResource := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "volumeattachments"}
+			vaUnstructured, err := f.DynamicClient.Resource(vaResource).Get(ctx, patchedVA.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to fetch the status of %q VolumeAttachment", patchedVA.Name)
+
+			retrievedVA := &storagev1.VolumeAttachment{}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(vaUnstructured.UnstructuredContent(), &retrievedVA)
+			framework.ExpectNoError(err, "Failed to retrieve %q status.", patchedVA.Name)
+			gomega.Expect(retrievedVA.Status.Attached).To(gomega.BeFalseBecause("Checking that the VolumeAttachment status has been read"))
+
+			ginkgo.By(fmt.Sprintf("Patching %q Status", patchedVA.Name))
+			statusPayload := []byte(`{"status":{"attached":true}}`)
+
+			vaPatched, err := vaClient.Patch(ctx, patchedVA.Name, types.MergePatchType, statusPayload, metav1.PatchOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to patch status.")
+			gomega.Expect(vaPatched.Status.Attached).To(gomega.BeTrueBecause("Checking that the VolumeAttachment status has been patched"))
+			framework.Logf("%q Status.Attached: %v", vaPatched.Name, vaPatched.Status.Attached)
+
+			ginkgo.By(fmt.Sprintf("Updating %q Status", vaPatched.Name))
+			var statusToUpdate, updatedVA *storagev1.VolumeAttachment
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				statusToUpdate, err = vaClient.Get(ctx, vaPatched.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Unable to retrieve VolumeAttachment %q", vaPatched.Name)
+
+				statusToUpdate.Status.Attached = false
+
+				updatedVA, err = vaClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "Failed to update status.")
+			gomega.Expect(updatedVA.Status.Attached).To(gomega.BeFalseBecause("Checking that the VolumeAttachment status has been updated"))
+			framework.Logf("%q Status.Attached: %v", updatedVA.Name, updatedVA.Status.Attached)
+
+			ginkgo.By(fmt.Sprintf("Delete VolumeAttachment %q on node %q", vaName, vaNodeName))
+			err = vaClient.Delete(ctx, vaName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete VolumeAttachment %q", vaName)
+
+			ginkgo.By(fmt.Sprintf("Confirm deletion of VolumeAttachment %q on node %q", vaName, vaNodeName))
+
+			type state struct {
+				VolumeAttachments []storagev1.VolumeAttachment
+			}
+
+			err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
+				vaList, err := vaClient.List(ctx, metav1.ListOptions{LabelSelector: patchedSelector})
+				if err != nil {
+					return nil, fmt.Errorf("failed to list VolumeAttachment: %w", err)
+				}
+				return &state{
+					VolumeAttachments: vaList.Items,
+				}, nil
+			})).WithTimeout(30 * time.Second).Should(framework.MakeMatcher(func(s *state) (func() string, error) {
+				if len(s.VolumeAttachments) == 0 {
+					return nil, nil
+				}
+				return func() string {
+					return fmt.Sprintf("Expected VolumeAttachment to be deleted, found %q", s.VolumeAttachments[0].Name)
+				}, nil
+			}))
+			framework.ExpectNoError(err, "Timeout while waiting to confirm VolumeAttachment %q deletion", vaName)
+		})
+
 	})
 })
 
