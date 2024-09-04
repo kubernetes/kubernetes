@@ -22,7 +22,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
@@ -31,22 +31,22 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*v1alpha1.ValidatingAdmissionPolicy))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*admissionregistrationv1alpha1.ValidatingAdmissionPolicy))
 	})
-	scheme.AddTypeDefaultingFunc(&v1alpha1.ValidatingAdmissionPolicyBinding{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyBinding(obj.(*v1alpha1.ValidatingAdmissionPolicyBinding))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBinding(obj.(*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding))
 	})
-	scheme.AddTypeDefaultingFunc(&v1alpha1.ValidatingAdmissionPolicyBindingList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyBindingList(obj.(*v1alpha1.ValidatingAdmissionPolicyBindingList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBindingList(obj.(*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1alpha1.ValidatingAdmissionPolicyList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*v1alpha1.ValidatingAdmissionPolicyList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ValidatingAdmissionPolicyList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*admissionregistrationv1alpha1.ValidatingAdmissionPolicyList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1alpha1.ValidatingAdmissionPolicy) {
+func SetObjectDefaults_ValidatingAdmissionPolicy(in *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) {
 	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
 	if in.Spec.MatchConstraints != nil {
 		SetDefaults_MatchResources(in.Spec.MatchConstraints)
@@ -61,7 +61,7 @@ func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1alpha1.ValidatingAdmissio
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1alpha1.ValidatingAdmissionPolicyBinding) {
+func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding) {
 	if in.Spec.ParamRef != nil {
 		SetDefaults_ParamRef(in.Spec.ParamRef)
 	}
@@ -78,14 +78,14 @@ func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1alpha1.ValidatingA
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyBindingList(in *v1alpha1.ValidatingAdmissionPolicyBindingList) {
+func SetObjectDefaults_ValidatingAdmissionPolicyBindingList(in *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingAdmissionPolicyBinding(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingAdmissionPolicyList(in *v1alpha1.ValidatingAdmissionPolicyList) {
+func SetObjectDefaults_ValidatingAdmissionPolicyList(in *admissionregistrationv1alpha1.ValidatingAdmissionPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingAdmissionPolicy(a)

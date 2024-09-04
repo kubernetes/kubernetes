@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/client-go/listers/admissionregistration/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ValidatingWebhookConfigurations.
 type ValidatingWebhookConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ValidatingWebhookConfigurationLister
+	Lister() admissionregistrationv1.ValidatingWebhookConfigurationLister
 }
 
 type validatingWebhookConfigurationInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredValidatingWebhookConfigurationInformer(client kubernetes.Interfa
 				return client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Watch(context.TODO(), options)
 			},
 		},
-		&admissionregistrationv1.ValidatingWebhookConfiguration{},
+		&apiadmissionregistrationv1.ValidatingWebhookConfiguration{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *validatingWebhookConfigurationInformer) defaultInformer(client kubernet
 }
 
 func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistrationv1.ValidatingWebhookConfiguration{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiadmissionregistrationv1.ValidatingWebhookConfiguration{}, f.defaultInformer)
 }
 
-func (f *validatingWebhookConfigurationInformer) Lister() v1.ValidatingWebhookConfigurationLister {
-	return v1.NewValidatingWebhookConfigurationLister(f.Informer().GetIndexer())
+func (f *validatingWebhookConfigurationInformer) Lister() admissionregistrationv1.ValidatingWebhookConfigurationLister {
+	return admissionregistrationv1.NewValidatingWebhookConfigurationLister(f.Informer().GetIndexer())
 }

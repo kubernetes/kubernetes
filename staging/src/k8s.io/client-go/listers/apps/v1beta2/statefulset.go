@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // StatefulSetLister helps list StatefulSets.
@@ -30,7 +30,7 @@ import (
 type StatefulSetLister interface {
 	// List lists all StatefulSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.StatefulSet, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
 	// StatefulSets returns an object that can list and get StatefulSets.
 	StatefulSets(namespace string) StatefulSetNamespaceLister
 	StatefulSetListerExpansion
@@ -38,17 +38,17 @@ type StatefulSetLister interface {
 
 // statefulSetLister implements the StatefulSetLister interface.
 type statefulSetLister struct {
-	listers.ResourceIndexer[*v1beta2.StatefulSet]
+	listers.ResourceIndexer[*appsv1beta2.StatefulSet]
 }
 
 // NewStatefulSetLister returns a new StatefulSetLister.
 func NewStatefulSetLister(indexer cache.Indexer) StatefulSetLister {
-	return &statefulSetLister{listers.New[*v1beta2.StatefulSet](indexer, v1beta2.Resource("statefulset"))}
+	return &statefulSetLister{listers.New[*appsv1beta2.StatefulSet](indexer, appsv1beta2.Resource("statefulset"))}
 }
 
 // StatefulSets returns an object that can list and get StatefulSets.
 func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceLister {
-	return statefulSetNamespaceLister{listers.NewNamespaced[*v1beta2.StatefulSet](s.ResourceIndexer, namespace)}
+	return statefulSetNamespaceLister{listers.NewNamespaced[*appsv1beta2.StatefulSet](s.ResourceIndexer, namespace)}
 }
 
 // StatefulSetNamespaceLister helps list and get StatefulSets.
@@ -56,15 +56,15 @@ func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceL
 type StatefulSetNamespaceLister interface {
 	// List lists all StatefulSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.StatefulSet, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
 	// Get retrieves the StatefulSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.StatefulSet, error)
+	Get(name string) (*appsv1beta2.StatefulSet, error)
 	StatefulSetNamespaceListerExpansion
 }
 
 // statefulSetNamespaceLister implements the StatefulSetNamespaceLister
 // interface.
 type statefulSetNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta2.StatefulSet]
+	listers.ResourceIndexer[*appsv1beta2.StatefulSet]
 }

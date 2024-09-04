@@ -20,18 +20,18 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MigrationConditionApplyConfiguration represents a declarative configuration of the MigrationCondition type for use
 // with apply.
 type MigrationConditionApplyConfiguration struct {
-	Type           *v1alpha1.MigrationConditionType `json:"type,omitempty"`
-	Status         *v1.ConditionStatus              `json:"status,omitempty"`
-	LastUpdateTime *metav1.Time                     `json:"lastUpdateTime,omitempty"`
-	Reason         *string                          `json:"reason,omitempty"`
-	Message        *string                          `json:"message,omitempty"`
+	Type           *storagemigrationv1alpha1.MigrationConditionType `json:"type,omitempty"`
+	Status         *v1.ConditionStatus                              `json:"status,omitempty"`
+	LastUpdateTime *metav1.Time                                     `json:"lastUpdateTime,omitempty"`
+	Reason         *string                                          `json:"reason,omitempty"`
+	Message        *string                                          `json:"message,omitempty"`
 }
 
 // MigrationConditionApplyConfiguration constructs a declarative configuration of the MigrationCondition type for use with
@@ -43,7 +43,7 @@ func MigrationCondition() *MigrationConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *MigrationConditionApplyConfiguration) WithType(value v1alpha1.MigrationConditionType) *MigrationConditionApplyConfiguration {
+func (b *MigrationConditionApplyConfiguration) WithType(value storagemigrationv1alpha1.MigrationConditionType) *MigrationConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

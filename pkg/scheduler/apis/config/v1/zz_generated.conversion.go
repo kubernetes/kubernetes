@@ -29,7 +29,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/component-base/config/v1alpha1"
-	v1 "k8s.io/kube-scheduler/config/v1"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -40,210 +40,210 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.DefaultPreemptionArgs)(nil), (*config.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(a.(*v1.DefaultPreemptionArgs), b.(*config.DefaultPreemptionArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.DefaultPreemptionArgs)(nil), (*config.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(a.(*configv1.DefaultPreemptionArgs), b.(*config.DefaultPreemptionArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.DefaultPreemptionArgs)(nil), (*v1.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(a.(*config.DefaultPreemptionArgs), b.(*v1.DefaultPreemptionArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.DefaultPreemptionArgs)(nil), (*configv1.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(a.(*config.DefaultPreemptionArgs), b.(*configv1.DefaultPreemptionArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Extender)(nil), (*config.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Extender_To_config_Extender(a.(*v1.Extender), b.(*config.Extender), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.Extender)(nil), (*config.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Extender_To_config_Extender(a.(*configv1.Extender), b.(*config.Extender), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Extender)(nil), (*v1.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Extender_To_v1_Extender(a.(*config.Extender), b.(*v1.Extender), scope)
+	if err := s.AddGeneratedConversionFunc((*config.Extender)(nil), (*configv1.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Extender_To_v1_Extender(a.(*config.Extender), b.(*configv1.Extender), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ExtenderManagedResource)(nil), (*config.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(a.(*v1.ExtenderManagedResource), b.(*config.ExtenderManagedResource), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.ExtenderManagedResource)(nil), (*config.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(a.(*configv1.ExtenderManagedResource), b.(*config.ExtenderManagedResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ExtenderManagedResource)(nil), (*v1.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(a.(*config.ExtenderManagedResource), b.(*v1.ExtenderManagedResource), scope)
+	if err := s.AddGeneratedConversionFunc((*config.ExtenderManagedResource)(nil), (*configv1.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(a.(*config.ExtenderManagedResource), b.(*configv1.ExtenderManagedResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ExtenderTLSConfig)(nil), (*config.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(a.(*v1.ExtenderTLSConfig), b.(*config.ExtenderTLSConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.ExtenderTLSConfig)(nil), (*config.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(a.(*configv1.ExtenderTLSConfig), b.(*config.ExtenderTLSConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ExtenderTLSConfig)(nil), (*v1.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(a.(*config.ExtenderTLSConfig), b.(*v1.ExtenderTLSConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*config.ExtenderTLSConfig)(nil), (*configv1.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(a.(*config.ExtenderTLSConfig), b.(*configv1.ExtenderTLSConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.InterPodAffinityArgs)(nil), (*config.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(a.(*v1.InterPodAffinityArgs), b.(*config.InterPodAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.InterPodAffinityArgs)(nil), (*config.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(a.(*configv1.InterPodAffinityArgs), b.(*config.InterPodAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.InterPodAffinityArgs)(nil), (*v1.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(a.(*config.InterPodAffinityArgs), b.(*v1.InterPodAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.InterPodAffinityArgs)(nil), (*configv1.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(a.(*config.InterPodAffinityArgs), b.(*configv1.InterPodAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.KubeSchedulerProfile)(nil), (*config.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(a.(*v1.KubeSchedulerProfile), b.(*config.KubeSchedulerProfile), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.KubeSchedulerProfile)(nil), (*config.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(a.(*configv1.KubeSchedulerProfile), b.(*config.KubeSchedulerProfile), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerProfile)(nil), (*v1.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(a.(*config.KubeSchedulerProfile), b.(*v1.KubeSchedulerProfile), scope)
+	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerProfile)(nil), (*configv1.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(a.(*config.KubeSchedulerProfile), b.(*configv1.KubeSchedulerProfile), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeAffinityArgs)(nil), (*config.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(a.(*v1.NodeAffinityArgs), b.(*config.NodeAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.NodeAffinityArgs)(nil), (*config.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(a.(*configv1.NodeAffinityArgs), b.(*config.NodeAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeAffinityArgs)(nil), (*v1.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(a.(*config.NodeAffinityArgs), b.(*v1.NodeAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.NodeAffinityArgs)(nil), (*configv1.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(a.(*config.NodeAffinityArgs), b.(*configv1.NodeAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeResourcesBalancedAllocationArgs)(nil), (*config.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*v1.NodeResourcesBalancedAllocationArgs), b.(*config.NodeResourcesBalancedAllocationArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.NodeResourcesBalancedAllocationArgs)(nil), (*config.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*configv1.NodeResourcesBalancedAllocationArgs), b.(*config.NodeResourcesBalancedAllocationArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesBalancedAllocationArgs)(nil), (*v1.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(a.(*config.NodeResourcesBalancedAllocationArgs), b.(*v1.NodeResourcesBalancedAllocationArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesBalancedAllocationArgs)(nil), (*configv1.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(a.(*config.NodeResourcesBalancedAllocationArgs), b.(*configv1.NodeResourcesBalancedAllocationArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*v1.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*configv1.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesFitArgs)(nil), (*v1.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*v1.NodeResourcesFitArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesFitArgs)(nil), (*configv1.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*configv1.NodeResourcesFitArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Plugin_To_config_Plugin(a.(*v1.Plugin), b.(*config.Plugin), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Plugin_To_config_Plugin(a.(*configv1.Plugin), b.(*config.Plugin), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Plugin)(nil), (*v1.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugin_To_v1_Plugin(a.(*config.Plugin), b.(*v1.Plugin), scope)
+	if err := s.AddGeneratedConversionFunc((*config.Plugin)(nil), (*configv1.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugin_To_v1_Plugin(a.(*config.Plugin), b.(*configv1.Plugin), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PluginConfig)(nil), (*config.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PluginConfig_To_config_PluginConfig(a.(*v1.PluginConfig), b.(*config.PluginConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.PluginConfig)(nil), (*config.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PluginConfig_To_config_PluginConfig(a.(*configv1.PluginConfig), b.(*config.PluginConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PluginConfig)(nil), (*v1.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PluginConfig_To_v1_PluginConfig(a.(*config.PluginConfig), b.(*v1.PluginConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*config.PluginConfig)(nil), (*configv1.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_PluginConfig_To_v1_PluginConfig(a.(*config.PluginConfig), b.(*configv1.PluginConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PluginSet_To_config_PluginSet(a.(*v1.PluginSet), b.(*config.PluginSet), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PluginSet_To_config_PluginSet(a.(*configv1.PluginSet), b.(*config.PluginSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*v1.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PluginSet_To_v1_PluginSet(a.(*config.PluginSet), b.(*v1.PluginSet), scope)
+	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*configv1.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_PluginSet_To_v1_PluginSet(a.(*config.PluginSet), b.(*configv1.PluginSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Plugins_To_config_Plugins(a.(*v1.Plugins), b.(*config.Plugins), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Plugins_To_config_Plugins(a.(*configv1.Plugins), b.(*config.Plugins), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Plugins)(nil), (*v1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugins_To_v1_Plugins(a.(*config.Plugins), b.(*v1.Plugins), scope)
+	if err := s.AddGeneratedConversionFunc((*config.Plugins)(nil), (*configv1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugins_To_v1_Plugins(a.(*config.Plugins), b.(*configv1.Plugins), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodTopologySpreadArgs)(nil), (*config.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(a.(*v1.PodTopologySpreadArgs), b.(*config.PodTopologySpreadArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.PodTopologySpreadArgs)(nil), (*config.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(a.(*configv1.PodTopologySpreadArgs), b.(*config.PodTopologySpreadArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PodTopologySpreadArgs)(nil), (*v1.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(a.(*config.PodTopologySpreadArgs), b.(*v1.PodTopologySpreadArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.PodTopologySpreadArgs)(nil), (*configv1.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(a.(*config.PodTopologySpreadArgs), b.(*configv1.PodTopologySpreadArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RequestedToCapacityRatioParam)(nil), (*config.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(a.(*v1.RequestedToCapacityRatioParam), b.(*config.RequestedToCapacityRatioParam), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.RequestedToCapacityRatioParam)(nil), (*config.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(a.(*configv1.RequestedToCapacityRatioParam), b.(*config.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioParam)(nil), (*v1.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(a.(*config.RequestedToCapacityRatioParam), b.(*v1.RequestedToCapacityRatioParam), scope)
+	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioParam)(nil), (*configv1.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(a.(*config.RequestedToCapacityRatioParam), b.(*configv1.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ResourceSpec)(nil), (*config.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ResourceSpec_To_config_ResourceSpec(a.(*v1.ResourceSpec), b.(*config.ResourceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.ResourceSpec)(nil), (*config.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ResourceSpec_To_config_ResourceSpec(a.(*configv1.ResourceSpec), b.(*config.ResourceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ResourceSpec)(nil), (*v1.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ResourceSpec_To_v1_ResourceSpec(a.(*config.ResourceSpec), b.(*v1.ResourceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*config.ResourceSpec)(nil), (*configv1.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ResourceSpec_To_v1_ResourceSpec(a.(*config.ResourceSpec), b.(*configv1.ResourceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ScoringStrategy)(nil), (*config.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ScoringStrategy_To_config_ScoringStrategy(a.(*v1.ScoringStrategy), b.(*config.ScoringStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.ScoringStrategy)(nil), (*config.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ScoringStrategy_To_config_ScoringStrategy(a.(*configv1.ScoringStrategy), b.(*config.ScoringStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ScoringStrategy)(nil), (*v1.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ScoringStrategy_To_v1_ScoringStrategy(a.(*config.ScoringStrategy), b.(*v1.ScoringStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*config.ScoringStrategy)(nil), (*configv1.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ScoringStrategy_To_v1_ScoringStrategy(a.(*config.ScoringStrategy), b.(*configv1.ScoringStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.UtilizationShapePoint)(nil), (*config.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(a.(*v1.UtilizationShapePoint), b.(*config.UtilizationShapePoint), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.UtilizationShapePoint)(nil), (*config.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(a.(*configv1.UtilizationShapePoint), b.(*config.UtilizationShapePoint), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.UtilizationShapePoint)(nil), (*v1.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(a.(*config.UtilizationShapePoint), b.(*v1.UtilizationShapePoint), scope)
+	if err := s.AddGeneratedConversionFunc((*config.UtilizationShapePoint)(nil), (*configv1.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(a.(*config.UtilizationShapePoint), b.(*configv1.UtilizationShapePoint), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.VolumeBindingArgs)(nil), (*config.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(a.(*v1.VolumeBindingArgs), b.(*config.VolumeBindingArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1.VolumeBindingArgs)(nil), (*config.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(a.(*configv1.VolumeBindingArgs), b.(*config.VolumeBindingArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.VolumeBindingArgs)(nil), (*v1.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(a.(*config.VolumeBindingArgs), b.(*v1.VolumeBindingArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.VolumeBindingArgs)(nil), (*configv1.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(a.(*config.VolumeBindingArgs), b.(*configv1.VolumeBindingArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1.KubeSchedulerConfiguration), scope)
+	if err := s.AddConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*configv1.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*configv1.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
+	if err := s.AddConversionFunc((*configv1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*configv1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
+func autoConvert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *configv1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
 		return err
 	}
@@ -254,11 +254,11 @@ func autoConvert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1
 }
 
 // Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs is an autogenerated conversion function.
-func Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
+func Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *configv1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
 	return autoConvert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in, out, s)
 }
 
-func autoConvert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1.DefaultPreemptionArgs, s conversion.Scope) error {
+func autoConvert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *configv1.DefaultPreemptionArgs, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
 		return err
 	}
@@ -269,11 +269,11 @@ func autoConvert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *co
 }
 
 // Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs is an autogenerated conversion function.
-func Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1.DefaultPreemptionArgs, s conversion.Scope) error {
+func Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *configv1.DefaultPreemptionArgs, s conversion.Scope) error {
 	return autoConvert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in, out, s)
 }
 
-func autoConvert_v1_Extender_To_config_Extender(in *v1.Extender, out *config.Extender, s conversion.Scope) error {
+func autoConvert_v1_Extender_To_config_Extender(in *configv1.Extender, out *config.Extender, s conversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb
@@ -290,11 +290,11 @@ func autoConvert_v1_Extender_To_config_Extender(in *v1.Extender, out *config.Ext
 }
 
 // Convert_v1_Extender_To_config_Extender is an autogenerated conversion function.
-func Convert_v1_Extender_To_config_Extender(in *v1.Extender, out *config.Extender, s conversion.Scope) error {
+func Convert_v1_Extender_To_config_Extender(in *configv1.Extender, out *config.Extender, s conversion.Scope) error {
 	return autoConvert_v1_Extender_To_config_Extender(in, out, s)
 }
 
-func autoConvert_config_Extender_To_v1_Extender(in *config.Extender, out *v1.Extender, s conversion.Scope) error {
+func autoConvert_config_Extender_To_v1_Extender(in *config.Extender, out *configv1.Extender, s conversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb
@@ -302,42 +302,42 @@ func autoConvert_config_Extender_To_v1_Extender(in *config.Extender, out *v1.Ext
 	out.Weight = in.Weight
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*v1.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
+	out.TLSConfig = (*configv1.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
 	out.HTTPTimeout = in.HTTPTimeout
 	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]v1.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
+	out.ManagedResources = *(*[]configv1.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
 	out.Ignorable = in.Ignorable
 	return nil
 }
 
 // Convert_config_Extender_To_v1_Extender is an autogenerated conversion function.
-func Convert_config_Extender_To_v1_Extender(in *config.Extender, out *v1.Extender, s conversion.Scope) error {
+func Convert_config_Extender_To_v1_Extender(in *config.Extender, out *configv1.Extender, s conversion.Scope) error {
 	return autoConvert_config_Extender_To_v1_Extender(in, out, s)
 }
 
-func autoConvert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *v1.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
+func autoConvert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *configv1.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
 	out.Name = in.Name
 	out.IgnoredByScheduler = in.IgnoredByScheduler
 	return nil
 }
 
 // Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource is an autogenerated conversion function.
-func Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *v1.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
+func Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *configv1.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
 	return autoConvert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in, out, s)
 }
 
-func autoConvert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in *config.ExtenderManagedResource, out *v1.ExtenderManagedResource, s conversion.Scope) error {
+func autoConvert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in *config.ExtenderManagedResource, out *configv1.ExtenderManagedResource, s conversion.Scope) error {
 	out.Name = in.Name
 	out.IgnoredByScheduler = in.IgnoredByScheduler
 	return nil
 }
 
 // Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource is an autogenerated conversion function.
-func Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in *config.ExtenderManagedResource, out *v1.ExtenderManagedResource, s conversion.Scope) error {
+func Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in *config.ExtenderManagedResource, out *configv1.ExtenderManagedResource, s conversion.Scope) error {
 	return autoConvert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in, out, s)
 }
 
-func autoConvert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
+func autoConvert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *configv1.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
 	out.Insecure = in.Insecure
 	out.ServerName = in.ServerName
 	out.CertFile = in.CertFile
@@ -350,11 +350,11 @@ func autoConvert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1.Extende
 }
 
 // Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig is an autogenerated conversion function.
-func Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
+func Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *configv1.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
 	return autoConvert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in, out, s)
 }
 
-func autoConvert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *v1.ExtenderTLSConfig, s conversion.Scope) error {
+func autoConvert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *configv1.ExtenderTLSConfig, s conversion.Scope) error {
 	out.Insecure = in.Insecure
 	out.ServerName = in.ServerName
 	out.CertFile = in.CertFile
@@ -367,11 +367,11 @@ func autoConvert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in *config.Ext
 }
 
 // Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig is an autogenerated conversion function.
-func Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *v1.ExtenderTLSConfig, s conversion.Scope) error {
+func Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *configv1.ExtenderTLSConfig, s conversion.Scope) error {
 	return autoConvert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in, out, s)
 }
 
-func autoConvert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
+func autoConvert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *configv1.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
@@ -380,11 +380,11 @@ func autoConvert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1.I
 }
 
 // Convert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs is an autogenerated conversion function.
-func Convert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
+func Convert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *configv1.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
 	return autoConvert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in, out, s)
 }
 
-func autoConvert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1.InterPodAffinityArgs, s conversion.Scope) error {
+func autoConvert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *configv1.InterPodAffinityArgs, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
@@ -393,11 +393,11 @@ func autoConvert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *conf
 }
 
 // Convert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs is an autogenerated conversion function.
-func Convert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1.InterPodAffinityArgs, s conversion.Scope) error {
+func Convert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *configv1.InterPodAffinityArgs, s conversion.Scope) error {
 	return autoConvert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in, out, s)
 }
 
-func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
+func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *configv1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigurat
 	return nil
 }
 
-func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1.KubeSchedulerConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *configv1.KubeSchedulerConfiguration, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
-		*out = make([]v1.KubeSchedulerProfile, len(*in))
+		*out = make([]configv1.KubeSchedulerProfile, len(*in))
 		for i := range *in {
 			if err := Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -464,12 +464,12 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 	} else {
 		out.Profiles = nil
 	}
-	out.Extenders = *(*[]v1.Extender)(unsafe.Pointer(&in.Extenders))
+	out.Extenders = *(*[]configv1.Extender)(unsafe.Pointer(&in.Extenders))
 	out.DelayCacheUntilActive = in.DelayCacheUntilActive
 	return nil
 }
 
-func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
+func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *configv1.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
@@ -498,18 +498,18 @@ func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1.K
 }
 
 // Convert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile is an autogenerated conversion function.
-func Convert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
+func Convert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *configv1.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
 	return autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in, out, s)
 }
 
-func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1.KubeSchedulerProfile, s conversion.Scope) error {
+func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *configv1.KubeSchedulerProfile, s conversion.Scope) error {
 	if err := metav1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
-		*out = new(v1.Plugins)
+		*out = new(configv1.Plugins)
 		if err := Convert_config_Plugins_To_v1_Plugins(*in, *out, s); err != nil {
 			return err
 		}
@@ -518,7 +518,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *conf
 	}
 	if in.PluginConfig != nil {
 		in, out := &in.PluginConfig, &out.PluginConfig
-		*out = make([]v1.PluginConfig, len(*in))
+		*out = make([]configv1.PluginConfig, len(*in))
 		for i := range *in {
 			if err := Convert_config_PluginConfig_To_v1_PluginConfig(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -531,51 +531,51 @@ func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *conf
 }
 
 // Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile is an autogenerated conversion function.
-func Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1.KubeSchedulerProfile, s conversion.Scope) error {
+func Convert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *configv1.KubeSchedulerProfile, s conversion.Scope) error {
 	return autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in, out, s)
 }
 
-func autoConvert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
+func autoConvert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *configv1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
 	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
 	return nil
 }
 
 // Convert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs is an autogenerated conversion function.
-func Convert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
+func Convert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *configv1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
 	return autoConvert_v1_NodeAffinityArgs_To_config_NodeAffinityArgs(in, out, s)
 }
 
-func autoConvert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1.NodeAffinityArgs, s conversion.Scope) error {
+func autoConvert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *configv1.NodeAffinityArgs, s conversion.Scope) error {
 	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
 	return nil
 }
 
 // Convert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs is an autogenerated conversion function.
-func Convert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1.NodeAffinityArgs, s conversion.Scope) error {
+func Convert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *configv1.NodeAffinityArgs, s conversion.Scope) error {
 	return autoConvert_config_NodeAffinityArgs_To_v1_NodeAffinityArgs(in, out, s)
 }
 
-func autoConvert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+func autoConvert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *configv1.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
 	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
-func Convert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+func Convert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *configv1.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
 	return autoConvert_v1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in, out, s)
 }
 
-func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
-	out.Resources = *(*[]v1.ResourceSpec)(unsafe.Pointer(&in.Resources))
+func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *configv1.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	out.Resources = *(*[]configv1.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+func Convert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *configv1.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
 	return autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1_NodeResourcesBalancedAllocationArgs(in, out, s)
 }
 
-func autoConvert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
+func autoConvert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *configv1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	out.ScoringStrategy = (*config.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
@@ -583,23 +583,23 @@ func autoConvert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1.N
 }
 
 // Convert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
+func Convert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *configv1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
 	return autoConvert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in, out, s)
 }
 
-func autoConvert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1.NodeResourcesFitArgs, s conversion.Scope) error {
+func autoConvert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *configv1.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
-	out.ScoringStrategy = (*v1.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
+	out.ScoringStrategy = (*configv1.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
 	return nil
 }
 
 // Convert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1.NodeResourcesFitArgs, s conversion.Scope) error {
+func Convert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *configv1.NodeResourcesFitArgs, s conversion.Scope) error {
 	return autoConvert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in, out, s)
 }
 
-func autoConvert_v1_Plugin_To_config_Plugin(in *v1.Plugin, out *config.Plugin, s conversion.Scope) error {
+func autoConvert_v1_Plugin_To_config_Plugin(in *configv1.Plugin, out *config.Plugin, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
@@ -608,11 +608,11 @@ func autoConvert_v1_Plugin_To_config_Plugin(in *v1.Plugin, out *config.Plugin, s
 }
 
 // Convert_v1_Plugin_To_config_Plugin is an autogenerated conversion function.
-func Convert_v1_Plugin_To_config_Plugin(in *v1.Plugin, out *config.Plugin, s conversion.Scope) error {
+func Convert_v1_Plugin_To_config_Plugin(in *configv1.Plugin, out *config.Plugin, s conversion.Scope) error {
 	return autoConvert_v1_Plugin_To_config_Plugin(in, out, s)
 }
 
-func autoConvert_config_Plugin_To_v1_Plugin(in *config.Plugin, out *v1.Plugin, s conversion.Scope) error {
+func autoConvert_config_Plugin_To_v1_Plugin(in *config.Plugin, out *configv1.Plugin, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
@@ -621,11 +621,11 @@ func autoConvert_config_Plugin_To_v1_Plugin(in *config.Plugin, out *v1.Plugin, s
 }
 
 // Convert_config_Plugin_To_v1_Plugin is an autogenerated conversion function.
-func Convert_config_Plugin_To_v1_Plugin(in *config.Plugin, out *v1.Plugin, s conversion.Scope) error {
+func Convert_config_Plugin_To_v1_Plugin(in *config.Plugin, out *configv1.Plugin, s conversion.Scope) error {
 	return autoConvert_config_Plugin_To_v1_Plugin(in, out, s)
 }
 
-func autoConvert_v1_PluginConfig_To_config_PluginConfig(in *v1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+func autoConvert_v1_PluginConfig_To_config_PluginConfig(in *configv1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Args, &out.Args, s); err != nil {
 		return err
@@ -634,11 +634,11 @@ func autoConvert_v1_PluginConfig_To_config_PluginConfig(in *v1.PluginConfig, out
 }
 
 // Convert_v1_PluginConfig_To_config_PluginConfig is an autogenerated conversion function.
-func Convert_v1_PluginConfig_To_config_PluginConfig(in *v1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+func Convert_v1_PluginConfig_To_config_PluginConfig(in *configv1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
 	return autoConvert_v1_PluginConfig_To_config_PluginConfig(in, out, s)
 }
 
-func autoConvert_config_PluginConfig_To_v1_PluginConfig(in *config.PluginConfig, out *v1.PluginConfig, s conversion.Scope) error {
+func autoConvert_config_PluginConfig_To_v1_PluginConfig(in *config.PluginConfig, out *configv1.PluginConfig, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Args, &out.Args, s); err != nil {
 		return err
@@ -647,11 +647,11 @@ func autoConvert_config_PluginConfig_To_v1_PluginConfig(in *config.PluginConfig,
 }
 
 // Convert_config_PluginConfig_To_v1_PluginConfig is an autogenerated conversion function.
-func Convert_config_PluginConfig_To_v1_PluginConfig(in *config.PluginConfig, out *v1.PluginConfig, s conversion.Scope) error {
+func Convert_config_PluginConfig_To_v1_PluginConfig(in *config.PluginConfig, out *configv1.PluginConfig, s conversion.Scope) error {
 	return autoConvert_config_PluginConfig_To_v1_PluginConfig(in, out, s)
 }
 
-func autoConvert_v1_PluginSet_To_config_PluginSet(in *v1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+func autoConvert_v1_PluginSet_To_config_PluginSet(in *configv1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
 		*out = make([]config.Plugin, len(*in))
@@ -678,14 +678,14 @@ func autoConvert_v1_PluginSet_To_config_PluginSet(in *v1.PluginSet, out *config.
 }
 
 // Convert_v1_PluginSet_To_config_PluginSet is an autogenerated conversion function.
-func Convert_v1_PluginSet_To_config_PluginSet(in *v1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+func Convert_v1_PluginSet_To_config_PluginSet(in *configv1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
 	return autoConvert_v1_PluginSet_To_config_PluginSet(in, out, s)
 }
 
-func autoConvert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.PluginSet, s conversion.Scope) error {
+func autoConvert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *configv1.PluginSet, s conversion.Scope) error {
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		*out = make([]v1.Plugin, len(*in))
+		*out = make([]configv1.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_config_Plugin_To_v1_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -696,7 +696,7 @@ func autoConvert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.
 	}
 	if in.Disabled != nil {
 		in, out := &in.Disabled, &out.Disabled
-		*out = make([]v1.Plugin, len(*in))
+		*out = make([]configv1.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_config_Plugin_To_v1_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -709,11 +709,11 @@ func autoConvert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.
 }
 
 // Convert_config_PluginSet_To_v1_PluginSet is an autogenerated conversion function.
-func Convert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.PluginSet, s conversion.Scope) error {
+func Convert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *configv1.PluginSet, s conversion.Scope) error {
 	return autoConvert_config_PluginSet_To_v1_PluginSet(in, out, s)
 }
 
-func autoConvert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s conversion.Scope) error {
+func autoConvert_v1_Plugins_To_config_Plugins(in *configv1.Plugins, out *config.Plugins, s conversion.Scope) error {
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}
@@ -757,11 +757,11 @@ func autoConvert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugin
 }
 
 // Convert_v1_Plugins_To_config_Plugins is an autogenerated conversion function.
-func Convert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s conversion.Scope) error {
+func Convert_v1_Plugins_To_config_Plugins(in *configv1.Plugins, out *config.Plugins, s conversion.Scope) error {
 	return autoConvert_v1_Plugins_To_config_Plugins(in, out, s)
 }
 
-func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *v1.Plugins, s conversion.Scope) error {
+func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *configv1.Plugins, s conversion.Scope) error {
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}
@@ -805,75 +805,75 @@ func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *v1.Plugin
 }
 
 // Convert_config_Plugins_To_v1_Plugins is an autogenerated conversion function.
-func Convert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *v1.Plugins, s conversion.Scope) error {
+func Convert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *configv1.Plugins, s conversion.Scope) error {
 	return autoConvert_config_Plugins_To_v1_Plugins(in, out, s)
 }
 
-func autoConvert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
+func autoConvert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *configv1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
 	out.DefaultingType = config.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
 // Convert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs is an autogenerated conversion function.
-func Convert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
+func Convert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *configv1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
 	return autoConvert_v1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in, out, s)
 }
 
-func autoConvert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1.PodTopologySpreadArgs, s conversion.Scope) error {
+func autoConvert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *configv1.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
-	out.DefaultingType = v1.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
+	out.DefaultingType = configv1.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
 // Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs is an autogenerated conversion function.
-func Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1.PodTopologySpreadArgs, s conversion.Scope) error {
+func Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *configv1.PodTopologySpreadArgs, s conversion.Scope) error {
 	return autoConvert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in, out, s)
 }
 
-func autoConvert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
+func autoConvert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *configv1.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
 	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam is an autogenerated conversion function.
-func Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
+func Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *configv1.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
 	return autoConvert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in, out, s)
 }
 
-func autoConvert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1.RequestedToCapacityRatioParam, s conversion.Scope) error {
-	out.Shape = *(*[]v1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+func autoConvert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *configv1.RequestedToCapacityRatioParam, s conversion.Scope) error {
+	out.Shape = *(*[]configv1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam is an autogenerated conversion function.
-func Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1.RequestedToCapacityRatioParam, s conversion.Scope) error {
+func Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *configv1.RequestedToCapacityRatioParam, s conversion.Scope) error {
 	return autoConvert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in, out, s)
 }
 
-func autoConvert_v1_ResourceSpec_To_config_ResourceSpec(in *v1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
+func autoConvert_v1_ResourceSpec_To_config_ResourceSpec(in *configv1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Weight = in.Weight
 	return nil
 }
 
 // Convert_v1_ResourceSpec_To_config_ResourceSpec is an autogenerated conversion function.
-func Convert_v1_ResourceSpec_To_config_ResourceSpec(in *v1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
+func Convert_v1_ResourceSpec_To_config_ResourceSpec(in *configv1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
 	return autoConvert_v1_ResourceSpec_To_config_ResourceSpec(in, out, s)
 }
 
-func autoConvert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out *v1.ResourceSpec, s conversion.Scope) error {
+func autoConvert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out *configv1.ResourceSpec, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Weight = in.Weight
 	return nil
 }
 
 // Convert_config_ResourceSpec_To_v1_ResourceSpec is an autogenerated conversion function.
-func Convert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out *v1.ResourceSpec, s conversion.Scope) error {
+func Convert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out *configv1.ResourceSpec, s conversion.Scope) error {
 	return autoConvert_config_ResourceSpec_To_v1_ResourceSpec(in, out, s)
 }
 
-func autoConvert_v1_ScoringStrategy_To_config_ScoringStrategy(in *v1.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
+func autoConvert_v1_ScoringStrategy_To_config_ScoringStrategy(in *configv1.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
 	out.Type = config.ScoringStrategyType(in.Type)
 	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	out.RequestedToCapacityRatio = (*config.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
@@ -881,45 +881,45 @@ func autoConvert_v1_ScoringStrategy_To_config_ScoringStrategy(in *v1.ScoringStra
 }
 
 // Convert_v1_ScoringStrategy_To_config_ScoringStrategy is an autogenerated conversion function.
-func Convert_v1_ScoringStrategy_To_config_ScoringStrategy(in *v1.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
+func Convert_v1_ScoringStrategy_To_config_ScoringStrategy(in *configv1.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
 	return autoConvert_v1_ScoringStrategy_To_config_ScoringStrategy(in, out, s)
 }
 
-func autoConvert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStrategy, out *v1.ScoringStrategy, s conversion.Scope) error {
-	out.Type = v1.ScoringStrategyType(in.Type)
-	out.Resources = *(*[]v1.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	out.RequestedToCapacityRatio = (*v1.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+func autoConvert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStrategy, out *configv1.ScoringStrategy, s conversion.Scope) error {
+	out.Type = configv1.ScoringStrategyType(in.Type)
+	out.Resources = *(*[]configv1.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	out.RequestedToCapacityRatio = (*configv1.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
 	return nil
 }
 
 // Convert_config_ScoringStrategy_To_v1_ScoringStrategy is an autogenerated conversion function.
-func Convert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStrategy, out *v1.ScoringStrategy, s conversion.Scope) error {
+func Convert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStrategy, out *configv1.ScoringStrategy, s conversion.Scope) error {
 	return autoConvert_config_ScoringStrategy_To_v1_ScoringStrategy(in, out, s)
 }
 
-func autoConvert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *v1.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
+func autoConvert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *configv1.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
 	out.Utilization = in.Utilization
 	out.Score = in.Score
 	return nil
 }
 
 // Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint is an autogenerated conversion function.
-func Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *v1.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
+func Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *configv1.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
 	return autoConvert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in, out, s)
 }
 
-func autoConvert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in *config.UtilizationShapePoint, out *v1.UtilizationShapePoint, s conversion.Scope) error {
+func autoConvert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in *config.UtilizationShapePoint, out *configv1.UtilizationShapePoint, s conversion.Scope) error {
 	out.Utilization = in.Utilization
 	out.Score = in.Score
 	return nil
 }
 
 // Convert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint is an autogenerated conversion function.
-func Convert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in *config.UtilizationShapePoint, out *v1.UtilizationShapePoint, s conversion.Scope) error {
+func Convert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in *config.UtilizationShapePoint, out *configv1.UtilizationShapePoint, s conversion.Scope) error {
 	return autoConvert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in, out, s)
 }
 
-func autoConvert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
+func autoConvert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *configv1.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
@@ -928,19 +928,19 @@ func autoConvert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1.VolumeB
 }
 
 // Convert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs is an autogenerated conversion function.
-func Convert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
+func Convert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *configv1.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
 	return autoConvert_v1_VolumeBindingArgs_To_config_VolumeBindingArgs(in, out, s)
 }
 
-func autoConvert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1.VolumeBindingArgs, s conversion.Scope) error {
+func autoConvert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *configv1.VolumeBindingArgs, s conversion.Scope) error {
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
-	out.Shape = *(*[]v1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+	out.Shape = *(*[]configv1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs is an autogenerated conversion function.
-func Convert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1.VolumeBindingArgs, s conversion.Scope) error {
+func Convert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *configv1.VolumeBindingArgs, s conversion.Scope) error {
 	return autoConvert_config_VolumeBindingArgs_To_v1_VolumeBindingArgs(in, out, s)
 }

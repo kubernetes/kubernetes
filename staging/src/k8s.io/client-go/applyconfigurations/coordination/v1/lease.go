@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apicoordinationv1 "k8s.io/api/coordination/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // LeaseApplyConfiguration represents a declarative configuration of the Lease type for use
 // with apply.
 type LeaseApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // Lease constructs a declarative configuration of the Lease type for use with
@@ -57,18 +57,18 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLease(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+func ExtractLease(lease *coordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	return extractLease(lease, fieldManager, "")
 }
 
 // ExtractLeaseStatus is the same as ExtractLease except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractLeaseStatus(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+func ExtractLeaseStatus(lease *coordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	return extractLease(lease, fieldManager, "status")
 }
 
-func extractLease(lease *apicoordinationv1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
+func extractLease(lease *coordinationv1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
 	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b, subresource)
 	if err != nil {
@@ -155,7 +155,7 @@ func (b *LeaseApplyConfiguration) WithGeneration(value int64) *LeaseApplyConfigu
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *LeaseApplyConfiguration) WithCreationTimestamp(value metav1.Time) *LeaseApplyConfiguration {
+func (b *LeaseApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *LeaseApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *LeaseApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Leas
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *LeaseApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *LeaseApplyConfiguration {
+func (b *LeaseApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *LeaseApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *LeaseApplyConfiguration) WithAnnotations(entries map[string]string) *Le
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *LeaseApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *LeaseApplyConfiguration {
+func (b *LeaseApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *LeaseApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,7 +236,7 @@ func (b *LeaseApplyConfiguration) WithFinalizers(values ...string) *LeaseApplyCo
 
 func (b *LeaseApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

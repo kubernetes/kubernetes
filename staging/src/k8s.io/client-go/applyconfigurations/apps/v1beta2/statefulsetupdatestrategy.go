@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 )
 
 // StatefulSetUpdateStrategyApplyConfiguration represents a declarative configuration of the StatefulSetUpdateStrategy type for use
 // with apply.
 type StatefulSetUpdateStrategyApplyConfiguration struct {
-	Type          *v1beta2.StatefulSetUpdateStrategyType              `json:"type,omitempty"`
+	Type          *appsv1beta2.StatefulSetUpdateStrategyType          `json:"type,omitempty"`
 	RollingUpdate *RollingUpdateStatefulSetStrategyApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
@@ -38,7 +38,7 @@ func StatefulSetUpdateStrategy() *StatefulSetUpdateStrategyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) WithType(value v1beta2.StatefulSetUpdateStrategyType) *StatefulSetUpdateStrategyApplyConfiguration {
+func (b *StatefulSetUpdateStrategyApplyConfiguration) WithType(value appsv1beta2.StatefulSetUpdateStrategyType) *StatefulSetUpdateStrategyApplyConfiguration {
 	b.Type = &value
 	return b
 }

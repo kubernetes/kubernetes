@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apibatchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // JobApplyConfiguration represents a declarative configuration of the Job type for use
 // with apply.
 type JobApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *JobSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *JobStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *JobSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *JobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Job constructs a declarative configuration of the Job type for use with
@@ -58,18 +58,18 @@ func Job(name, namespace string) *JobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+func ExtractJob(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return extractJob(job, fieldManager, "")
 }
 
 // ExtractJobStatus is the same as ExtractJob except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractJobStatus(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+func ExtractJobStatus(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return extractJob(job, fieldManager, "status")
 }
 
-func extractJob(job *apibatchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
+func extractJob(job *batchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
 	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *JobApplyConfiguration) WithGeneration(value int64) *JobApplyConfigurati
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *JobApplyConfiguration) WithCreationTimestamp(value metav1.Time) *JobApplyConfiguration {
+func (b *JobApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *JobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *JobApplyConfiguration) WithCreationTimestamp(value metav1.Time) *JobApp
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *JobApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *JobApplyConfiguration {
+func (b *JobApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *JobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *JobApplyConfiguration) WithAnnotations(entries map[string]string) *JobA
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *JobApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *JobApplyConfiguration {
+func (b *JobApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *JobApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *JobApplyConfiguration) WithFinalizers(values ...string) *JobApplyConfig
 
 func (b *JobApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

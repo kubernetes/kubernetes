@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ValidatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicy type for use
 // with apply.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ValidatingAdmissionPolicy constructs a declarative configuration of the ValidatingAdmissionPolicy type for use with
@@ -57,18 +57,18 @@ func ValidatingAdmissionPolicy(name string) *ValidatingAdmissionPolicyApplyConfi
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *apiadmissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "")
 }
 
 // ExtractValidatingAdmissionPolicyStatus is the same as ExtractValidatingAdmissionPolicy except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *apiadmissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "status")
 }
 
-func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *apiadmissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithGeneration(value int64
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ValidatingAdmissionPolicyApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
+func (b *ValidatingAdmissionPolicyApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithCreationTimestamp(valu
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
+func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithAnnotations(entries ma
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ValidatingAdmissionPolicyApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ValidatingAdmissionPolicyApplyConfiguration {
+func (b *ValidatingAdmissionPolicyApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithFinalizers(values ...s
 
 func (b *ValidatingAdmissionPolicyApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

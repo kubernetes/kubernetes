@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	json "encoding/json"
-	"fmt"
+	fmt "fmt"
 
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
+	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -40,47 +40,47 @@ type StatefulSetsGetter interface {
 
 // StatefulSetInterface has methods to work with StatefulSet resources.
 type StatefulSetInterface interface {
-	Create(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.CreateOptions) (*v1beta2.StatefulSet, error)
-	Update(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (*v1beta2.StatefulSet, error)
+	Create(ctx context.Context, statefulSet *appsv1beta2.StatefulSet, opts v1.CreateOptions) (*appsv1beta2.StatefulSet, error)
+	Update(ctx context.Context, statefulSet *appsv1beta2.StatefulSet, opts v1.UpdateOptions) (*appsv1beta2.StatefulSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (*v1beta2.StatefulSet, error)
+	UpdateStatus(ctx context.Context, statefulSet *appsv1beta2.StatefulSet, opts v1.UpdateOptions) (*appsv1beta2.StatefulSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.StatefulSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.StatefulSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta2.StatefulSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta2.StatefulSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.StatefulSet, err error)
-	Apply(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta2.StatefulSet, err error)
+	Apply(ctx context.Context, statefulSet *applyconfigurationsappsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.StatefulSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error)
-	GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (*v1beta2.Scale, error)
-	UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale, opts v1.UpdateOptions) (*v1beta2.Scale, error)
-	ApplyScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.ScaleApplyConfiguration, opts v1.ApplyOptions) (*v1beta2.Scale, error)
+	ApplyStatus(ctx context.Context, statefulSet *applyconfigurationsappsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.StatefulSet, err error)
+	GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (*appsv1beta2.Scale, error)
+	UpdateScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.Scale, opts v1.UpdateOptions) (*appsv1beta2.Scale, error)
+	ApplyScale(ctx context.Context, statefulSetName string, scale *applyconfigurationsappsv1beta2.ScaleApplyConfiguration, opts v1.ApplyOptions) (*appsv1beta2.Scale, error)
 
 	StatefulSetExpansion
 }
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	*gentype.ClientWithListAndApply[*v1beta2.StatefulSet, *v1beta2.StatefulSetList, *appsv1beta2.StatefulSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta2.StatefulSet, *appsv1beta2.StatefulSetList, *applyconfigurationsappsv1beta2.StatefulSetApplyConfiguration]
 }
 
 // newStatefulSets returns a StatefulSets
 func newStatefulSets(c *AppsV1beta2Client, namespace string) *statefulSets {
 	return &statefulSets{
-		gentype.NewClientWithListAndApply[*v1beta2.StatefulSet, *v1beta2.StatefulSetList, *appsv1beta2.StatefulSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta2.StatefulSet, *appsv1beta2.StatefulSetList, *applyconfigurationsappsv1beta2.StatefulSetApplyConfiguration](
 			"statefulsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.StatefulSet { return &v1beta2.StatefulSet{} },
-			func() *v1beta2.StatefulSetList { return &v1beta2.StatefulSetList{} }),
+			func() *appsv1beta2.StatefulSet { return &appsv1beta2.StatefulSet{} },
+			func() *appsv1beta2.StatefulSetList { return &appsv1beta2.StatefulSetList{} }),
 	}
 }
 
-// GetScale takes name of the statefulSet, and returns the corresponding v1beta2.Scale object, and an error if there is any.
-func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *v1beta2.Scale, err error) {
-	result = &v1beta2.Scale{}
+// GetScale takes name of the statefulSet, and returns the corresponding appsv1beta2.Scale object, and an error if there is any.
+func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *appsv1beta2.Scale, err error) {
+	result = &appsv1beta2.Scale{}
 	err = c.GetClient().Get().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
@@ -93,8 +93,8 @@ func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, opt
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale, opts v1.UpdateOptions) (result *v1beta2.Scale, err error) {
-	result = &v1beta2.Scale{}
+func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.Scale, opts v1.UpdateOptions) (result *appsv1beta2.Scale, err error) {
+	result = &appsv1beta2.Scale{}
 	err = c.GetClient().Put().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
@@ -109,7 +109,7 @@ func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, 
 
 // ApplyScale takes top resource name and the apply declarative configuration for scale,
 // applies it and returns the applied scale, and an error, if there is any.
-func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Scale, err error) {
+func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, scale *applyconfigurationsappsv1beta2.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.Scale, err error) {
 	if scale == nil {
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
@@ -119,7 +119,7 @@ func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, s
 		return nil, err
 	}
 
-	result = &v1beta2.Scale{}
+	result = &appsv1beta2.Scale{}
 	err = c.GetClient().Patch(types.ApplyPatchType).
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").

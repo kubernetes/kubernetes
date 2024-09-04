@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -32,8 +32,8 @@ import (
 type StorageVersionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *v1alpha1.StorageVersionSpec            `json:"spec,omitempty"`
-	Status                           *StorageVersionStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                             *apiserverinternalv1alpha1.StorageVersionSpec `json:"spec,omitempty"`
+	Status                           *StorageVersionStatusApplyConfiguration       `json:"status,omitempty"`
 }
 
 // StorageVersion constructs a declarative configuration of the StorageVersion type for use with
@@ -57,18 +57,18 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+func ExtractStorageVersion(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
 	return extractStorageVersion(storageVersion, fieldManager, "")
 }
 
 // ExtractStorageVersionStatus is the same as ExtractStorageVersion except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractStorageVersionStatus(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+func ExtractStorageVersionStatus(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
 	return extractStorageVersion(storageVersion, fieldManager, "status")
 }
 
-func extractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
+func extractStorageVersion(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
 	b := &StorageVersionApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
 	if err != nil {
@@ -242,7 +242,7 @@ func (b *StorageVersionApplyConfiguration) ensureObjectMetaApplyConfigurationExi
 // WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Spec field is set to the value of the last call.
-func (b *StorageVersionApplyConfiguration) WithSpec(value v1alpha1.StorageVersionSpec) *StorageVersionApplyConfiguration {
+func (b *StorageVersionApplyConfiguration) WithSpec(value apiserverinternalv1alpha1.StorageVersionSpec) *StorageVersionApplyConfiguration {
 	b.Spec = &value
 	return b
 }

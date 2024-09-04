@@ -19,20 +19,20 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 )
 
 // CertificateSigningRequestSpecApplyConfiguration represents a declarative configuration of the CertificateSigningRequestSpec type for use
 // with apply.
 type CertificateSigningRequestSpecApplyConfiguration struct {
-	Request           []byte                        `json:"request,omitempty"`
-	SignerName        *string                       `json:"signerName,omitempty"`
-	ExpirationSeconds *int32                        `json:"expirationSeconds,omitempty"`
-	Usages            []v1beta1.KeyUsage            `json:"usages,omitempty"`
-	Username          *string                       `json:"username,omitempty"`
-	UID               *string                       `json:"uid,omitempty"`
-	Groups            []string                      `json:"groups,omitempty"`
-	Extra             map[string]v1beta1.ExtraValue `json:"extra,omitempty"`
+	Request           []byte                                    `json:"request,omitempty"`
+	SignerName        *string                                   `json:"signerName,omitempty"`
+	ExpirationSeconds *int32                                    `json:"expirationSeconds,omitempty"`
+	Usages            []certificatesv1beta1.KeyUsage            `json:"usages,omitempty"`
+	Username          *string                                   `json:"username,omitempty"`
+	UID               *string                                   `json:"uid,omitempty"`
+	Groups            []string                                  `json:"groups,omitempty"`
+	Extra             map[string]certificatesv1beta1.ExtraValue `json:"extra,omitempty"`
 }
 
 // CertificateSigningRequestSpecApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestSpec type for use with
@@ -70,7 +70,7 @@ func (b *CertificateSigningRequestSpecApplyConfiguration) WithExpirationSeconds(
 // WithUsages adds the given value to the Usages field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Usages field.
-func (b *CertificateSigningRequestSpecApplyConfiguration) WithUsages(values ...v1beta1.KeyUsage) *CertificateSigningRequestSpecApplyConfiguration {
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithUsages(values ...certificatesv1beta1.KeyUsage) *CertificateSigningRequestSpecApplyConfiguration {
 	for i := range values {
 		b.Usages = append(b.Usages, values[i])
 	}
@@ -107,9 +107,9 @@ func (b *CertificateSigningRequestSpecApplyConfiguration) WithGroups(values ...s
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Extra field,
 // overwriting an existing map entries in Extra field with the same key.
-func (b *CertificateSigningRequestSpecApplyConfiguration) WithExtra(entries map[string]v1beta1.ExtraValue) *CertificateSigningRequestSpecApplyConfiguration {
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithExtra(entries map[string]certificatesv1beta1.ExtraValue) *CertificateSigningRequestSpecApplyConfiguration {
 	if b.Extra == nil && len(entries) > 0 {
-		b.Extra = make(map[string]v1beta1.ExtraValue, len(entries))
+		b.Extra = make(map[string]certificatesv1beta1.ExtraValue, len(entries))
 	}
 	for k, v := range entries {
 		b.Extra[k] = v

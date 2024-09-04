@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
+	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (*v1beta1.Ingress, error)
-	Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
+	Create(ctx context.Context, ingress *extensionsv1beta1.Ingress, opts v1.CreateOptions) (*extensionsv1beta1.Ingress, error)
+	Update(ctx context.Context, ingress *extensionsv1beta1.Ingress, opts v1.UpdateOptions) (*extensionsv1beta1.Ingress, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
+	UpdateStatus(ctx context.Context, ingress *extensionsv1beta1.Ingress, opts v1.UpdateOptions) (*extensionsv1beta1.Ingress, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Ingress, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.IngressList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*extensionsv1beta1.Ingress, error)
+	List(ctx context.Context, opts v1.ListOptions) (*extensionsv1beta1.IngressList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error)
-	Apply(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *extensionsv1beta1.Ingress, err error)
+	Apply(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *extensionsv1beta1.Ingress, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
+	ApplyStatus(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *extensionsv1beta1.Ingress, err error)
 	IngressExpansion
 }
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	*gentype.ClientWithListAndApply[*v1beta1.Ingress, *v1beta1.IngressList, *extensionsv1beta1.IngressApplyConfiguration]
+	*gentype.ClientWithListAndApply[*extensionsv1beta1.Ingress, *extensionsv1beta1.IngressList, *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration]
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 	return &ingresses{
-		gentype.NewClientWithListAndApply[*v1beta1.Ingress, *v1beta1.IngressList, *extensionsv1beta1.IngressApplyConfiguration](
+		gentype.NewClientWithListAndApply[*extensionsv1beta1.Ingress, *extensionsv1beta1.IngressList, *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration](
 			"ingresses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.Ingress { return &v1beta1.Ingress{} },
-			func() *v1beta1.IngressList { return &v1beta1.IngressList{} }),
+			func() *extensionsv1beta1.Ingress { return &extensionsv1beta1.Ingress{} },
+			func() *extensionsv1beta1.IngressList { return &extensionsv1beta1.IngressList{} }),
 	}
 }

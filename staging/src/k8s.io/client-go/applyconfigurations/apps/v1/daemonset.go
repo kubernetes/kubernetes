@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiappsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DaemonSetApplyConfiguration represents a declarative configuration of the DaemonSet type for use
 // with apply.
 type DaemonSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DaemonSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *DaemonSetSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // DaemonSet constructs a declarative configuration of the DaemonSet type for use with
@@ -58,18 +58,18 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDaemonSet(daemonSet *apiappsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+func ExtractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return extractDaemonSet(daemonSet, fieldManager, "")
 }
 
 // ExtractDaemonSetStatus is the same as ExtractDaemonSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractDaemonSetStatus(daemonSet *apiappsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+func ExtractDaemonSetStatus(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return extractDaemonSet(daemonSet, fieldManager, "status")
 }
 
-func extractDaemonSet(daemonSet *apiappsv1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
+func extractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
 	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.apps.v1.DaemonSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *DaemonSetApplyConfiguration) WithGeneration(value int64) *DaemonSetAppl
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *DaemonSetApplyConfiguration) WithCreationTimestamp(value metav1.Time) *DaemonSetApplyConfiguration {
+func (b *DaemonSetApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *DaemonSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *DaemonSetApplyConfiguration) WithCreationTimestamp(value metav1.Time) *
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *DaemonSetApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *DaemonSetApplyConfiguration {
+func (b *DaemonSetApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *DaemonSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *DaemonSetApplyConfiguration) WithAnnotations(entries map[string]string)
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *DaemonSetApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *DaemonSetApplyConfiguration {
+func (b *DaemonSetApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *DaemonSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *DaemonSetApplyConfiguration) WithFinalizers(values ...string) *DaemonSe
 
 func (b *DaemonSetApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

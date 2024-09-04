@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PodOSApplyConfiguration represents a declarative configuration of the PodOS type for use
 // with apply.
 type PodOSApplyConfiguration struct {
-	Name *v1.OSName `json:"name,omitempty"`
+	Name *corev1.OSName `json:"name,omitempty"`
 }
 
 // PodOSApplyConfiguration constructs a declarative configuration of the PodOS type for use with
@@ -37,7 +37,7 @@ func PodOS() *PodOSApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *PodOSApplyConfiguration) WithName(value v1.OSName) *PodOSApplyConfiguration {
+func (b *PodOSApplyConfiguration) WithName(value corev1.OSName) *PodOSApplyConfiguration {
 	b.Name = &value
 	return b
 }

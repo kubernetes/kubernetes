@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	coordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
+	applyconfigurationscoordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type LeaseCandidatesGetter interface {
 
 // LeaseCandidateInterface has methods to work with LeaseCandidate resources.
 type LeaseCandidateInterface interface {
-	Create(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.CreateOptions) (*v1alpha1.LeaseCandidate, error)
-	Update(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.UpdateOptions) (*v1alpha1.LeaseCandidate, error)
+	Create(ctx context.Context, leaseCandidate *coordinationv1alpha1.LeaseCandidate, opts v1.CreateOptions) (*coordinationv1alpha1.LeaseCandidate, error)
+	Update(ctx context.Context, leaseCandidate *coordinationv1alpha1.LeaseCandidate, opts v1.UpdateOptions) (*coordinationv1alpha1.LeaseCandidate, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.LeaseCandidate, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.LeaseCandidateList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*coordinationv1alpha1.LeaseCandidate, error)
+	List(ctx context.Context, opts v1.ListOptions) (*coordinationv1alpha1.LeaseCandidateList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.LeaseCandidate, err error)
-	Apply(ctx context.Context, leaseCandidate *coordinationv1alpha1.LeaseCandidateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.LeaseCandidate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *coordinationv1alpha1.LeaseCandidate, err error)
+	Apply(ctx context.Context, leaseCandidate *applyconfigurationscoordinationv1alpha1.LeaseCandidateApplyConfiguration, opts v1.ApplyOptions) (result *coordinationv1alpha1.LeaseCandidate, err error)
 	LeaseCandidateExpansion
 }
 
 // leaseCandidates implements LeaseCandidateInterface
 type leaseCandidates struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.LeaseCandidate, *v1alpha1.LeaseCandidateList, *coordinationv1alpha1.LeaseCandidateApplyConfiguration]
+	*gentype.ClientWithListAndApply[*coordinationv1alpha1.LeaseCandidate, *coordinationv1alpha1.LeaseCandidateList, *applyconfigurationscoordinationv1alpha1.LeaseCandidateApplyConfiguration]
 }
 
 // newLeaseCandidates returns a LeaseCandidates
 func newLeaseCandidates(c *CoordinationV1alpha1Client, namespace string) *leaseCandidates {
 	return &leaseCandidates{
-		gentype.NewClientWithListAndApply[*v1alpha1.LeaseCandidate, *v1alpha1.LeaseCandidateList, *coordinationv1alpha1.LeaseCandidateApplyConfiguration](
+		gentype.NewClientWithListAndApply[*coordinationv1alpha1.LeaseCandidate, *coordinationv1alpha1.LeaseCandidateList, *applyconfigurationscoordinationv1alpha1.LeaseCandidateApplyConfiguration](
 			"leasecandidates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.LeaseCandidate { return &v1alpha1.LeaseCandidate{} },
-			func() *v1alpha1.LeaseCandidateList { return &v1alpha1.LeaseCandidateList{} }),
+			func() *coordinationv1alpha1.LeaseCandidate { return &coordinationv1alpha1.LeaseCandidate{} },
+			func() *coordinationv1alpha1.LeaseCandidateList { return &coordinationv1alpha1.LeaseCandidateList{} }),
 	}
 }

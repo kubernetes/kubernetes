@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	apidiscoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/discovery/v1beta1"
+	discoveryv1beta1 "k8s.io/client-go/listers/discovery/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // EndpointSlices.
 type EndpointSliceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.EndpointSliceLister
+	Lister() discoveryv1beta1.EndpointSliceLister
 }
 
 type endpointSliceInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredEndpointSliceInformer(client kubernetes.Interface, namespace str
 				return client.DiscoveryV1beta1().EndpointSlices(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&discoveryv1beta1.EndpointSlice{},
+		&apidiscoveryv1beta1.EndpointSlice{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *endpointSliceInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *endpointSliceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&discoveryv1beta1.EndpointSlice{}, f.defaultInformer)
+	return f.factory.InformerFor(&apidiscoveryv1beta1.EndpointSlice{}, f.defaultInformer)
 }
 
-func (f *endpointSliceInformer) Lister() v1beta1.EndpointSliceLister {
-	return v1beta1.NewEndpointSliceLister(f.Informer().GetIndexer())
+func (f *endpointSliceInformer) Lister() discoveryv1beta1.EndpointSliceLister {
+	return discoveryv1beta1.NewEndpointSliceLister(f.Informer().GetIndexer())
 }

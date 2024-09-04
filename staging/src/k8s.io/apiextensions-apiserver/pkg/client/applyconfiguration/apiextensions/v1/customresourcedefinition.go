@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CustomResourceDefinitionApplyConfiguration represents a declarative configuration of the CustomResourceDefinition type for use
 // with apply.
 type CustomResourceDefinitionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CustomResourceDefinitionSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *CustomResourceDefinitionSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CustomResourceDefinition constructs a declarative configuration of the CustomResourceDefinition type for use with
@@ -116,7 +116,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithGeneration(value int64)
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CustomResourceDefinitionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CustomResourceDefinitionApplyConfiguration {
+func (b *CustomResourceDefinitionApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -125,7 +125,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithCreationTimestamp(value
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CustomResourceDefinitionApplyConfiguration {
+func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -173,7 +173,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithAnnotations(entries map
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CustomResourceDefinitionApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CustomResourceDefinitionApplyConfiguration {
+func (b *CustomResourceDefinitionApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -197,7 +197,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithFinalizers(values ...st
 
 func (b *CustomResourceDefinitionApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

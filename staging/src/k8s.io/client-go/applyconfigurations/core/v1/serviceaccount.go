@@ -19,22 +19,22 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ServiceAccountApplyConfiguration represents a declarative configuration of the ServiceAccount type for use
 // with apply.
 type ServiceAccountApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
-	ImagePullSecrets                 []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
-	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Secrets                              []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
+	ImagePullSecrets                     []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
+	AutomountServiceAccountToken         *bool                                    `json:"automountServiceAccountToken,omitempty"`
 }
 
 // ServiceAccount constructs a declarative configuration of the ServiceAccount type for use with
@@ -59,18 +59,18 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
 	return extractServiceAccount(serviceAccount, fieldManager, "")
 }
 
 // ExtractServiceAccountStatus is the same as ExtractServiceAccount except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceAccountStatus(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccountStatus(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
 	return extractServiceAccount(serviceAccount, fieldManager, "status")
 }
 
-func extractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
+func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b, subresource)
 	if err != nil {
@@ -157,7 +157,7 @@ func (b *ServiceAccountApplyConfiguration) WithGeneration(value int64) *ServiceA
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ServiceAccountApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ServiceAccountApplyConfiguration {
+func (b *ServiceAccountApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -166,7 +166,7 @@ func (b *ServiceAccountApplyConfiguration) WithCreationTimestamp(value metav1.Ti
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ServiceAccountApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ServiceAccountApplyConfiguration {
+func (b *ServiceAccountApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -214,7 +214,7 @@ func (b *ServiceAccountApplyConfiguration) WithAnnotations(entries map[string]st
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ServiceAccountApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ServiceAccountApplyConfiguration {
+func (b *ServiceAccountApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ServiceAccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -238,7 +238,7 @@ func (b *ServiceAccountApplyConfiguration) WithFinalizers(values ...string) *Ser
 
 func (b *ServiceAccountApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

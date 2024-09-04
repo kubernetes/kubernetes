@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	apicertificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
+	certificatesv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ClusterTrustBundles.
 type ClusterTrustBundleInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterTrustBundleLister
+	Lister() certificatesv1alpha1.ClusterTrustBundleLister
 }
 
 type clusterTrustBundleInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredClusterTrustBundleInformer(client kubernetes.Interface, resyncPe
 				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(context.TODO(), options)
 			},
 		},
-		&certificatesv1alpha1.ClusterTrustBundle{},
+		&apicertificatesv1alpha1.ClusterTrustBundle{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *clusterTrustBundleInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *clusterTrustBundleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificatesv1alpha1.ClusterTrustBundle{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicertificatesv1alpha1.ClusterTrustBundle{}, f.defaultInformer)
 }
 
-func (f *clusterTrustBundleInformer) Lister() v1alpha1.ClusterTrustBundleLister {
-	return v1alpha1.NewClusterTrustBundleLister(f.Informer().GetIndexer())
+func (f *clusterTrustBundleInformer) Lister() certificatesv1alpha1.ClusterTrustBundleLister {
+	return certificatesv1alpha1.NewClusterTrustBundleLister(f.Informer().GetIndexer())
 }

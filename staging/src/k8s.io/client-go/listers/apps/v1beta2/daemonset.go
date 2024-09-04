@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DaemonSetLister helps list DaemonSets.
@@ -30,7 +30,7 @@ import (
 type DaemonSetLister interface {
 	// List lists all DaemonSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.DaemonSet, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.DaemonSet, err error)
 	// DaemonSets returns an object that can list and get DaemonSets.
 	DaemonSets(namespace string) DaemonSetNamespaceLister
 	DaemonSetListerExpansion
@@ -38,17 +38,17 @@ type DaemonSetLister interface {
 
 // daemonSetLister implements the DaemonSetLister interface.
 type daemonSetLister struct {
-	listers.ResourceIndexer[*v1beta2.DaemonSet]
+	listers.ResourceIndexer[*appsv1beta2.DaemonSet]
 }
 
 // NewDaemonSetLister returns a new DaemonSetLister.
 func NewDaemonSetLister(indexer cache.Indexer) DaemonSetLister {
-	return &daemonSetLister{listers.New[*v1beta2.DaemonSet](indexer, v1beta2.Resource("daemonset"))}
+	return &daemonSetLister{listers.New[*appsv1beta2.DaemonSet](indexer, appsv1beta2.Resource("daemonset"))}
 }
 
 // DaemonSets returns an object that can list and get DaemonSets.
 func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister {
-	return daemonSetNamespaceLister{listers.NewNamespaced[*v1beta2.DaemonSet](s.ResourceIndexer, namespace)}
+	return daemonSetNamespaceLister{listers.NewNamespaced[*appsv1beta2.DaemonSet](s.ResourceIndexer, namespace)}
 }
 
 // DaemonSetNamespaceLister helps list and get DaemonSets.
@@ -56,15 +56,15 @@ func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister 
 type DaemonSetNamespaceLister interface {
 	// List lists all DaemonSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.DaemonSet, err error)
+	List(selector labels.Selector) (ret []*appsv1beta2.DaemonSet, err error)
 	// Get retrieves the DaemonSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.DaemonSet, error)
+	Get(name string) (*appsv1beta2.DaemonSet, error)
 	DaemonSetNamespaceListerExpansion
 }
 
 // daemonSetNamespaceLister implements the DaemonSetNamespaceLister
 // interface.
 type daemonSetNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta2.DaemonSet]
+	listers.ResourceIndexer[*appsv1beta2.DaemonSet]
 }

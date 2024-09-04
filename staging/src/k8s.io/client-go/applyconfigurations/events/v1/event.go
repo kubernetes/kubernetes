@@ -19,34 +19,34 @@ limitations under the License.
 package v1
 
 import (
-	apieventsv1 "k8s.io/api/events/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	eventsv1 "k8s.io/api/events/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // EventApplyConfiguration represents a declarative configuration of the Event type for use
 // with apply.
 type EventApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	EventTime                        *metav1.MicroTime                         `json:"eventTime,omitempty"`
-	Series                           *EventSeriesApplyConfiguration            `json:"series,omitempty"`
-	ReportingController              *string                                   `json:"reportingController,omitempty"`
-	ReportingInstance                *string                                   `json:"reportingInstance,omitempty"`
-	Action                           *string                                   `json:"action,omitempty"`
-	Reason                           *string                                   `json:"reason,omitempty"`
-	Regarding                        *corev1.ObjectReferenceApplyConfiguration `json:"regarding,omitempty"`
-	Related                          *corev1.ObjectReferenceApplyConfiguration `json:"related,omitempty"`
-	Note                             *string                                   `json:"note,omitempty"`
-	Type                             *string                                   `json:"type,omitempty"`
-	DeprecatedSource                 *corev1.EventSourceApplyConfiguration     `json:"deprecatedSource,omitempty"`
-	DeprecatedFirstTimestamp         *metav1.Time                              `json:"deprecatedFirstTimestamp,omitempty"`
-	DeprecatedLastTimestamp          *metav1.Time                              `json:"deprecatedLastTimestamp,omitempty"`
-	DeprecatedCount                  *int32                                    `json:"deprecatedCount,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	EventTime                            *apismetav1.MicroTime                     `json:"eventTime,omitempty"`
+	Series                               *EventSeriesApplyConfiguration            `json:"series,omitempty"`
+	ReportingController                  *string                                   `json:"reportingController,omitempty"`
+	ReportingInstance                    *string                                   `json:"reportingInstance,omitempty"`
+	Action                               *string                                   `json:"action,omitempty"`
+	Reason                               *string                                   `json:"reason,omitempty"`
+	Regarding                            *corev1.ObjectReferenceApplyConfiguration `json:"regarding,omitempty"`
+	Related                              *corev1.ObjectReferenceApplyConfiguration `json:"related,omitempty"`
+	Note                                 *string                                   `json:"note,omitempty"`
+	Type                                 *string                                   `json:"type,omitempty"`
+	DeprecatedSource                     *corev1.EventSourceApplyConfiguration     `json:"deprecatedSource,omitempty"`
+	DeprecatedFirstTimestamp             *apismetav1.Time                          `json:"deprecatedFirstTimestamp,omitempty"`
+	DeprecatedLastTimestamp              *apismetav1.Time                          `json:"deprecatedLastTimestamp,omitempty"`
+	DeprecatedCount                      *int32                                    `json:"deprecatedCount,omitempty"`
 }
 
 // Event constructs a declarative configuration of the Event type for use with
@@ -71,18 +71,18 @@ func Event(name, namespace string) *EventApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEvent(event *apieventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+func ExtractEvent(event *eventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
 	return extractEvent(event, fieldManager, "")
 }
 
 // ExtractEventStatus is the same as ExtractEvent except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractEventStatus(event *apieventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+func ExtractEventStatus(event *eventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
 	return extractEvent(event, fieldManager, "status")
 }
 
-func extractEvent(event *apieventsv1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
+func extractEvent(event *eventsv1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
 	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1.Event"), fieldManager, b, subresource)
 	if err != nil {
@@ -169,7 +169,7 @@ func (b *EventApplyConfiguration) WithGeneration(value int64) *EventApplyConfigu
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithCreationTimestamp(value metav1.Time) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *EventApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -178,7 +178,7 @@ func (b *EventApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Even
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *EventApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -226,7 +226,7 @@ func (b *EventApplyConfiguration) WithAnnotations(entries map[string]string) *Ev
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *EventApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *EventApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -250,14 +250,14 @@ func (b *EventApplyConfiguration) WithFinalizers(values ...string) *EventApplyCo
 
 func (b *EventApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
 // WithEventTime sets the EventTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the EventTime field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithEventTime(value metav1.MicroTime) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithEventTime(value apismetav1.MicroTime) *EventApplyConfiguration {
 	b.EventTime = &value
 	return b
 }
@@ -345,7 +345,7 @@ func (b *EventApplyConfiguration) WithDeprecatedSource(value *corev1.EventSource
 // WithDeprecatedFirstTimestamp sets the DeprecatedFirstTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeprecatedFirstTimestamp field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithDeprecatedFirstTimestamp(value metav1.Time) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithDeprecatedFirstTimestamp(value apismetav1.Time) *EventApplyConfiguration {
 	b.DeprecatedFirstTimestamp = &value
 	return b
 }
@@ -353,7 +353,7 @@ func (b *EventApplyConfiguration) WithDeprecatedFirstTimestamp(value metav1.Time
 // WithDeprecatedLastTimestamp sets the DeprecatedLastTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeprecatedLastTimestamp field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithDeprecatedLastTimestamp(value metav1.Time) *EventApplyConfiguration {
+func (b *EventApplyConfiguration) WithDeprecatedLastTimestamp(value apismetav1.Time) *EventApplyConfiguration {
 	b.DeprecatedLastTimestamp = &value
 	return b
 }

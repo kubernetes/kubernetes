@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 )
 
 // ExampleStatusApplyConfiguration represents a declarative configuration of the ExampleStatus type for use
 // with apply.
 type ExampleStatusApplyConfiguration struct {
-	State   *v1.ExampleState `json:"state,omitempty"`
-	Message *string          `json:"message,omitempty"`
+	State   *crv1.ExampleState `json:"state,omitempty"`
+	Message *string            `json:"message,omitempty"`
 }
 
 // ExampleStatusApplyConfiguration constructs a declarative configuration of the ExampleStatus type for use with
@@ -38,7 +38,7 @@ func ExampleStatus() *ExampleStatusApplyConfiguration {
 // WithState sets the State field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the State field is set to the value of the last call.
-func (b *ExampleStatusApplyConfiguration) WithState(value v1.ExampleState) *ExampleStatusApplyConfiguration {
+func (b *ExampleStatusApplyConfiguration) WithState(value crv1.ExampleState) *ExampleStatusApplyConfiguration {
 	b.State = &value
 	return b
 }

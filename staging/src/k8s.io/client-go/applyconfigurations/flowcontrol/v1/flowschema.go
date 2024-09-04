@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apiflowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // FlowSchemaApplyConfiguration represents a declarative configuration of the FlowSchema type for use
 // with apply.
 type FlowSchemaApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *FlowSchemaSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *FlowSchemaStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *FlowSchemaSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *FlowSchemaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // FlowSchema constructs a declarative configuration of the FlowSchema type for use with
@@ -57,18 +57,18 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractFlowSchema(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+func ExtractFlowSchema(flowSchema *flowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return extractFlowSchema(flowSchema, fieldManager, "")
 }
 
 // ExtractFlowSchemaStatus is the same as ExtractFlowSchema except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractFlowSchemaStatus(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+func ExtractFlowSchemaStatus(flowSchema *flowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return extractFlowSchema(flowSchema, fieldManager, "status")
 }
 
-func extractFlowSchema(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
+func extractFlowSchema(flowSchema *flowcontrolv1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
 	b := &FlowSchemaApplyConfiguration{}
 	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1.FlowSchema"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *FlowSchemaApplyConfiguration) WithGeneration(value int64) *FlowSchemaAp
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *FlowSchemaApplyConfiguration) WithCreationTimestamp(value metav1.Time) *FlowSchemaApplyConfiguration {
+func (b *FlowSchemaApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *FlowSchemaApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *FlowSchemaApplyConfiguration) WithCreationTimestamp(value metav1.Time) 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *FlowSchemaApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *FlowSchemaApplyConfiguration {
+func (b *FlowSchemaApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *FlowSchemaApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *FlowSchemaApplyConfiguration) WithAnnotations(entries map[string]string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *FlowSchemaApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *FlowSchemaApplyConfiguration {
+func (b *FlowSchemaApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *FlowSchemaApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *FlowSchemaApplyConfiguration) WithFinalizers(values ...string) *FlowSch
 
 func (b *FlowSchemaApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

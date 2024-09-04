@@ -19,22 +19,22 @@ limitations under the License.
 package v1
 
 import (
-	apinodev1 "k8s.io/api/node/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	nodev1 "k8s.io/api/node/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RuntimeClassApplyConfiguration represents a declarative configuration of the RuntimeClass type for use
 // with apply.
 type RuntimeClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Handler                          *string                       `json:"handler,omitempty"`
-	Overhead                         *OverheadApplyConfiguration   `json:"overhead,omitempty"`
-	Scheduling                       *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Handler                              *string                       `json:"handler,omitempty"`
+	Overhead                             *OverheadApplyConfiguration   `json:"overhead,omitempty"`
+	Scheduling                           *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
 }
 
 // RuntimeClass constructs a declarative configuration of the RuntimeClass type for use with
@@ -58,18 +58,18 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRuntimeClass(runtimeClass *apinodev1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+func ExtractRuntimeClass(runtimeClass *nodev1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
 	return extractRuntimeClass(runtimeClass, fieldManager, "")
 }
 
 // ExtractRuntimeClassStatus is the same as ExtractRuntimeClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractRuntimeClassStatus(runtimeClass *apinodev1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+func ExtractRuntimeClassStatus(runtimeClass *nodev1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
 	return extractRuntimeClass(runtimeClass, fieldManager, "status")
 }
 
-func extractRuntimeClass(runtimeClass *apinodev1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
+func extractRuntimeClass(runtimeClass *nodev1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
 	b := &RuntimeClassApplyConfiguration{}
 	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1.RuntimeClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -155,7 +155,7 @@ func (b *RuntimeClassApplyConfiguration) WithGeneration(value int64) *RuntimeCla
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *RuntimeClassApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RuntimeClassApplyConfiguration {
+func (b *RuntimeClassApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *RuntimeClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *RuntimeClassApplyConfiguration) WithCreationTimestamp(value metav1.Time
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *RuntimeClassApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RuntimeClassApplyConfiguration {
+func (b *RuntimeClassApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *RuntimeClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -212,7 +212,7 @@ func (b *RuntimeClassApplyConfiguration) WithAnnotations(entries map[string]stri
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *RuntimeClassApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RuntimeClassApplyConfiguration {
+func (b *RuntimeClassApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *RuntimeClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -236,7 +236,7 @@ func (b *RuntimeClassApplyConfiguration) WithFinalizers(values ...string) *Runti
 
 func (b *RuntimeClassApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

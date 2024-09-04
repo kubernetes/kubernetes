@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	apiapiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/apiserverinternal/v1alpha1"
+	apiserverinternalv1alpha1 "k8s.io/client-go/listers/apiserverinternal/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // StorageVersions.
 type StorageVersionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.StorageVersionLister
+	Lister() apiserverinternalv1alpha1.StorageVersionLister
 }
 
 type storageVersionInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod
 				return client.InternalV1alpha1().StorageVersions().Watch(context.TODO(), options)
 			},
 		},
-		&apiserverinternalv1alpha1.StorageVersion{},
+		&apiapiserverinternalv1alpha1.StorageVersion{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *storageVersionInformer) defaultInformer(client kubernetes.Interface, re
 }
 
 func (f *storageVersionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiserverinternalv1alpha1.StorageVersion{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiapiserverinternalv1alpha1.StorageVersion{}, f.defaultInformer)
 }
 
-func (f *storageVersionInformer) Lister() v1alpha1.StorageVersionLister {
-	return v1alpha1.NewStorageVersionLister(f.Informer().GetIndexer())
+func (f *storageVersionInformer) Lister() apiserverinternalv1alpha1.StorageVersionLister {
+	return apiserverinternalv1alpha1.NewStorageVersionLister(f.Informer().GetIndexer())
 }

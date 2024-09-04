@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	apiscrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	versioned "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/listers/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/listers/cr/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // Examples.
 type ExampleInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ExampleLister
+	Lister() crv1.ExampleLister
 }
 
 type exampleInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 				return client.CrV1().Examples(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&crv1.Example{},
+		&apiscrv1.Example{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *exampleInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *exampleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&crv1.Example{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiscrv1.Example{}, f.defaultInformer)
 }
 
-func (f *exampleInformer) Lister() v1.ExampleLister {
-	return v1.NewExampleLister(f.Informer().GetIndexer())
+func (f *exampleInformer) Lister() crv1.ExampleLister {
+	return crv1.NewExampleLister(f.Informer().GetIndexer())
 }

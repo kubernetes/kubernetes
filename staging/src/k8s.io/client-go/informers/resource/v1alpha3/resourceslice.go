@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apiresourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ResourceSlices.
 type ResourceSliceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha3.ResourceSliceLister
+	Lister() resourcev1alpha3.ResourceSliceLister
 }
 
 type resourceSliceInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod 
 				return client.ResourceV1alpha3().ResourceSlices().Watch(context.TODO(), options)
 			},
 		},
-		&resourcev1alpha3.ResourceSlice{},
+		&apiresourcev1alpha3.ResourceSlice{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *resourceSliceInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *resourceSliceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resourcev1alpha3.ResourceSlice{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiresourcev1alpha3.ResourceSlice{}, f.defaultInformer)
 }
 
-func (f *resourceSliceInformer) Lister() v1alpha3.ResourceSliceLister {
-	return v1alpha3.NewResourceSliceLister(f.Informer().GetIndexer())
+func (f *resourceSliceInformer) Lister() resourcev1alpha3.ResourceSliceLister {
+	return resourcev1alpha3.NewResourceSliceLister(f.Informer().GetIndexer())
 }

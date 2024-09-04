@@ -24,7 +24,7 @@ package v1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
@@ -42,310 +42,310 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.ControllerRevision)(nil), (*apps.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ControllerRevision_To_apps_ControllerRevision(a.(*v1.ControllerRevision), b.(*apps.ControllerRevision), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ControllerRevision)(nil), (*apps.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ControllerRevision_To_apps_ControllerRevision(a.(*appsv1.ControllerRevision), b.(*apps.ControllerRevision), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevision)(nil), (*v1.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ControllerRevision_To_v1_ControllerRevision(a.(*apps.ControllerRevision), b.(*v1.ControllerRevision), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevision)(nil), (*appsv1.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ControllerRevision_To_v1_ControllerRevision(a.(*apps.ControllerRevision), b.(*appsv1.ControllerRevision), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ControllerRevisionList)(nil), (*apps.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(a.(*v1.ControllerRevisionList), b.(*apps.ControllerRevisionList), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ControllerRevisionList)(nil), (*apps.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(a.(*appsv1.ControllerRevisionList), b.(*apps.ControllerRevisionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevisionList)(nil), (*v1.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(a.(*apps.ControllerRevisionList), b.(*v1.ControllerRevisionList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevisionList)(nil), (*appsv1.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(a.(*apps.ControllerRevisionList), b.(*appsv1.ControllerRevisionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*v1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*appsv1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetCondition)(nil), (*v1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(a.(*apps.DaemonSetCondition), b.(*v1.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetCondition)(nil), (*appsv1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(a.(*apps.DaemonSetCondition), b.(*appsv1.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetList)(nil), (*apps.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetList_To_apps_DaemonSetList(a.(*v1.DaemonSetList), b.(*apps.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DaemonSetList)(nil), (*apps.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetList_To_apps_DaemonSetList(a.(*appsv1.DaemonSetList), b.(*apps.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*v1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetList_To_v1_DaemonSetList(a.(*apps.DaemonSetList), b.(*v1.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*appsv1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetList_To_v1_DaemonSetList(a.(*apps.DaemonSetList), b.(*appsv1.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*appsv1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetStatus)(nil), (*apps.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(a.(*v1.DaemonSetStatus), b.(*apps.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DaemonSetStatus)(nil), (*apps.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(a.(*appsv1.DaemonSetStatus), b.(*apps.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetStatus)(nil), (*v1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(a.(*apps.DaemonSetStatus), b.(*v1.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetStatus)(nil), (*appsv1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(a.(*apps.DaemonSetStatus), b.(*appsv1.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*appsv1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*appsv1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*appsv1.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(a.(*v1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(a.(*appsv1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentCondition)(nil), (*v1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(a.(*apps.DeploymentCondition), b.(*v1.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentCondition)(nil), (*appsv1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(a.(*apps.DeploymentCondition), b.(*appsv1.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentList)(nil), (*apps.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentList_To_apps_DeploymentList(a.(*v1.DeploymentList), b.(*apps.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DeploymentList)(nil), (*apps.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentList_To_apps_DeploymentList(a.(*appsv1.DeploymentList), b.(*apps.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*v1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentList_To_v1_DeploymentList(a.(*apps.DeploymentList), b.(*v1.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*appsv1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentList_To_v1_DeploymentList(a.(*apps.DeploymentList), b.(*appsv1.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(a.(*appsv1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStatus)(nil), (*apps.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(a.(*v1.DeploymentStatus), b.(*apps.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DeploymentStatus)(nil), (*apps.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(a.(*appsv1.DeploymentStatus), b.(*apps.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStatus)(nil), (*v1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(a.(*apps.DeploymentStatus), b.(*v1.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStatus)(nil), (*appsv1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(a.(*apps.DeploymentStatus), b.(*appsv1.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*appsv1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStrategy)(nil), (*appsv1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*appsv1.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSet)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSet_To_apps_ReplicaSet(a.(*v1.ReplicaSet), b.(*apps.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ReplicaSet)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSet_To_apps_ReplicaSet(a.(*appsv1.ReplicaSet), b.(*apps.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSet)(nil), (*v1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSet_To_v1_ReplicaSet(a.(*apps.ReplicaSet), b.(*v1.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSet)(nil), (*appsv1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSet_To_v1_ReplicaSet(a.(*apps.ReplicaSet), b.(*appsv1.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetCondition)(nil), (*apps.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(a.(*v1.ReplicaSetCondition), b.(*apps.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ReplicaSetCondition)(nil), (*apps.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(a.(*appsv1.ReplicaSetCondition), b.(*apps.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetCondition)(nil), (*v1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(a.(*apps.ReplicaSetCondition), b.(*v1.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetCondition)(nil), (*appsv1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(a.(*apps.ReplicaSetCondition), b.(*appsv1.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetList)(nil), (*apps.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(a.(*v1.ReplicaSetList), b.(*apps.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ReplicaSetList)(nil), (*apps.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(a.(*appsv1.ReplicaSetList), b.(*apps.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetList)(nil), (*v1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(a.(*apps.ReplicaSetList), b.(*v1.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetList)(nil), (*appsv1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(a.(*apps.ReplicaSetList), b.(*appsv1.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*appsv1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetSpec)(nil), (*appsv1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*appsv1.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(a.(*v1.ReplicaSetStatus), b.(*apps.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.ReplicaSetStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(a.(*appsv1.ReplicaSetStatus), b.(*apps.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetStatus)(nil), (*v1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(a.(*apps.ReplicaSetStatus), b.(*v1.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetStatus)(nil), (*appsv1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(a.(*apps.ReplicaSetStatus), b.(*appsv1.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*appsv1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*appsv1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*appsv1.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*appsv1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDeployment)(nil), (*appsv1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*appsv1.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateStatefulSetStrategy)(nil), (*apps.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(a.(*v1.RollingUpdateStatefulSetStrategy), b.(*apps.RollingUpdateStatefulSetStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.RollingUpdateStatefulSetStrategy)(nil), (*apps.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(a.(*appsv1.RollingUpdateStatefulSetStrategy), b.(*apps.RollingUpdateStatefulSetStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateStatefulSetStrategy)(nil), (*v1.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(a.(*apps.RollingUpdateStatefulSetStrategy), b.(*v1.RollingUpdateStatefulSetStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateStatefulSetStrategy)(nil), (*appsv1.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(a.(*apps.RollingUpdateStatefulSetStrategy), b.(*appsv1.RollingUpdateStatefulSetStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSet)(nil), (*apps.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSet_To_apps_StatefulSet(a.(*v1.StatefulSet), b.(*apps.StatefulSet), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSet)(nil), (*apps.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSet_To_apps_StatefulSet(a.(*appsv1.StatefulSet), b.(*apps.StatefulSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSet)(nil), (*v1.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSet_To_v1_StatefulSet(a.(*apps.StatefulSet), b.(*v1.StatefulSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSet)(nil), (*appsv1.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSet_To_v1_StatefulSet(a.(*apps.StatefulSet), b.(*appsv1.StatefulSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetCondition)(nil), (*apps.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(a.(*v1.StatefulSetCondition), b.(*apps.StatefulSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetCondition)(nil), (*apps.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(a.(*appsv1.StatefulSetCondition), b.(*apps.StatefulSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetCondition)(nil), (*v1.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(a.(*apps.StatefulSetCondition), b.(*v1.StatefulSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetCondition)(nil), (*appsv1.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(a.(*apps.StatefulSetCondition), b.(*appsv1.StatefulSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetList)(nil), (*apps.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetList_To_apps_StatefulSetList(a.(*v1.StatefulSetList), b.(*apps.StatefulSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetList)(nil), (*apps.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetList_To_apps_StatefulSetList(a.(*appsv1.StatefulSetList), b.(*apps.StatefulSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetList)(nil), (*v1.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetList_To_v1_StatefulSetList(a.(*apps.StatefulSetList), b.(*v1.StatefulSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetList)(nil), (*appsv1.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetList_To_v1_StatefulSetList(a.(*apps.StatefulSetList), b.(*appsv1.StatefulSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetOrdinals)(nil), (*apps.StatefulSetOrdinals)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(a.(*v1.StatefulSetOrdinals), b.(*apps.StatefulSetOrdinals), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetOrdinals)(nil), (*apps.StatefulSetOrdinals)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(a.(*appsv1.StatefulSetOrdinals), b.(*apps.StatefulSetOrdinals), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetOrdinals)(nil), (*v1.StatefulSetOrdinals)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(a.(*apps.StatefulSetOrdinals), b.(*v1.StatefulSetOrdinals), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetOrdinals)(nil), (*appsv1.StatefulSetOrdinals)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(a.(*apps.StatefulSetOrdinals), b.(*appsv1.StatefulSetOrdinals), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), (*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(a.(*v1.StatefulSetPersistentVolumeClaimRetentionPolicy), b.(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), (*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(a.(*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy), b.(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), (*v1.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(a.(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy), b.(*v1.StatefulSetPersistentVolumeClaimRetentionPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), (*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(a.(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy), b.(*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*v1.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*appsv1.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetStatus)(nil), (*v1.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(a.(*apps.StatefulSetStatus), b.(*v1.StatefulSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetStatus)(nil), (*appsv1.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(a.(*apps.StatefulSetStatus), b.(*appsv1.StatefulSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*v1.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*appsv1.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*appsv1.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetUpdateStrategy)(nil), (*v1.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(a.(*apps.StatefulSetUpdateStrategy), b.(*v1.StatefulSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetUpdateStrategy)(nil), (*appsv1.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(a.(*apps.StatefulSetUpdateStrategy), b.(*appsv1.StatefulSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	if err := s.AddConversionFunc((*apps.DaemonSetSpec)(nil), (*appsv1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*appsv1.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSet_To_v1_DaemonSet(a.(*apps.DaemonSet), b.(*v1.DaemonSet), scope)
+	if err := s.AddConversionFunc((*apps.DaemonSet)(nil), (*appsv1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSet_To_v1_DaemonSet(a.(*apps.DaemonSet), b.(*appsv1.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	if err := s.AddConversionFunc((*apps.DeploymentSpec)(nil), (*appsv1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*appsv1.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_Deployment_To_v1_Deployment(a.(*apps.Deployment), b.(*v1.Deployment), scope)
+	if err := s.AddConversionFunc((*apps.Deployment)(nil), (*appsv1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_Deployment_To_v1_Deployment(a.(*apps.Deployment), b.(*appsv1.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*v1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*v1.StatefulSetSpec), scope)
+	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*appsv1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*appsv1.StatefulSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSet_To_apps_DaemonSet(a.(*v1.DaemonSet), b.(*apps.DaemonSet), scope)
+	if err := s.AddConversionFunc((*appsv1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSet_To_apps_DaemonSet(a.(*appsv1.DaemonSet), b.(*apps.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Deployment_To_apps_Deployment(a.(*v1.Deployment), b.(*apps.Deployment), scope)
+	if err := s.AddConversionFunc((*appsv1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Deployment_To_apps_Deployment(a.(*appsv1.Deployment), b.(*apps.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*v1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
+	if err := s.AddConversionFunc((*appsv1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*appsv1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_ControllerRevision_To_apps_ControllerRevision(in *v1.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {
+func autoConvert_v1_ControllerRevision_To_apps_ControllerRevision(in *appsv1.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Data = in.Data
 	out.Revision = in.Revision
@@ -353,11 +353,11 @@ func autoConvert_v1_ControllerRevision_To_apps_ControllerRevision(in *v1.Control
 }
 
 // Convert_v1_ControllerRevision_To_apps_ControllerRevision is an autogenerated conversion function.
-func Convert_v1_ControllerRevision_To_apps_ControllerRevision(in *v1.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {
+func Convert_v1_ControllerRevision_To_apps_ControllerRevision(in *appsv1.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {
 	return autoConvert_v1_ControllerRevision_To_apps_ControllerRevision(in, out, s)
 }
 
-func autoConvert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.ControllerRevision, out *v1.ControllerRevision, s conversion.Scope) error {
+func autoConvert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.ControllerRevision, out *appsv1.ControllerRevision, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Data = in.Data
 	out.Revision = in.Revision
@@ -365,33 +365,33 @@ func autoConvert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.Contr
 }
 
 // Convert_apps_ControllerRevision_To_v1_ControllerRevision is an autogenerated conversion function.
-func Convert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.ControllerRevision, out *v1.ControllerRevision, s conversion.Scope) error {
+func Convert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.ControllerRevision, out *appsv1.ControllerRevision, s conversion.Scope) error {
 	return autoConvert_apps_ControllerRevision_To_v1_ControllerRevision(in, out, s)
 }
 
-func autoConvert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in *v1.ControllerRevisionList, out *apps.ControllerRevisionList, s conversion.Scope) error {
+func autoConvert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in *appsv1.ControllerRevisionList, out *apps.ControllerRevisionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]apps.ControllerRevision)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList is an autogenerated conversion function.
-func Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in *v1.ControllerRevisionList, out *apps.ControllerRevisionList, s conversion.Scope) error {
+func Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in *appsv1.ControllerRevisionList, out *apps.ControllerRevisionList, s conversion.Scope) error {
 	return autoConvert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in, out, s)
 }
 
-func autoConvert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.ControllerRevisionList, out *v1.ControllerRevisionList, s conversion.Scope) error {
+func autoConvert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.ControllerRevisionList, out *appsv1.ControllerRevisionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ControllerRevision)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]appsv1.ControllerRevision)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList is an autogenerated conversion function.
-func Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.ControllerRevisionList, out *v1.ControllerRevisionList, s conversion.Scope) error {
+func Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.ControllerRevisionList, out *appsv1.ControllerRevisionList, s conversion.Scope) error {
 	return autoConvert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in, out, s)
 }
 
-func autoConvert_v1_DaemonSet_To_apps_DaemonSet(in *v1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
+func autoConvert_v1_DaemonSet_To_apps_DaemonSet(in *appsv1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -402,7 +402,7 @@ func autoConvert_v1_DaemonSet_To_apps_DaemonSet(in *v1.DaemonSet, out *apps.Daem
 	return nil
 }
 
-func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *v1.DaemonSet, s conversion.Scope) error {
+func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *appsv1.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -413,7 +413,7 @@ func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *v1.Daem
 	return nil
 }
 
-func autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *appsv1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
 	out.Type = apps.DaemonSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -423,12 +423,12 @@ func autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1.DaemonS
 }
 
 // Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition is an autogenerated conversion function.
-func Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+func Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *appsv1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
 	return autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
-	out.Type = v1.DaemonSetConditionType(in.Type)
+func autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *appsv1.DaemonSetCondition, s conversion.Scope) error {
+	out.Type = appsv1.DaemonSetConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -437,11 +437,11 @@ func autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.Daemo
 }
 
 // Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition is an autogenerated conversion function.
-func Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
+func Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *appsv1.DaemonSetCondition, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in *appsv1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -458,15 +458,15 @@ func autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, ou
 }
 
 // Convert_v1_DaemonSetList_To_apps_DaemonSetList is an autogenerated conversion function.
-func Convert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
+func Convert_v1_DaemonSetList_To_apps_DaemonSetList(in *appsv1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
 	return autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *appsv1.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.DaemonSet, len(*in))
+		*out = make([]appsv1.DaemonSet, len(*in))
 		for i := range *in {
 			if err := Convert_apps_DaemonSet_To_v1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -479,11 +479,11 @@ func autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, 
 }
 
 // Convert_apps_DaemonSetList_To_v1_DaemonSetList is an autogenerated conversion function.
-func Convert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
+func Convert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *appsv1.DaemonSetList, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -497,11 +497,11 @@ func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, ou
 }
 
 // Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec is an autogenerated conversion function.
-func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
+func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	return autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *v1.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -515,7 +515,7 @@ func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, 
 	return nil
 }
 
-func autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *appsv1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -530,11 +530,11 @@ func autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1.DaemonSetStat
 }
 
 // Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus is an autogenerated conversion function.
-func Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
+func Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *appsv1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *appsv1.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -544,16 +544,16 @@ func autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetSt
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]v1.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]appsv1.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus is an autogenerated conversion function.
-func Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
+func Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *appsv1.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *appsv1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
@@ -568,15 +568,15 @@ func autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *
 }
 
 // Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy is an autogenerated conversion function.
-func Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *appsv1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = v1.DaemonSetUpdateStrategyType(in.Type)
+func autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *appsv1.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = appsv1.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(v1.RollingUpdateDaemonSet)
+		*out = new(appsv1.RollingUpdateDaemonSet)
 		if err := Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(*in, *out, s); err != nil {
 			return err
 		}
@@ -587,11 +587,11 @@ func autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *
 }
 
 // Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy is an autogenerated conversion function.
-func Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *appsv1.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in, out, s)
 }
 
-func autoConvert_v1_Deployment_To_apps_Deployment(in *v1.Deployment, out *apps.Deployment, s conversion.Scope) error {
+func autoConvert_v1_Deployment_To_apps_Deployment(in *appsv1.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -602,7 +602,7 @@ func autoConvert_v1_Deployment_To_apps_Deployment(in *v1.Deployment, out *apps.D
 	return nil
 }
 
-func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *v1.Deployment, s conversion.Scope) error {
+func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *appsv1.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -613,7 +613,7 @@ func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *v1.D
 	return nil
 }
 
-func autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *v1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+func autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
 	out.Type = apps.DeploymentConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
@@ -624,12 +624,12 @@ func autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *v1.Deplo
 }
 
 // Convert_v1_DeploymentCondition_To_apps_DeploymentCondition is an autogenerated conversion function.
-func Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *v1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+func Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
 	return autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
-	out.Type = v1.DeploymentConditionType(in.Type)
+func autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *appsv1.DeploymentCondition, s conversion.Scope) error {
+	out.Type = appsv1.DeploymentConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -639,11 +639,11 @@ func autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.Dep
 }
 
 // Convert_apps_DeploymentCondition_To_v1_DeploymentCondition is an autogenerated conversion function.
-func Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
+func Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *appsv1.DeploymentCondition, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+func autoConvert_v1_DeploymentList_To_apps_DeploymentList(in *appsv1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -660,15 +660,15 @@ func autoConvert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList,
 }
 
 // Convert_v1_DeploymentList_To_apps_DeploymentList is an autogenerated conversion function.
-func Convert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+func Convert_v1_DeploymentList_To_apps_DeploymentList(in *appsv1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	return autoConvert_v1_DeploymentList_To_apps_DeploymentList(in, out, s)
 }
 
-func autoConvert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
+func autoConvert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *appsv1.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.Deployment, len(*in))
+		*out = make([]appsv1.Deployment, len(*in))
 		for i := range *in {
 			if err := Convert_apps_Deployment_To_v1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -681,11 +681,11 @@ func autoConvert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentLis
 }
 
 // Convert_apps_DeploymentList_To_v1_DeploymentList is an autogenerated conversion function.
-func Convert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
+func Convert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *appsv1.DeploymentList, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentList_To_v1_DeploymentList(in, out, s)
 }
 
-func autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *v1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -704,11 +704,11 @@ func autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *v1.DeploymentSpec,
 }
 
 // Convert_v1_DeploymentSpec_To_apps_DeploymentSpec is an autogenerated conversion function.
-func Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *v1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+func Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	return autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
 }
 
-func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpec, out *v1.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -727,7 +727,7 @@ func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpe
 	return nil
 }
 
-func autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *v1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
@@ -740,28 +740,28 @@ func autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *v1.DeploymentS
 }
 
 // Convert_v1_DeploymentStatus_To_apps_DeploymentStatus is an autogenerated conversion function.
-func Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *v1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+func Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	return autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *appsv1.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
-	out.Conditions = *(*[]v1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]appsv1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
 // Convert_apps_DeploymentStatus_To_v1_DeploymentStatus is an autogenerated conversion function.
-func Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
+func Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *appsv1.DeploymentStatus, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+func autoConvert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *appsv1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
@@ -776,15 +776,15 @@ func autoConvert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1.Deploym
 }
 
 // Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy is an autogenerated conversion function.
-func Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+func Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *appsv1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
 	return autoConvert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in, out, s)
 }
 
-func autoConvert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = v1.DeploymentStrategyType(in.Type)
+func autoConvert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.DeploymentStrategy, out *appsv1.DeploymentStrategy, s conversion.Scope) error {
+	out.Type = appsv1.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(v1.RollingUpdateDeployment)
+		*out = new(appsv1.RollingUpdateDeployment)
 		if err := Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
@@ -795,11 +795,11 @@ func autoConvert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.Deplo
 }
 
 // Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy is an autogenerated conversion function.
-func Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1.DeploymentStrategy, s conversion.Scope) error {
+func Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.DeploymentStrategy, out *appsv1.DeploymentStrategy, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in *appsv1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -811,11 +811,11 @@ func autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.R
 }
 
 // Convert_v1_ReplicaSet_To_apps_ReplicaSet is an autogenerated conversion function.
-func Convert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+func Convert_v1_ReplicaSet_To_apps_ReplicaSet(in *appsv1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	return autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *appsv1.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -827,11 +827,11 @@ func autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.R
 }
 
 // Convert_apps_ReplicaSet_To_v1_ReplicaSet is an autogenerated conversion function.
-func Convert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
+func Convert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *appsv1.ReplicaSet, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *appsv1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = apps.ReplicaSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -841,12 +841,12 @@ func autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1.Repli
 }
 
 // Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+func Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *appsv1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
 	return autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = v1.ReplicaSetConditionType(in.Type)
+func autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *appsv1.ReplicaSetCondition, s conversion.Scope) error {
+	out.Type = appsv1.ReplicaSetConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -855,11 +855,11 @@ func autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.Rep
 }
 
 // Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
+func Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *appsv1.ReplicaSetCondition, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *appsv1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -876,15 +876,15 @@ func autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList,
 }
 
 // Convert_v1_ReplicaSetList_To_apps_ReplicaSetList is an autogenerated conversion function.
-func Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+func Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *appsv1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	return autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *appsv1.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.ReplicaSet, len(*in))
+		*out = make([]appsv1.ReplicaSet, len(*in))
 		for i := range *in {
 			if err := Convert_apps_ReplicaSet_To_v1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -897,11 +897,11 @@ func autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetLis
 }
 
 // Convert_apps_ReplicaSetList_To_v1_ReplicaSetList is an autogenerated conversion function.
-func Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
+func Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *appsv1.ReplicaSetList, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -914,11 +914,11 @@ func autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1.ReplicaSetSpec,
 }
 
 // Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec is an autogenerated conversion function.
-func Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	return autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *appsv1.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -931,11 +931,11 @@ func autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpe
 }
 
 // Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec is an autogenerated conversion function.
-func Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *appsv1.ReplicaSetSpec, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *appsv1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -946,26 +946,26 @@ func autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1.ReplicaSetS
 }
 
 // Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *appsv1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	return autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *appsv1.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]v1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]appsv1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *appsv1.ReplicaSetStatus, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -976,11 +976,11 @@ func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1
 }
 
 // Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet is an autogenerated conversion function.
-func Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	return autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in, out, s)
 }
 
-func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *appsv1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -991,11 +991,11 @@ func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *ap
 }
 
 // Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet is an autogenerated conversion function.
-func Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *appsv1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	return autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in, out, s)
 }
 
-func autoConvert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *appsv1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1006,11 +1006,11 @@ func autoConvert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *
 }
 
 // Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment is an autogenerated conversion function.
-func Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *appsv1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	return autoConvert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in, out, s)
 }
 
-func autoConvert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *appsv1.RollingUpdateDeployment, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1021,11 +1021,11 @@ func autoConvert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *
 }
 
 // Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment is an autogenerated conversion function.
-func Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *appsv1.RollingUpdateDeployment, s conversion.Scope) error {
 	return autoConvert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in, out, s)
 }
 
-func autoConvert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *v1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
+func autoConvert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *appsv1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
@@ -1034,11 +1034,11 @@ func autoConvert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatef
 }
 
 // Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy is an autogenerated conversion function.
-func Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *v1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
+func Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *appsv1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
 	return autoConvert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in, out, s)
 }
 
-func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *v1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *appsv1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
@@ -1047,11 +1047,11 @@ func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatef
 }
 
 // Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy is an autogenerated conversion function.
-func Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *v1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
+func Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *appsv1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
 	return autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in, out, s)
 }
 
-func autoConvert_v1_StatefulSet_To_apps_StatefulSet(in *v1.StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
+func autoConvert_v1_StatefulSet_To_apps_StatefulSet(in *appsv1.StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1063,11 +1063,11 @@ func autoConvert_v1_StatefulSet_To_apps_StatefulSet(in *v1.StatefulSet, out *app
 }
 
 // Convert_v1_StatefulSet_To_apps_StatefulSet is an autogenerated conversion function.
-func Convert_v1_StatefulSet_To_apps_StatefulSet(in *v1.StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
+func Convert_v1_StatefulSet_To_apps_StatefulSet(in *appsv1.StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSet_To_apps_StatefulSet(in, out, s)
 }
 
-func autoConvert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *v1.StatefulSet, s conversion.Scope) error {
+func autoConvert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *appsv1.StatefulSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1079,11 +1079,11 @@ func autoConvert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *v
 }
 
 // Convert_apps_StatefulSet_To_v1_StatefulSet is an autogenerated conversion function.
-func Convert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *v1.StatefulSet, s conversion.Scope) error {
+func Convert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *appsv1.StatefulSet, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSet_To_v1_StatefulSet(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *v1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
 	out.Type = apps.StatefulSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -1093,12 +1093,12 @@ func autoConvert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *v1.Sta
 }
 
 // Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition is an autogenerated conversion function.
-func Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *v1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
+func Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *v1.StatefulSetCondition, s conversion.Scope) error {
-	out.Type = v1.StatefulSetConditionType(in.Type)
+func autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *appsv1.StatefulSetCondition, s conversion.Scope) error {
+	out.Type = appsv1.StatefulSetConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -1107,11 +1107,11 @@ func autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.S
 }
 
 // Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition is an autogenerated conversion function.
-func Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *v1.StatefulSetCondition, s conversion.Scope) error {
+func Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *appsv1.StatefulSetCondition, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetList_To_apps_StatefulSetList(in *v1.StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetList_To_apps_StatefulSetList(in *appsv1.StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1128,15 +1128,15 @@ func autoConvert_v1_StatefulSetList_To_apps_StatefulSetList(in *v1.StatefulSetLi
 }
 
 // Convert_v1_StatefulSetList_To_apps_StatefulSetList is an autogenerated conversion function.
-func Convert_v1_StatefulSetList_To_apps_StatefulSetList(in *v1.StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
+func Convert_v1_StatefulSetList_To_apps_StatefulSetList(in *appsv1.StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetList_To_apps_StatefulSetList(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList, out *v1.StatefulSetList, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList, out *appsv1.StatefulSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.StatefulSet, len(*in))
+		*out = make([]appsv1.StatefulSet, len(*in))
 		for i := range *in {
 			if err := Convert_apps_StatefulSet_To_v1_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1149,53 +1149,53 @@ func autoConvert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSet
 }
 
 // Convert_apps_StatefulSetList_To_v1_StatefulSetList is an autogenerated conversion function.
-func Convert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList, out *v1.StatefulSetList, s conversion.Scope) error {
+func Convert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList, out *appsv1.StatefulSetList, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetList_To_v1_StatefulSetList(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *v1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
 	out.Start = in.Start
 	return nil
 }
 
 // Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals is an autogenerated conversion function.
-func Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *v1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
+func Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *v1.StatefulSetOrdinals, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *appsv1.StatefulSetOrdinals, s conversion.Scope) error {
 	out.Start = in.Start
 	return nil
 }
 
 // Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals is an autogenerated conversion function.
-func Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *v1.StatefulSetOrdinals, s conversion.Scope) error {
+func Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *appsv1.StatefulSetOrdinals, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *v1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
 	out.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
 	out.WhenScaled = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
 	return nil
 }
 
 // Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy is an autogenerated conversion function.
-func Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *v1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
+func Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *v1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
-	out.WhenDeleted = v1.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
-	out.WhenScaled = v1.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
+func autoConvert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
+	out.WhenDeleted = appsv1.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
+	out.WhenScaled = appsv1.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
 	return nil
 }
 
 // Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy is an autogenerated conversion function.
-func Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *v1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
+func Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1216,7 +1216,7 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSp
 	return nil
 }
 
-func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec, out *v1.StatefulSetSpec, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1.StatefulSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1226,18 +1226,18 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 	}
 	out.VolumeClaimTemplates = *(*[]corev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
-	out.PodManagementPolicy = v1.PodManagementPolicyType(in.PodManagementPolicy)
+	out.PodManagementPolicy = appsv1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	out.MinReadySeconds = in.MinReadySeconds
-	out.PersistentVolumeClaimRetentionPolicy = (*v1.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
-	out.Ordinals = (*v1.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	out.PersistentVolumeClaimRetentionPolicy = (*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
+	out.Ordinals = (*appsv1.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
 	return nil
 }
 
-func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
 		return err
 	}
@@ -1254,11 +1254,11 @@ func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulS
 }
 
 // Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus is an autogenerated conversion function.
-func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1.StatefulSetStatus, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1.StatefulSetStatus, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
 		return err
 	}
@@ -1269,17 +1269,17 @@ func autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.Statefu
 	out.CurrentRevision = in.CurrentRevision
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]v1.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]appsv1.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
 	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
 // Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus is an autogenerated conversion function.
-func Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1.StatefulSetStatus, s conversion.Scope) error {
+func Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1.StatefulSetStatus, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in, out, s)
 }
 
-func autoConvert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *v1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
+func autoConvert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
@@ -1294,15 +1294,15 @@ func autoConvert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(
 }
 
 // Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy is an autogenerated conversion function.
-func Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *v1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
+func Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in, out, s)
 }
 
-func autoConvert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *v1.StatefulSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = v1.StatefulSetUpdateStrategyType(in.Type)
+func autoConvert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *appsv1.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = appsv1.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(v1.RollingUpdateStatefulSetStrategy)
+		*out = new(appsv1.RollingUpdateStatefulSetStrategy)
 		if err := Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(*in, *out, s); err != nil {
 			return err
 		}
@@ -1313,6 +1313,6 @@ func autoConvert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(
 }
 
 // Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy is an autogenerated conversion function.
-func Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *v1.StatefulSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *appsv1.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in, out, s)
 }

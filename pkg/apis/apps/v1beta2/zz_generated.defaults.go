@@ -22,7 +22,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -32,18 +32,18 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta2.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*v1beta2.DaemonSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*v1beta2.DaemonSetList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1beta2.Deployment)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1beta2.DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*v1beta2.ReplicaSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*v1beta2.ReplicaSetList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*v1beta2.StatefulSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*v1beta2.StatefulSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*appsv1beta2.DaemonSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*appsv1beta2.DaemonSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*appsv1beta2.Deployment)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*appsv1beta2.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*appsv1beta2.ReplicaSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*appsv1beta2.ReplicaSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*appsv1beta2.StatefulSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta2.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*appsv1beta2.StatefulSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
+func SetObjectDefaults_DaemonSet(in *appsv1beta2.DaemonSet) {
 	SetDefaults_DaemonSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -341,14 +341,14 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_DaemonSetList(in *v1beta2.DaemonSetList) {
+func SetObjectDefaults_DaemonSetList(in *appsv1beta2.DaemonSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_DaemonSet(a)
 	}
 }
 
-func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
+func SetObjectDefaults_Deployment(in *appsv1beta2.Deployment) {
 	SetDefaults_Deployment(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -646,14 +646,14 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_DeploymentList(in *v1beta2.DeploymentList) {
+func SetObjectDefaults_DeploymentList(in *appsv1beta2.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
 	}
 }
 
-func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
+func SetObjectDefaults_ReplicaSet(in *appsv1beta2.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -951,14 +951,14 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_ReplicaSetList(in *v1beta2.ReplicaSetList) {
+func SetObjectDefaults_ReplicaSetList(in *appsv1beta2.ReplicaSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicaSet(a)
 	}
 }
 
-func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
+func SetObjectDefaults_StatefulSet(in *appsv1beta2.StatefulSet) {
 	SetDefaults_StatefulSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -1265,7 +1265,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 	}
 }
 
-func SetObjectDefaults_StatefulSetList(in *v1beta2.StatefulSetList) {
+func SetObjectDefaults_StatefulSetList(in *appsv1beta2.StatefulSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StatefulSet(a)

@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // MatchResourcesApplyConfiguration represents a declarative configuration of the MatchResources type for use
 // with apply.
 type MatchResourcesApplyConfiguration struct {
-	NamespaceSelector    *v1.LabelSelectorApplyConfiguration         `json:"namespaceSelector,omitempty"`
-	ObjectSelector       *v1.LabelSelectorApplyConfiguration         `json:"objectSelector,omitempty"`
+	NamespaceSelector    *metav1.LabelSelectorApplyConfiguration     `json:"namespaceSelector,omitempty"`
+	ObjectSelector       *metav1.LabelSelectorApplyConfiguration     `json:"objectSelector,omitempty"`
 	ResourceRules        []NamedRuleWithOperationsApplyConfiguration `json:"resourceRules,omitempty"`
 	ExcludeResourceRules []NamedRuleWithOperationsApplyConfiguration `json:"excludeResourceRules,omitempty"`
-	MatchPolicy          *apiadmissionregistrationv1.MatchPolicyType `json:"matchPolicy,omitempty"`
+	MatchPolicy          *admissionregistrationv1.MatchPolicyType    `json:"matchPolicy,omitempty"`
 }
 
 // MatchResourcesApplyConfiguration constructs a declarative configuration of the MatchResources type for use with
@@ -42,7 +42,7 @@ func MatchResources() *MatchResourcesApplyConfiguration {
 // WithNamespaceSelector sets the NamespaceSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NamespaceSelector field is set to the value of the last call.
-func (b *MatchResourcesApplyConfiguration) WithNamespaceSelector(value *v1.LabelSelectorApplyConfiguration) *MatchResourcesApplyConfiguration {
+func (b *MatchResourcesApplyConfiguration) WithNamespaceSelector(value *metav1.LabelSelectorApplyConfiguration) *MatchResourcesApplyConfiguration {
 	b.NamespaceSelector = value
 	return b
 }
@@ -50,7 +50,7 @@ func (b *MatchResourcesApplyConfiguration) WithNamespaceSelector(value *v1.Label
 // WithObjectSelector sets the ObjectSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ObjectSelector field is set to the value of the last call.
-func (b *MatchResourcesApplyConfiguration) WithObjectSelector(value *v1.LabelSelectorApplyConfiguration) *MatchResourcesApplyConfiguration {
+func (b *MatchResourcesApplyConfiguration) WithObjectSelector(value *metav1.LabelSelectorApplyConfiguration) *MatchResourcesApplyConfiguration {
 	b.ObjectSelector = value
 	return b
 }
@@ -84,7 +84,7 @@ func (b *MatchResourcesApplyConfiguration) WithExcludeResourceRules(values ...*N
 // WithMatchPolicy sets the MatchPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchPolicy field is set to the value of the last call.
-func (b *MatchResourcesApplyConfiguration) WithMatchPolicy(value apiadmissionregistrationv1.MatchPolicyType) *MatchResourcesApplyConfiguration {
+func (b *MatchResourcesApplyConfiguration) WithMatchPolicy(value admissionregistrationv1.MatchPolicyType) *MatchResourcesApplyConfiguration {
 	b.MatchPolicy = &value
 	return b
 }

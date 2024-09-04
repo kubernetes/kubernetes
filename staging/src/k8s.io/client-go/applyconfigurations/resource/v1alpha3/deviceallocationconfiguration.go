@@ -19,14 +19,14 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 )
 
 // DeviceAllocationConfigurationApplyConfiguration represents a declarative configuration of the DeviceAllocationConfiguration type for use
 // with apply.
 type DeviceAllocationConfigurationApplyConfiguration struct {
-	Source                                *v1alpha3.AllocationConfigSource `json:"source,omitempty"`
-	Requests                              []string                         `json:"requests,omitempty"`
+	Source                                *resourcev1alpha3.AllocationConfigSource `json:"source,omitempty"`
+	Requests                              []string                                 `json:"requests,omitempty"`
 	DeviceConfigurationApplyConfiguration `json:",inline"`
 }
 
@@ -39,7 +39,7 @@ func DeviceAllocationConfiguration() *DeviceAllocationConfigurationApplyConfigur
 // WithSource sets the Source field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Source field is set to the value of the last call.
-func (b *DeviceAllocationConfigurationApplyConfiguration) WithSource(value v1alpha3.AllocationConfigSource) *DeviceAllocationConfigurationApplyConfiguration {
+func (b *DeviceAllocationConfigurationApplyConfiguration) WithSource(value resourcev1alpha3.AllocationConfigSource) *DeviceAllocationConfigurationApplyConfiguration {
 	b.Source = &value
 	return b
 }

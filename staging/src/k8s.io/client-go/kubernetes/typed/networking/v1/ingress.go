@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
+	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) (*v1.Ingress, error)
-	Update(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) (*v1.Ingress, error)
+	Create(ctx context.Context, ingress *networkingv1.Ingress, opts metav1.CreateOptions) (*networkingv1.Ingress, error)
+	Update(ctx context.Context, ingress *networkingv1.Ingress, opts metav1.UpdateOptions) (*networkingv1.Ingress, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) (*v1.Ingress, error)
+	UpdateStatus(ctx context.Context, ingress *networkingv1.Ingress, opts metav1.UpdateOptions) (*networkingv1.Ingress, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Ingress, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.IngressList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkingv1.Ingress, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*networkingv1.IngressList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Ingress, err error)
-	Apply(ctx context.Context, ingress *networkingv1.IngressApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Ingress, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *networkingv1.Ingress, err error)
+	Apply(ctx context.Context, ingress *applyconfigurationsnetworkingv1.IngressApplyConfiguration, opts metav1.ApplyOptions) (result *networkingv1.Ingress, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, ingress *networkingv1.IngressApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Ingress, err error)
+	ApplyStatus(ctx context.Context, ingress *applyconfigurationsnetworkingv1.IngressApplyConfiguration, opts metav1.ApplyOptions) (result *networkingv1.Ingress, err error)
 	IngressExpansion
 }
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	*gentype.ClientWithListAndApply[*v1.Ingress, *v1.IngressList, *networkingv1.IngressApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkingv1.Ingress, *networkingv1.IngressList, *applyconfigurationsnetworkingv1.IngressApplyConfiguration]
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *NetworkingV1Client, namespace string) *ingresses {
 	return &ingresses{
-		gentype.NewClientWithListAndApply[*v1.Ingress, *v1.IngressList, *networkingv1.IngressApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkingv1.Ingress, *networkingv1.IngressList, *applyconfigurationsnetworkingv1.IngressApplyConfiguration](
 			"ingresses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Ingress { return &v1.Ingress{} },
-			func() *v1.IngressList { return &v1.IngressList{} }),
+			func() *networkingv1.Ingress { return &networkingv1.Ingress{} },
+			func() *networkingv1.IngressList { return &networkingv1.IngressList{} }),
 	}
 }

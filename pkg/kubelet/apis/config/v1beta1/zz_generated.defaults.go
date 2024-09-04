@@ -23,7 +23,7 @@ package v1beta1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1beta1 "k8s.io/kubelet/config/v1beta1"
+	configv1beta1 "k8s.io/kubelet/config/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -31,11 +31,13 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*v1beta1.KubeletConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&configv1beta1.KubeletConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeletConfiguration(obj.(*configv1beta1.KubeletConfiguration))
+	})
 	return nil
 }
 
-func SetObjectDefaults_KubeletConfiguration(in *v1beta1.KubeletConfiguration) {
+func SetObjectDefaults_KubeletConfiguration(in *configv1beta1.KubeletConfiguration) {
 	SetDefaults_KubeletConfiguration(in)
 	for i := range in.ReservedMemory {
 		a := &in.ReservedMemory[i]

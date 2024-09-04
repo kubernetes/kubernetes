@@ -19,14 +19,14 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 // DaemonSetUpdateStrategyApplyConfiguration represents a declarative configuration of the DaemonSetUpdateStrategy type for use
 // with apply.
 type DaemonSetUpdateStrategyApplyConfiguration struct {
-	Type          *v1beta1.DaemonSetUpdateStrategyType      `json:"type,omitempty"`
-	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration `json:"rollingUpdate,omitempty"`
+	Type          *extensionsv1beta1.DaemonSetUpdateStrategyType `json:"type,omitempty"`
+	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration      `json:"rollingUpdate,omitempty"`
 }
 
 // DaemonSetUpdateStrategyApplyConfiguration constructs a declarative configuration of the DaemonSetUpdateStrategy type for use with
@@ -38,7 +38,7 @@ func DaemonSetUpdateStrategy() *DaemonSetUpdateStrategyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) WithType(value v1beta1.DaemonSetUpdateStrategyType) *DaemonSetUpdateStrategyApplyConfiguration {
+func (b *DaemonSetUpdateStrategyApplyConfiguration) WithType(value extensionsv1beta1.DaemonSetUpdateStrategyType) *DaemonSetUpdateStrategyApplyConfiguration {
 	b.Type = &value
 	return b
 }

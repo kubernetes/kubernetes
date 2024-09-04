@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 // RuleWithOperationsApplyConfiguration represents a declarative configuration of the RuleWithOperations type for use
 // with apply.
 type RuleWithOperationsApplyConfiguration struct {
-	Operations             []v1.OperationType `json:"operations,omitempty"`
+	Operations             []admissionregistrationv1.OperationType `json:"operations,omitempty"`
 	RuleApplyConfiguration `json:",inline"`
 }
 
@@ -38,7 +38,7 @@ func RuleWithOperations() *RuleWithOperationsApplyConfiguration {
 // WithOperations adds the given value to the Operations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Operations field.
-func (b *RuleWithOperationsApplyConfiguration) WithOperations(values ...v1.OperationType) *RuleWithOperationsApplyConfiguration {
+func (b *RuleWithOperationsApplyConfiguration) WithOperations(values ...admissionregistrationv1.OperationType) *RuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.Operations = append(b.Operations, values[i])
 	}
@@ -78,7 +78,7 @@ func (b *RuleWithOperationsApplyConfiguration) WithResources(values ...string) *
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *RuleWithOperationsApplyConfiguration) WithScope(value v1.ScopeType) *RuleWithOperationsApplyConfiguration {
+func (b *RuleWithOperationsApplyConfiguration) WithScope(value admissionregistrationv1.ScopeType) *RuleWithOperationsApplyConfiguration {
 	b.RuleApplyConfiguration.Scope = &value
 	return b
 }

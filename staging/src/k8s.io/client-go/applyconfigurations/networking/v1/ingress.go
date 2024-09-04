@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // IngressApplyConfiguration represents a declarative configuration of the Ingress type for use
 // with apply.
 type IngressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *IngressSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *IngressStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *IngressSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *IngressStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Ingress constructs a declarative configuration of the Ingress type for use with
@@ -58,18 +58,18 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractIngress(ingress *apinetworkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+func ExtractIngress(ingress *networkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return extractIngress(ingress, fieldManager, "")
 }
 
 // ExtractIngressStatus is the same as ExtractIngress except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractIngressStatus(ingress *apinetworkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+func ExtractIngressStatus(ingress *networkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return extractIngress(ingress, fieldManager, "status")
 }
 
-func extractIngress(ingress *apinetworkingv1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
+func extractIngress(ingress *networkingv1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
 	b := &IngressApplyConfiguration{}
 	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.networking.v1.Ingress"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *IngressApplyConfiguration) WithGeneration(value int64) *IngressApplyCon
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *IngressApplyConfiguration) WithCreationTimestamp(value metav1.Time) *IngressApplyConfiguration {
+func (b *IngressApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *IngressApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *IngressApplyConfiguration) WithCreationTimestamp(value metav1.Time) *In
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *IngressApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *IngressApplyConfiguration {
+func (b *IngressApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *IngressApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *IngressApplyConfiguration) WithAnnotations(entries map[string]string) *
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *IngressApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *IngressApplyConfiguration {
+func (b *IngressApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *IngressApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *IngressApplyConfiguration) WithFinalizers(values ...string) *IngressApp
 
 func (b *IngressApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

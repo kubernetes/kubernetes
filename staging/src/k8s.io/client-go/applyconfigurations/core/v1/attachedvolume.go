@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // AttachedVolumeApplyConfiguration represents a declarative configuration of the AttachedVolume type for use
 // with apply.
 type AttachedVolumeApplyConfiguration struct {
-	Name       *v1.UniqueVolumeName `json:"name,omitempty"`
-	DevicePath *string              `json:"devicePath,omitempty"`
+	Name       *corev1.UniqueVolumeName `json:"name,omitempty"`
+	DevicePath *string                  `json:"devicePath,omitempty"`
 }
 
 // AttachedVolumeApplyConfiguration constructs a declarative configuration of the AttachedVolume type for use with
@@ -38,7 +38,7 @@ func AttachedVolume() *AttachedVolumeApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *AttachedVolumeApplyConfiguration) WithName(value v1.UniqueVolumeName) *AttachedVolumeApplyConfiguration {
+func (b *AttachedVolumeApplyConfiguration) WithName(value corev1.UniqueVolumeName) *AttachedVolumeApplyConfiguration {
 	b.Name = &value
 	return b
 }

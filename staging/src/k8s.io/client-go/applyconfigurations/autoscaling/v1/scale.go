@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ScaleApplyConfiguration represents a declarative configuration of the Scale type for use
 // with apply.
 type ScaleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ScaleSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ScaleStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ScaleSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ScaleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ScaleApplyConfiguration constructs a declarative configuration of the Scale type for use with
@@ -115,7 +115,7 @@ func (b *ScaleApplyConfiguration) WithGeneration(value int64) *ScaleApplyConfigu
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ScaleApplyConfiguration {
+func (b *ScaleApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ScaleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -124,7 +124,7 @@ func (b *ScaleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Scal
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ScaleApplyConfiguration {
+func (b *ScaleApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ScaleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -172,7 +172,7 @@ func (b *ScaleApplyConfiguration) WithAnnotations(entries map[string]string) *Sc
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ScaleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ScaleApplyConfiguration {
+func (b *ScaleApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ScaleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -196,7 +196,7 @@ func (b *ScaleApplyConfiguration) WithFinalizers(values ...string) *ScaleApplyCo
 
 func (b *ScaleApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

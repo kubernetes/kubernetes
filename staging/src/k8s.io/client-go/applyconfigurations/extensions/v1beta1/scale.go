@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -30,8 +30,8 @@ import (
 type ScaleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *v1beta1.ScaleSpec   `json:"spec,omitempty"`
-	Status                           *v1beta1.ScaleStatus `json:"status,omitempty"`
+	Spec                             *extensionsv1beta1.ScaleSpec   `json:"spec,omitempty"`
+	Status                           *extensionsv1beta1.ScaleStatus `json:"status,omitempty"`
 }
 
 // ScaleApplyConfiguration constructs a declarative configuration of the Scale type for use with
@@ -204,7 +204,7 @@ func (b *ScaleApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 // WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Spec field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithSpec(value v1beta1.ScaleSpec) *ScaleApplyConfiguration {
+func (b *ScaleApplyConfiguration) WithSpec(value extensionsv1beta1.ScaleSpec) *ScaleApplyConfiguration {
 	b.Spec = &value
 	return b
 }
@@ -212,7 +212,7 @@ func (b *ScaleApplyConfiguration) WithSpec(value v1beta1.ScaleSpec) *ScaleApplyC
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithStatus(value v1beta1.ScaleStatus) *ScaleApplyConfiguration {
+func (b *ScaleApplyConfiguration) WithStatus(value extensionsv1beta1.ScaleStatus) *ScaleApplyConfiguration {
 	b.Status = &value
 	return b
 }

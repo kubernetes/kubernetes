@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // LimitRangeItemApplyConfiguration represents a declarative configuration of the LimitRangeItem type for use
 // with apply.
 type LimitRangeItemApplyConfiguration struct {
-	Type                 *v1.LimitType    `json:"type,omitempty"`
-	Max                  *v1.ResourceList `json:"max,omitempty"`
-	Min                  *v1.ResourceList `json:"min,omitempty"`
-	Default              *v1.ResourceList `json:"default,omitempty"`
-	DefaultRequest       *v1.ResourceList `json:"defaultRequest,omitempty"`
-	MaxLimitRequestRatio *v1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
+	Type                 *corev1.LimitType    `json:"type,omitempty"`
+	Max                  *corev1.ResourceList `json:"max,omitempty"`
+	Min                  *corev1.ResourceList `json:"min,omitempty"`
+	Default              *corev1.ResourceList `json:"default,omitempty"`
+	DefaultRequest       *corev1.ResourceList `json:"defaultRequest,omitempty"`
+	MaxLimitRequestRatio *corev1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 
 // LimitRangeItemApplyConfiguration constructs a declarative configuration of the LimitRangeItem type for use with
@@ -42,7 +42,7 @@ func LimitRangeItem() *LimitRangeItemApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithType(value v1.LimitType) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithType(value corev1.LimitType) *LimitRangeItemApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -50,7 +50,7 @@ func (b *LimitRangeItemApplyConfiguration) WithType(value v1.LimitType) *LimitRa
 // WithMax sets the Max field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Max field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithMax(value v1.ResourceList) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithMax(value corev1.ResourceList) *LimitRangeItemApplyConfiguration {
 	b.Max = &value
 	return b
 }
@@ -58,7 +58,7 @@ func (b *LimitRangeItemApplyConfiguration) WithMax(value v1.ResourceList) *Limit
 // WithMin sets the Min field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Min field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithMin(value v1.ResourceList) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithMin(value corev1.ResourceList) *LimitRangeItemApplyConfiguration {
 	b.Min = &value
 	return b
 }
@@ -66,7 +66,7 @@ func (b *LimitRangeItemApplyConfiguration) WithMin(value v1.ResourceList) *Limit
 // WithDefault sets the Default field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Default field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithDefault(value v1.ResourceList) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithDefault(value corev1.ResourceList) *LimitRangeItemApplyConfiguration {
 	b.Default = &value
 	return b
 }
@@ -74,7 +74,7 @@ func (b *LimitRangeItemApplyConfiguration) WithDefault(value v1.ResourceList) *L
 // WithDefaultRequest sets the DefaultRequest field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DefaultRequest field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithDefaultRequest(value v1.ResourceList) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithDefaultRequest(value corev1.ResourceList) *LimitRangeItemApplyConfiguration {
 	b.DefaultRequest = &value
 	return b
 }
@@ -82,7 +82,7 @@ func (b *LimitRangeItemApplyConfiguration) WithDefaultRequest(value v1.ResourceL
 // WithMaxLimitRequestRatio sets the MaxLimitRequestRatio field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MaxLimitRequestRatio field is set to the value of the last call.
-func (b *LimitRangeItemApplyConfiguration) WithMaxLimitRequestRatio(value v1.ResourceList) *LimitRangeItemApplyConfiguration {
+func (b *LimitRangeItemApplyConfiguration) WithMaxLimitRequestRatio(value corev1.ResourceList) *LimitRangeItemApplyConfiguration {
 	b.MaxLimitRequestRatio = &value
 	return b
 }

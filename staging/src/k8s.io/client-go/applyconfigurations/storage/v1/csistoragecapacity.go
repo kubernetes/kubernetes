@@ -21,22 +21,22 @@ package v1
 import (
 	storagev1 "k8s.io/api/storage/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CSIStorageCapacityApplyConfiguration represents a declarative configuration of the CSIStorageCapacity type for use
 // with apply.
 type CSIStorageCapacityApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	NodeTopology                     *v1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
-	StorageClassName                 *string                             `json:"storageClassName,omitempty"`
-	Capacity                         *resource.Quantity                  `json:"capacity,omitempty"`
-	MaximumVolumeSize                *resource.Quantity                  `json:"maximumVolumeSize,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	NodeTopology                         *metav1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
+	StorageClassName                     *string                                 `json:"storageClassName,omitempty"`
+	Capacity                             *resource.Quantity                      `json:"capacity,omitempty"`
+	MaximumVolumeSize                    *resource.Quantity                      `json:"maximumVolumeSize,omitempty"`
 }
 
 // CSIStorageCapacity constructs a declarative configuration of the CSIStorageCapacity type for use with
@@ -159,7 +159,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithGeneration(value int64) *CSIS
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -168,7 +168,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithCreationTimestamp(value metav
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -216,7 +216,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithAnnotations(entries map[strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CSIStorageCapacityApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -240,14 +240,14 @@ func (b *CSIStorageCapacityApplyConfiguration) WithFinalizers(values ...string) 
 
 func (b *CSIStorageCapacityApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
 // WithNodeTopology sets the NodeTopology field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeTopology field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithNodeTopology(value *v1.LabelSelectorApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithNodeTopology(value *metav1.LabelSelectorApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
 	b.NodeTopology = value
 	return b
 }

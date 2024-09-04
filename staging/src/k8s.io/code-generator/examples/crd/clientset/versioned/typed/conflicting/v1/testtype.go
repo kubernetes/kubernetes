@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
-	conflictingv1 "k8s.io/code-generator/examples/crd/applyconfiguration/conflicting/v1"
+	conflictingv1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
+	applyconfigurationconflictingv1 "k8s.io/code-generator/examples/crd/applyconfiguration/conflicting/v1"
 	scheme "k8s.io/code-generator/examples/crd/clientset/versioned/scheme"
 )
 
@@ -38,36 +38,36 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (*v1.TestType, error)
-	Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	Create(ctx context.Context, testType *conflictingv1.TestType, opts metav1.CreateOptions) (*conflictingv1.TestType, error)
+	Update(ctx context.Context, testType *conflictingv1.TestType, opts metav1.UpdateOptions) (*conflictingv1.TestType, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	UpdateStatus(ctx context.Context, testType *conflictingv1.TestType, opts metav1.UpdateOptions) (*conflictingv1.TestType, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TestType, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.TestTypeList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*conflictingv1.TestType, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*conflictingv1.TestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error)
-	Apply(ctx context.Context, testType *conflictingv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *conflictingv1.TestType, err error)
+	Apply(ctx context.Context, testType *applyconfigurationconflictingv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *conflictingv1.TestType, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, testType *conflictingv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
+	ApplyStatus(ctx context.Context, testType *applyconfigurationconflictingv1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *conflictingv1.TestType, err error)
 	TestTypeExpansion
 }
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	*gentype.ClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *conflictingv1.TestTypeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*conflictingv1.TestType, *conflictingv1.TestTypeList, *applyconfigurationconflictingv1.TestTypeApplyConfiguration]
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *ConflictingExampleV1Client, namespace string) *testTypes {
 	return &testTypes{
-		gentype.NewClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *conflictingv1.TestTypeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*conflictingv1.TestType, *conflictingv1.TestTypeList, *applyconfigurationconflictingv1.TestTypeApplyConfiguration](
 			"testtypes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.TestType { return &v1.TestType{} },
-			func() *v1.TestTypeList { return &v1.TestTypeList{} }),
+			func() *conflictingv1.TestType { return &conflictingv1.TestType{} },
+			func() *conflictingv1.TestTypeList { return &conflictingv1.TestTypeList{} }),
 	}
 }

@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ValidatingWebhookConfigurationLister helps list ValidatingWebhookConfigurations.
@@ -30,19 +30,19 @@ import (
 type ValidatingWebhookConfigurationLister interface {
 	// List lists all ValidatingWebhookConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.ValidatingWebhookConfiguration, err error)
+	List(selector labels.Selector) (ret []*admissionregistrationv1beta1.ValidatingWebhookConfiguration, err error)
 	// Get retrieves the ValidatingWebhookConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.ValidatingWebhookConfiguration, error)
+	Get(name string) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
 	ValidatingWebhookConfigurationListerExpansion
 }
 
 // validatingWebhookConfigurationLister implements the ValidatingWebhookConfigurationLister interface.
 type validatingWebhookConfigurationLister struct {
-	listers.ResourceIndexer[*v1beta1.ValidatingWebhookConfiguration]
+	listers.ResourceIndexer[*admissionregistrationv1beta1.ValidatingWebhookConfiguration]
 }
 
 // NewValidatingWebhookConfigurationLister returns a new ValidatingWebhookConfigurationLister.
 func NewValidatingWebhookConfigurationLister(indexer cache.Indexer) ValidatingWebhookConfigurationLister {
-	return &validatingWebhookConfigurationLister{listers.New[*v1beta1.ValidatingWebhookConfiguration](indexer, v1beta1.Resource("validatingwebhookconfiguration"))}
+	return &validatingWebhookConfigurationLister{listers.New[*admissionregistrationv1beta1.ValidatingWebhookConfiguration](indexer, admissionregistrationv1beta1.Resource("validatingwebhookconfiguration"))}
 }

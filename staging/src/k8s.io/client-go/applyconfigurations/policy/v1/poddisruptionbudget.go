@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apipolicyv1 "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetApplyConfiguration represents a declarative configuration of the PodDisruptionBudget type for use
 // with apply.
 type PodDisruptionBudgetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodDisruptionBudgetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *PodDisruptionBudgetSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodDisruptionBudget constructs a declarative configuration of the PodDisruptionBudget type for use with
@@ -58,18 +58,18 @@ func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfig
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func ExtractPodDisruptionBudget(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "")
 }
 
 // ExtractPodDisruptionBudgetStatus is the same as ExtractPodDisruptionBudget except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "status")
 }
 
-func extractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func extractPodDisruptionBudget(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	b := &PodDisruptionBudgetApplyConfiguration{}
 	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1.PodDisruptionBudget"), fieldManager, b, subresource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (b *PodDisruptionBudgetApplyConfiguration) WithGeneration(value int64) *Pod
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PodDisruptionBudgetApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PodDisruptionBudgetApplyConfiguration {
+func (b *PodDisruptionBudgetApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PodDisruptionBudgetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -165,7 +165,7 @@ func (b *PodDisruptionBudgetApplyConfiguration) WithCreationTimestamp(value meta
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PodDisruptionBudgetApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PodDisruptionBudgetApplyConfiguration {
+func (b *PodDisruptionBudgetApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PodDisruptionBudgetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -213,7 +213,7 @@ func (b *PodDisruptionBudgetApplyConfiguration) WithAnnotations(entries map[stri
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PodDisruptionBudgetApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PodDisruptionBudgetApplyConfiguration {
+func (b *PodDisruptionBudgetApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PodDisruptionBudgetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -237,7 +237,7 @@ func (b *PodDisruptionBudgetApplyConfiguration) WithFinalizers(values ...string)
 
 func (b *PodDisruptionBudgetApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

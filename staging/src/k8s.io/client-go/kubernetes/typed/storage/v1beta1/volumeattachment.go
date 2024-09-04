@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
+	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type VolumeAttachmentsGetter interface {
 
 // VolumeAttachmentInterface has methods to work with VolumeAttachment resources.
 type VolumeAttachmentInterface interface {
-	Create(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.CreateOptions) (*v1beta1.VolumeAttachment, error)
-	Update(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.UpdateOptions) (*v1beta1.VolumeAttachment, error)
+	Create(ctx context.Context, volumeAttachment *storagev1beta1.VolumeAttachment, opts v1.CreateOptions) (*storagev1beta1.VolumeAttachment, error)
+	Update(ctx context.Context, volumeAttachment *storagev1beta1.VolumeAttachment, opts v1.UpdateOptions) (*storagev1beta1.VolumeAttachment, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.UpdateOptions) (*v1beta1.VolumeAttachment, error)
+	UpdateStatus(ctx context.Context, volumeAttachment *storagev1beta1.VolumeAttachment, opts v1.UpdateOptions) (*storagev1beta1.VolumeAttachment, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.VolumeAttachment, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.VolumeAttachmentList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1beta1.VolumeAttachment, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagev1beta1.VolumeAttachmentList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.VolumeAttachment, err error)
-	Apply(ctx context.Context, volumeAttachment *storagev1beta1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.VolumeAttachment, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1beta1.VolumeAttachment, err error)
+	Apply(ctx context.Context, volumeAttachment *applyconfigurationsstoragev1beta1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *storagev1beta1.VolumeAttachment, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, volumeAttachment *storagev1beta1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.VolumeAttachment, err error)
+	ApplyStatus(ctx context.Context, volumeAttachment *applyconfigurationsstoragev1beta1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *storagev1beta1.VolumeAttachment, err error)
 	VolumeAttachmentExpansion
 }
 
 // volumeAttachments implements VolumeAttachmentInterface
 type volumeAttachments struct {
-	*gentype.ClientWithListAndApply[*v1beta1.VolumeAttachment, *v1beta1.VolumeAttachmentList, *storagev1beta1.VolumeAttachmentApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagev1beta1.VolumeAttachment, *storagev1beta1.VolumeAttachmentList, *applyconfigurationsstoragev1beta1.VolumeAttachmentApplyConfiguration]
 }
 
 // newVolumeAttachments returns a VolumeAttachments
 func newVolumeAttachments(c *StorageV1beta1Client) *volumeAttachments {
 	return &volumeAttachments{
-		gentype.NewClientWithListAndApply[*v1beta1.VolumeAttachment, *v1beta1.VolumeAttachmentList, *storagev1beta1.VolumeAttachmentApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagev1beta1.VolumeAttachment, *storagev1beta1.VolumeAttachmentList, *applyconfigurationsstoragev1beta1.VolumeAttachmentApplyConfiguration](
 			"volumeattachments",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.VolumeAttachment { return &v1beta1.VolumeAttachment{} },
-			func() *v1beta1.VolumeAttachmentList { return &v1beta1.VolumeAttachmentList{} }),
+			func() *storagev1beta1.VolumeAttachment { return &storagev1beta1.VolumeAttachment{} },
+			func() *storagev1beta1.VolumeAttachmentList { return &storagev1beta1.VolumeAttachmentList{} }),
 	}
 }

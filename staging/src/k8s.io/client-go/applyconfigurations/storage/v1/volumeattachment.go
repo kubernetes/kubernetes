@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apistoragev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // VolumeAttachmentApplyConfiguration represents a declarative configuration of the VolumeAttachment type for use
 // with apply.
 type VolumeAttachmentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *VolumeAttachmentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *VolumeAttachmentSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // VolumeAttachment constructs a declarative configuration of the VolumeAttachment type for use with
@@ -57,18 +57,18 @@ func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+func ExtractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
 	return extractVolumeAttachment(volumeAttachment, fieldManager, "")
 }
 
 // ExtractVolumeAttachmentStatus is the same as ExtractVolumeAttachment except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractVolumeAttachmentStatus(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+func ExtractVolumeAttachmentStatus(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
 	return extractVolumeAttachment(volumeAttachment, fieldManager, "status")
 }
 
-func extractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
+func extractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
 	b := &VolumeAttachmentApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b, subresource)
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *VolumeAttachmentApplyConfiguration) WithGeneration(value int64) *Volume
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *VolumeAttachmentApplyConfiguration) WithCreationTimestamp(value metav1.Time) *VolumeAttachmentApplyConfiguration {
+func (b *VolumeAttachmentApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *VolumeAttachmentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -163,7 +163,7 @@ func (b *VolumeAttachmentApplyConfiguration) WithCreationTimestamp(value metav1.
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *VolumeAttachmentApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *VolumeAttachmentApplyConfiguration {
+func (b *VolumeAttachmentApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *VolumeAttachmentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -211,7 +211,7 @@ func (b *VolumeAttachmentApplyConfiguration) WithAnnotations(entries map[string]
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *VolumeAttachmentApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *VolumeAttachmentApplyConfiguration {
+func (b *VolumeAttachmentApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *VolumeAttachmentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -235,7 +235,7 @@ func (b *VolumeAttachmentApplyConfiguration) WithFinalizers(values ...string) *V
 
 func (b *VolumeAttachmentApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

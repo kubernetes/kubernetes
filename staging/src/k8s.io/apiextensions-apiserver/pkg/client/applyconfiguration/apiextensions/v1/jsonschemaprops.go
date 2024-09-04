@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // JSONSchemaPropsApplyConfiguration represents a declarative configuration of the JSONSchemaProps type for use
 // with apply.
 type JSONSchemaPropsApplyConfiguration struct {
 	ID                     *string                                      `json:"id,omitempty"`
-	Schema                 *v1.JSONSchemaURL                            `json:"$schema,omitempty"`
+	Schema                 *apiextensionsv1.JSONSchemaURL               `json:"$schema,omitempty"`
 	Ref                    *string                                      `json:"$ref,omitempty"`
 	Description            *string                                      `json:"description,omitempty"`
 	Type                   *string                                      `json:"type,omitempty"`
 	Format                 *string                                      `json:"format,omitempty"`
 	Title                  *string                                      `json:"title,omitempty"`
-	Default                *v1.JSON                                     `json:"default,omitempty"`
+	Default                *apiextensionsv1.JSON                        `json:"default,omitempty"`
 	Maximum                *float64                                     `json:"maximum,omitempty"`
 	ExclusiveMaximum       *bool                                        `json:"exclusiveMaximum,omitempty"`
 	Minimum                *float64                                     `json:"minimum,omitempty"`
@@ -44,23 +44,23 @@ type JSONSchemaPropsApplyConfiguration struct {
 	MinItems               *int64                                       `json:"minItems,omitempty"`
 	UniqueItems            *bool                                        `json:"uniqueItems,omitempty"`
 	MultipleOf             *float64                                     `json:"multipleOf,omitempty"`
-	Enum                   []v1.JSON                                    `json:"enum,omitempty"`
+	Enum                   []apiextensionsv1.JSON                       `json:"enum,omitempty"`
 	MaxProperties          *int64                                       `json:"maxProperties,omitempty"`
 	MinProperties          *int64                                       `json:"minProperties,omitempty"`
 	Required               []string                                     `json:"required,omitempty"`
-	Items                  *v1.JSONSchemaPropsOrArray                   `json:"items,omitempty"`
+	Items                  *apiextensionsv1.JSONSchemaPropsOrArray      `json:"items,omitempty"`
 	AllOf                  []JSONSchemaPropsApplyConfiguration          `json:"allOf,omitempty"`
 	OneOf                  []JSONSchemaPropsApplyConfiguration          `json:"oneOf,omitempty"`
 	AnyOf                  []JSONSchemaPropsApplyConfiguration          `json:"anyOf,omitempty"`
 	Not                    *JSONSchemaPropsApplyConfiguration           `json:"not,omitempty"`
 	Properties             map[string]JSONSchemaPropsApplyConfiguration `json:"properties,omitempty"`
-	AdditionalProperties   *v1.JSONSchemaPropsOrBool                    `json:"additionalProperties,omitempty"`
+	AdditionalProperties   *apiextensionsv1.JSONSchemaPropsOrBool       `json:"additionalProperties,omitempty"`
 	PatternProperties      map[string]JSONSchemaPropsApplyConfiguration `json:"patternProperties,omitempty"`
-	Dependencies           *v1.JSONSchemaDependencies                   `json:"dependencies,omitempty"`
-	AdditionalItems        *v1.JSONSchemaPropsOrBool                    `json:"additionalItems,omitempty"`
-	Definitions            *v1.JSONSchemaDefinitions                    `json:"definitions,omitempty"`
+	Dependencies           *apiextensionsv1.JSONSchemaDependencies      `json:"dependencies,omitempty"`
+	AdditionalItems        *apiextensionsv1.JSONSchemaPropsOrBool       `json:"additionalItems,omitempty"`
+	Definitions            *apiextensionsv1.JSONSchemaDefinitions       `json:"definitions,omitempty"`
 	ExternalDocs           *ExternalDocumentationApplyConfiguration     `json:"externalDocs,omitempty"`
-	Example                *v1.JSON                                     `json:"example,omitempty"`
+	Example                *apiextensionsv1.JSON                        `json:"example,omitempty"`
 	Nullable               *bool                                        `json:"nullable,omitempty"`
 	XPreserveUnknownFields *bool                                        `json:"x-kubernetes-preserve-unknown-fields,omitempty"`
 	XEmbeddedResource      *bool                                        `json:"x-kubernetes-embedded-resource,omitempty"`
@@ -68,7 +68,7 @@ type JSONSchemaPropsApplyConfiguration struct {
 	XListMapKeys           []string                                     `json:"x-kubernetes-list-map-keys,omitempty"`
 	XListType              *string                                      `json:"x-kubernetes-list-type,omitempty"`
 	XMapType               *string                                      `json:"x-kubernetes-map-type,omitempty"`
-	XValidations           *v1.ValidationRules                          `json:"x-kubernetes-validations,omitempty"`
+	XValidations           *apiextensionsv1.ValidationRules             `json:"x-kubernetes-validations,omitempty"`
 }
 
 // JSONSchemaPropsApplyConfiguration constructs a declarative configuration of the JSONSchemaProps type for use with
@@ -88,7 +88,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithID(value string) *JSONSchemaProp
 // WithSchema sets the Schema field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Schema field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithSchema(value v1.JSONSchemaURL) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithSchema(value apiextensionsv1.JSONSchemaURL) *JSONSchemaPropsApplyConfiguration {
 	b.Schema = &value
 	return b
 }
@@ -136,7 +136,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithTitle(value string) *JSONSchemaP
 // WithDefault sets the Default field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Default field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDefault(value v1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDefault(value apiextensionsv1.JSON) *JSONSchemaPropsApplyConfiguration {
 	b.Default = &value
 	return b
 }
@@ -232,7 +232,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithMultipleOf(value float64) *JSONS
 // WithEnum adds the given value to the Enum field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Enum field.
-func (b *JSONSchemaPropsApplyConfiguration) WithEnum(values ...v1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithEnum(values ...apiextensionsv1.JSON) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		b.Enum = append(b.Enum, values[i])
 	}
@@ -268,7 +268,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithRequired(values ...string) *JSON
 // WithItems sets the Items field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Items field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithItems(value v1.JSONSchemaPropsOrArray) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithItems(value apiextensionsv1.JSONSchemaPropsOrArray) *JSONSchemaPropsApplyConfiguration {
 	b.Items = &value
 	return b
 }
@@ -337,7 +337,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithProperties(entries map[string]JS
 // WithAdditionalProperties sets the AdditionalProperties field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AdditionalProperties field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalProperties(value v1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalProperties(value apiextensionsv1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
 	b.AdditionalProperties = &value
 	return b
 }
@@ -359,7 +359,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithPatternProperties(entries map[st
 // WithDependencies sets the Dependencies field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Dependencies field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value v1.JSONSchemaDependencies) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value apiextensionsv1.JSONSchemaDependencies) *JSONSchemaPropsApplyConfiguration {
 	b.Dependencies = &value
 	return b
 }
@@ -367,7 +367,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value v1.JSONSchema
 // WithAdditionalItems sets the AdditionalItems field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AdditionalItems field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value v1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value apiextensionsv1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
 	b.AdditionalItems = &value
 	return b
 }
@@ -375,7 +375,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value v1.JSONSch
 // WithDefinitions sets the Definitions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Definitions field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDefinitions(value v1.JSONSchemaDefinitions) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDefinitions(value apiextensionsv1.JSONSchemaDefinitions) *JSONSchemaPropsApplyConfiguration {
 	b.Definitions = &value
 	return b
 }
@@ -391,7 +391,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithExternalDocs(value *ExternalDocu
 // WithExample sets the Example field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Example field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithExample(value v1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithExample(value apiextensionsv1.JSON) *JSONSchemaPropsApplyConfiguration {
 	b.Example = &value
 	return b
 }
@@ -457,7 +457,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithXMapType(value string) *JSONSche
 // WithXValidations sets the XValidations field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the XValidations field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithXValidations(value v1.ValidationRules) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithXValidations(value apiextensionsv1.ValidationRules) *JSONSchemaPropsApplyConfiguration {
 	b.XValidations = &value
 	return b
 }

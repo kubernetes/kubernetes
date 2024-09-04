@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // NamespaceSpecApplyConfiguration represents a declarative configuration of the NamespaceSpec type for use
 // with apply.
 type NamespaceSpecApplyConfiguration struct {
-	Finalizers []v1.FinalizerName `json:"finalizers,omitempty"`
+	Finalizers []corev1.FinalizerName `json:"finalizers,omitempty"`
 }
 
 // NamespaceSpecApplyConfiguration constructs a declarative configuration of the NamespaceSpec type for use with
@@ -37,7 +37,7 @@ func NamespaceSpec() *NamespaceSpecApplyConfiguration {
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
-func (b *NamespaceSpecApplyConfiguration) WithFinalizers(values ...v1.FinalizerName) *NamespaceSpecApplyConfiguration {
+func (b *NamespaceSpecApplyConfiguration) WithFinalizers(values ...corev1.FinalizerName) *NamespaceSpecApplyConfiguration {
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
