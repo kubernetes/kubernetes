@@ -865,7 +865,7 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.22"
+    version: "1.23"
   - default: true
     lockToDefault: false
     preRelease: Beta

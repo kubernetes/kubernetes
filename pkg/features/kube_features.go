@@ -759,7 +759,7 @@ const (
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
 	// owner: @mattcary
-	// alpha: v1.22
+	// alpha: v1.23
 	// beta: v1.27
 	//
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
