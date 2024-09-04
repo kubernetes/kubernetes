@@ -300,14 +300,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 //
-// Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
-// when adding or removing one entry.
+// Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	// Example:
-	// EmulationVersion: {
-	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-	// },
-
 	AnonymousAuthConfigurableEndpoints: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
