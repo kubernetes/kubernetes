@@ -42,7 +42,7 @@ import (
 // slices).
 type Allocator struct {
 	claimsToAllocate []*resourceapi.ResourceClaim
-	allocatedDevices []DeviceID
+	allocatedDevices sets.Set[DeviceID]
 	classLister      resourcelisters.DeviceClassLister
 	slices           []*resourceapi.ResourceSlice
 	celCache         *CELCache
@@ -63,7 +63,8 @@ func NewAllocator(ctx context.Context,
 ) (*Allocator, error) {
 	return &Allocator{
 		claimsToAllocate: claimsToAllocate,
-		allocatedDevices: allocatedDevices,
+		// This won't change, so build this set only once.
+		allocatedDevices: sets.New(allocatedDevices...),
 		classLister:      classLister,
 		slices:           slices,
 		celCache:         celCache,
@@ -281,18 +282,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// the Allocate call and can be compared in Go.
 	alloc.deviceMatchesRequest = make(map[matchKey]bool)
 
-	// Some of the existing devices are probably already allocated by
-	// claims...
-	numAllocated := len(alloc.allocatedDevices)
+	// We can estimate the size based on what we need to allocate.
+	alloc.allocatingDevices = make(map[DeviceID]bool, numDevicesTotal)
 
-	// Pre-allocating the map avoids growing it later. We can estimate
-	// the size based on what is already allocated and what we need to
-	// allocate.
-	alloc.allocated = make(map[DeviceID]bool, numAllocated+numDevicesTotal)
-	for _, deviceID := range alloc.allocatedDevices {
-		alloc.allocated[deviceID] = true
-	}
-	alloc.logger.V(6).Info("Gathered information about allocated devices", "numAllocated", numAllocated)
+	alloc.logger.V(6).Info("Gathered information about devices", "numAllocated", len(alloc.allocatedDevices), "toBeAllocated", numDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
 	// expressions. Most likely, there is going to be handful of different
@@ -376,7 +369,7 @@ type allocator struct {
 	deviceMatchesRequest map[matchKey]bool
 	constraints          [][]constraint                 // one list of constraints per claim
 	requestData          map[requestIndices]requestData // one entry per request
-	allocated            map[DeviceID]bool
+	allocatingDevices    map[DeviceID]bool
 	skippedUnknownDevice bool
 	result               []internalAllocationResult
 }
@@ -601,7 +594,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if !request.AdminAccess && alloc.allocated[deviceID] {
+				if !request.AdminAccess && (alloc.allocatedDevices.Has(deviceID) || alloc.allocatingDevices[deviceID]) {
 					alloc.logger.V(7).Info("Device in use", "device", deviceID)
 					continue
 				}
@@ -752,7 +745,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	request := &claim.Spec.Devices.Requests[r.requestIndex]
 	adminAccess := request.AdminAccess
-	if !adminAccess && alloc.allocated[device.id] {
+	if !adminAccess && (alloc.allocatedDevices.Has(device.id) || alloc.allocatingDevices[device.id]) {
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
 	}
@@ -779,7 +772,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// and record the result.
 	alloc.logger.V(7).Info("Device allocated", "device", device.id)
 	if !adminAccess {
-		alloc.allocated[device.id] = true
+		alloc.allocatingDevices[device.id] = true
 	}
 	result := internalDeviceResult{
 		request:     request.Name,
@@ -795,7 +788,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			constraint.remove(request.Name, device.basic, device.id)
 		}
 		if !adminAccess {
-			alloc.allocated[device.id] = false
+			alloc.allocatingDevices[device.id] = false
 		}
 		// Truncate, but keep the underlying slice.
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
