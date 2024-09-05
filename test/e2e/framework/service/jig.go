@@ -121,7 +121,7 @@ func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
 	for idx, v := range staticPorts {
 		if v == 0 {
 			staticPorts[idx] = 1
-			return idx + NodePortRange.Base
+			return idx + staticPortRange.Base
 		}
 	}
 	return -1
@@ -132,8 +132,8 @@ func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
 func (j *TestJig) ReleaseStaticNodePort(port int) bool {
 	staticPortLock.Lock()
 	defer staticPortLock.Unlock()
-	if port-NodePortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-NodePortRange.Base] == 1 {
-		staticPorts[port-NodePortRange.Base] = 0
+	if port-staticPortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-staticPortRange.Base] == 1 {
+		staticPorts[port-staticPortRange.Base] = 0
 		return true
 	} else {
 		return false
