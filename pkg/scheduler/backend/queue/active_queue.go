@@ -186,6 +186,11 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
+
+	return aq.unlockedPop(logger)
+}
+
+func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	for aq.queue.Len() == 0 {
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the p.closed is set and the condition is broadcast,
@@ -201,12 +206,22 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 		return nil, err
 	}
 	pInfo.Attempts++
-	aq.schedCycle++
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
+		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
+		// https://github.com/kubernetes/kubernetes/pull/127016
+		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+			// Just report it as an error, but no need to stop the scheduler
+			// because it likely doesn't cause any visible issues from the scheduling perspective.
+			logger.Error(nil, "the same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
+			// Just ignore/discard this duplicated pod and try to pop the next one.
+			return aq.unlockedPop(logger)
+		}
+
 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
 	}
+	aq.schedCycle++
 
 	// Update metrics and reset the set of unschedulable plugins for the next attempt.
 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
