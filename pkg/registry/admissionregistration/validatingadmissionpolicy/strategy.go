@@ -100,7 +100,7 @@ func (v *validatingAdmissionPolicyStrategy) WarningsOnCreate(ctx context.Context
 func (v *validatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is true for validatingAdmissionPolicy; this means you may create one with a PUT request.
+// AllowCreateOnUpdate is false for validatingAdmissionPolicy; this means you may not create one with a PUT request.
 func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
