@@ -111,10 +111,9 @@ type SchedulingQueue interface {
 	Done(types.UID)
 	Update(logger klog.Logger, oldPod, newPod *v1.Pod)
 	Delete(pod *v1.Pod)
-	// TODO(sanposhiho): move all PreEnqueueCheck to Requeue and delete it from this parameter eventually.
-	// Some PreEnqueueCheck include event filtering logic based on some in-tree plugins
-	// and it affect badly to other plugins.
-	// See https://github.com/kubernetes/kubernetes/issues/110175
+	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
+	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
+	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent)
