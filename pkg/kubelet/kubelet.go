@@ -2538,6 +2538,9 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		kl.podResizeMutex.Lock()
 		defer kl.podResizeMutex.Unlock()
 	}
+	needToAdmit := func(pod *v1.Pod) bool {
+		return pod.Status.Phase == v1.PodPending && pod.Status.PodIP == ""
+	}
 	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -2579,10 +2582,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				podCopy := pod.DeepCopy()
 				kl.updateContainerResourceAllocation(podCopy)
 
-				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
-					kl.rejectPod(pod, reason, message)
-					continue
+				if needToAdmit(pod) {
+					// Check if we can admit the pod; if not, reject it.
+					if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
 				if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
@@ -2590,10 +2595,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
 			} else {
-				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
-					kl.rejectPod(pod, reason, message)
-					continue
+				if needToAdmit(pod) {
+					// Check if we can admit the pod; if not, reject it.
+					if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
 				}
 			}
 		}
