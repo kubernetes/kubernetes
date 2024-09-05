@@ -1684,6 +1684,22 @@ var _ = common.SIGDescribe("Services", func() {
 		service.Spec.Type = v1.ServiceTypeNodePort
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		nodePort := -1
+		retry.OnError(retry.DefaultRetry, func(e error) bool {
+			return e != nil
+		}, func() error {
+			v := jig.GetUnusedStaticNodePortAndReserve()
+			if v == -1 {
+				return errors.New("No available nodeport found")
+			}
+			nodePort = v
+			return nil
+		})
+		if nodePort == -1 {
+			framework.Failf("No available static nodeport found")
+		}
+		service.Spec.Ports[0].NodePort = int32(nodePort)
 		service, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -1700,7 +1716,8 @@ var _ = common.SIGDescribe("Services", func() {
 		if !e2eservice.NodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
-		nodePort := port.NodePort
+		// ignore return value
+		defer jig.ReleaseStaticNodePort(nodePort)
 
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
@@ -1724,7 +1741,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = nodePort
+		service.Spec.Ports[0].NodePort = int32(nodePort)
 		_, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})

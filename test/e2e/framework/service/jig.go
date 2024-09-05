@@ -23,6 +23,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,6 +56,12 @@ import (
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
+var staticPortRange = utilnet.PortRange{Base: 30000, Size: 87}
+
+var staticPorts = makeStaticPorts()
+
+var staticPortLock = sync.Mutex{}
+
 // It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
 
@@ -70,6 +77,15 @@ type TestJig struct {
 	ExternalIPs bool
 }
 
+// Initialize just once during the package init
+func makeStaticPorts() []int {
+	ports := make([]int, staticPortRange.Size)
+	for i := staticPortRange.Base; i < staticPortRange.Base+staticPortRange.Size; i++ {
+		ports[i-staticPortRange.Base] = 0
+	}
+	return ports
+}
+
 // NewTestJig allocates and inits a new TestJig.
 func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	j := &TestJig{}
@@ -80,6 +96,48 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	j.Labels = map[string]string{"testid": j.ID}
 
 	return j
+}
+
+/*
+// ReserveStaticNodePort reserves a port in static port range and returns true
+// If the provided port is not in static range or is already reserved it returns false
+func (j *TestJig) ReserveStaticNodePort(port int) bool {
+	staticPortLock.Lock()
+	defer staticPortLock.Unlock()
+	if port-staticPortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-staticPortRange.Base] == 0 {
+		staticPorts[port-staticPortRange.Base] = 1
+		return true
+	} else {
+		return false
+	}
+
+}*/
+
+// GetUnusedStaticNodePort returns first free port in static range
+// If no port in static range is available it returns -1
+func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
+	staticPortLock.Lock()
+	defer staticPortLock.Unlock()
+	for idx, v := range staticPorts {
+		if v == 0 {
+			staticPorts[idx] = 1
+			return idx + NodePortRange.Base
+		}
+	}
+	return -1
+}
+
+// ReleaseStaticNodePort releases a previously reserved static port and returns true
+// If the port was not previously reserved it returns false
+func (j *TestJig) ReleaseStaticNodePort(port int) bool {
+	staticPortLock.Lock()
+	defer staticPortLock.Unlock()
+	if port-NodePortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-NodePortRange.Base] == 1 {
+		staticPorts[port-NodePortRange.Base] = 0
+		return true
+	} else {
+		return false
+	}
 }
 
 // newServiceTemplate returns the default v1.Service template for this j, but
