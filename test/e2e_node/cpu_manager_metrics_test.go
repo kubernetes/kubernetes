@@ -161,6 +161,27 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
+
+		ginkgo.It("[alignment] should return updated alignment counters when pod successfully run", func(ctx context.Context) {
+			ginkgo.By("Creating the test pod")
+			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("count-align-smt-ok", smtLevel))
+
+			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
+			// being [Serial], we can also assume noone else but us is running pods.
+			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with pod should be admitted")
+
+			idFn := makeCustomPairID("scope", "boundary")
+			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(1),
+				}),
+			})
+
+			ginkgo.By("Giving the Kubelet time to update the alignment metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations about alignment metrics a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
+		})
 	})
 })
 
