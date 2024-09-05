@@ -548,20 +548,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: NodeOutOfServiceVolumeDetach
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.24"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.26"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.28"
 - name: NodeSwap
   versionedSpecs:
   - default: false

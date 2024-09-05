@@ -232,11 +232,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
 	},
-	NodeOutOfServiceVolumeDetach: {
-		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-	},
 	NodeSwap: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},

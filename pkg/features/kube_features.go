@@ -505,15 +505,6 @@ const (
 	// Enables querying logs of node services using the /logs endpoint
 	NodeLogQuery featuregate.Feature = "NodeLogQuery"
 
-	// owner: @xing-yang @sonasingh46
-	// kep: https://kep.k8s.io/2268
-	// alpha: v1.24
-	// beta: v1.26
-	// GA: v1.28
-	//
-	// Allow pods to failover to a different node in case of non graceful node shutdown
-	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
-
 	// owner: @iholder101 @kannon92
 	// kep: https://kep.k8s.io/2400
 	// alpha: v1.22
