@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ResourceSlice struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
@@ -38,6 +40,14 @@ type ResourceSliceSpec struct {
 	Devices                []Device
 	PerDeviceNodeSelection *bool
 	SharedCounters         []CounterSet
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ResourceSliceList struct {
+	metav1.TypeMeta
+	metav1.ListMeta
+	Items []ResourceSlice
 }
 
 type CounterSet struct {

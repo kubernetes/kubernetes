@@ -24,6 +24,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -72,7 +73,7 @@ func (c *shareListerContract) StorageInfos() framework.StorageInfoLister {
 
 type resourceSliceListerContract struct{}
 
-func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return nil, nil
 }
 

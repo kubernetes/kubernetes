@@ -52,7 +52,7 @@ type Allocator struct {
 	claimsToAllocate []*resourceapi.ResourceClaim
 	allocatedDevices sets.Set[DeviceID]
 	classLister      deviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*draapi.ResourceSlice
 	celCache         *cel.Cache
 }
 
@@ -72,7 +72,7 @@ func NewAllocator(ctx context.Context,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister deviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
@@ -888,10 +888,10 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-		var nodeName string
+		var nodeName draapi.UniqueString
 		var allNodes bool
 		if device.NodeName != nil {
-			nodeName = *device.NodeName
+			nodeName = draapi.MakeUniqueString(*device.NodeName)
 		}
 		if device.AllNodes != nil {
 			allNodes = *device.AllNodes
@@ -926,13 +926,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDev
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		// If this conversion turns out to be expensive, the CEL package could be converted
-		// to use unique strings.
-		var d resourceapi.BasicDevice
-		if err := draapi.Convert_api_BasicDevice_To_v1beta1_BasicDevice(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert BasicDevice: %w", err)
-		}
-		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity})
+		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: device.Attributes, Capacity: device.Capacity})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 		} else {
