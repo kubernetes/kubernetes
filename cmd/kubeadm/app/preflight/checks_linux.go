@@ -79,9 +79,7 @@ func addExecChecks(checks []Checker, execer utilsexec.Interface) []Checker {
 		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 		InPathCheck{executable: "mount", mandatory: true, exec: execer},
 		InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-		InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
 		InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-		InPathCheck{executable: "socat", mandatory: false, exec: execer},
 		InPathCheck{executable: "tc", mandatory: false, exec: execer},
 		InPathCheck{executable: "touch", mandatory: false, exec: execer})
 	return checks
