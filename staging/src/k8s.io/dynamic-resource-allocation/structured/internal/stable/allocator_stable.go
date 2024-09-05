@@ -61,7 +61,7 @@ type Allocator struct {
 	features         Features
 	allocatedDevices sets.Set[DeviceID]
 	classLister      DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*draapi.ResourceSlice
 	celCache         *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -91,7 +91,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedDevices sets.Set[DeviceID],
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{

@@ -54,6 +54,8 @@ func MakeFullyQualifiedName(name resourceapi.QualifiedName, defaultDomain string
 // - Fields from this package use upper case whereas types from the
 //   real API use lower case.
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ResourceSlice struct {
 	metav1.TypeMeta `json:"-"` // Not needed, not set consistently.
 	metav1.ObjectMeta
@@ -105,4 +107,12 @@ type DeviceCounterConsumption struct {
 	CounterSet          UniqueString
 	Counters            map[string]resourceapi.Counter `json:",omitempty"`
 	CompatibilityGroups []string                       `json:",omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ResourceSliceList struct {
+	metav1.TypeMeta
+	metav1.ListMeta
+	Items []ResourceSlice
 }

@@ -87,9 +87,9 @@ type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
 	classLister    DeviceClassLister
-	slicesOnNode   map[string][]*resourceapi.ResourceSlice
-	slicesShared   []*resourceapi.ResourceSlice
-	allSlices      []*resourceapi.ResourceSlice
+	slicesOnNode   map[string][]*draapi.ResourceSlice
+	slicesShared   []*draapi.ResourceSlice
+	allSlices      []*draapi.ResourceSlice
 	celCache       *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -126,11 +126,11 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedState AllocatedState,
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
-	slicesOnNode := make(map[string][]*resourceapi.ResourceSlice)
-	slicesShared := make([]*resourceapi.ResourceSlice, 0)
+	slicesOnNode := make(map[string][]*draapi.ResourceSlice)
+	slicesShared := make([]*draapi.ResourceSlice, 0)
 	for _, slice := range slices {
 		nodeName := ptr.Deref(slice.Spec.NodeName, "")
 		if nodeName == "" {
