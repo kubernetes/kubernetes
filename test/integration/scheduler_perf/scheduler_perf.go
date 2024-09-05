@@ -1139,7 +1139,10 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
-					collector.init()
+					err = collector.init()
+					if err != nil {
+						tCtx.Fatalf("op %d: Failed to initialize data collector: %v", opIndex, err)
+					}
 					collectorWG.Add(1)
 					go func() {
 						defer collectorWG.Done()
@@ -1203,13 +1206,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 						}
 					}
 				}()
-			}
-
-			if !concreteOp.SkipWaitToCompletion {
-				// SkipWaitToCompletion=false indicates this step has waited for the Pods to be scheduled.
-				// So we reset the metrics in global registry; otherwise metrics gathered in this step
-				// will be carried over to next step.
-				legacyregistry.Reset()
 			}
 
 		case *churnOp:
@@ -1376,7 +1372,7 @@ func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsP
 }
 
 type testDataCollector interface {
-	init()
+	init() error
 	run(tCtx ktesting.TContext)
 	collect() []DataItem
 }
