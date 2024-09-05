@@ -25,9 +25,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -870,5 +873,108 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 			t.Errorf("Unexpected error: got %q, want %q", err.Error(), err)
 		}
 		integration.DeletePodOrErrorf(t, client, ns.Name, tc.update.Name)
+	}
+}
+
+// Test disabling of RelaxedDNSSearchValidation after a Pod has been created
+func TestRelaxedDNSSearchValidation(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t,
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+		framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-update-dns-search", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name               string
+		original           *v1.PodDNSConfig
+		valid              bool
+		featureGateEnabled bool
+		update             bool
+	}{
+		{
+			name:               "new pod with underscore - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+		{
+			name:               "new pod with dot - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+
+		{
+			name:               "new pod without underscore - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+		{
+			name:               "new pod with underscore - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:              false,
+			featureGateEnabled: false,
+		},
+		{
+			name:               "new pod with dot - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:              false,
+			featureGateEnabled: false,
+		},
+		{
+			name:               "new pod without underscore - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:              true,
+			featureGateEnabled: false,
+		},
+	}
+
+	for _, tc := range cases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, tc.featureGateEnabled)
+		pod := testPod("dns")
+		pod.Spec.DNSConfig = tc.original
+		_, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if tc.valid && err != nil {
+			t.Errorf("%v: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		// Disable gate and perform update
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, false)
+		pod.ObjectMeta.Labels = map[string]string{"label": "value"}
+		_, err = client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
+
+		if tc.valid && err != nil {
+			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		if tc.valid {
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
 	}
 }

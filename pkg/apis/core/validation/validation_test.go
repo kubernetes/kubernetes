@@ -24193,6 +24193,64 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		dnsConfig      *core.PodDNSConfig
+	}{
+		{
+			name:           "beginswith underscore, contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "begins with underscore, contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 // TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
 func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 	fldPath := field.NewPath("spec")

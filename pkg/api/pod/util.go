@@ -391,6 +391,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
 	// we must allow it
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
+	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 
 	if oldPodSpec != nil {
 		// if old spec has status.hostIPs downwardAPI set, we must allow it
@@ -445,6 +446,30 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 		}
 	}
 
+	return false
+}
+
+func useRelaxedDNSSearchValidation(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedDNSSearchValidation) {
+		return true
+	}
+
+	// Return false early if there is no DNSConfig or Searches.
+	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil || oldPodSpec.DNSConfig.Searches == nil {
+		return false
+	}
+
+	return hasDotOrUnderscore(oldPodSpec.DNSConfig.Searches)
+}
+
+// Helper function to check if any domain is a dot or contains an underscore.
+func hasDotOrUnderscore(searches []string) bool {
+	for _, domain := range searches {
+		if domain == "." || strings.Contains(domain, "_") {
+			return true
+		}
+	}
 	return false
 }
 

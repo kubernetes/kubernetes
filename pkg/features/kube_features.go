@@ -643,6 +643,13 @@ const (
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 
+	// owner: @adrianmoisey
+	// kep: https://kep.k8s.io/4427
+	// alpha: v1.32
+	//
+	// Relaxed DNS search string validation.
+	RelaxedDNSSearchValidation featuregate.Feature = "RelaxedDNSSearchValidation"
+
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4369
 	// alpha: v1.30

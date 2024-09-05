@@ -726,6 +726,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.23"
+- name: RelaxedDNSSearchValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: RelaxedEnvironmentVariableValidation
   versionedSpecs:
   - default: false
