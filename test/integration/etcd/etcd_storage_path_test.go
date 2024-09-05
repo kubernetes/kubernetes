@@ -71,6 +71,9 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 
