@@ -246,7 +246,9 @@ func autoConvert_api_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *Resourc
 	if err := Convert_api_ResourcePool_To_v1alpha3_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
 		return err
 	}
-	out.NodeName = in.NodeName
+	if err := Convert_api_UniqueString_To_string(&in.NodeName, &out.NodeName, s); err != nil {
+		return err
+	}
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
 	if in.Devices != nil {
@@ -275,7 +277,9 @@ func autoConvert_v1alpha3_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1alpha
 	if err := Convert_v1alpha3_ResourcePool_To_api_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
 		return err
 	}
-	out.NodeName = in.NodeName
+	if err := Convert_string_To_api_UniqueString(&in.NodeName, &out.NodeName, s); err != nil {
+		return err
+	}
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
 	if in.Devices != nil {

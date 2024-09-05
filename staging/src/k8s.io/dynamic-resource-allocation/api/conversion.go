@@ -29,11 +29,19 @@ var (
 )
 
 func Convert_api_UniqueString_To_string(in *UniqueString, out *string, s conversion.Scope) error {
+	if *in == NullUniqueString {
+		*out = ""
+		return nil
+	}
 	*out = in.String()
 	return nil
 }
 
 func Convert_string_To_api_UniqueString(in *string, out *UniqueString, s conversion.Scope) error {
+	if *in == "" {
+		*out = NullUniqueString
+		return nil
+	}
 	*out = UniqueString(unique.Make(*in))
 	return nil
 }
