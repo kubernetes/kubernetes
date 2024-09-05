@@ -1,3 +1,5 @@
+//go:build windows
+
 package interop
 
 import (
@@ -5,7 +7,7 @@ import (
 	"unsafe"
 )
 
-//go:generate go run ../../mksyscall_windows.go -output zsyscall_windows.go interop.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go interop.go
 
 //sys coTaskMemFree(buffer unsafe.Pointer) = api_ms_win_core_com_l1_1_0.CoTaskMemFree
 

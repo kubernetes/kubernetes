@@ -1,3 +1,5 @@
+//go:build windows
+
 package winapi
 
 import (
@@ -24,7 +26,10 @@ const (
 // Access rights for creating or opening job objects.
 //
 // https://docs.microsoft.com/en-us/windows/win32/procthread/job-object-security-and-access-rights
-const JOB_OBJECT_ALL_ACCESS = 0x1F001F
+const (
+	JOB_OBJECT_QUERY      = 0x0004
+	JOB_OBJECT_ALL_ACCESS = 0x1F001F
+)
 
 // IO limit flags
 //
@@ -52,6 +57,8 @@ const (
 	JobObjectLimitViolationInformation       uint32 = 13
 	JobObjectMemoryUsageInformation          uint32 = 28
 	JobObjectNotificationLimitInformation2   uint32 = 33
+	JobObjectCreateSilo                      uint32 = 35
+	JobObjectSiloBasicInformation            uint32 = 36
 	JobObjectIoAttribution                   uint32 = 42
 )
 
@@ -93,7 +100,7 @@ type JOBOBJECT_BASIC_PROCESS_ID_LIST struct {
 
 // AllPids returns all the process Ids in the job object.
 func (p *JOBOBJECT_BASIC_PROCESS_ID_LIST) AllPids() []uintptr {
-	return (*[(1 << 27) - 1]uintptr)(unsafe.Pointer(&p.ProcessIdList[0]))[:p.NumberOfProcessIdsInList]
+	return (*[(1 << 27) - 1]uintptr)(unsafe.Pointer(&p.ProcessIdList[0]))[:p.NumberOfProcessIdsInList:p.NumberOfProcessIdsInList]
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
@@ -108,29 +115,27 @@ type JOBOBJECT_BASIC_ACCOUNTING_INFORMATION struct {
 	TotalTerminateProcesses   uint32
 }
 
-//https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_and_io_accounting_information
+// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_and_io_accounting_information
 type JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION struct {
 	BasicInfo JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
 	IoInfo    windows.IO_COUNTERS
 }
 
-// typedef struct _JOBOBJECT_MEMORY_USAGE_INFORMATION {
-//     ULONG64 JobMemory;
-//     ULONG64 PeakJobMemoryUsed;
-// } JOBOBJECT_MEMORY_USAGE_INFORMATION, *PJOBOBJECT_MEMORY_USAGE_INFORMATION;
-//
+//	typedef struct _JOBOBJECT_MEMORY_USAGE_INFORMATION {
+//		ULONG64 JobMemory;
+//		ULONG64 PeakJobMemoryUsed;
+//	} JOBOBJECT_MEMORY_USAGE_INFORMATION, *PJOBOBJECT_MEMORY_USAGE_INFORMATION;
 type JOBOBJECT_MEMORY_USAGE_INFORMATION struct {
 	JobMemory         uint64
 	PeakJobMemoryUsed uint64
 }
 
-// typedef struct _JOBOBJECT_IO_ATTRIBUTION_STATS {
-//     ULONG_PTR IoCount;
-//     ULONGLONG TotalNonOverlappedQueueTime;
-//     ULONGLONG TotalNonOverlappedServiceTime;
-//     ULONGLONG TotalSize;
-// } JOBOBJECT_IO_ATTRIBUTION_STATS, *PJOBOBJECT_IO_ATTRIBUTION_STATS;
-//
+//	typedef struct _JOBOBJECT_IO_ATTRIBUTION_STATS {
+//		ULONG_PTR IoCount;
+//		ULONGLONG TotalNonOverlappedQueueTime;
+//		ULONGLONG TotalNonOverlappedServiceTime;
+//		ULONGLONG TotalSize;
+//	} JOBOBJECT_IO_ATTRIBUTION_STATS, *PJOBOBJECT_IO_ATTRIBUTION_STATS;
 type JOBOBJECT_IO_ATTRIBUTION_STATS struct {
 	IoCount                       uintptr
 	TotalNonOverlappedQueueTime   uint64
@@ -138,12 +143,11 @@ type JOBOBJECT_IO_ATTRIBUTION_STATS struct {
 	TotalSize                     uint64
 }
 
-// typedef struct _JOBOBJECT_IO_ATTRIBUTION_INFORMATION {
-//     ULONG ControlFlags;
-//     JOBOBJECT_IO_ATTRIBUTION_STATS ReadStats;
-//     JOBOBJECT_IO_ATTRIBUTION_STATS WriteStats;
-// } JOBOBJECT_IO_ATTRIBUTION_INFORMATION, *PJOBOBJECT_IO_ATTRIBUTION_INFORMATION;
-//
+//	typedef struct _JOBOBJECT_IO_ATTRIBUTION_INFORMATION {
+//	    ULONG ControlFlags;
+//	    JOBOBJECT_IO_ATTRIBUTION_STATS ReadStats;
+//	    JOBOBJECT_IO_ATTRIBUTION_STATS WriteStats;
+//	} JOBOBJECT_IO_ATTRIBUTION_INFORMATION, *PJOBOBJECT_IO_ATTRIBUTION_INFORMATION;
 type JOBOBJECT_IO_ATTRIBUTION_INFORMATION struct {
 	ControlFlags uint32
 	ReadStats    JOBOBJECT_IO_ATTRIBUTION_STATS
@@ -162,7 +166,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 // 		PBOOL  Result
 // );
 //
-//sys IsProcessInJob(procHandle windows.Handle, jobHandle windows.Handle, result *bool) (err error) = kernel32.IsProcessInJob
+//sys IsProcessInJob(procHandle windows.Handle, jobHandle windows.Handle, result *int32) (err error) = kernel32.IsProcessInJob
 
 // BOOL QueryInformationJobObject(
 //		HANDLE             hJob,
@@ -172,7 +176,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //		LPDWORD            lpReturnLength
 // );
 //
-//sys QueryInformationJobObject(jobHandle windows.Handle, infoClass uint32, jobObjectInfo uintptr, jobObjectInformationLength uint32, lpReturnLength *uint32) (err error) = kernel32.QueryInformationJobObject
+//sys QueryInformationJobObject(jobHandle windows.Handle, infoClass uint32, jobObjectInfo unsafe.Pointer, jobObjectInformationLength uint32, lpReturnLength *uint32) (err error) = kernel32.QueryInformationJobObject
 
 // HANDLE OpenJobObjectW(
 //		DWORD   dwDesiredAccess,
@@ -180,7 +184,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //		LPCWSTR lpName
 // );
 //
-//sys OpenJobObject(desiredAccess uint32, inheritHandle bool, lpName *uint16) (handle windows.Handle, err error) = kernel32.OpenJobObjectW
+//sys OpenJobObject(desiredAccess uint32, inheritHandle int32, lpName *uint16) (handle windows.Handle, err error) = kernel32.OpenJobObjectW
 
 // DWORD SetIoRateControlInformationJobObject(
 //		HANDLE                                hJob,
@@ -195,6 +199,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //		JOBOBJECT_IO_RATE_CONTROL_INFORMATION **InfoBlocks,
 // 		ULONG                                 *InfoBlockCount
 // );
+//
 //sys QueryIoRateControlInformationJobObject(jobHandle windows.Handle, volumeName *uint16, ioRateControlInfo **JOBOBJECT_IO_RATE_CONTROL_INFORMATION, infoBlockCount *uint32) (ret uint32, err error) = kernel32.QueryIoRateControlInformationJobObject
 
 // NTSTATUS
@@ -203,6 +208,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //     _In_ ACCESS_MASK DesiredAccess,
 //     _In_ POBJECT_ATTRIBUTES ObjectAttributes
 // );
+//
 //sys NtOpenJobObject(jobHandle *windows.Handle, desiredAccess uint32, objAttributes *ObjectAttributes) (status uint32) = ntdll.NtOpenJobObject
 
 // NTSTATUS
@@ -212,4 +218,5 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //     _In_ ACCESS_MASK DesiredAccess,
 //     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes
 // );
+//
 //sys NtCreateJobObject(jobHandle *windows.Handle, desiredAccess uint32, objAttributes *ObjectAttributes) (status uint32) = ntdll.NtCreateJobObject

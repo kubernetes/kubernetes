@@ -1,3 +1,5 @@
+//go:build windows
+
 package hns
 
 import (
@@ -29,7 +31,7 @@ func hnsCallRawResponse(method, path, request string) (*hnsResponse, error) {
 func hnsCall(method, path, request string, returnResponse interface{}) error {
 	hnsresponse, err := hnsCallRawResponse(method, path, request)
 	if err != nil {
-		return fmt.Errorf("failed during hnsCallRawResponse: %v", err)
+		return fmt.Errorf("failed during hnsCallRawResponse: %w", err)
 	}
 	if !hnsresponse.Success {
 		return fmt.Errorf("hns failed with error : %s", hnsresponse.Error)

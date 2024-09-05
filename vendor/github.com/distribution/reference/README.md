@@ -10,7 +10,7 @@ Go library to handle references to container images.
 [![codecov](https://codecov.io/gh/distribution/reference/branch/main/graph/badge.svg)](https://codecov.io/gh/distribution/reference)
 [![FOSSA Status](https://app.fossa.com/api/projects/custom%2B162%2Fgithub.com%2Fdistribution%2Freference.svg?type=shield)](https://app.fossa.com/projects/custom%2B162%2Fgithub.com%2Fdistribution%2Freference?ref=badge_shield)
 
-This repository contains a library for handling refrences to container images held in container registries. Please see [godoc](https://pkg.go.dev/github.com/distribution/reference) for details.
+This repository contains a library for handling references to container images held in container registries. Please see [godoc](https://pkg.go.dev/github.com/distribution/reference) for details.
 
 ## Contribution
 

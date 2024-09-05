@@ -69,7 +69,44 @@
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
       "rsc.io/quote": "refer to #102833",
-      "rsc.io/sampler": "refer to #102833"
+      "rsc.io/sampler": "refer to #102833",
+      "github.com/Microsoft/cosesign1go": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/Microsoft/didx509go": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/OneOfOne/xxhash": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/agnivade/levenshtein": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/akavel/rsrc": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/decred/dcrd/dcrec/secp256k1/v4": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/docker/cli": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/docker/docker-credential-helpers": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/docker/go-events": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/go-ini/ini": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/gobwas/glob": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/goccy/go-json": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/google/go-containerregistry": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/josephspurrier/goversioninfo": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/klauspost/compress": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/backoff/v2": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/blackmagic": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/httpcc": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/iter": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/jwx": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/lestrrat-go/option": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/linuxkit/virtsock": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/mattn/go-shellwords": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/mitchellh/go-homedir": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/moby/docker-image-spec": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/moby/sys/sequential": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/open-policy-agent/opa": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/pelletier/go-toml": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/rcrowley/go-metrics": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/tchap/go-patricia/v2": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/vbatts/tar-split": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/veraison/go-cose": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/xeipuuv/gojsonpointer": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/xeipuuv/gojsonreference": "FIXME: Temporary transitive dependency for hcsshim",
+      "github.com/yashtewari/glob-intersection": "FIXME: Temporary transitive dependency for hcsshim",
+      "go.uber.org/mock": "FIXME: Temporary transitive dependency for hcsshim",
+      "google.golang.org/grpc/cmd/protoc-gen-go-grpc": "FIXME: Temporary transitive dependency for hcsshim"
     }
   },
   "status": {
@@ -87,17 +124,50 @@
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
       ],
+      "github.com/Microsoft/cosesign1go": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/Microsoft/didx509go": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/OneOfOne/xxhash": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/agnivade/levenshtein": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/akavel/rsrc": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/decred/dcrd/dcrec/secp256k1/v4": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/docker/cli": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/docker/docker-credential-helpers": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/docker/go-events": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/go-ini/ini": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
-      "github.com/gogo/googleapis": [
-        "github.com/google/cadvisor"
+      "github.com/gobwas/glob": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/goccy/go-json": [
+        "github.com/Microsoft/hcsshim"
       ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/cgroups",
+        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -117,6 +187,9 @@
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
+      "github.com/google/go-containerregistry": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go",
         "k8s.io/apiextensions-apiserver",
@@ -135,6 +208,9 @@
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
+      "github.com/gorilla/mux": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
       ],
@@ -147,6 +223,9 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/server/v3"
       ],
+      "github.com/josephspurrier/goversioninfo": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
         "go.etcd.io/etcd/client/v2",
@@ -154,6 +233,30 @@
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
+      ],
+      "github.com/klauspost/compress": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/backoff/v2": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/blackmagic": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/httpcc": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/iter": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/jwx": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/lestrrat-go/option": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/linuxkit/virtsock": [
+        "github.com/Microsoft/hcsshim"
       ],
       "github.com/mailru/easyjson": [
         "github.com/go-openapi/jsonpointer",
@@ -163,26 +266,67 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/mattn/go-shellwords": [
+        "github.com/Microsoft/hcsshim"
+       ],
+       "github.com/mitchellh/go-homedir": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/moby/docker-image-spec": [
+        "github.com/Microsoft/hcsshim",
+        "github.com/google/cadvisor"
+      ],
+      "github.com/moby/sys/sequential": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/open-policy-agent/opa": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/pelletier/go-toml": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
-        "github.com/containerd/continuity",
-        "github.com/containerd/fifo",
-        "github.com/containerd/go-runc",
-        "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
-        "gotest.tools/v3",
         "k8s.io/kubectl",
         "k8s.io/kubernetes",
         "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
+      "github.com/rcrowley/go-metrics": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/tchap/go-patricia/v2": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/vbatts/tar-split": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/veraison/go-cose": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/xeipuuv/gojsonpointer": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/xeipuuv/gojsonreference": [
+        "github.com/Microsoft/hcsshim"
+      ],
+      "github.com/yashtewari/glob-intersection": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "go.opencensus.io": [
         "github.com/Microsoft/hcsshim"
       ],
+      "go.uber.org/mock": [
+        "github.com/Microsoft/hcsshim"
+      ],
       "golang.org/x/exp": [
+        "github.com/Microsoft/hcsshim",
         "github.com/antlr4-go/antlr/v4",
+        "github.com/cilium/ebpf",
+        "github.com/containerd/cgroups/v3",
         "github.com/google/cel-go",
         "k8s.io/mount-utils"
       ],
@@ -190,12 +334,15 @@
         "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
-        "github.com/containerd/ttrpc",
+       "github.com/Microsoft/hcsshim",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3"
+      ],
+      "google.golang.org/grpc/cmd/protoc-gen-go-grpc": [
+        "github.com/Microsoft/hcsshim"
       ]
     },
     "unwantedVendored": [

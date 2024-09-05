@@ -4,10 +4,10 @@ package asm
 
 // Mode for load and store operations
 //
-//    msb      lsb
-//    +---+--+---+
-//    |MDE|sz|cls|
-//    +---+--+---+
+//	msb      lsb
+//	+---+--+---+
+//	|MDE|sz|cls|
+//	+---+--+---+
 type Mode uint8
 
 const modeMask OpCode = 0xe0
@@ -30,10 +30,10 @@ const (
 
 // Size of load and store operations
 //
-//    msb      lsb
-//    +---+--+---+
-//    |mde|SZ|cls|
-//    +---+--+---+
+//	msb      lsb
+//	+---+--+---+
+//	|mde|SZ|cls|
+//	+---+--+---+
 type Size uint8
 
 const sizeMask OpCode = 0x18

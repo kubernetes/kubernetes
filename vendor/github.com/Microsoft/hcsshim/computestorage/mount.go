@@ -1,3 +1,5 @@
+//go:build windows
+
 package computestorage
 
 import (
@@ -6,14 +8,13 @@ import (
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/Microsoft/hcsshim/internal/oc"
 	"github.com/pkg/errors"
-	"go.opencensus.io/trace"
 	"golang.org/x/sys/windows"
 )
 
 // GetLayerVhdMountPath returns the volume path for a virtual disk of a writable container layer.
 func GetLayerVhdMountPath(ctx context.Context, vhdHandle windows.Handle) (path string, err error) {
-	title := "hcsshim.GetLayerVhdMountPath"
-	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	title := "hcsshim::GetLayerVhdMountPath"
+	ctx, span := oc.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 
