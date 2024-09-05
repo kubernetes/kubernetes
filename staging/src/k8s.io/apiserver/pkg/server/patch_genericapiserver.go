@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/audit"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -196,8 +197,10 @@ func WithLateConnectionFilter(handler http.Handler) http.Handler {
 		if late {
 			if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" && pth != "/livez" {
 				if isLocal(r) {
+					audit.AddAuditAnnotation(r.Context(), "openshift.io/during-graceful", fmt.Sprintf("loopback=true,%v,readyz=false", r.URL.Host))
 					klog.V(4).Infof("Loopback request to %q (user agent %q) through connection created very late in the graceful termination process (more than 80%% has passed). This client probably does not watch /readyz and might get failures when termination is over.", r.URL.Path, r.UserAgent())
 				} else {
+					audit.AddAuditAnnotation(r.Context(), "openshift.io/during-graceful", fmt.Sprintf("loopback=false,%v,readyz=false", r.URL.Host))
 					klog.Warningf("Request to %q (source IP %s, user agent %q) through a connection created very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", r.URL.Path, r.RemoteAddr, r.UserAgent())
 
 					// create only one event to avoid event spam.
@@ -234,9 +237,11 @@ func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadySignal lifecyc
 		if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" && pth != "/livez" {
 			if isLocal(r) {
 				if !isKubeApiserverLoopBack(r) {
+					audit.AddAuditAnnotation(r.Context(), "openshift.io/unready", fmt.Sprintf("loopback=true,%v,readyz=false", r.URL.Host))
 					klog.V(2).Infof("Loopback request to %q (user agent %q) before server is ready. This client probably does not watch /readyz and might get inconsistent answers.", r.URL.Path, r.UserAgent())
 				}
 			} else {
+				audit.AddAuditAnnotation(r.Context(), "openshift.io/unready", fmt.Sprintf("loopback=false,%v,readyz=false", r.URL.Host))
 				klog.Warningf("Request to %q (source IP %s, user agent %q) before server is ready, possibly a sign for a broken load balancer setup.", r.URL.Path, r.RemoteAddr, r.UserAgent())
 
 				// create only one event to avoid event spam.
