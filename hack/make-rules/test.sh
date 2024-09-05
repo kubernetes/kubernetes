@@ -66,9 +66,6 @@ KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # The directory to save test coverage reports to, if generating them. If unset,
 # a semi-predictable temporary directory will be used.
 KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
-# How many 'go test' instances to run simultaneously when running tests in
-# coverage mode.
-KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 # use KUBE_RACE="" to disable the race detector
 # this is defaulted to "-race" in make test as well
 # NOTE: DO NOT ADD A COLON HERE. KUBE_RACE="" is meaningful!
@@ -133,25 +130,20 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
+#
+# KUBE_TEST_ARGS contains arguments for `go test` (like -short)
+# and may end with `-args <arguments for test binary>`, so it
+# has to be passed to `go test` at the end of the invocation.
 testargs=()
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
-# Used to filter verbose test output.
-go_test_grep_pattern=".*"
+# gotestsum --format value
+gotestsum_format=standard-quiet
+if [[ -n "${FULL_LOG:-}" ]] ; then
+  gotestsum_format=standard-verbose
+fi
 
 goflags=()
-# The junit report tool needs full test case information to produce a
-# meaningful report.
-if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
-  goflags+=(-v)
-  goflags+=(-json)
-  # Show only summary lines by matching lines like "status package/test"
-  go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
-fi
-
-if [[ -n "${FULL_LOG:-}" ]] ; then
-  go_test_grep_pattern=".*"
-fi
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
@@ -180,113 +172,78 @@ junitFilenamePrefix() {
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
-produceJUnitXMLReport() {
-  local -r junit_filename_prefix=$1
-  if [[ -z "${junit_filename_prefix}" ]]; then
-    return
-  fi
-
-  local junit_xml_filename
-  junit_xml_filename="${junit_filename_prefix}.xml"
-
+installTools() {
   if ! command -v gotestsum >/dev/null 2>&1; then
     kube::log::status "gotestsum not found; installing from ./hack/tools"
     go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
-  fi
-  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
-  if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm "${junit_filename_prefix}"*.stdout
   fi
 
   if ! command -v prune-junit-xml >/dev/null 2>&1; then
     kube::log::status "prune-junit-xml not found; installing from ./cmd"
     go -C "${KUBE_ROOT}/cmd/prune-junit-xml" install .
   fi
-  prune-junit-xml "${junit_xml_filename}"
-
-  kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
 runTests() {
   local junit_filename_prefix
   junit_filename_prefix=$(junitFilenamePrefix)
 
-  # Try to normalize input names.
+  installTools
+
+  # Try to normalize input names. This is slow!
   local -a targets
+  kube::log::status "Normalizing Go targets"
   kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
 
-  # If we're not collecting coverage, run all requested tests with one 'go test'
-  # command, which is much faster.
-  if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running tests without code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-    # shellcheck disable=SC2031
-    go test "${goflags[@]:+${goflags[@]}}" \
-     "${KUBE_TIMEOUT}" "${targets[@]}" \
-     "${testargs[@]:+${testargs[@]}}" \
-     | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
-    produceJUnitXMLReport "${junit_filename_prefix}"
-    return "${rc}"
-  fi
+  # Enable coverage data collection?
+  local cover_msg
+  local COMBINED_COVER_PROFILE
 
-  kube::log::status "Running tests with code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-
-  # Create coverage report directories.
-  if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+  if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then
+    cover_msg="with code coverage"
+    if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
+      cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+    else
+      cover_report_dir="${KUBE_COVER_REPORT_DIR}"
+    fi
+    kube::log::status "Saving coverage output in '${cover_report_dir}'"
+    mkdir -p "${@+${@/#/${cover_report_dir}/}}"
+    COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
+    goflags+=(-cover -covermode="${KUBE_COVERMODE}" -coverprofile="${COMBINED_COVER_PROFILE}")
   else
-    cover_report_dir="${KUBE_COVER_REPORT_DIR}"
+    cover_msg="without code coverage"
   fi
-  cover_profile="coverage.out"  # Name for each individual coverage profile
-  kube::log::status "Saving coverage output in '${cover_report_dir}'"
-  mkdir -p "${@+${@/#/${cover_report_dir}/}}"
 
-  # Run all specified tests, collecting coverage results. Go currently doesn't
-  # support collecting coverage across multiple packages at once, so we must issue
-  # separate 'go test' commands for each package and then combine at the end.
-  # To speed things up considerably, we can at least use xargs -P to run multiple
-  # 'go test' commands at once.
-  # To properly parse the test results if generating a JUnit test report, we
-  # must make sure the output from PARALLEL runs is not mixed. To achieve this,
-  # we spawn a subshell for each PARALLEL process, redirecting the output to
-  # separate files.
+  # Keep the raw JSON output in addition to the JUnit file?
+  local jsonfile=""
+  if [[ -n "${junit_filename_prefix}" ]] && [[ ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
+      jsonfile="${junit_filename_prefix}.stdout"
+  fi
 
-  printf "%s\n" "${@}" \
-    | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
-    bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
-      go test ${goflags[*]:+${goflags[*]}} \
-        ${KUBE_TIMEOUT} \
-        -cover -covermode=\"${KUBE_COVERMODE}\" \
-        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-        \"\${_pkg}\" \
-        ${testargs[*]:+${testargs[*]}} \
-      | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-      | grep \"${go_test_grep_pattern}\"" \
-    {} \
-    && test_result=$? || test_result=$?
+  kube::log::status "Running tests ${cover_msg} ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
+  gotestsum --format="${gotestsum_format}" \
+            --jsonfile="${jsonfile}" \
+            --junitfile="${junit_filename_prefix:+"${junit_filename_prefix}.xml"}" \
+            --raw-command \
+            -- \
+            go test -json \
+            "${goflags[@]:+${goflags[@]}}" \
+            "${KUBE_TIMEOUT}" \
+            "${targets[@]}" \
+            "${testargs[@]:+${testargs[@]}}" \
+    && rc=$? || rc=$?
 
-  produceJUnitXMLReport "${junit_filename_prefix}"
+  if [[ -n "${junit_filename_prefix}" ]]; then
+    prune-junit-xml "${junit_filename_prefix}.xml"
+  fi
 
-  COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
-  {
-    # The combined coverage profile needs to start with a line indicating which
-    # coverage mode was used (set, count, or atomic). This line is included in
-    # each of the coverage profiles generated when running 'go test -cover', but
-    # we strip these lines out when combining so that there's only one.
-    echo "mode: ${KUBE_COVERMODE}"
+  if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then
+    coverage_html_file="${cover_report_dir}/combined-coverage.html"
+    go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
+    kube::log::status "Combined coverage report: ${coverage_html_file}"
+  fi
 
-    # Include all coverage reach data in the combined profile, but exclude the
-    # 'mode' lines, as there should be only one.
-    while IFS='' read -r x; do
-      grep -h -v "^mode:" < "${x}" || true
-    done < <(find "${cover_report_dir}" -name "${cover_profile}")
-  } >"${COMBINED_COVER_PROFILE}"
-
-  coverage_html_file="${cover_report_dir}/combined-coverage.html"
-  go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
-  kube::log::status "Combined coverage report: ${coverage_html_file}"
-
-  return "${test_result}"
+  return "${rc}"
 }
 
 reportCoverageToCoveralls() {
