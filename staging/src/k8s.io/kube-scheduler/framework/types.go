@@ -179,7 +179,7 @@ const (
 	CSIStorageCapacity    EventResource = "storage.k8s.io/CSIStorageCapacity"
 	StorageClass          EventResource = "storage.k8s.io/StorageClass"
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
-	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
+	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice" // Hints use the ResourceSlice type from k8s.io/dynamic-resource-allocation/api.
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"

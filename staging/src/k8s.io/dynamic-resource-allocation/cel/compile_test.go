@@ -669,7 +669,6 @@ func testCEL(tCtx ktesting.TContext) {
 				return
 			}
 			tCtx.Require(result.Error).To(g.Succeed(), "unexpected compile error")
-
 			tCtx.Assert(result.MaxCost).To(g.Equal(scenario.expectCost), "expected CEL cost (%.0f%% of limit %d)", float64(result.MaxCost)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 
 			match, details, err := result.DeviceMatches(tCtx, Device{

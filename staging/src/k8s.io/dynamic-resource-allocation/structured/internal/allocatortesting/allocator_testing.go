@@ -966,6 +966,18 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 	}
 }
 
+func apiSlices(in []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
+	out := make([]*draapi.ResourceSlice, len(in))
+	for i := range in {
+		var o draapi.ResourceSlice
+		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(in[i], &o, nil); err != nil {
+			panic(err)
+		}
+		out[i] = &o
+	}
+	return out
+}
+
 type AllocatorTestCase struct {
 	features                 Features
 	claimsToAllocate         []wrapResourceClaim
@@ -1009,7 +1021,7 @@ func TestAllocator(t *testing.T,
 		features Features,
 		allocateState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
 	tCtx := ktesting.Init(t)
@@ -9438,12 +9450,12 @@ func TestAllocator(t *testing.T,
 					tCtx.Cancel("cancel test")
 				}
 
-				allocator, err := newAllocator(tCtx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
+				allocator, err := newAllocator(tCtx, Features{}, AllocatedState{}, classLister, apiSlices(slices), cel.NewCache(1, cel.Features{}))
 				tCtx.ExpectNoError(err)
 				_, err = allocator.Allocate(tCtx, node, claimsToAllocate)
 				tCtx.Logf("got error %v", err)
 				if tCtx.Err() != nil {
-					tCtx.Require(err).To(g.MatchError(tCtx.Err()))
+					tCtx.Expect(err).To(g.MatchError(tCtx.Err()))
 				} else {
 					tCtx.ExpectNoError(err)
 				}
@@ -9459,7 +9471,7 @@ func runTestAllocator(tCtx ktesting.TContext,
 		features Features,
 		allocateState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error),
 	testcases map[string]AllocatorTestCase) {
@@ -9505,7 +9517,8 @@ func runTestAllocator(tCtx ktesting.TContext,
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(tCtx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
+
+			allocator, err := newAllocator(tCtx, tc.features, allocatedState, classLister, apiSlices(slices), cel.NewCache(1, cel.Features{
 				EnableConsumableCapacity: tc.features.ConsumableCapacity,
 				EnableListTypeAttributes: tc.features.ListTypeAttributes,
 			}))

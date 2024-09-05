@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	resourceapi "k8s.io/api/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/ktesting"
 )
@@ -33,7 +34,7 @@ func TestLexicographicalAllocator(t *testing.T,
 		features Features,
 		allocateState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
 	tCtx := ktesting.Init(t)
