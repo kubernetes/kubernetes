@@ -754,6 +754,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		for _, item := range table {
 			t.Run(fmt.Sprintf("[QueueingHint: %v] %s", qHintEnabled, item.name), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, qHintEnabled)
+				logger, ctx := ktesting.NewTestContext(t)
 				var gotError error
 				var gotPod *v1.Pod
 				var gotForgetPod *v1.Pod
@@ -781,8 +782,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					gotBinding = action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
 					return true, gotBinding, item.injectBindError
 				})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+
 				fwk, err := tf.NewFramework(ctx,
 					append(item.registerPluginFuncs,
 						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -806,7 +806,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					SchedulingQueue: queue,
 					Profiles:        profile.Map{testSchedulerName: fwk},
 				}
-				queue.Add(klog.Logger{}, item.sendPod)
+				queue.Add(logger, item.sendPod)
 
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 					return item.mockResult.result, item.mockResult.err
