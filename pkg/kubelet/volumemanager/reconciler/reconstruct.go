@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"context"
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,6 +153,8 @@ func (rc *reconciler) cleanOrphanVolumes() {
 		return
 	}
 
+	volumesUnmountFailed := make([]podVolume, 0)
+
 	for _, volume := range rc.volumesFailedReconstruction {
 		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			// Some pod needs the volume, don't clean it up and hope that
@@ -161,11 +164,17 @@ func (rc *reconciler) cleanOrphanVolumes() {
 		}
 		klog.InfoS("Cleaning up mounts for volume that could not be reconstructed", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 		rc.cleanupMounts(volume)
+
+		if _, err := os.Stat(volume.volumePath); os.IsNotExist(err) {
+			continue
+		}
+		klog.Warningf("volume path still exists, need process again. podName: %s, volumeSpecName: %s", volume.podName, volume.volumeSpecName)
+		volumesUnmountFailed = append(volumesUnmountFailed, volume)
 	}
 
 	klog.V(2).InfoS("Orphan volume cleanup finished")
-	// Clean the cache, cleanup is one shot operation.
-	rc.volumesFailedReconstruction = make([]podVolume, 0)
+	// restore the pod volumes need to process again.
+	rc.volumesFailedReconstruction = volumesUnmountFailed
 }
 
 // updateReconstructedFromNodeStatus tries to file devicePaths of reconstructed volumes from
