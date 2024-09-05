@@ -32,6 +32,7 @@ import (
 const (
 	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
+	DRASubsystem                       = "dra"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
 	NodeStartupPreKubeletKey           = "node_startup_pre_kubelet_duration_seconds"
@@ -126,6 +127,9 @@ const (
 
 	// Metric for tracking garbage collected images
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
+
+	// Metric keys for DRA operations
+	DRAOperationsDurationKey = "dra_operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -917,6 +921,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA operations",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1008,6 +1024,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			legacyregistry.MustRegister(DRAOperationsDuration)
+		}
 	})
 }
 
