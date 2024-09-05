@@ -3115,7 +3115,7 @@ func TestDoPodResizeAction(t *testing.T) {
 			// If some containers don't have limits, pod level limits are not applied
 			otherContainersHaveLimits: false,
 			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
-			expectPodCgroupUpdates:    1, // cpu req, cpu lim, mem lim
+			expectPodCgroupUpdates:    1, // cpu req
 		},
 		{
 			testName: "Increase cpu and memory requests only",
@@ -3183,6 +3183,43 @@ func TestDoPodResizeAction(t *testing.T) {
 			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
 			expectPodCgroupUpdates:    2, // cpu lim, memory lim
 		},
+		{
+			testName: "Remove limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates: 0,
+		},
+		{
+			testName: "Remove limits and pod limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    2, // cpu lim, memory lim
+		},
+		{
+			testName: "Remove requests",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources:       containerResources{},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates: 1, // cpu req
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
 			_, _, m, err := createTestRuntimeManagerWithErrors(tCtx, tc.runtimeErrors)
@@ -3196,20 +3233,27 @@ func TestDoPodResizeAction(t *testing.T) {
 			mockPCM := cmtesting.NewMockPodContainerManager(t)
 			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
 
+			podMemoryLimit := int64(-1)
+			const mega = 1000000
+			if tc.otherContainersHaveLimits && tc.currentResources.memoryLimit > 0 {
+				podMemoryLimit = (tc.currentResources.memoryLimit + 200) * mega
+			}
 			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
-				Memory: ptr.To(tc.currentResources.memoryLimit),
+				Memory: ptr.To(podMemoryLimit),
 			}, nil).Maybe()
 			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
 			// Set up mock pod cgroup config
 			podCPURequest := tc.currentResources.cpuRequest
-			podCPULimit := tc.currentResources.cpuLimit
 			if tc.otherContainersHaveLimits {
 				podCPURequest += 200
-				podCPULimit += 200
+			}
+			podCPUQuota := int64(-1)
+			if tc.otherContainersHaveLimits && tc.currentResources.cpuLimit > 0 {
+				podCPUQuota = cm.MilliCPUToQuota(tc.currentResources.cpuLimit+200, cm.QuotaPeriod)
 			}
 			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
 				CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
-				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
+				CPUQuota:  ptr.To(podCPUQuota),
 			}, nil).Maybe()
 			if tc.expectPodCgroupUpdates > 0 {
 				// TODO: Update to use proper logger once contextual logging migration is complete
@@ -3221,11 +3265,11 @@ func TestDoPodResizeAction(t *testing.T) {
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuRequest, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest*mega, resource.DecimalSI),
 				},
 				Limits: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit*mega, resource.DecimalSI),
 				},
 			}
 			if tc.otherContainersHaveLimits {
