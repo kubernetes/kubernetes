@@ -821,7 +821,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 
 	for i := range result {
 		slice := result[i].slice
-		if slice.Spec.NodeName != "" {
+		if slice.Spec.NodeName != draapi.NullUniqueString {
 			// At least one device is local to one node. This
 			// restricts the allocation to that node.
 			return &v1.NodeSelector{
@@ -829,7 +829,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					MatchFields: []v1.NodeSelectorRequirement{{
 						Key:      "metadata.name",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{slice.Spec.NodeName},
+						Values:   []string{slice.Spec.NodeName.String()},
 					}},
 				}},
 			}, nil

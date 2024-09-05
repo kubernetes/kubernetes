@@ -33,11 +33,15 @@ import (
 // recorded in the result.
 func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
+	nodeName := ""
+	if node != nil {
+		nodeName = node.Name
+	}
 
 	for _, slice := range slices {
 		switch {
 		case slice.Spec.NodeName != "":
-			if slice.Spec.NodeName == node.Name {
+			if slice.Spec.NodeName == nodeName {
 				if err := addSlice(pools, slice); err != nil {
 					return nil, fmt.Errorf("add node slice %s: %w", slice.Name, err)
 				}
@@ -47,6 +51,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
 			}
 		case slice.Spec.NodeSelector != nil:
+			// TODO: move conversion into api.
 			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)
