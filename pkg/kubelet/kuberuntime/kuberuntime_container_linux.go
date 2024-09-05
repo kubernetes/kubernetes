@@ -258,6 +258,25 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	}
 }
 
+// generateContainerResourcesForUpdate generates platform specific (linux) container resources config for runtime
+// with setting negative values to parameters that will be updated to max.
+func (m *kubeGenericRuntimeManager) generateContainerResourcesForUpdate(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+	containerResources := m.generateContainerResources(pod, container)
+	if containerResources == nil {
+		return nil
+	}
+	if m.cpuCFSQuota && containerResources.Linux.CpuQuota == 0 {
+		containerResources.Linux.CpuQuota = -1
+	}
+	if containerResources.Linux.CpuShares == 0 {
+		containerResources.Linux.CpuShares = cm.MinShares
+	}
+	if containerResources.Linux.MemoryLimitInBytes == 0 {
+		containerResources.Linux.MemoryLimitInBytes = -1
+	}
+	return containerResources
+}
+
 // generateUpdatePodSandboxResourcesRequest generates platform specific (linux) podsandox resources config for runtime
 func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
 
