@@ -56,15 +56,14 @@ type Allocator struct {
 // Allocate call.
 func NewAllocator(ctx context.Context,
 	claimsToAllocate []*resourceapi.ResourceClaim,
-	allocatedDevices []DeviceID,
+	allocatedDevices sets.Set[DeviceID],
 	classLister resourcelisters.DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *CELCache,
 ) (*Allocator, error) {
 	return &Allocator{
 		claimsToAllocate: claimsToAllocate,
-		// This won't change, so build this set only once.
-		allocatedDevices: sets.New(allocatedDevices...),
+		allocatedDevices: allocatedDevices,
 		classLister:      classLister,
 		slices:           slices,
 		celCache:         celCache,
