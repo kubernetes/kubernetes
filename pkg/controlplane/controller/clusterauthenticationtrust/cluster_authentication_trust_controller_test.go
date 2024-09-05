@@ -101,6 +101,7 @@ func TestWriteClientCAs(t *testing.T) {
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				ClientCA:                         someRandomCAProvider,
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{"alfa", "bravo", "charlie"},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"golf", "hotel", "india"},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{"delta"},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{"echo", "foxtrot"},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -112,6 +113,7 @@ func TestWriteClientCAs(t *testing.T) {
 					Data: map[string]string{
 						"client-ca-file":                     string(someRandomCA),
 						"requestheader-username-headers":     `["alfa","bravo","charlie"]`,
+						"requestheader-uid-headers":          `["golf","hotel","india"]`,
 						"requestheader-group-headers":        `["delta"]`,
 						"requestheader-extra-headers-prefix": `["echo","foxtrot"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -132,6 +134,7 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -166,6 +169,7 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -201,6 +205,7 @@ func TestWriteClientCAs(t *testing.T) {
 			name: "overwrite extension-apiserver-authentication requestheader",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -211,6 +216,7 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(someRandomCA),
@@ -223,6 +229,7 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(someRandomCA) + string(anotherRandomCA),
@@ -253,6 +260,7 @@ func TestWriteClientCAs(t *testing.T) {
 			name: "skip on no change",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -263,6 +271,7 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -332,6 +341,7 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 		Data: map[string]string{
 			"requestheader-username-headers":     `[]`,
+			"requestheader-uid-headers":          `[]`,
 			"requestheader-group-headers":        `[]`,
 			"requestheader-extra-headers-prefix": `[]`,
 			"requestheader-client-ca-file":       string(anotherRandomCA),
