@@ -436,7 +436,145 @@ func TestCreateConfig(t *testing.T) {
 
 	// Don't check
 	c.SecureServing = nil
+	assert.NotNil(t, c.WebhookSecureServing, "webhook secureserving shouldn't be nil")
 	c.WebhookSecureServing = nil
+	c.Authentication = apiserver.AuthenticationInfo{}
+	c.Authorization = apiserver.AuthorizationInfo{}
+	c.SharedInformers = nil
+	c.VersionedClient = nil
+	c.ClientBuilder = nil
+	c.EventRecorder = nil
+	c.EventBroadcaster = nil
+	c.Kubeconfig = nil
+	c.Client = nil
+	c.LoopbackClientConfig = nil
+
+	if !reflect.DeepEqual(expected, c) {
+		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", cmp.Diff(expected, c))
+	}
+}
+
+func TestCreateConfigWithoutWebHooks(t *testing.T) {
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+
+	s, err := NewCloudControllerManagerOptions()
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+
+	for _, f := range s.Flags([]string{""}, []string{""}, nil, []string{""}, []string{""}).FlagSets {
+		fs.AddFlagSet(f)
+	}
+
+	tmpdir, err := os.MkdirTemp("", "options_test")
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	args := []string{
+		"--allocate-node-cidrs=true",
+		"--authorization-always-allow-paths=",
+		"--bind-address=0.0.0.0",
+		"--secure-port=10200",
+		fmt.Sprintf("--cert-dir=%s/certs", tmpdir),
+		"--cloud-provider=aws",
+		"--cluster-cidr=1.2.3.4/24",
+		"--cluster-name=k8s",
+		"--configure-cloud-routes=false",
+		"--contention-profiling=true",
+		"--controller-start-interval=2m",
+		"--controllers=foo,bar",
+		"--concurrent-node-syncs=1",
+		"--http2-max-streams-per-connection=47",
+		"--kube-api-burst=101",
+		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
+		"--kube-api-qps=50.0",
+		"--leader-elect=false",
+		"--leader-elect-lease-duration=30s",
+		"--leader-elect-renew-deadline=15s",
+		"--leader-elect-resource-lock=configmap",
+		"--leader-elect-retry-period=5s",
+		"--master=192.168.4.20",
+		"--min-resync-period=100m",
+		"--node-status-update-frequency=10m",
+		"--profiling=false",
+		"--route-reconciliation-period=30s",
+		"--use-service-account-credentials=false",
+	}
+	err = fs.Parse(args)
+	if err != nil {
+		t.Errorf("error parsing the arguments, error : %v", err)
+	}
+
+	fs.VisitAll(func(f *pflag.Flag) {
+		fmt.Printf("%s: %s\n", f.Name, f.Value)
+	})
+
+	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
+	if err != nil {
+		t.Errorf("error generating config, error : %v", err)
+	}
+
+	expected := &appconfig.Config{
+		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
+			Generic: cmconfig.GenericControllerManagerConfiguration{
+				Address:         "0.0.0.0",
+				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					ContentType: "application/vnd.kubernetes.protobuf",
+					QPS:         50.0,
+					Burst:       101,
+				},
+				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					ResourceLock:      "configmap",
+					LeaderElect:       false,
+					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+					ResourceName:      "cloud-controller-manager",
+					ResourceNamespace: "kube-system",
+				},
+				Controllers: []string{"foo", "bar"},
+				Debugging: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           false,
+					EnableContentionProfiling: true,
+				},
+				LeaderMigration: cmconfig.LeaderMigrationConfiguration{},
+			},
+			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
+				CloudProvider: cpconfig.CloudProviderConfiguration{
+					Name:            "aws",
+					CloudConfigFile: "",
+				},
+			},
+			ServiceController: serviceconfig.ServiceControllerConfiguration{
+				ConcurrentServiceSyncs: 1,
+			},
+			NodeController:            nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 1},
+			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
+			Webhook:                   cpconfig.WebhookConfiguration{},
+		},
+		SecureServing:        nil,
+		WebhookSecureServing: nil,
+		Authentication:       apiserver.AuthenticationInfo{},
+		Authorization:        apiserver.AuthorizationInfo{},
+	}
+
+	// Don't check
+	c.SecureServing = nil
 	c.Authentication = apiserver.AuthenticationInfo{}
 	c.Authorization = apiserver.AuthorizationInfo{}
 	c.SharedInformers = nil
