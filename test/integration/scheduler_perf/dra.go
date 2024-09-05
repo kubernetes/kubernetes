@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
@@ -309,14 +310,14 @@ claims:
 		}
 
 		objs := claimCache.List(nil)
-		allocatedDevices := make([]structured.DeviceID, 0, len(objs))
+		allocatedDevices := sets.New[structured.DeviceID]()
 		for _, obj := range objs {
 			claim := obj.(*resourceapi.ResourceClaim)
 			if claim.Status.Allocation == nil {
 				continue
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
-				allocatedDevices = append(allocatedDevices, structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
 			}
 		}
 
