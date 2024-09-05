@@ -1350,13 +1350,3 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.20"
-- name: ZeroLimitedNominalConcurrencyShares
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.29"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.30"
