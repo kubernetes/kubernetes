@@ -300,6 +300,63 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			},
 			true,
 		),
+		ginkgo.Entry("remove limits and requests)",
+			[]podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+				},
+			},
+			false,
+		),
 	)
 
 }
