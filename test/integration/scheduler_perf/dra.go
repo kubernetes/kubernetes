@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -157,10 +158,12 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:              draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer:            sliceInformer,
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
@@ -180,7 +183,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		Synced: map[reflect.Type]bool{
 			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
-			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*draapi.ResourceSlice]():      true,
 			reflect.TypeFor[*v1.Node]():                   true,
 		},
 	}
