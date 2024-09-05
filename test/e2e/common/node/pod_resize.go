@@ -1029,6 +1029,138 @@ func doPodResizeTests(f *framework.Framework) {
 				},
 			},
 		},
+		{
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove memory limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove CPU limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with memory requests + limits, cpu requests - remove CPU requests",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with CPU requests + limits, cpu requests - remove memory requests",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove all limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove cpu request + limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove memory request + limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one restartable init container - remove all limits",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
 	}
 
 	for idx := range tests {
