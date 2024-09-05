@@ -21,8 +21,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	delayShutdown int
 )
 
 // CmdPause is used by agnhost Cobra.
@@ -32,6 +37,10 @@ var CmdPause = &cobra.Command{
 	Long:  `Pauses the execution. Useful for keeping the containers running, so other commands can be executed.`,
 	Args:  cobra.MaximumNArgs(0),
 	Run:   pause,
+}
+
+func init() {
+	CmdPause.Flags().IntVar(&delayShutdown, "delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM/SIGINT.")
 }
 
 func pause(cmd *cobra.Command, args []string) {
@@ -45,12 +54,17 @@ func pause(cmd *cobra.Command, args []string) {
 		switch sig {
 		case syscall.SIGINT:
 			done <- 1
-			os.Exit(1)
 		case syscall.SIGTERM:
 			done <- 2
-			os.Exit(2)
 		}
 	}()
+
 	result := <-done
+	if delayShutdown > 0 {
+		fmt.Printf("Sleeping %d seconds before exit ...", delayShutdown)
+		time.Sleep(time.Duration(delayShutdown) * time.Second)
+	}
+
 	fmt.Printf("exiting %d\n", result)
+	os.Exit(result)
 }
