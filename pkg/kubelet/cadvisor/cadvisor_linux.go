@@ -98,7 +98,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 
 	duration := maxHousekeepingInterval
 	if MaxHouseKeepingInterval != 0 {
-		duration = MaxHouseKeepingInterval
+		duration = MaxHouseKeepingInterval * time.Second
 	}
 	housekeepingConfig := manager.HousekeepingConfig{
 		Interval:     &duration,
