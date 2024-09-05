@@ -121,8 +121,18 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if err != nil {
 			klog.ErrorS(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
-		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
-			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+
+		const maxRetries = 2
+
+		for i := 0; i < maxRetries; i++ {
+			if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
+				if i < maxRetries-1 {
+					klog.Infof("Attempt %d failed, retrying...", i+1)
+					continue
+				}
+				return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+			}
+			break
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
