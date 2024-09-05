@@ -70,6 +70,9 @@ const fastPodFailureBackoff = 100 * time.Millisecond
 // verify there is no change.
 const sleepDurationForControllerLatency = 100 * time.Millisecond
 
+const restConfigQPS = 10_000
+const restConfigBurst = 10_000
+
 type metricLabelsWithValue struct {
 	Labels []string
 	Value  int
@@ -172,8 +175,8 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 		cancel()
 	}()
 	resetMetrics()
-	restConfig.QPS = 200
-	restConfig.Burst = 200
+	restConfig.QPS = restConfigQPS
+	restConfig.Burst = restConfigBurst
 
 	// create a job with a failed pod matching the exit code rule and a couple of successful pods
 	jobObj, err := createJobWithDefaults(ctx, cs, ns.Name, &job)
@@ -3304,6 +3307,8 @@ func TestElasticIndexedJob(t *testing.T) {
 // also faster to track, as they need less API calls.
 func BenchmarkLargeIndexedJob(b *testing.B) {
 	closeFn, restConfig, clientSet, ns := setup(b, "indexed")
+	// During the benchmark, we restrict the client QPS and Burst to ensure that
+	// the job-controller performance is fast enough in the limited QPS and Burst situations.
 	restConfig.QPS = 100
 	restConfig.Burst = 100
 	defer closeFn()
@@ -3387,6 +3392,8 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 	b.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	b.Cleanup(setDurationDuringTest(&jobcontroller.MaxJobPodFailureBackOff, fastPodFailureBackoff))
 	closeFn, restConfig, clientSet, ns := setup(b, "indexed")
+	// During the benchmark, we restrict the client QPS and Burst to ensure that
+	// the job-controller performance is fast enough in the limited QPS and Burst situations.
 	restConfig.QPS = 100
 	restConfig.Burst = 100
 	defer closeFn()
@@ -3513,8 +3520,8 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
 			resetMetrics()
 			defer cancel()
-			restConfig.QPS = 200
-			restConfig.Burst = 200
+			restConfig.QPS = restConfigQPS
+			restConfig.Burst = restConfigBurst
 			runGC := util.CreateGCController(ctx, t, *restConfig, informerSet)
 			informerSet.Start(ctx.Done())
 			go jc.Run(ctx, 1)
@@ -4352,8 +4359,8 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
-	config.QPS = 200
-	config.Burst = 200
+	config.QPS = restConfigQPS
+	config.Burst = restConfigBurst
 	config.Timeout = 0
 	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
