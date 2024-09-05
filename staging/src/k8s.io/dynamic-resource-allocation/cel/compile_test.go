@@ -23,6 +23,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -30,8 +31,8 @@ import (
 var testcases = map[string]struct {
 	expression         string
 	driver             string
-	attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	attributes         map[draapi.QualifiedName]draapi.DeviceAttribute
+	capacity           map[draapi.QualifiedName]draapi.DeviceCapacity
 	expectCompileError string
 	expectMatchError   string
 	expectMatch        bool
@@ -76,7 +77,7 @@ var testcases = map[string]struct {
 	},
 	"domain-check-positive": {
 		expression:  `"dra.example.com" in device.attributes`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"dra.example.com/something": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"dra.example.com/something": {BoolValue: ptr.To(true)}},
 		expectMatch: true,
 		expectCost:  3,
 	},
@@ -94,69 +95,69 @@ var testcases = map[string]struct {
 	"driver-name-qualifier": {
 		expression:  `device.attributes["dra.example.com"].name`,
 		driver:      "dra.example.com",
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 		expectMatch: true,
 		expectCost:  4,
 	},
 	"driver-name-qualifier-map-lookup": {
 		expression:  `device.attributes["dra.example.com"]["name"]`,
 		driver:      "dra.example.com",
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 		expectMatch: true,
 		expectCost:  4,
 	},
 	"bind": {
 		expression:  `cel.bind(dra, device.attributes["dra.example.com"], dra.name)`,
 		driver:      "dra.example.com",
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 		expectMatch: true,
 		expectCost:  15,
 	},
 	"qualified-attribute-name": {
 		expression:  `device.attributes["other.example.com"].name`,
 		driver:      "dra.example.com",
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"other.example.com/name": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"other.example.com/name": {BoolValue: ptr.To(true)}},
 		expectMatch: true,
 		expectCost:  4,
 	},
 	"bool": {
 		expression:  `device.attributes["dra.example.com"].name`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  4,
 	},
 	"int": {
 		expression:  `device.attributes["dra.example.com"].name > 0`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: ptr.To(int64(1))}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {IntValue: ptr.To(int64(1))}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  5,
 	},
 	"string": {
 		expression:  `device.attributes["dra.example.com"].name == "fish"`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: ptr.To("fish")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {StringValue: ptr.To("fish")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  5,
 	},
 	"version": {
 		expression:  `device.attributes["dra.example.com"].name.isGreaterThan(semver("0.0.1"))`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: ptr.To("1.0.0")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"name": {VersionValue: ptr.To("1.0.0")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  6,
 	},
 	"quantity": {
 		expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
+		capacity:    map[draapi.QualifiedName]draapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  6,
 	},
 	"check-positive": {
 		expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
+		capacity:    map[draapi.QualifiedName]draapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  10,
@@ -179,13 +180,13 @@ device.attributes["dra.example.com"]["int"] > 0 &&
 device.attributes["dra.example.com"]["string"] == "fish" &&
 device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 `,
-		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+		attributes: map[draapi.QualifiedName]draapi.DeviceAttribute{
 			"bool":    {BoolValue: ptr.To(true)},
 			"int":     {IntValue: ptr.To(int64(1))},
 			"string":  {StringValue: ptr.To("fish")},
 			"version": {VersionValue: ptr.To("1.0.0")},
 		},
-		capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		capacity: map[draapi.QualifiedName]draapi.DeviceCapacity{
 			"quantity": {Value: resource.MustParse("1Mi")},
 		},
 		driver:      "dra.example.com",
@@ -194,7 +195,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 	},
 	"many": {
 		expression: `device.attributes["dra.example.com"].a && device.attributes["dra.example.com"].b && device.attributes["dra.example.com"].c`,
-		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+		attributes: map[draapi.QualifiedName]draapi.DeviceAttribute{
 			"a": {BoolValue: ptr.To(true)},
 			"b": {BoolValue: ptr.To(true)},
 			"c": {BoolValue: ptr.To(true)},
@@ -205,42 +206,42 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 	},
 	"check_attribute_domains": {
 		expression:  `device.attributes.exists_one(x, x == "dra.example.com")`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  164,
 	},
 	"check_attribute_ids": {
 		expression:  `device.attributes["dra.example.com"].exists_one(x, x == "services")`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  133,
 	},
 	"split_attribute": {
 		expression:  `device.attributes["dra.example.com"].services.split("example").size() >= 2`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  19,
 	},
 	"regexp_attribute": {
 		expression:  `device.attributes["dra.example.com"].services.matches("[^a]?sym")`,
-		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("asymetric")}},
+		attributes:  map[draapi.QualifiedName]draapi.DeviceAttribute{"services": {StringValue: ptr.To("asymetric")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  18,
 	},
 	"check_capacity_domains": {
 		expression:  `device.capacity.exists_one(x, x == "dra.example.com")`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
+		capacity:    map[draapi.QualifiedName]draapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  164,
 	},
 	"check_capacity_ids": {
 		expression:  `device.capacity["dra.example.com"].exists_one(x, x == "memory")`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
+		capacity:    map[draapi.QualifiedName]draapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  133,
@@ -250,16 +251,16 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		// attributes and the maximum attribute name length.
 		// To actually reach that expected cost at runtime, we must
 		// have many attributes.
-		attributes: func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
-			attributes := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+		attributes: func() map[draapi.QualifiedName]draapi.DeviceAttribute {
+			attributes := make(map[draapi.QualifiedName]draapi.DeviceAttribute)
 			prefix := "dra.example.com/"
-			attribute := resourceapi.DeviceAttribute{
+			attribute := draapi.DeviceAttribute{
 				StringValue: ptr.To("abc"),
 			}
 			for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
 				suffix := fmt.Sprintf("-%d", i)
 				name := prefix + strings.Repeat("x", resourceapi.DeviceMaxIDLength-len(suffix)) + suffix
-				attributes[resourceapi.QualifiedName(name)] = attribute
+				attributes[draapi.QualifiedName(name)] = attribute
 			}
 			return attributes
 		}(),

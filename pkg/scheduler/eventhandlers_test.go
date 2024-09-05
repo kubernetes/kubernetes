@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -441,7 +442,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                   true,
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):      true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -460,7 +461,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                          true,
 				reflect.TypeOf(&v1.Namespace{}):                     true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):             true,
 				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
@@ -549,7 +550,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				var err error
 				opts := resourceslicetracker.Options{
 					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+					SliceInformer:      draapi.NewInformerForResourceSlice(informerFactory),
 				}
 				if opts.EnableDeviceTaints {
 					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()

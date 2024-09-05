@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
@@ -50,12 +51,12 @@ const (
 
 type handlerEvent struct {
 	event  handlerEventType
-	oldObj *resourceapi.ResourceSlice
-	newObj *resourceapi.ResourceSlice
+	oldObj *draapi.ResourceSlice
+	newObj *draapi.ResourceSlice
 }
 
 type inputEventGenerator struct {
-	addResourceSlice      func(slice *resourceapi.ResourceSlice)
+	addResourceSlice      func(slice *draapi.ResourceSlice)
 	deleteResourceSlice   func(name string)
 	addDeviceTaintRule    func(taintRule *resourcealphaapi.DeviceTaintRule)
 	deleteDeviceTaintRule func(name string)
@@ -65,7 +66,7 @@ type inputEventGenerator struct {
 
 func inputEventGeneratorForTest(ctx context.Context, t *testing.T, tracker *Tracker) inputEventGenerator {
 	return inputEventGenerator{
-		addResourceSlice: func(slice *resourceapi.ResourceSlice) {
+		addResourceSlice: func(slice *draapi.ResourceSlice) {
 			oldObj, exists, err := tracker.resourceSlices.GetIndexer().Get(slice)
 			require.NoError(t, err)
 			err = tracker.resourceSlices.GetIndexer().Add(slice)
@@ -131,17 +132,17 @@ func TestListPatchedResourceSlices(t *testing.T) {
 	tests := map[string]struct {
 		deviceTaintsDisabled  bool
 		inputEvents           func(event inputEventGenerator)
-		expectedPatchedSlices []*resourceapi.ResourceSlice
+		expectedPatchedSlices []*draapi.ResourceSlice
 		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
 	}{
 		"add-slices-no-patches": {
 			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
 			},
@@ -157,58 +158,58 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"update-slices-no-patches": {
 			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s1",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						// no devices
 						Devices: nil,
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s2",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						// no devices
 						Devices: nil,
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
 
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s1",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						// devices!
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
+						Devices: []draapi.Device{
+							{Basic: &draapi.BasicDevice{}},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s2",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						// devices!
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
+						Devices: []draapi.Device{
+							{Basic: &draapi.BasicDevice{}},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s1",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
+							{Basic: &draapi.BasicDevice{}},
 						},
 					},
 				},
@@ -216,9 +217,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "s2",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
+							{Basic: &draapi.BasicDevice{}},
 						},
 					},
 				},
@@ -243,13 +244,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"delete-slices": {
 			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "keep-me"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
+				event.addResourceSlice(&draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "keep-me"}})
 				event.deleteResourceSlice("s1")
 				event.deleteResourceSlice("s2")
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{ObjectMeta: metav1.ObjectMeta{Name: "keep-me"}},
 			},
 			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
@@ -265,14 +266,14 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"patch-all-slices": {
 			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -292,15 +293,15 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -342,32 +343,32 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				}
 				event.addDeviceTaintRule(taintRule.DeepCopy())
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice-1",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-1",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool-1"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice-2",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-2",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool-2"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -375,18 +376,18 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				taintRule.Spec.DeviceSelector.Pool = ptr.To("pool-2")
 				event.addDeviceTaintRule(taintRule)
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice-1",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-1",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool-1"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -395,13 +396,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice-2",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-2",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool-2"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -444,15 +445,15 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:    "example.com/taint2",
 										Value:  "tainted2",
@@ -464,16 +465,16 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{
 										{
 											Key:    "example.com/taint2",
@@ -519,43 +520,43 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -571,11 +572,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -609,49 +610,49 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-pool",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "other",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("other"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -667,13 +668,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-pool",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "other",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("other"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -707,40 +708,40 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Name:  "device",
-								Basic: &resourceapi.BasicDevice{},
+								Name:  draapi.MakeUniqueString("device"),
+								Basic: &draapi.BasicDevice{},
 							},
 							{
-								Name:  "wrong-device",
-								Basic: &resourceapi.BasicDevice{},
+								Name:  draapi.MakeUniqueString("wrong-device"),
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Name: "device",
-								Basic: &resourceapi.BasicDevice{
+								Name: draapi.MakeUniqueString("device"),
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -750,8 +751,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 								},
 							},
 							{
-								Name:  "wrong-device",
-								Basic: &resourceapi.BasicDevice{},
+								Name:  draapi.MakeUniqueString("wrong-device"),
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -789,43 +790,43 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -841,11 +842,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -895,30 +896,30 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -956,18 +957,18 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -980,19 +981,19 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -1038,20 +1039,20 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
+			expectedPatchedSlices: []*draapi.ResourceSlice{},
 			expectUnhandledErrors: func(t *testing.T, errs []error) {
 				if !assert.Len(t, errs, 1) {
 					return
@@ -1091,43 +1092,43 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -1143,11 +1144,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -1205,51 +1206,51 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Name:  "device",
-								Basic: &resourceapi.BasicDevice{},
+								Name:  draapi.MakeUniqueString("device"),
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
+				event.addResourceSlice(&draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
 				})
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("test.example.com"),
+						Pool: draapi.ResourcePool{
+							Name: draapi.MakeUniqueString("pool"),
 						},
-						Devices: []resourceapi.Device{
+						Devices: []draapi.Device{
 							{
-								Name: "device",
-								Basic: &resourceapi.BasicDevice{
+								Name: draapi.MakeUniqueString("device"),
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -1265,11 +1266,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "wrong-driver",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Driver: draapi.MakeUniqueString("wrong.example.com"),
+						Devices: []draapi.Device{
 							{
-								Basic: &resourceapi.BasicDevice{},
+								Basic: &draapi.BasicDevice{},
 							},
 						},
 					},
@@ -1303,27 +1304,27 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						},
 					},
 				})
-				oneDevice := []resourceapi.Device{
-					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
+				oneDevice := []draapi.Device{
+					{Name: draapi.MakeUniqueString("device-1"), Basic: &draapi.BasicDevice{}},
 				}
-				threeDevices := []resourceapi.Device{
-					{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
-					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
-					{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
+				threeDevices := []draapi.Device{
+					{Name: draapi.MakeUniqueString("device-0"), Basic: &draapi.BasicDevice{}},
+					{Name: draapi.MakeUniqueString("device-1"), Basic: &draapi.BasicDevice{}},
+					{Name: draapi.MakeUniqueString("device-2"), Basic: &draapi.BasicDevice{}},
 				}
-				devicesAdded := &resourceapi.ResourceSlice{
+				devicesAdded := &draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "devices-added",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						Devices: oneDevice,
 					},
 				}
-				devicesRemoved := &resourceapi.ResourceSlice{
+				devicesRemoved := &draapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "devices-removed",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
+					Spec: draapi.ResourceSliceSpec{
 						Devices: threeDevices,
 					},
 				}
@@ -1334,17 +1335,17 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				devicesRemoved.Spec.Devices = oneDevice
 				event.addResourceSlice(devicesRemoved)
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "devices-added",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
+							{Name: draapi.MakeUniqueString("device-0"), Basic: &draapi.BasicDevice{}},
 							{
-								Name: "device-1",
-								Basic: &resourceapi.BasicDevice{
+								Name: draapi.MakeUniqueString("device-1"),
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -1353,7 +1354,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 									}},
 								},
 							},
-							{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
+							{Name: draapi.MakeUniqueString("device-2"), Basic: &draapi.BasicDevice{}},
 						},
 					},
 				},
@@ -1361,11 +1362,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "devices-removed",
 					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
+					Spec: draapi.ResourceSliceSpec{
+						Devices: []draapi.Device{
 							{
-								Name: "device-1",
-								Basic: &resourceapi.BasicDevice{
+								Name: draapi.MakeUniqueString("device-1"),
+								Basic: &draapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
 										Key:       "example.com/taint",
 										Value:     "tainted",
@@ -1404,19 +1405,19 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			var handlerEvents []handlerEvent
 			handler := cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*draapi.ResourceSlice)})
 				},
 				UpdateFunc: func(oldObj, newObj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*draapi.ResourceSlice), newObj: newObj.(*draapi.ResourceSlice)})
 				},
 				DeleteFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*draapi.ResourceSlice)})
 				},
 			}
 
 			opts := Options{
 				EnableDeviceTaints: !test.deviceTaintsDisabled,
-				SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+				SliceInformer:      draapi.NewInformerForResourceSlice(informerFactory),
 				TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 				ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
 				KubeClient:         kubeClient,
@@ -1452,7 +1453,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			// Check ResourceSlices
 			patchedResourceSlices, err := tracker.ListPatchedResourceSlices()
 			require.NoError(t, err, "list patched resource slices")
-			sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+			sortResourceSlicesFunc := func(s1, s2 *draapi.ResourceSlice) int {
 				return stdcmp.Compare(s1.Name, s2.Name)
 			}
 			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
@@ -1484,39 +1485,39 @@ func TestListPatchedResourceSlices(t *testing.T) {
 func BenchmarkEventHandlers(b *testing.B) {
 	now := time.Now()
 	benchmarks := map[string]struct {
-		resourceSlices []*resourceapi.ResourceSlice
+		resourceSlices []*draapi.ResourceSlice
 		taintRules     []*resourcealphaapi.DeviceTaintRule
-		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int)
+		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int)
 	}{
 		"resource-slice-add-no-taint-rules": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 1000)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 1000)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{{Basic: &draapi.BasicDevice{}}}, 64),
 						},
 					}
 				}
 				return resourceSlices
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
 		"one-patch-to-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{{Basic: &draapi.BasicDevice{}}}, 64),
 						},
 					}
 				}
@@ -1538,20 +1539,20 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
 		"one-patch-to-many-slices-add-slice": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{{Basic: &draapi.BasicDevice{}}}, 64),
 						},
 					}
 				}
@@ -1573,30 +1574,30 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
 		"one-patched-device-among-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
+			resourceSlices: func() []*draapi.ResourceSlice {
 				nSlices := 500
 				nDevices := 64
-				resourceSlices := make([]*resourceapi.ResourceSlice, nSlices)
+				resourceSlices := make([]*draapi.ResourceSlice, nSlices)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: draapi.MakeUniqueString("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []resourceapi.Device {
-								devices := make([]resourceapi.Device, nDevices)
+							Devices: func() []draapi.Device {
+								devices := make([]draapi.Device, nDevices)
 								for j := range devices {
-									devices[j] = resourceapi.Device{
-										Name:  "device-" + strconv.Itoa(j),
-										Basic: &resourceapi.BasicDevice{},
+									devices[j] = draapi.Device{
+										Name:  draapi.MakeUniqueString("device-" + strconv.Itoa(j)),
+										Basic: &draapi.BasicDevice{},
 									}
 								}
 								return devices
@@ -1604,7 +1605,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 						},
 					}
 				}
-				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = "patchme"
+				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = draapi.MakeUniqueString("patchme")
 				return resourceSlices
 			}(),
 			taintRules: []*resourcealphaapi.DeviceTaintRule{
@@ -1625,26 +1626,26 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
 		"one-patched-device-among-many-slices-add-slice": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: draapi.MakeUniqueString("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []resourceapi.Device {
+							Devices: func() []draapi.Device {
 								nDevices := 64
-								devices := slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, nDevices)
-								devices[nDevices/2].Name = "patchme"
+								devices := slices.Repeat([]draapi.Device{{Basic: &draapi.BasicDevice{}}}, nDevices)
+								devices[nDevices/2].Name = draapi.MakeUniqueString("patchme")
 								return devices
 							}(),
 						},
@@ -1671,23 +1672,23 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, patches []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[250]) // the slice affected by the patch
 			},
 		},
 		"one-patch-for-each-of-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: draapi.MakeUniqueString("pool-" + strconv.Itoa(i)),
 							},
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]draapi.Device{{Basic: &draapi.BasicDevice{}}}, 64),
 						},
 					}
 				}
@@ -1715,7 +1716,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return patches
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
@@ -1726,7 +1727,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 		opts := Options{
 			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+			SliceInformer:      draapi.NewInformerForResourceSlice(informerFactory),
 			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 			ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
 			KubeClient:         kubeClient,

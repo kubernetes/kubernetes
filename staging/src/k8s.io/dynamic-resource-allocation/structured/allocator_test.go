@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -238,10 +239,10 @@ func deviceClaimConfig(requests []string, deviceConfig resourceapi.DeviceConfigu
 }
 
 // generate a Device object with the given name, capacity and attributes.
-func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) wrapDevice {
-	device := resourceapi.Device{
-		Name: name,
-		Basic: &resourceapi.BasicDevice{
+func device(name string, capacity map[draapi.QualifiedName]resource.Quantity, attributes map[draapi.QualifiedName]draapi.DeviceAttribute) wrapDevice {
+	device := draapi.Device{
+		Name: draapi.MakeUniqueString(name),
+		Basic: &draapi.BasicDevice{
 			Attributes: attributes,
 			Capacity:   toDeviceCapacity(capacity),
 		},
@@ -253,26 +254,26 @@ const (
 	fromDeviceCapacityConsumption = "fromDeviceCapacityConsumption"
 )
 
-func partitionableDevice(name string, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
-	consumesCapacity ...resourceapi.DeviceCounterConsumption) resourceapi.Device {
+func partitionableDevice(name string, capacity any, attributes map[draapi.QualifiedName]draapi.DeviceAttribute,
+	consumesCapacity ...draapi.DeviceCounterConsumption) draapi.Device {
 
-	device := resourceapi.Device{
-		Name: name,
-		Basic: &resourceapi.BasicDevice{
+	device := draapi.Device{
+		Name: draapi.MakeUniqueString(name),
+		Basic: &draapi.BasicDevice{
 			Attributes: attributes,
 		},
 	}
 
 	switch capacity := capacity.(type) {
-	case map[resourceapi.QualifiedName]resource.Quantity:
+	case map[draapi.QualifiedName]resource.Quantity:
 		device.Basic.Capacity = toDeviceCapacity(capacity)
 	case string:
 		if capacity == fromDeviceCapacityConsumption {
-			c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
+			c := make(map[draapi.QualifiedName]draapi.DeviceCapacity)
 			for _, dcc := range consumesCapacity {
 				for name, cap := range dcc.Counters {
-					ccap := resourceapi.DeviceCapacity(cap)
-					c[resourceapi.QualifiedName(name)] = ccap
+					ccap := draapi.DeviceCapacity(cap)
+					c[draapi.QualifiedName(name)] = ccap
 				}
 			}
 			device.Basic.Capacity = c
@@ -289,8 +290,8 @@ func partitionableDevice(name string, capacity any, attributes map[resourceapi.Q
 	return device
 }
 
-func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
-	consumesCapacity ...resourceapi.DeviceCounterConsumption) resourceapi.Device {
+func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacity any, attributes map[draapi.QualifiedName]draapi.DeviceAttribute,
+	consumesCapacity ...draapi.DeviceCounterConsumption) draapi.Device {
 	device := partitionableDevice(name, capacity, attributes, consumesCapacity...)
 
 	switch nodeSelection := nodeSelection.(type) {
@@ -313,22 +314,22 @@ func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacit
 	return device
 }
 
-type wrapDevice resourceapi.Device
+type wrapDevice draapi.Device
 
-func (in wrapDevice) obj() resourceapi.Device {
-	return resourceapi.Device(in)
+func (in wrapDevice) obj() draapi.Device {
+	return draapi.Device(in)
 }
 
 func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
-	inDevice := resourceapi.Device(in)
+	inDevice := draapi.Device(in)
 	device := inDevice.DeepCopy()
 	device.Basic.Taints = append(device.Basic.Taints, taints...)
 	return wrapDevice(*device)
 }
 
-func deviceCapacityConsumption(capacityPool string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.DeviceCounterConsumption {
-	return resourceapi.DeviceCounterConsumption{
-		CounterSet: capacityPool,
+func deviceCapacityConsumption(capacityPool string, capacity map[draapi.QualifiedName]resource.Quantity) draapi.DeviceCounterConsumption {
+	return draapi.DeviceCounterConsumption{
+		CounterSet: draapi.MakeUniqueString(capacityPool),
 		Counters:   toDeviceCounter(capacity),
 	}
 }
@@ -344,22 +345,22 @@ const (
 // nodeSelectionAll for all nodes, the value nodeSelectionPerDevice
 // for per device node selection, or any other value to set the
 // node name. Providing a node selectors sets the NodeSelector field.
-func slice(name string, nodeSelection any, pool, driver string, devices ...wrapDevice) *resourceapi.ResourceSlice {
-	slice := &resourceapi.ResourceSlice{
+func slice(name string, nodeSelection any, pool, driver string, devices ...wrapDevice) *draapi.ResourceSlice {
+	slice := &draapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: resourceapi.ResourceSliceSpec{
-			Driver: driver,
-			Pool: resourceapi.ResourcePool{
-				Name:               pool,
+		Spec: draapi.ResourceSliceSpec{
+			Driver: draapi.MakeUniqueString(driver),
+			Pool: draapi.ResourcePool{
+				Name:               draapi.MakeUniqueString(pool),
 				ResourceSliceCount: 1,
 				Generation:         1,
 			},
 		},
 	}
 	for _, device := range devices {
-		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device(device))
+		slice.Spec.Devices = append(slice.Spec.Devices, draapi.Device(device))
 	}
 	switch nodeSelection := nodeSelection.(type) {
 	case *v1.NodeSelector:
@@ -373,7 +374,7 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...wrapD
 				return &r
 			}()
 		} else {
-			slice.Spec.NodeName = nodeSelection
+			slice.Spec.NodeName = draapi.MakeUniqueString(nodeSelection)
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -512,17 +513,17 @@ type wrapper[T any] interface {
 }
 
 // generate a ResourceSlice object with the given parameters and no devices
-func sliceWithNoDevices(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
+func sliceWithNoDevices(name string, nodeSelection any, pool, driver string) *draapi.ResourceSlice {
 	return slice(name, nodeSelection, pool, driver)
 }
 
 // generate a ResourceSlice object with the given parameters and one device "device-1"
-func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
+func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *draapi.ResourceSlice {
 	return slice(name, nodeSelection, pool, driver, device(device1, nil, nil))
 }
 
 // generate a ResourceSclie object with the given parameters and the specified number of devices.
-func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver string, count int) *resourceapi.ResourceSlice {
+func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver string, count int) *draapi.ResourceSlice {
 	var devices []wrapDevice
 	for i := 0; i < count; i++ {
 		devices = append(devices, device(fmt.Sprintf("device-%d", i), nil, nil))
@@ -530,32 +531,32 @@ func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver strin
 	return slice(name, nodeSelection, pool, driver, devices...)
 }
 
-func sliceWithCapacityPools(name string, nodeSelection any, pool, driver string, sharedCounters []resourceapi.CounterSet, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
+func sliceWithCapacityPools(name string, nodeSelection any, pool, driver string, sharedCounters []draapi.CounterSet, devices ...draapi.Device) *draapi.ResourceSlice {
 	slice := slice(name, nodeSelection, pool, driver)
 	slice.Spec.SharedCounters = sharedCounters
 	slice.Spec.Devices = devices
 	return slice
 }
 
-func counterSet(name string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.CounterSet {
-	return resourceapi.CounterSet{
-		Name:     name,
+func counterSet(name string, capacity map[draapi.QualifiedName]resource.Quantity) draapi.CounterSet {
+	return draapi.CounterSet{
+		Name:     draapi.MakeUniqueString(name),
 		Counters: toDeviceCounter(capacity),
 	}
 }
 
-func toDeviceCapacity(capacity map[resourceapi.QualifiedName]resource.Quantity) map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
-	out := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
+func toDeviceCapacity(capacity map[draapi.QualifiedName]resource.Quantity) map[draapi.QualifiedName]draapi.DeviceCapacity {
+	out := make(map[draapi.QualifiedName]draapi.DeviceCapacity, len(capacity))
 	for name, quantity := range capacity {
-		out[name] = resourceapi.DeviceCapacity{Value: quantity}
+		out[name] = draapi.DeviceCapacity{Value: quantity}
 	}
 	return out
 }
 
-func toDeviceCounter(capacity map[resourceapi.QualifiedName]resource.Quantity) map[string]resourceapi.Counter {
-	out := make(map[string]resourceapi.Counter, len(capacity))
+func toDeviceCounter(capacity map[draapi.QualifiedName]resource.Quantity) map[string]draapi.Counter {
+	out := make(map[string]draapi.Counter, len(capacity))
 	for name, quantity := range capacity {
-		out[string(name)] = resourceapi.Counter{Value: quantity}
+		out[string(name)] = draapi.Counter{Value: quantity}
 	}
 	return out
 }
@@ -596,7 +597,7 @@ func TestAllocator(t *testing.T) {
 		claimsToAllocate []wrapResourceClaim
 		allocatedDevices []DeviceID
 		classes          []*resourceapi.DeviceClass
-		slices           []*resourceapi.ResourceSlice
+		slices           []*draapi.ResourceSlice
 		node             *v1.Node
 
 		expectResults []any
@@ -644,10 +645,10 @@ func TestAllocator(t *testing.T) {
 			)),
 			classes: objects(class(classA, driverA)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device1, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
-				device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device2, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
 			)),
@@ -677,10 +678,10 @@ func TestAllocator(t *testing.T) {
 			// be allocated for the "small" request, leaving the "large" request unsatisfied.
 			// The initial decision needs to be undone before a solution is found.
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device2, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device1, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
 			)),
@@ -714,10 +715,10 @@ func TestAllocator(t *testing.T) {
 			// be allocated for the "small" request, leaving the "large" request unsatisfied.
 			// The initial decision needs to be undone before a solution is found.
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device2, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device1, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
 			)),
@@ -753,7 +754,7 @@ func TestAllocator(t *testing.T) {
 			classes:          objects(class(classA, driverA)),
 			slices: objects(
 				sliceWithOneDevice("slice-1-obsolete", node1, pool1, driverA),
-				func() *resourceapi.ResourceSlice {
+				func() *draapi.ResourceSlice {
 					slice := sliceWithOneDevice(slice1, node1, pool1, driverA)
 					// This makes the other slice obsolete.
 					slice.Spec.Pool.Generation++
@@ -770,7 +771,7 @@ func TestAllocator(t *testing.T) {
 		"duplicate-slice": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
-			slices: func() []*resourceapi.ResourceSlice {
+			slices: func() []*draapi.ResourceSlice {
 				// This simulates the problem that can
 				// (theoretically) occur when the resource
 				// slice controller wants to publish a pool
@@ -783,7 +784,7 @@ func TestAllocator(t *testing.T) {
 				sliceA.Spec.Pool.ResourceSliceCount = 2
 				sliceB := sliceA.DeepCopy()
 				sliceB.Name += "-2"
-				return []*resourceapi.ResourceSlice{sliceA, sliceB}
+				return []*draapi.ResourceSlice{sliceA, sliceB}
 			}(),
 			node: node(node1, region1),
 
@@ -884,7 +885,7 @@ func TestAllocator(t *testing.T) {
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: objects(
-				func() *resourceapi.ResourceSlice {
+				func() *draapi.ResourceSlice {
 					slice := sliceWithOneDevice(slice1, node1, pool1, driverA)
 					// This makes the pool incomplete, one other slice is missing.
 					slice.Spec.Pool.ResourceSliceCount++
@@ -1385,13 +1386,13 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("1.0.0")},
 					"numa":            {IntValue: ptr.To(int64(1))},
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
 					"boolAttribute":   {BoolValue: ptr.To(true)},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("1.0.0")},
 					"numa":            {IntValue: ptr.To(int64(1))},
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
@@ -1424,10 +1425,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(1))},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(2))},
 				}),
 			)),
@@ -1449,10 +1450,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(1))},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(2))},
 				}),
 			)),
@@ -1468,10 +1469,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue2")},
 				}),
 			)),
@@ -1487,10 +1488,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"boolAttribute": {BoolValue: ptr.To(true)},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"boolAttribute": {BoolValue: ptr.To(false)},
 				}),
 			)),
@@ -1506,10 +1507,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("1.0.0")},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("2.0.0")},
 				}),
 			)),
@@ -1531,10 +1532,10 @@ func TestAllocator(t *testing.T) {
 			)),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("1.0.0")},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("2.0.0")},
 				}),
 			)),
@@ -1566,15 +1567,15 @@ func TestAllocator(t *testing.T) {
 				// This device does not satisfy the second
 				// match attribute, so the allocator must
 				// backtrack.
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("1.0.0")},
 					"stringAttribute": {StringValue: ptr.To("a")},
 				}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("2.0.0")},
 					"stringAttribute": {StringValue: ptr.To("b")},
 				}),
-				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				device(device3, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("3.0.0")},
 					"stringAttribute": {StringValue: ptr.To("b")},
 				}),
@@ -1669,7 +1670,7 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
 			slices: objects(
-				func() *resourceapi.ResourceSlice {
+				func() *draapi.ResourceSlice {
 					slice := sliceWithOneDevice(slice1, node1, pool1, driverA)
 					slice.Spec.Devices[0].Basic = nil /* empty = unknown future extension */
 					return slice
@@ -1808,8 +1809,8 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverB,
-				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}),
-				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}),
+				device(device1, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{}),
+				device(device2, nil, map[draapi.QualifiedName]draapi.DeviceAttribute{}),
 			)),
 			node: node(node1, region1),
 
@@ -1893,13 +1894,13 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device1, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device2, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device3, map[resourceapi.QualifiedName]resource.Quantity{
+				device(device3, map[draapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
 			)),
@@ -1947,28 +1948,28 @@ func TestAllocator(t *testing.T) {
 			slices: objects(
 				slice(slice1, node1, pool1, driverA,
 					device(device1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						map[draapi.QualifiedName]draapi.DeviceAttribute{
 							"driverVersion": {VersionValue: ptr.To("1.0.0")},
 						},
 					),
 				),
 				slice(slice2, node1, pool2, driverA,
 					device(device2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("2Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						map[draapi.QualifiedName]draapi.DeviceAttribute{
 							"driverVersion": {VersionValue: ptr.To("2.0.0")},
 						},
 					),
 					device(device3,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("1Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						map[draapi.QualifiedName]draapi.DeviceAttribute{
 							"driverVersion": {VersionValue: ptr.To("1.0.0")},
 						},
 					),
@@ -2017,20 +2018,20 @@ func TestAllocator(t *testing.T) {
 			slices: objects(
 				slice(slice1, node1, pool1, driverA,
 					device(device1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						map[draapi.QualifiedName]draapi.DeviceAttribute{
 							"driverVersion": {VersionValue: ptr.To("1.0.0")},
 						},
 					),
 				),
 				slice(slice2, node1, pool2, driverA,
 					device(device2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("2Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						map[draapi.QualifiedName]draapi.DeviceAttribute{
 							"driverVersion": {VersionValue: ptr.To("2.0.0")},
 						},
 					),
@@ -2161,18 +2162,18 @@ func TestAllocator(t *testing.T) {
 			slices: objects(
 				slice(slice1, node1, pool1, driverA,
 					device(device1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
+						map[draapi.QualifiedName]draapi.DeviceAttribute{},
 					),
 				),
 				slice(slice2, node1, pool2, driverA,
 					device(device2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
+						map[draapi.QualifiedName]draapi.DeviceAttribute{},
 					),
 				),
 			),
@@ -2212,18 +2213,18 @@ func TestAllocator(t *testing.T) {
 			slices: objects(
 				slice(slice1, node1, pool1, driverA,
 					device(device1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
+						map[draapi.QualifiedName]draapi.DeviceAttribute{},
 					),
 				),
 				slice(slice2, node1, pool2, driverA,
 					device(device2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
-						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
+						map[draapi.QualifiedName]draapi.DeviceAttribute{},
 					),
 				),
 			),
@@ -2262,14 +2263,14 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1, nil, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2307,34 +2308,34 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1,
-					map[resourceapi.QualifiedName]resource.Quantity{
+					map[draapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("4Gi"),
 					}, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device2,
-					map[resourceapi.QualifiedName]resource.Quantity{
+					map[draapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("6Gi"),
 					}, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
 						},
 					),
 				),
 				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2361,34 +2362,34 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1,
-					map[resourceapi.QualifiedName]resource.Quantity{
+					map[draapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("4Gi"),
 					}, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device2,
-					map[resourceapi.QualifiedName]resource.Quantity{
+					map[draapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("6Gi"),
 					}, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
 						},
 					),
 				),
 				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2427,48 +2428,48 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 					counterSet(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus": resource.MustParse("8"),
 						},
 					),
 				),
 				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus": resource.MustParse("4"),
 						},
 					),
 				),
 				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus": resource.MustParse("6"),
 						},
 					),
 				),
 				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus": resource.MustParse("4"),
 						},
 					),
@@ -2495,13 +2496,13 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus":   resource.MustParse("8"),
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 					counterSet(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus":   resource.MustParse("12"),
 							"memory": resource.MustParse("18Gi"),
 						},
@@ -2509,13 +2510,13 @@ func TestAllocator(t *testing.T) {
 				),
 				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 							"cpus":   resource.MustParse("6"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus":   resource.MustParse("4"),
 							"memory": resource.MustParse("2Gi"),
 						},
@@ -2523,13 +2524,13 @@ func TestAllocator(t *testing.T) {
 				),
 				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
 							"cpus":   resource.MustParse("4"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus":   resource.MustParse("6"),
 							"memory": resource.MustParse("6Gi"),
 						},
@@ -2537,13 +2538,13 @@ func TestAllocator(t *testing.T) {
 				),
 				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 							"cpus":   resource.MustParse("4"),
 						},
 					),
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"cpus":   resource.MustParse("4"),
 							"memory": resource.MustParse("4Gi"),
 						},
@@ -2570,21 +2571,21 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("16Gi"),
 						},
 					),
@@ -2609,21 +2610,21 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("20Gi"),
 						},
 					),
@@ -2648,14 +2649,14 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1, nil, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2689,21 +2690,21 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device1, node1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device2, node2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
 						},
 					),
@@ -2727,14 +2728,14 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2767,28 +2768,28 @@ func TestAllocator(t *testing.T) {
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
 					counterSet(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device2, node1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDeviceWithNodeSelector(device3, nodeSelectionAll, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
@@ -2796,28 +2797,28 @@ func TestAllocator(t *testing.T) {
 			), sliceWithCapacityPools(slice2, node1, pool2, driverB,
 				objects(
 					counterSet(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("12Gi"),
 						},
 					),
 				),
 				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
 				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
-						map[resourceapi.QualifiedName]resource.Quantity{
+						map[draapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
