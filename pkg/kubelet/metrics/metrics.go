@@ -32,6 +32,7 @@ import (
 const (
 	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
+	DRASubsystem                       = "dra"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
 	NodeStartupPreKubeletKey           = "node_startup_pre_kubelet_duration_seconds"
@@ -131,6 +132,9 @@ const (
 	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
 	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
+
+	// Metric keys for DRA operations
+	DRAOperationsDurationKey = "operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -938,6 +942,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAOperationsDurationKey,
+			Help:           "Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name", "is_error"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1030,6 +1046,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			legacyregistry.MustRegister(DRAOperationsDuration)
+		}
 	})
 }
 
