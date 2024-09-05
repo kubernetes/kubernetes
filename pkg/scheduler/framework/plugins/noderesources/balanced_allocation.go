@@ -22,8 +22,8 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -56,7 +56,7 @@ type draPreScoreState struct {
 	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
 	allocatedState *structured.AllocatedState
 	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
-	resourceSlices []*resourceapi.ResourceSlice
+	resourceSlices []*draapi.ResourceSlice
 }
 
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
