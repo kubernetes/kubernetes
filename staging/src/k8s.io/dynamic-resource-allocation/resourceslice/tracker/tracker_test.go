@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ import (
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
@@ -51,8 +53,8 @@ const (
 
 type handlerEvent struct {
 	event  handlerEventType
-	oldObj *resourceapi.ResourceSlice
-	newObj *resourceapi.ResourceSlice
+	oldObj *draapi.ResourceSlice
+	newObj *draapi.ResourceSlice
 }
 
 func add[T any](obj *T) [2]*T {
@@ -105,19 +107,25 @@ func applyEventPair(tCtx *testContext, event any) {
 	switch pair := event.(type) {
 	case [2]*resourceapi.ResourceSlice:
 		store := tCtx.resourceSlices.GetStore()
+		var converted [2]draapi.ResourceSlice
+		for i := range pair {
+			if pair[i] != nil {
+				require.NoError(tCtx, draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(pair[i], &converted[i], nil))
+			}
+		}
 		switch {
 		case pair[0] != nil && pair[1] != nil:
-			err := store.Update(pair[1])
+			err := store.Update(&converted[1])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceUpdate(tCtx.Context)(pair[0], pair[1])
+			tCtx.resourceSliceUpdate(tCtx.Context)(&converted[0], &converted[1])
 		case pair[0] != nil:
-			err := store.Delete(pair[0])
+			err := store.Delete(&converted[0])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceDelete(tCtx.Context)(resourceinformers.DeletedResourceSlice{OptionalObj: pair[0]})
+			tCtx.resourceSliceDelete(tCtx.Context)(draapi.DeletedResourceSlice{OptionalObj: &converted[0]})
 		default:
-			err := store.Add(pair[1])
+			err := store.Add(&converted[1])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceAdd(tCtx.Context)(pair[1])
+			tCtx.resourceSliceAdd(tCtx.Context)(&converted[1])
 		}
 	case [2]*resourceapi.DeviceTaintRule:
 		store := tCtx.deviceTaints.GetStore()
@@ -317,6 +325,17 @@ var (
 	taintDevice1Rule        = taintNamedDevicesRule(taintAllDevicesRule, device1Name)
 )
 
+func apiSlice(in *resourceapi.ResourceSlice) *draapi.ResourceSlice {
+	if in == nil {
+		return nil
+	}
+	var out draapi.ResourceSlice
+	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(in, &out, nil); err != nil {
+		panic(err)
+	}
+	return &out
+}
+
 func TestListPatchedResourceSlices(t *testing.T) {
 	type test struct {
 		// events contains pairs of old and new objects which will
@@ -352,8 +371,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 		"update-slices-no-patches": {
@@ -374,11 +393,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				unchangedSlice,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1NoDevices},
-				{event: handlerEventUpdate, oldObj: slice1NoDevices, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2NoDevices},
-				{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
-				{event: handlerEventAdd, newObj: unchangedSlice},
+				{event: handlerEventAdd, newObj: apiSlice(slice1NoDevices)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice1NoDevices), newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2NoDevices)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice2NoDevices), newObj: apiSlice(slice2)},
+				{event: handlerEventAdd, newObj: apiSlice(unchangedSlice)},
 			},
 		},
 		"delete-slices": {
@@ -391,11 +410,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				unchangedSlice,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventDelete, oldObj: slice1},
-				{event: handlerEventAdd, newObj: slice2},
-				{event: handlerEventDelete, oldObj: slice2},
-				{event: handlerEventAdd, newObj: unchangedSlice},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventDelete, oldObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
+				{event: handlerEventDelete, oldObj: apiSlice(slice2)},
+				{event: handlerEventAdd, newObj: apiSlice(unchangedSlice)},
 			},
 		},
 		"patch-all-slices": {
@@ -407,8 +426,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice1), newObj: apiSlice(slice1Tainted)},
 			},
 		},
 		"update-patch": {
@@ -425,8 +444,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2Tainted,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2Tainted},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2Tainted)},
 			},
 		},
 		"remove-patch-known-deleted-rule": {
@@ -441,9 +460,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2Tainted},
-				{event: handlerEventUpdate, oldObj: slice2Tainted, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2Tainted)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice2Tainted), newObj: apiSlice(slice2)},
 			},
 		},
 		"remove-patch-unknown-deleted-rule": {
@@ -458,9 +477,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2Tainted},
-				{event: handlerEventUpdate, oldObj: slice2Tainted, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2Tainted)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice2Tainted), newObj: apiSlice(slice2)},
 			},
 		},
 		"merge-taints": {
@@ -472,7 +491,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1MergedTaints,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1MergedTaints},
+				{event: handlerEventAdd, newObj: apiSlice(slice1MergedTaints)},
 			},
 		},
 		"add-taint-for-driver": {
@@ -486,8 +505,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1Tainted)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 		"add-taint-for-pool": {
@@ -501,8 +520,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1Tainted)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 		"add-taint-for-device": {
@@ -516,8 +535,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1Tainted)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 		"filter-all-criteria": {
@@ -542,8 +561,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1Tainted)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 		"update-patched-slice": {
@@ -563,10 +582,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				sliceWithDevices(slice2, taintedDevices),
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
-				{event: handlerEventAdd, newObj: sliceWithDevices(slice2, threeDevicesOneTainted)},
-				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
+				{event: handlerEventAdd, newObj: apiSlice(slice1Tainted)},
+				{event: handlerEventUpdate, oldObj: apiSlice(slice1Tainted), newObj: apiSlice(sliceWithDevices(slice1, threeDevicesOneTainted))},
+				{event: handlerEventAdd, newObj: apiSlice(sliceWithDevices(slice2, threeDevicesOneTainted))},
+				{event: handlerEventUpdate, oldObj: apiSlice(sliceWithDevices(slice2, threeDevicesOneTainted)), newObj: apiSlice(sliceWithDevices(slice2, taintedDevices))},
 			},
 		},
 		"nil-selector-matches-none": {
@@ -580,8 +599,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventAdd, newObj: apiSlice(slice1)},
+				{event: handlerEventAdd, newObj: apiSlice(slice2)},
 			},
 		},
 	}
@@ -591,10 +610,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 		kubeClient := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+		sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 
 		opts := Options{
 			EnableDeviceTaintRules: true,
-			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+			SliceInformer:          sliceInformer,
 			TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
 			KubeClient:             kubeClient,
 		}
@@ -621,13 +642,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		var handlerEvents []handlerEvent
 		handler := cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*draapi.ResourceSlice)})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*draapi.ResourceSlice), newObj: newObj.(*draapi.ResourceSlice)})
 			},
 			DeleteFunc: func(obj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*draapi.ResourceSlice)})
 			},
 		}
 		_, _ = tCtx.AddEventHandler(handler)
@@ -654,12 +675,16 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// Check ResourceSlices
 		patchedResourceSlices, err := tCtx.ListPatchedResourceSlices()
 		require.NoError(tCtx, err, "list patched resource slices")
-		sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+		expectedPatchedSlices := make([]*draapi.ResourceSlice, len(test.expectedPatchedSlices))
+		for i, in := range test.expectedPatchedSlices {
+			expectedPatchedSlices[i] = apiSlice(in)
+		}
+		sortResourceSlicesFunc := func(s1, s2 *draapi.ResourceSlice) int {
 			return stdcmp.Compare(s1.Name, s2.Name)
 		}
-		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
+		slices.SortFunc(expectedPatchedSlices, sortResourceSlicesFunc)
 		slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
-		assert.Equal(tCtx, test.expectedPatchedSlices, patchedResourceSlices)
+		assert.Equal(tCtx, expectedPatchedSlices, patchedResourceSlices)
 		expectEvents := test.expectEvents
 		if expectEvents == nil {
 			expectEvents = func(t *assert.CollectT, events *v1.EventList) {
@@ -780,7 +805,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				return resourceSlices
 			}(),
 			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourceapi.DeviceTaintRule, i int) {
-				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
+				tracker.resourceSliceAdd(ctx)(apiSlice(resourceSlices[i%len(resourceSlices)]))
 			},
 		},
 		"one-patch-to-many-slices-add-taint-rule": {
@@ -850,7 +875,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				},
 			},
 			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourceapi.DeviceTaintRule, i int) {
-				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
+				tracker.resourceSliceAdd(ctx)(apiSlice(resourceSlices[i%len(resourceSlices)]))
 			},
 		},
 		"one-patched-device-among-many-slices-add-taint-rule": {
@@ -947,7 +972,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				},
 			},
 			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourceapi.DeviceTaintRule, i int) {
-				tracker.resourceSliceAdd(ctx)(resourceSlices[250]) // the slice affected by the patch
+				tracker.resourceSliceAdd(ctx)(apiSlice(resourceSlices[250])) // the slice affected by the patch
 			},
 		},
 		"one-patch-for-each-of-many-slices-add-taint-rule": {
@@ -999,9 +1024,12 @@ func BenchmarkEventHandlers(b *testing.B) {
 	newBenchTracker := func(ctx context.Context) *Tracker {
 		kubeClient := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+		sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
+
 		opts := Options{
 			EnableDeviceTaintRules: true,
-			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+			SliceInformer:          sliceInformer,
 			TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
 			KubeClient:             kubeClient,
 		}

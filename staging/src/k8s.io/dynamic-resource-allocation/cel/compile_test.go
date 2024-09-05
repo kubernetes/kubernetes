@@ -662,6 +662,10 @@ func TestCEL(t *testing.T) {
 				t.Errorf("ERROR: expected CEL cost %d, got %d instead (%.0f%% of limit %d)", expect, actual, float64(actual)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 			}
 
+			// in := resourceapi.BasicDevice{Attributes: scenario.attributes, Capacity: scenario.capacity}
+			// var out draapi.BasicDevice
+			// require.NoError(t, draapi.Convert_v1alpha3_BasicDevice_To_api_BasicDevice(&in, &out, nil), "convert test data")
+
 			match, details, err := result.DeviceMatches(ctx, Device{
 				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
 			})

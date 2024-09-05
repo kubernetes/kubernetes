@@ -47,6 +47,19 @@ func (us UniqueString) MarshalText() ([]byte, error) {
 	return []byte(us.String()), nil
 }
 
+func (us *UniqueString) DeepCopyInto(out *UniqueString) {
+	*out = *us
+}
+
+func (us *UniqueString) DeepCopy() *UniqueString {
+	if us == nil {
+		return nil
+	}
+
+	out := *us
+	return &out
+}
+
 // MakeUniqueString constructs a new unique string.
 func MakeUniqueString(str string) UniqueString {
 	return UniqueString(unique.Make(str))
