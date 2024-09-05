@@ -58,7 +58,7 @@ type Allocator struct {
 func NewAllocator(ctx context.Context,
 	adminAccessEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
-	allocatedDevices []DeviceID,
+	allocatedDevices sets.Set[DeviceID],
 	classLister resourcelisters.DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *CELCache,
@@ -66,12 +66,11 @@ func NewAllocator(ctx context.Context,
 	return &Allocator{
 		adminAccessEnabled: adminAccessEnabled,
 		claimsToAllocate:   claimsToAllocate,
-		// This won't change, so build this set only once.
-		allocatedDevices: sets.New(allocatedDevices...),
-		classLister:      classLister,
-		slices:           slices,
-		celCache:         celCache,
-		celMutex:         keymutex.NewHashed(0),
+		allocatedDevices:   allocatedDevices,
+		classLister:        classLister,
+		slices:             slices,
+		celCache:           celCache,
+		celMutex:           keymutex.NewHashed(0),
 	}, nil
 }
 

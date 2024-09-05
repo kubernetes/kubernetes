@@ -108,11 +108,12 @@ type dynamicResources struct {
 	enableAdminAccess         bool
 	enableSchedulingQueueHint bool
 
-	fh          framework.Handle
-	clientset   kubernetes.Interface
-	classLister resourcelisters.DeviceClassLister
-	sliceLister resourcelisters.ResourceSliceLister
-	celCache    *structured.CELCache
+	fh               framework.Handle
+	clientset        kubernetes.Interface
+	classLister      resourcelisters.DeviceClassLister
+	sliceLister      resourcelisters.ResourceSliceLister
+	celCache         *structured.CELCache
+	allocatedDevices *allocatedDevices
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -177,6 +178,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	pl := &dynamicResources{
 		enabled:                   true,
 		enableAdminAccess:         fts.EnableDRAAdminAccess,
@@ -192,7 +194,13 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		// recent 10 of them get reused across different scheduling
 		// cycles.
 		celCache: structured.NewCELCache(10),
+
+		allocatedDevices: newAllocatedDevices(logger),
 	}
+
+	// Reacting to events is more efficient than iterating over the list
+	// repeatedly in PreFilter.
+	pl.claimAssumeCache.AddEventHandler(pl.allocatedDevices.handlers())
 
 	return pl, nil
 }
@@ -538,10 +546,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// Claims are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
-		allocatedDevices := pl.listAllAllocatedDevices()
-		if err != nil {
-			return nil, statusError(logger, err)
-		}
+		allocatedDevices := pl.listAllAllocatedDevices(logger)
 		slices, err := pl.sliceLister.List(labels.Everything())
 		if err != nil {
 			return nil, statusError(logger, err)
@@ -558,18 +563,14 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	return nil, nil
 }
 
-func (pl *dynamicResources) listAllAllocatedDevices() []structured.DeviceID {
-	// Probably not worth adding an index for?
-	objs := pl.claimAssumeCache.List(nil)
-	var allocated []structured.DeviceID
-	for _, obj := range objs {
-		claim := obj.(*resourceapi.ResourceClaim)
-		if obj, ok := pl.inFlightAllocations.Load(claim.UID); ok {
-			claim = obj.(*resourceapi.ResourceClaim)
-		}
-		if claim.Status.Allocation == nil {
-			continue
-		}
+func (pl *dynamicResources) listAllAllocatedDevices(logger klog.Logger) sets.Set[structured.DeviceID] {
+	// Start with a fresh set that matches the current known state of the
+	// world according to the informers.
+	allocated := pl.allocatedDevices.Get()
+
+	// Whatever is in flight also has to be checked.
+	pl.inFlightAllocations.Range(func(key, value any) bool {
+		claim := value.(*resourceapi.ResourceClaim)
 		for _, result := range claim.Status.Allocation.Devices.Results {
 			// Kubernetes 1.31 did not set this, 1.32 always does.
 			// Supporting 1.31 is not worth the additional code that
@@ -581,9 +582,11 @@ func (pl *dynamicResources) listAllAllocatedDevices() []structured.DeviceID {
 				continue
 			}
 			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-			allocated = append(allocated, deviceID)
+			logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
+			allocated.Insert(deviceID)
 		}
-	}
+		return true
+	})
 	return allocated
 }
 
