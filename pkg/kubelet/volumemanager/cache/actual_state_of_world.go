@@ -738,7 +738,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		// Update uncertain volumes - the new markVolumeOpts may have updated information.
 		// Especially reconstructed volumes (marked as uncertain during reconstruction) need
 		// an update.
-		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
+		updateUncertainVolume = podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
 	}
 	if !podExists || updateUncertainVolume {
 		// Add new mountedPod or update existing one.

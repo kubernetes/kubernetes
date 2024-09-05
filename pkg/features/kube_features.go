@@ -481,14 +481,6 @@ const (
 	// Enables the dynamic configuration of Service IP ranges
 	MultiCIDRServiceAllocator featuregate.Feature = "MultiCIDRServiceAllocator"
 
-	// owner: @jsafrane
-	// kep: https://kep.k8s.io/3756
-	// alpha: v1.25 (as part of SELinuxMountReadWriteOncePod)
-	// beta: v1.27
-	// GA: v1.30
-	// Robust VolumeManager reconstruction after kubelet restart.
-	NewVolumeManagerReconstruction featuregate.Feature = "NewVolumeManagerReconstruction"
-
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
 	// alpha: v1.29
