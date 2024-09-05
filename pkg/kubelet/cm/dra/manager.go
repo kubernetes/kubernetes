@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // draManagerStateFileName is the file name where dra manager stores its state
@@ -150,6 +151,9 @@ func (m *ManagerImpl) reconcileLoop(ctx context.Context) {
 // for each new resource requirement, process their responses and update the cached
 // containerResources on success.
 func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
+	defer func(startTime time.Time) {
+		metrics.DRAOperationsDuration.WithLabelValues("PrepareResources").Observe(time.Since(startTime).Seconds())
+	}(time.Now())
 	logger := klog.FromContext(ctx)
 	batches := make(map[string][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
@@ -369,6 +373,9 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
 // already been successfully unprepared.
 func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
+	defer func(startTime time.Time) {
+		metrics.DRAOperationsDuration.WithLabelValues("UnprepareResources").Observe(time.Since(startTime).Seconds())
+	}(time.Now())
 	var claimNames []string
 	for i := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
