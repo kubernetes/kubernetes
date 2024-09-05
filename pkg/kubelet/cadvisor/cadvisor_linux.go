@@ -49,6 +49,7 @@ type cadvisorClient struct {
 }
 
 var _ Interface = new(cadvisorClient)
+var MaxHouseKeepingInterval int = 0
 
 // TODO(vmarmol): Make configurable.
 // The amount of time for which to keep stats in memory.
@@ -96,6 +97,9 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	duration := maxHousekeepingInterval
+	if MaxHouseKeepingInterval != 0 {
+		duration = MaxHouseKeepingInterval
+	}
 	housekeepingConfig := manager.HousekeepingConfig{
 		Interval:     &duration,
 		AllowDynamic: pointer.Bool(allowDynamicHousekeeping),
