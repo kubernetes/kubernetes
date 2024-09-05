@@ -260,13 +260,6 @@ const (
 	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
 	WatchFromStorageWithoutResourceVersion featuregate.Feature = "WatchFromStorageWithoutResourceVersion"
 
-	// owner: @vinaykul
-	// kep: http://kep.k8s.io/1287
-	// alpha: v1.27
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @p0lyn0mial
 	// alpha: v1.27
 	//
@@ -372,8 +365,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchCacheInitializationPostStartHook: {Default: false, PreRelease: featuregate.Beta},
 
 	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
-
-	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
