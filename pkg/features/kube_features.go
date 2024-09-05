@@ -464,15 +464,6 @@ const (
 	// Enables kubelet to support memory QoS with cgroups v2.
 	MemoryQoS featuregate.Feature = "MemoryQoS"
 
-	// owner: @sanposhiho
-	// kep: https://kep.k8s.io/3022
-	// alpha: v1.24
-	// beta: v1.25
-	// GA: v1.30
-	//
-	// Enable MinDomains in Pod Topology Spread.
-	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
-
 	// owner: @aojea
 	// kep: https://kep.k8s.io/1880
 	// alpha: v1.27
