@@ -113,7 +113,7 @@ func (j *TestJig) ReserveStaticNodePort(port int) bool {
 
 }*/
 
-// GetUnusedStaticNodePort returns first free port in static range
+// GetUnusedStaticNodePortAndReserve returns first free port in static range
 // If no port in static range is available it returns -1
 func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
 	staticPortLock.Lock()
