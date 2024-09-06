@@ -49,7 +49,7 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 	})
 }
 
-// AllowBootstrapTokensToGetNodes creates RBAC rules to allow Node Bootstrap Tokens to list nodes
+// AllowBootstrapTokensToGetNodes creates RBAC rules to allow Node Bootstrap Tokens to list nodes.
 func AllowBootstrapTokensToGetNodes(client clientset.Interface) error {
 	fmt.Println("[bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to get nodes")
 

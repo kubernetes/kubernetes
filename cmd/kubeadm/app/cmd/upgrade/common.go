@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -223,12 +221,4 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		return fakeclient, nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-// getWaiter gets the right waiter implementation
-func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) apiclient.Waiter {
-	if dryRun {
-		return dryrunutil.NewWaiter()
-	}
-	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
