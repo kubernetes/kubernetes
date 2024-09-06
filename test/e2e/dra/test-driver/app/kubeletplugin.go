@@ -182,7 +182,9 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		resources := kubeletplugin.Resources{
 			Devices: devices,
 		}
-		ex.d.PublishResources(ctx, resources)
+		if err := ex.d.PublishResources(ctx, resources); err != nil {
+			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
+		}
 	} else if len(ex.fileOps.Devices) > 0 {
 		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
 		for i, deviceName := range sets.List(ex.deviceNames) {
@@ -194,7 +196,9 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		resources := kubeletplugin.Resources{
 			Devices: devices,
 		}
-		ex.d.PublishResources(ctx, resources)
+		if err := ex.d.PublishResources(ctx, resources); err != nil {
+			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
+		}
 	}
 
 	return ex, nil
