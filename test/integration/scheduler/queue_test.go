@@ -190,8 +190,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		name string
 		// initialNode is the Node to be created at first.
 		initialNodes []*v1.Node
-		// initialPod is the Pod to be created at first if it's not empty.
-		initialPod *v1.Pod
+		// initialPods is the list of Pods to be created at first if it's not empty.
+		// Note that the scheduler won't schedule those Pods,
+		// meaning, those Pods should be already scheduled basically; they should have .spec.nodename.
+		initialPods []*v1.Pod
 		// pods are the list of Pods to be created.
 		// All of them are expected to be unschedulable at first.
 		pods []*v1.Pod
@@ -227,7 +229,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
-			initialPod:   st.MakePod().Label("anti", "anti").Name("pod1").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+			initialPods: []*v1.Pod{
+				st.MakePod().Label("anti", "anti").Name("pod1").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+			},
 			pods: []*v1.Pod{
 				// - Pod2 will be rejected by the PodAffinity plugin.
 				st.MakePod().Label("anti", "anti").Name("pod2").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
@@ -381,7 +385,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		{
 			name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
-			initialPod:   st.MakePod().Name("pod1").Label("key", "val").Container("image").Node("fake-node").Obj(),
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("key", "val").Container("image").Node("fake-node").Obj(),
+			},
 			pods: []*v1.Pod{
 				// - Pod2 will be rejected by the PodTopologySpread plugin.
 				st.MakePod().Name("pod2").Label("key", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
@@ -401,7 +407,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label to make it match the podAntiAffinity",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
-			initialPod:   st.MakePod().Name("pod1").Label("anti1", "anti1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("anti1", "anti1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
+			},
 			pods: []*v1.Pod{
 				// - Pod2 and pod3 will be rejected by the PodAffinity plugin.
 				st.MakePod().Name("pod2").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
@@ -421,7 +429,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
-			initialPod:   st.MakePod().Name("pod1").Container("image").Node("fake-node").Obj(),
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").Node("fake-node").Obj(),
+			},
 			pods: []*v1.Pod{
 				// - Pod2 and pod3 will be rejected by the PodAffinity plugin.
 				st.MakePod().Name("pod2").PodAffinityExists("aaa", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
@@ -458,6 +468,50 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.New("pod1"),
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			name:         "Pod rejected with hostport by the NodePorts plugin is requeued when pod with common hostport is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("fake-node").Obj(),
+				st.MakePod().Name("pod2").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8081}}).Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod3").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Obj(),
+				st.MakePod().Name("pod4").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8081}}).Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an assigned Pod delete event.
+				// Because Pod1 and Pod3 have common port, deleting Pod1 makes Pod3 schedulable.
+				// By setting GracePeriodSeconds to 0, allowing Pod3 to be requeued immediately after Pod1 is deleted.
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+					return fmt.Errorf("failed to delete Pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod3"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with hostport by the NodePorts plugin is requeued when new node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeCreated event.
+				// It makes Pod2 schedulable.
+				node := st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create a new node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -488,9 +542,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					}
 				}
 
-				if tt.initialPod != nil {
-					if _, err := cs.CoreV1().Pods(ns).Create(ctx, tt.initialPod, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Failed to create an initial Pod %q: %v", tt.initialPod.Name, err)
+				for _, pod := range tt.initialPods {
+					if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create an initial Pod %q: %v", pod.Name, err)
 					}
 				}
 
