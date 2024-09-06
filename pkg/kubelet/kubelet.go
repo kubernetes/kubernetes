@@ -2841,6 +2841,10 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
 		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", klog.KObj(pod))
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeInfeasible,
+			"Resize is not feasible as request exceeds allocatable node resources. Over capacity resources: CPU=%d, Memory=%d",
+			cpuRequests-cpuAvailable, memRequests-memAvailable,
+		)
 		return false, v1.PodResizeStatusInfeasible
 	}
 
@@ -2852,7 +2856,13 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 	if ok, failReason, failMessage := kl.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeDeferred, "Resize cannot be accommodated: %s", failReason)
 		return false, v1.PodResizeStatusDeferred
+	}
+
+	// If it's not, record a normal event
+	if pod.Status.Resize != v1.PodResizeStatusInProgress {
+		kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeInProgress, "Resize is in progress")
 	}
 
 	return true, v1.PodResizeStatusInProgress

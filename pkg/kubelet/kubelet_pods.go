@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -1823,6 +1824,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		s.Resize = kl.determinePodResizeStatus(pod, podStatus, podIsTerminal)
+		if s.Resize == "" && !podIsTerminal && !kubetypes.IsStaticPod(pod) {
+			kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "Pod %v resized", klog.KObj(pod))
+		}
 	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)

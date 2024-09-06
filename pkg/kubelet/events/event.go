@@ -34,6 +34,11 @@ const (
 	FailedToCreatePodContainer     = "FailedCreatePodContainer"
 	FailedToMakePodDataDirectories = "Failed"
 	NetworkNotReady                = "NetworkNotReady"
+	ResizeInProgress               = "ResizeInProgress"
+	ResizeDeferred                 = "ResizeDeferred"
+	ResizeInfeasible               = "ResizeInfeasible"
+	ResizeError                    = "ResizeError"
+	ResizeCompleted                = "ResizeCompleted"
 )
 
 // Image event reason list
