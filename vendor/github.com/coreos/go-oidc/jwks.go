@@ -6,18 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/pquerna/cachecontrol"
 	jose "gopkg.in/square/go-jose.v2"
-	"k8s.io/klog/v2"
 )
-
-var logHeaderAllowList = strings.Split(os.Getenv("OIDC_LOG_REMOTE_HEADERS"), ",")
 
 // keysExpiryDelta is the allowed clock skew between a client and the OpenID Connect
 // server.
@@ -118,16 +112,6 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 	keys, expiry := r.keysFromCache()
 
 	// Don't check expiry yet. This optimizes for when the provider is unavailable.
-	kids := make([]string, len(keys))
-	for i, k := range keys {
-		kids[i] = k.KeyID
-	}
-	klog.InfoS(
-		"verifying jwt",
-		"kid", keyID,
-		"kids", kids,
-		"expiry", expiry.Format(time.RFC3339),
-	)
 	for _, key := range keys {
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
@@ -141,22 +125,19 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 		return nil, errors.New("failed to verify id token signature")
 	}
 
-	klog.InfoS("cached JWKS keyset does not contain kid, fetching new keyset", "kid", keyID)
 	keys, err := r.keysFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching keys %v", err)
 	}
 
-	kids = make([]string, len(keys))
-	for i, key := range keys {
-		kids[i] = key.KeyID
+	for _, key := range keys {
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
 				return payload, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("failed to verify id token signature for kid %s, available kids %v", keyID, kids)
+	return nil, errors.New("failed to verify id token signature")
 }
 
 func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey, expiry time.Time) {
@@ -234,20 +215,6 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)
 	}
-	kids := make([]string, len(keySet.Keys))
-	for i, k := range keySet.Keys {
-		kids[i] = k.KeyID
-	}
-	headers, otherHeaders := logHeaders(resp.Header)
-	klog.InfoS(
-		"http response header",
-		"headers", headers,
-		"otherHeaders", otherHeaders,
-		"kids", kids,
-		"url", r.jwksURL,
-	)
-
-	klog.InfoS("got keys from jwks bundle", "keyCount", len(kids), "jwksURL", r.jwksURL, "kids", kids)
 
 	// If the server doesn't provide cache control headers, assume the
 	// keys expire immediately.
@@ -258,19 +225,4 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 		expiry = e
 	}
 	return keySet.Keys, expiry, nil
-}
-
-func logHeaders(r http.Header) (string, []string) {
-	multiline := ""
-	otherHeaders := make([]string, 0)
-	for name, values := range r.Clone() {
-		if slices.Contains(logHeaderAllowList, name) {
-			for _, value := range values {
-				multiline = fmt.Sprintf("%s\n%s: %s", multiline, name, value)
-			}
-		} else {
-			otherHeaders = append(otherHeaders, name)
-		}
-	}
-	return multiline, otherHeaders
 }

@@ -672,7 +672,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
-		// Give time to scheduler to attempt to schedule pod
+		// Give time to shceduler to attempt to schedule pod
 		if err := waitForPodUnschedulable(config.client, pod); err != nil {
 			t.Errorf("Failed as Pod %s was not unschedulable: %v", pod.Name, err)
 		}
@@ -687,8 +687,8 @@ func TestPVAffinityConflict(t *testing.T) {
 		if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
 			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
 		}
-		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match Pod's node affinity") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match Pod's node affinity. Got message %q", podName, p.Status.Conditions[0].Message)
+		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match Pod's node affinity") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
+			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match Pod's node affinity, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
 		// Deleting test pod
 		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err != nil {

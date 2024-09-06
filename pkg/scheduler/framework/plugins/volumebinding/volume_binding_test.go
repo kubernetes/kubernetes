@@ -27,7 +27,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
@@ -80,7 +79,6 @@ func TestVolumeBinding(t *testing.T) {
 		pvs                     []*v1.PersistentVolume
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
-		wantPreFilterResult     *framework.PreFilterResult
 		wantPreFilterStatus     *framework.Status
 		wantStateAfterPreFilter *stateData
 		wantFilterStatus        []*framework.Status
@@ -116,45 +114,6 @@ func TestVolumeBinding(t *testing.T) {
 				podVolumeClaims: &PodVolumeClaims{
 					boundClaims: []*v1.PersistentVolumeClaim{
 						makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-					},
-					unboundClaimsDelayBinding:  []*v1.PersistentVolumeClaim{},
-					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{},
-				},
-				podVolumesByNode: map[string]*PodVolumes{},
-			},
-			wantFilterStatus: []*framework.Status{
-				nil,
-			},
-			wantScores: []int64{
-				0,
-			},
-		},
-		{
-			name: "all bound with local volumes",
-			pod:  makePod("pod-a").withPVCVolume("pvc-a", "volume-a").withPVCVolume("pvc-b", "volume-b").Pod,
-			nodes: []*v1.Node{
-				makeNode("node-a").Node,
-			},
-			pvcs: []*v1.PersistentVolumeClaim{
-				makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-				makePVC("pvc-b", waitSC.Name).withBoundPV("pv-b").PersistentVolumeClaim,
-			},
-			pvs: []*v1.PersistentVolume{
-				makePV("pv-a", waitSC.Name).withPhase(v1.VolumeBound).withNodeAffinity(map[string][]string{
-					v1.LabelHostname: {"node-a"},
-				}).PersistentVolume,
-				makePV("pv-b", waitSC.Name).withPhase(v1.VolumeBound).withNodeAffinity(map[string][]string{
-					v1.LabelHostname: {"node-a"},
-				}).PersistentVolume,
-			},
-			wantPreFilterResult: &framework.PreFilterResult{
-				NodeNames: sets.New("node-a"),
-			},
-			wantStateAfterPreFilter: &stateData{
-				podVolumeClaims: &PodVolumeClaims{
-					boundClaims: []*v1.PersistentVolumeClaim{
-						makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-						makePVC("pvc-b", waitSC.Name).withBoundPV("pv-b").PersistentVolumeClaim,
 					},
 					unboundClaimsDelayBinding:  []*v1.PersistentVolumeClaim{},
 					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{},
@@ -843,10 +802,8 @@ func TestVolumeBinding(t *testing.T) {
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
-			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
+			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
-			assert.Equal(t, item.wantPreFilterResult, gotPreFilterResult)
-
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
