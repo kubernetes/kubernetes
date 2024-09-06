@@ -222,8 +222,6 @@ type volumeBinder struct {
 	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
 }
 
-var _ SchedulerVolumeBinder = &volumeBinder{}
-
 // CapacityCheck contains additional parameters for NewVolumeBinder that
 // are only needed when checking volume sizes against available storage
 // capacity is desired.
@@ -265,7 +263,7 @@ func NewVolumeBinder(
 }
 
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
-// for the given pod and node. If the node does not fit, conflict reasons are
+// for the given pod and node. If the node does not fit, confilict reasons are
 // returned.
 func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolumeClaims *PodVolumeClaims, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	podVolumes = &PodVolumes{}

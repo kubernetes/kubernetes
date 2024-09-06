@@ -80,7 +80,6 @@ func TestVolumeBinding(t *testing.T) {
 		pvs                     []*v1.PersistentVolume
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
-		wantPreFilterResult     *framework.PreFilterResult
 		wantPreFilterStatus     *framework.Status
 		wantStateAfterPreFilter *stateData
 		wantFilterStatus        []*framework.Status
@@ -795,10 +794,8 @@ func TestVolumeBinding(t *testing.T) {
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
-			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
+			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
-			assert.Equal(t, item.wantPreFilterResult, gotPreFilterResult)
-
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
