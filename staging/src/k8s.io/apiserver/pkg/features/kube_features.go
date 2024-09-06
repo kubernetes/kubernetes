@@ -331,7 +331,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ConcurrentWatchObjectDecode: {Default: false, PreRelease: featuregate.Beta},
 
-	CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
+	CoordinatedLeaderElection: {Default: true, PreRelease: featuregate.Alpha},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
