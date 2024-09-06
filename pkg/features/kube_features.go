@@ -1007,7 +1007,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.CoordinatedLeaderElection: {Default: true, PreRelease: featuregate.Alpha},
 
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
