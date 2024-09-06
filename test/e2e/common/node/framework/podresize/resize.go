@@ -216,11 +216,34 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 
 	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod)
 
+	var podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes int64
 	var errs []error
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
 		errs = append(errs, cgroups.VerifyContainerCgroupValues(f, pod, &tc, onCgroupv2))
+
+		// TODO: Consider PodLevelResources feature and move this function to `cgroups` package.
+		// Accumulate container resources for verifying pod (PodLevelResources feature is not taken into account now)
+		podCPURequestMilliValue += tc.Resources.Requests.Cpu().MilliValue()
+		if podCPULimitMilliValue >= 0 {
+			if tc.Resources.Limits.Cpu().IsZero() {
+				podCPULimitMilliValue = -1
+			} else {
+				podCPULimitMilliValue += tc.Resources.Limits.Cpu().MilliValue()
+			}
+		}
+		if podMemoryLimitInBytes >= 0 {
+			if tc.Resources.Limits.Memory().IsZero() {
+				podMemoryLimitInBytes = -1
+			} else {
+				podMemoryLimitInBytes += tc.Resources.Limits.Memory().Value()
+			}
+		}
 	}
+
+	podResourceInfo := cgroups.BuildPodResourceInfo(podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes)
+	errs = append(errs, cgroups.VerifyPodCgroups(ctx, f, pod, &podResourceInfo))
+
 	return utilerrors.NewAggregate(errs)
 }
 
