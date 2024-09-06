@@ -214,6 +214,7 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	}
 	pInfo.UnschedulablePlugins.Clear()
 	pInfo.PendingPlugins.Clear()
+	pInfo.GatingPlugin = ""
 
 	return pInfo, nil
 }

@@ -212,6 +212,15 @@ func (ce ClusterEvent) Match(event ClusterEvent) bool {
 	return ce.IsWildCard() || (ce.Resource == WildCard || ce.Resource == event.Resource) && ce.ActionType&event.ActionType != 0
 }
 
+func (ce ClusterEvent) MatchAny(events []ClusterEvent) bool {
+	for _, e := range events {
+		if ce.Match(e) {
+			return true
+		}
+	}
+	return false
+}
+
 func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
 		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
@@ -252,6 +261,8 @@ type QueuedPodInfo struct {
 	UnschedulablePlugins sets.Set[string]
 	// PendingPlugins records the plugin names that the Pod failed with Pending status.
 	PendingPlugins sets.Set[string]
+	// GatingPlugin records the plugin namesthat gated the Pod at PreEnqueue.
+	GatingPlugin string
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
 }
