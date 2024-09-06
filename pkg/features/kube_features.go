@@ -259,13 +259,6 @@ const (
 	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
-	// owner: @jpbetz
-	// alpha: v1.30
-	// beta: v1.31
-	// Resource create requests using generateName are retried automatically by the apiserver
-	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
-	RetryGenerateName featuregate.Feature = "RetryGenerateName"
-
 	// owner: @bobbypage
 	// alpha: v1.20
 	// beta:  v1.21
@@ -1021,6 +1014,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
 
+	genericfeatures.RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
+
 	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
@@ -1059,8 +1054,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
-	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
