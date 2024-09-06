@@ -396,6 +396,12 @@ func (aq *activeQueue) done(pod types.UID) {
 
 // close closes the activeQueue.
 func (aq *activeQueue) close() {
+	// We should call done() for all in-flight pods to clean up the inFlightEvents metrics.
+	// It's safe even if the binding cycle running asynchronously calls done() afterwards
+	// done() will just be a no-op.
+	for pod := range aq.inFlightPods {
+		aq.done(pod)
+	}
 	aq.lock.Lock()
 	aq.closed = true
 	aq.lock.Unlock()
