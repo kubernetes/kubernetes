@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -95,7 +96,7 @@ func checkErr(err error, handleErr func(string, int)) {
 	}
 
 	switch {
-	case err == ErrExit:
+	case errors.Is(err, ErrExit):
 		handleErr("", DefaultErrorExitCode)
 	case strings.Contains(err.Error(), ErrInvalidSubCommandMsg):
 		handleErr(err.Error(), DefaultErrorExitCode)
