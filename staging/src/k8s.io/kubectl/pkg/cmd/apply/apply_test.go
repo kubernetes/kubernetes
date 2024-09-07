@@ -1059,17 +1059,14 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 				"namespace/test-apply pruned",
 			},
 		},
-		// Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release
-		// namespace is a non-namespaced resource and will not be pruned in the future
 		"prune with namespace and without allowlist should delete resources that are not in the specified file": {
 			currentResources:        []runtime.Object{rc, rc2, cm, ns},
 			namespace:               "test",
-			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
 				"configmap/test-cm pruned",
 				"replicationcontroller/test-rc2 pruned",
-				"namespace/test-apply pruned",
 			},
 		},
 		// Even namespace is a non-namespaced resource, it will be pruned if specified in pruneAllowList in the future
