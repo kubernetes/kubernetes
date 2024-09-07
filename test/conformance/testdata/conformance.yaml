@@ -2229,15 +2229,14 @@
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, managed etc hosts
   codename: '[sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts
-    file [LinuxOnly] [NodeConformance] [Conformance]'
+    file [NodeConformance] [Conformance]'
   description: Create a Pod with containers with hostNetwork set to false, one of
     the containers mounts the /etc/hosts file form the host. Create a second Pod with
     hostNetwork set to true. 1. The Pod with hostNetwork=false MUST have /etc/hosts
     of containers managed by the Kubelet. 2. The Pod with hostNetwork=false but the
     container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be
     managed by the Kubelet. 3. The Pod with hostNetwork=true , /etc/hosts file MUST
-    not be managed by the Kubelet. This test is marked LinuxOnly since Windows cannot
-    mount individual files in Containers.
+    not be managed by the Kubelet.
   release: v1.9
   file: test/e2e/common/node/kubelet_etc_hosts.go
 - testname: lease API should be available
