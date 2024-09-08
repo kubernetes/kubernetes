@@ -50,6 +50,28 @@ func prefixedName(namePrefix string, name string) string {
 	return fmt.Sprintf("%s-%s", namePrefix, name)
 }
 
+type podTerminationContainerStatus struct {
+	exitCode int32
+	reason   string
+}
+
+func expectPodTerminationContainerStatuses(statuses []v1.ContainerStatus, to map[string]podTerminationContainerStatus) {
+	ginkgo.GinkgoHelper()
+
+	if len(statuses) != len(to) {
+		ginkgo.Fail(fmt.Sprintf("mismatched lengths in pod termination container statuses. got %d, expected %d", len(statuses), len(to)))
+	}
+	for _, status := range statuses {
+		expected, ok := to[status.Name]
+		if !ok {
+			ginkgo.Fail(fmt.Sprintf("container %q not found in expected pod termination container statuses", status.Name))
+		}
+		gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
+		gomega.Expect(status.State.Terminated.ExitCode).To(gomega.Equal(expected.exitCode))
+		gomega.Expect(status.State.Terminated.Reason).To(gomega.Equal(expected.reason))
+	}
+}
+
 var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	addAfterEachForCleaningUpPods(f)
@@ -3115,6 +3137,12 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 				pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 
+				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
+					restartableInit1: {exitCode: int32(0), reason: "Completed"},
+					restartableInit2: {exitCode: int32(0), reason: "Completed"},
+					restartableInit3: {exitCode: int32(0), reason: "Completed"},
+				})
+
 				results := parseOutput(context.TODO(), f, pod)
 
 				ginkgo.By("Analyzing results")
@@ -3220,6 +3248,13 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 
 				pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
+
+				// all restartable init containers are sigkilled with exit code 137
+				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
+					restartableInit1: {exitCode: int32(137), reason: "Error"},
+					restartableInit2: {exitCode: int32(137), reason: "Error"},
+					restartableInit3: {exitCode: int32(137), reason: "Error"},
+				})
 
 				results := parseOutput(context.TODO(), f, pod)
 
@@ -3351,6 +3386,12 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 
 				pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
+
+				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
+					restartableInit1: {exitCode: int32(0), reason: "Completed"},
+					restartableInit2: {exitCode: int32(0), reason: "Completed"},
+					restartableInit3: {exitCode: int32(0), reason: "Completed"},
+				})
 
 				results := parseOutput(context.TODO(), f, pod)
 
