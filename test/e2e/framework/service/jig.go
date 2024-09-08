@@ -98,21 +98,6 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	return j
 }
 
-/*
-// ReserveStaticNodePort reserves a port in static port range and returns true
-// If the provided port is not in static range or is already reserved it returns false
-func (j *TestJig) ReserveStaticNodePort(port int) bool {
-	staticPortLock.Lock()
-	defer staticPortLock.Unlock()
-	if port-staticPortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-staticPortRange.Base] == 0 {
-		staticPorts[port-staticPortRange.Base] = 1
-		return true
-	} else {
-		return false
-	}
-
-}*/
-
 // GetUnusedStaticNodePortAndReserve returns first free port in static range
 // If no port in static range is available it returns -1
 func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
