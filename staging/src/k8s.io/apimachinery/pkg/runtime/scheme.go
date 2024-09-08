@@ -137,7 +137,6 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 // the struct becomes the "kind" field when encoding. Version may not be empty - use the
 // APIVersionInternal constant if you have a type that does not have a formal version.
 func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
-	s.addObservedVersion(gv)
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
 		if t.Kind() != reflect.Pointer {
