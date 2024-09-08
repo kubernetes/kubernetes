@@ -84,7 +84,7 @@ func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
-	// iperf 2.19+ reportes 15 fields, before it was just 9
+	// iperf 2.19+ reports 15 fields, before it was just 9
 	if len(slice) != 15 {
 		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
 	}
