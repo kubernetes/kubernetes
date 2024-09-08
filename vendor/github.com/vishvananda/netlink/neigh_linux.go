@@ -24,7 +24,11 @@ const (
 	NDA_MASTER
 	NDA_LINK_NETNSID
 	NDA_SRC_VNI
-	NDA_MAX = NDA_SRC_VNI
+	NDA_PROTOCOL
+	NDA_NH_ID
+	NDA_FDB_EXT_ATTRS
+	NDA_FLAGS_EXT
+	NDA_MAX = NDA_FLAGS_EXT
 )
 
 // Neighbor Cache Entry States.
@@ -42,11 +46,19 @@ const (
 
 // Neighbor Flags
 const (
-	NTF_USE    = 0x01
-	NTF_SELF   = 0x02
-	NTF_MASTER = 0x04
-	NTF_PROXY  = 0x08
-	NTF_ROUTER = 0x80
+	NTF_USE         = 0x01
+	NTF_SELF        = 0x02
+	NTF_MASTER      = 0x04
+	NTF_PROXY       = 0x08
+	NTF_EXT_LEARNED = 0x10
+	NTF_OFFLOADED   = 0x20
+	NTF_STICKY      = 0x40
+	NTF_ROUTER      = 0x80
+)
+
+// Extended Neighbor Flags
+const (
+	NTF_EXT_MANAGED = 0x00000001
 )
 
 // Ndmsg is for adding, removing or receiving information about a neighbor table entry
@@ -162,9 +174,14 @@ func neighHandle(neigh *Neigh, req *nl.NetlinkRequest) error {
 	if neigh.LLIPAddr != nil {
 		llIPData := nl.NewRtAttr(NDA_LLADDR, neigh.LLIPAddr.To4())
 		req.AddData(llIPData)
-	} else if neigh.Flags != NTF_PROXY || neigh.HardwareAddr != nil {
+	} else if neigh.HardwareAddr != nil {
 		hwData := nl.NewRtAttr(NDA_LLADDR, []byte(neigh.HardwareAddr))
 		req.AddData(hwData)
+	}
+
+	if neigh.FlagsExt != 0 {
+		flagsExtData := nl.NewRtAttr(NDA_FLAGS_EXT, nl.Uint32Attr(uint32(neigh.FlagsExt)))
+		req.AddData(flagsExtData)
 	}
 
 	if neigh.Vlan != 0 {
@@ -243,6 +260,18 @@ func (h *Handle) NeighListExecute(msg Ndmsg) ([]Neigh, error) {
 			// Ignore messages from other interfaces
 			continue
 		}
+		if msg.Family != 0 && ndm.Family != msg.Family {
+			continue
+		}
+		if msg.State != 0 && ndm.State != msg.State {
+			continue
+		}
+		if msg.Type != 0 && ndm.Type != msg.Type {
+			continue
+		}
+		if msg.Flags != 0 && ndm.Flags != msg.Flags {
+			continue
+		}
 
 		neigh, err := NeighDeserialize(m)
 		if err != nil {
@@ -293,6 +322,8 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 			} else {
 				neigh.HardwareAddr = net.HardwareAddr(attr.Value)
 			}
+		case NDA_FLAGS_EXT:
+			neigh.FlagsExt = int(native.Uint32(attr.Value[0:4]))
 		case NDA_VLAN:
 			neigh.Vlan = int(native.Uint16(attr.Value[0:2]))
 		case NDA_VNI:
@@ -308,13 +339,13 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 // NeighSubscribe takes a chan down which notifications will be sent
 // when neighbors are added or deleted. Close the 'done' chan to stop subscription.
 func NeighSubscribe(ch chan<- NeighUpdate, done <-chan struct{}) error {
-	return neighSubscribeAt(netns.None(), netns.None(), ch, done, nil, false)
+	return neighSubscribeAt(netns.None(), netns.None(), ch, done, nil, false, 0, nil, false)
 }
 
 // NeighSubscribeAt works like NeighSubscribe plus it allows the caller
 // to choose the network namespace in which to subscribe (ns).
 func NeighSubscribeAt(ns netns.NsHandle, ch chan<- NeighUpdate, done <-chan struct{}) error {
-	return neighSubscribeAt(ns, netns.None(), ch, done, nil, false)
+	return neighSubscribeAt(ns, netns.None(), ch, done, nil, false, 0, nil, false)
 }
 
 // NeighSubscribeOptions contains a set of options to use with
@@ -323,6 +354,11 @@ type NeighSubscribeOptions struct {
 	Namespace     *netns.NsHandle
 	ErrorCallback func(error)
 	ListExisting  bool
+
+	// max size is based on value of /proc/sys/net/core/rmem_max
+	ReceiveBufferSize      int
+	ReceiveBufferForceSize bool
+	ReceiveTimeout         *unix.Timeval
 }
 
 // NeighSubscribeWithOptions work like NeighSubscribe but enable to
@@ -333,16 +369,17 @@ func NeighSubscribeWithOptions(ch chan<- NeighUpdate, done <-chan struct{}, opti
 		none := netns.None()
 		options.Namespace = &none
 	}
-	return neighSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting)
+	return neighSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting,
+		options.ReceiveBufferSize, options.ReceiveTimeout, options.ReceiveBufferForceSize)
 }
 
-func neighSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- NeighUpdate, done <-chan struct{}, cberr func(error), listExisting bool) error {
+func neighSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- NeighUpdate, done <-chan struct{}, cberr func(error), listExisting bool,
+	rcvbuf int, rcvTimeout *unix.Timeval, rcvbufForce bool) error {
 	s, err := nl.SubscribeAt(newNs, curNs, unix.NETLINK_ROUTE, unix.RTNLGRP_NEIGH)
 	makeRequest := func(family int) error {
-		req := pkgHandle.newNetlinkRequest(unix.RTM_GETNEIGH,
-			unix.NLM_F_DUMP)
-		infmsg := nl.NewIfInfomsg(family)
-		req.AddData(infmsg)
+		req := pkgHandle.newNetlinkRequest(unix.RTM_GETNEIGH, unix.NLM_F_DUMP)
+		ndmsg := &Ndmsg{Family: uint8(family)}
+		req.AddData(ndmsg)
 		if err := s.Send(req); err != nil {
 			return err
 		}
@@ -350,6 +387,17 @@ func neighSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- NeighUpdate, done <
 	}
 	if err != nil {
 		return err
+	}
+	if rcvTimeout != nil {
+		if err := s.SetReceiveTimeout(rcvTimeout); err != nil {
+			return err
+		}
+	}
+	if rcvbuf != 0 {
+		err = s.SetReceiveBufferSize(rcvbuf, rcvbufForce)
+		if err != nil {
+			return err
+		}
 	}
 	if done != nil {
 		go func() {
@@ -396,13 +444,12 @@ func neighSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- NeighUpdate, done <
 					continue
 				}
 				if m.Header.Type == unix.NLMSG_ERROR {
-					native := nl.NativeEndian()
-					error := int32(native.Uint32(m.Data[0:4]))
-					if error == 0 {
+					nError := int32(native.Uint32(m.Data[0:4]))
+					if nError == 0 {
 						continue
 					}
 					if cberr != nil {
-						cberr(syscall.Errno(-error))
+						cberr(syscall.Errno(-nError))
 					}
 					return
 				}

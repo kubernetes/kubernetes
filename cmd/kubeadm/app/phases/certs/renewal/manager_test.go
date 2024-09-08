@@ -184,7 +184,7 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			}
 
 			if !newCert.NotAfter.After(cert.NotAfter) {
-				t.Fatalf("expected new certificate with updated expiration, but renewed certificate has same NotAfter value: saw %s, expected greather than %s", newCert.NotAfter, cert.NotAfter)
+				t.Fatalf("expected new certificate with updated expiration, but renewed certificate has same NotAfter value: saw %s, expected greater than %s", newCert.NotAfter, cert.NotAfter)
 			}
 
 			certtestutil.AssertCertificateIsSignedByCa(t, newCert, testCACert)

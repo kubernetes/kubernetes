@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -28,11 +28,11 @@ import (
 type TopologySpreadConstraintApplyConfiguration struct {
 	MaxSkew            *int32                                  `json:"maxSkew,omitempty"`
 	TopologyKey        *string                                 `json:"topologyKey,omitempty"`
-	WhenUnsatisfiable  *v1.UnsatisfiableConstraintAction       `json:"whenUnsatisfiable,omitempty"`
+	WhenUnsatisfiable  *corev1.UnsatisfiableConstraintAction   `json:"whenUnsatisfiable,omitempty"`
 	LabelSelector      *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
 	MinDomains         *int32                                  `json:"minDomains,omitempty"`
-	NodeAffinityPolicy *v1.NodeInclusionPolicy                 `json:"nodeAffinityPolicy,omitempty"`
-	NodeTaintsPolicy   *v1.NodeInclusionPolicy                 `json:"nodeTaintsPolicy,omitempty"`
+	NodeAffinityPolicy *corev1.NodeInclusionPolicy             `json:"nodeAffinityPolicy,omitempty"`
+	NodeTaintsPolicy   *corev1.NodeInclusionPolicy             `json:"nodeTaintsPolicy,omitempty"`
 	MatchLabelKeys     []string                                `json:"matchLabelKeys,omitempty"`
 }
 
@@ -61,7 +61,7 @@ func (b *TopologySpreadConstraintApplyConfiguration) WithTopologyKey(value strin
 // WithWhenUnsatisfiable sets the WhenUnsatisfiable field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the WhenUnsatisfiable field is set to the value of the last call.
-func (b *TopologySpreadConstraintApplyConfiguration) WithWhenUnsatisfiable(value v1.UnsatisfiableConstraintAction) *TopologySpreadConstraintApplyConfiguration {
+func (b *TopologySpreadConstraintApplyConfiguration) WithWhenUnsatisfiable(value corev1.UnsatisfiableConstraintAction) *TopologySpreadConstraintApplyConfiguration {
 	b.WhenUnsatisfiable = &value
 	return b
 }
@@ -85,7 +85,7 @@ func (b *TopologySpreadConstraintApplyConfiguration) WithMinDomains(value int32)
 // WithNodeAffinityPolicy sets the NodeAffinityPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeAffinityPolicy field is set to the value of the last call.
-func (b *TopologySpreadConstraintApplyConfiguration) WithNodeAffinityPolicy(value v1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
+func (b *TopologySpreadConstraintApplyConfiguration) WithNodeAffinityPolicy(value corev1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
 	b.NodeAffinityPolicy = &value
 	return b
 }
@@ -93,7 +93,7 @@ func (b *TopologySpreadConstraintApplyConfiguration) WithNodeAffinityPolicy(valu
 // WithNodeTaintsPolicy sets the NodeTaintsPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeTaintsPolicy field is set to the value of the last call.
-func (b *TopologySpreadConstraintApplyConfiguration) WithNodeTaintsPolicy(value v1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
+func (b *TopologySpreadConstraintApplyConfiguration) WithNodeTaintsPolicy(value corev1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
 	b.NodeTaintsPolicy = &value
 	return b
 }

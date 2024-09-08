@@ -19,14 +19,14 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 )
 
 // DeviceConstraintApplyConfiguration represents a declarative configuration of the DeviceConstraint type for use
 // with apply.
 type DeviceConstraintApplyConfiguration struct {
-	Requests       []string                     `json:"requests,omitempty"`
-	MatchAttribute *v1alpha3.FullyQualifiedName `json:"matchAttribute,omitempty"`
+	Requests       []string                             `json:"requests,omitempty"`
+	MatchAttribute *resourcev1alpha3.FullyQualifiedName `json:"matchAttribute,omitempty"`
 }
 
 // DeviceConstraintApplyConfiguration constructs a declarative configuration of the DeviceConstraint type for use with
@@ -48,7 +48,7 @@ func (b *DeviceConstraintApplyConfiguration) WithRequests(values ...string) *Dev
 // WithMatchAttribute sets the MatchAttribute field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchAttribute field is set to the value of the last call.
-func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value v1alpha3.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
+func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1alpha3.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
 	b.MatchAttribute = &value
 	return b
 }

@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DeviceClassLister helps list DeviceClasses.
@@ -30,19 +30,19 @@ import (
 type DeviceClassLister interface {
 	// List lists all DeviceClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha3.DeviceClass, err error)
+	List(selector labels.Selector) (ret []*resourcev1alpha3.DeviceClass, err error)
 	// Get retrieves the DeviceClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha3.DeviceClass, error)
+	Get(name string) (*resourcev1alpha3.DeviceClass, error)
 	DeviceClassListerExpansion
 }
 
 // deviceClassLister implements the DeviceClassLister interface.
 type deviceClassLister struct {
-	listers.ResourceIndexer[*v1alpha3.DeviceClass]
+	listers.ResourceIndexer[*resourcev1alpha3.DeviceClass]
 }
 
 // NewDeviceClassLister returns a new DeviceClassLister.
 func NewDeviceClassLister(indexer cache.Indexer) DeviceClassLister {
-	return &deviceClassLister{listers.New[*v1alpha3.DeviceClass](indexer, v1alpha3.Resource("deviceclass"))}
+	return &deviceClassLister{listers.New[*resourcev1alpha3.DeviceClass](indexer, resourcev1alpha3.Resource("deviceclass"))}
 }

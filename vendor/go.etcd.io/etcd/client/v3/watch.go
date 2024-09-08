@@ -1036,7 +1036,7 @@ func (pr *progressRequest) toPB() *pb.WatchRequest {
 
 func streamKeyFromCtx(ctx context.Context) string {
 	if md, ok := metadata.FromOutgoingContext(ctx); ok {
-		return fmt.Sprintf("%+v", md)
+		return fmt.Sprintf("%+v", map[string][]string(md))
 	}
 	return ""
 }

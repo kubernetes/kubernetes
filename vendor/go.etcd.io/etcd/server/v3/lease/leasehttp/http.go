@@ -103,6 +103,9 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, ErrLeaseHTTPTimeout.Error(), http.StatusRequestTimeout)
 			return
 		}
+
+		// gofail: var beforeLookupWhenForwardLeaseTimeToLive struct{}
+
 		l := h.l.Lookup(lease.LeaseID(lreq.LeaseTimeToLiveRequest.ID))
 		if l == nil {
 			http.Error(w, lease.ErrLeaseNotFound.Error(), http.StatusNotFound)
@@ -124,6 +127,14 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				kbs[i] = []byte(ks[i])
 			}
 			resp.LeaseTimeToLiveResponse.Keys = kbs
+		}
+
+		// The leasor could be demoted if leader changed during lookup.
+		// We should return error to force retry instead of returning
+		// incorrect remaining TTL.
+		if l.Demoted() {
+			http.Error(w, lease.ErrNotPrimary.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		v, err = resp.Marshal()

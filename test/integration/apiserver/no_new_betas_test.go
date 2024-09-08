@@ -24,23 +24,6 @@ import (
 )
 
 func TestNoNewBetaAPIsByDefault(t *testing.T) {
-	// yes, this *is* a copy/paste from somewhere else.  We really do mean it when we say you shouldn't be modifying
-	// this list and this test was created to make it more painful.
-	// legacyBetaEnabledByDefaultResources is the list of beta resources we enable.  You may not add to this list
-	legacyBetaEnabledByDefaultResources := map[schema.GroupVersionResource]bool{
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"):                 true, // remove in 1.29
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"): true, // remove in 1.29
-	}
-
-	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
-	// before we changed that policy and do not have stable versions. These resources are allowed to have additional
-	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
-	// are no more beta resources enabled by default.
-	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas").GroupResource():                 true,
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations").GroupResource(): true,
-	}
-
 	// if you found this because you want to create an integration test for your new beta API, the method you're looking for
 	// is this setupWithResources method and you need to pass the resource you want to enable into it.
 	_, kubeClient, _, tearDownFn := setupWithResources(t,
@@ -66,12 +49,6 @@ func TestNoNewBetaAPIsByDefault(t *testing.T) {
 				Group:    currResource.Group,
 				Version:  currResource.Version,
 				Resource: currResource.Name,
-			}
-			if legacyBetaEnabledByDefaultResources[enabledGVR] {
-				continue
-			}
-			if legacyBetaResourcesWithoutStableEquivalents[enabledGVR.GroupResource()] {
-				continue
 			}
 
 			t.Errorf("%v is a new beta API.  New beta APIs may not be enabled by default.  "+

@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
+	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type VolumeAttributesClassesGetter interface {
 
 // VolumeAttributesClassInterface has methods to work with VolumeAttributesClass resources.
 type VolumeAttributesClassInterface interface {
-	Create(ctx context.Context, volumeAttributesClass *v1beta1.VolumeAttributesClass, opts v1.CreateOptions) (*v1beta1.VolumeAttributesClass, error)
-	Update(ctx context.Context, volumeAttributesClass *v1beta1.VolumeAttributesClass, opts v1.UpdateOptions) (*v1beta1.VolumeAttributesClass, error)
+	Create(ctx context.Context, volumeAttributesClass *storagev1beta1.VolumeAttributesClass, opts v1.CreateOptions) (*storagev1beta1.VolumeAttributesClass, error)
+	Update(ctx context.Context, volumeAttributesClass *storagev1beta1.VolumeAttributesClass, opts v1.UpdateOptions) (*storagev1beta1.VolumeAttributesClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.VolumeAttributesClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.VolumeAttributesClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1beta1.VolumeAttributesClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagev1beta1.VolumeAttributesClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.VolumeAttributesClass, err error)
-	Apply(ctx context.Context, volumeAttributesClass *storagev1beta1.VolumeAttributesClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.VolumeAttributesClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1beta1.VolumeAttributesClass, err error)
+	Apply(ctx context.Context, volumeAttributesClass *applyconfigurationsstoragev1beta1.VolumeAttributesClassApplyConfiguration, opts v1.ApplyOptions) (result *storagev1beta1.VolumeAttributesClass, err error)
 	VolumeAttributesClassExpansion
 }
 
 // volumeAttributesClasses implements VolumeAttributesClassInterface
 type volumeAttributesClasses struct {
-	*gentype.ClientWithListAndApply[*v1beta1.VolumeAttributesClass, *v1beta1.VolumeAttributesClassList, *storagev1beta1.VolumeAttributesClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagev1beta1.VolumeAttributesClass, *storagev1beta1.VolumeAttributesClassList, *applyconfigurationsstoragev1beta1.VolumeAttributesClassApplyConfiguration]
 }
 
 // newVolumeAttributesClasses returns a VolumeAttributesClasses
 func newVolumeAttributesClasses(c *StorageV1beta1Client) *volumeAttributesClasses {
 	return &volumeAttributesClasses{
-		gentype.NewClientWithListAndApply[*v1beta1.VolumeAttributesClass, *v1beta1.VolumeAttributesClassList, *storagev1beta1.VolumeAttributesClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagev1beta1.VolumeAttributesClass, *storagev1beta1.VolumeAttributesClassList, *applyconfigurationsstoragev1beta1.VolumeAttributesClassApplyConfiguration](
 			"volumeattributesclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.VolumeAttributesClass { return &v1beta1.VolumeAttributesClass{} },
-			func() *v1beta1.VolumeAttributesClassList { return &v1beta1.VolumeAttributesClassList{} }),
+			func() *storagev1beta1.VolumeAttributesClass { return &storagev1beta1.VolumeAttributesClass{} },
+			func() *storagev1beta1.VolumeAttributesClassList { return &storagev1beta1.VolumeAttributesClassList{} }),
 	}
 }

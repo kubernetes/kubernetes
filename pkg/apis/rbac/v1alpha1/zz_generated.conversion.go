@@ -24,7 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -38,150 +38,150 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.AggregationRule)(nil), (*rbac.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_AggregationRule_To_rbac_AggregationRule(a.(*v1alpha1.AggregationRule), b.(*rbac.AggregationRule), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.AggregationRule)(nil), (*rbac.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AggregationRule_To_rbac_AggregationRule(a.(*rbacv1alpha1.AggregationRule), b.(*rbac.AggregationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.AggregationRule)(nil), (*v1alpha1.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_AggregationRule_To_v1alpha1_AggregationRule(a.(*rbac.AggregationRule), b.(*v1alpha1.AggregationRule), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.AggregationRule)(nil), (*rbacv1alpha1.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_AggregationRule_To_v1alpha1_AggregationRule(a.(*rbac.AggregationRule), b.(*rbacv1alpha1.AggregationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterRole)(nil), (*rbac.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(a.(*v1alpha1.ClusterRole), b.(*rbac.ClusterRole), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.ClusterRole)(nil), (*rbac.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(a.(*rbacv1alpha1.ClusterRole), b.(*rbac.ClusterRole), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRole)(nil), (*v1alpha1.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(a.(*rbac.ClusterRole), b.(*v1alpha1.ClusterRole), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRole)(nil), (*rbacv1alpha1.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(a.(*rbac.ClusterRole), b.(*rbacv1alpha1.ClusterRole), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterRoleBinding)(nil), (*rbac.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(a.(*v1alpha1.ClusterRoleBinding), b.(*rbac.ClusterRoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.ClusterRoleBinding)(nil), (*rbac.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(a.(*rbacv1alpha1.ClusterRoleBinding), b.(*rbac.ClusterRoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBinding)(nil), (*v1alpha1.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(a.(*rbac.ClusterRoleBinding), b.(*v1alpha1.ClusterRoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBinding)(nil), (*rbacv1alpha1.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(a.(*rbac.ClusterRoleBinding), b.(*rbacv1alpha1.ClusterRoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterRoleBindingList)(nil), (*rbac.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(a.(*v1alpha1.ClusterRoleBindingList), b.(*rbac.ClusterRoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.ClusterRoleBindingList)(nil), (*rbac.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(a.(*rbacv1alpha1.ClusterRoleBindingList), b.(*rbac.ClusterRoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBindingList)(nil), (*v1alpha1.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(a.(*rbac.ClusterRoleBindingList), b.(*v1alpha1.ClusterRoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBindingList)(nil), (*rbacv1alpha1.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(a.(*rbac.ClusterRoleBindingList), b.(*rbacv1alpha1.ClusterRoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterRoleList)(nil), (*rbac.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(a.(*v1alpha1.ClusterRoleList), b.(*rbac.ClusterRoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.ClusterRoleList)(nil), (*rbac.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(a.(*rbacv1alpha1.ClusterRoleList), b.(*rbac.ClusterRoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleList)(nil), (*v1alpha1.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(a.(*rbac.ClusterRoleList), b.(*v1alpha1.ClusterRoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleList)(nil), (*rbacv1alpha1.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(a.(*rbac.ClusterRoleList), b.(*rbacv1alpha1.ClusterRoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.PolicyRule)(nil), (*rbac.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(a.(*v1alpha1.PolicyRule), b.(*rbac.PolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.PolicyRule)(nil), (*rbac.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(a.(*rbacv1alpha1.PolicyRule), b.(*rbac.PolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.PolicyRule)(nil), (*v1alpha1.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(a.(*rbac.PolicyRule), b.(*v1alpha1.PolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.PolicyRule)(nil), (*rbacv1alpha1.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(a.(*rbac.PolicyRule), b.(*rbacv1alpha1.PolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.Role)(nil), (*rbac.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_Role_To_rbac_Role(a.(*v1alpha1.Role), b.(*rbac.Role), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.Role)(nil), (*rbac.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Role_To_rbac_Role(a.(*rbacv1alpha1.Role), b.(*rbac.Role), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.Role)(nil), (*v1alpha1.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_Role_To_v1alpha1_Role(a.(*rbac.Role), b.(*v1alpha1.Role), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.Role)(nil), (*rbacv1alpha1.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_Role_To_v1alpha1_Role(a.(*rbac.Role), b.(*rbacv1alpha1.Role), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.RoleBinding)(nil), (*rbac.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding(a.(*v1alpha1.RoleBinding), b.(*rbac.RoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.RoleBinding)(nil), (*rbac.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding(a.(*rbacv1alpha1.RoleBinding), b.(*rbac.RoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleBinding)(nil), (*v1alpha1.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding(a.(*rbac.RoleBinding), b.(*v1alpha1.RoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.RoleBinding)(nil), (*rbacv1alpha1.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding(a.(*rbac.RoleBinding), b.(*rbacv1alpha1.RoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.RoleBindingList)(nil), (*rbac.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(a.(*v1alpha1.RoleBindingList), b.(*rbac.RoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.RoleBindingList)(nil), (*rbac.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(a.(*rbacv1alpha1.RoleBindingList), b.(*rbac.RoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleBindingList)(nil), (*v1alpha1.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(a.(*rbac.RoleBindingList), b.(*v1alpha1.RoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.RoleBindingList)(nil), (*rbacv1alpha1.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(a.(*rbac.RoleBindingList), b.(*rbacv1alpha1.RoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.RoleList)(nil), (*rbac.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_RoleList_To_rbac_RoleList(a.(*v1alpha1.RoleList), b.(*rbac.RoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.RoleList)(nil), (*rbac.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RoleList_To_rbac_RoleList(a.(*rbacv1alpha1.RoleList), b.(*rbac.RoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleList)(nil), (*v1alpha1.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleList_To_v1alpha1_RoleList(a.(*rbac.RoleList), b.(*v1alpha1.RoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.RoleList)(nil), (*rbacv1alpha1.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_RoleList_To_v1alpha1_RoleList(a.(*rbac.RoleList), b.(*rbacv1alpha1.RoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.RoleRef)(nil), (*rbac.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_RoleRef_To_rbac_RoleRef(a.(*v1alpha1.RoleRef), b.(*rbac.RoleRef), scope)
+	if err := s.AddGeneratedConversionFunc((*rbacv1alpha1.RoleRef)(nil), (*rbac.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RoleRef_To_rbac_RoleRef(a.(*rbacv1alpha1.RoleRef), b.(*rbac.RoleRef), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleRef)(nil), (*v1alpha1.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleRef_To_v1alpha1_RoleRef(a.(*rbac.RoleRef), b.(*v1alpha1.RoleRef), scope)
+	if err := s.AddGeneratedConversionFunc((*rbac.RoleRef)(nil), (*rbacv1alpha1.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_RoleRef_To_v1alpha1_RoleRef(a.(*rbac.RoleRef), b.(*rbacv1alpha1.RoleRef), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*rbac.Subject)(nil), (*v1alpha1.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_Subject_To_v1alpha1_Subject(a.(*rbac.Subject), b.(*v1alpha1.Subject), scope)
+	if err := s.AddConversionFunc((*rbac.Subject)(nil), (*rbacv1alpha1.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_rbac_Subject_To_v1alpha1_Subject(a.(*rbac.Subject), b.(*rbacv1alpha1.Subject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.Subject)(nil), (*rbac.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_Subject_To_rbac_Subject(a.(*v1alpha1.Subject), b.(*rbac.Subject), scope)
+	if err := s.AddConversionFunc((*rbacv1alpha1.Subject)(nil), (*rbac.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Subject_To_rbac_Subject(a.(*rbacv1alpha1.Subject), b.(*rbac.Subject), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_AggregationRule_To_rbac_AggregationRule(in *v1alpha1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
+func autoConvert_v1alpha1_AggregationRule_To_rbac_AggregationRule(in *rbacv1alpha1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
 	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 
 // Convert_v1alpha1_AggregationRule_To_rbac_AggregationRule is an autogenerated conversion function.
-func Convert_v1alpha1_AggregationRule_To_rbac_AggregationRule(in *v1alpha1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
+func Convert_v1alpha1_AggregationRule_To_rbac_AggregationRule(in *rbacv1alpha1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
 	return autoConvert_v1alpha1_AggregationRule_To_rbac_AggregationRule(in, out, s)
 }
 
-func autoConvert_rbac_AggregationRule_To_v1alpha1_AggregationRule(in *rbac.AggregationRule, out *v1alpha1.AggregationRule, s conversion.Scope) error {
+func autoConvert_rbac_AggregationRule_To_v1alpha1_AggregationRule(in *rbac.AggregationRule, out *rbacv1alpha1.AggregationRule, s conversion.Scope) error {
 	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 
 // Convert_rbac_AggregationRule_To_v1alpha1_AggregationRule is an autogenerated conversion function.
-func Convert_rbac_AggregationRule_To_v1alpha1_AggregationRule(in *rbac.AggregationRule, out *v1alpha1.AggregationRule, s conversion.Scope) error {
+func Convert_rbac_AggregationRule_To_v1alpha1_AggregationRule(in *rbac.AggregationRule, out *rbacv1alpha1.AggregationRule, s conversion.Scope) error {
 	return autoConvert_rbac_AggregationRule_To_v1alpha1_AggregationRule(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *v1alpha1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *rbacv1alpha1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]rbac.PolicyRule)(unsafe.Pointer(&in.Rules))
 	out.AggregationRule = (*rbac.AggregationRule)(unsafe.Pointer(in.AggregationRule))
@@ -189,23 +189,23 @@ func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *v1alpha1.ClusterRo
 }
 
 // Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *v1alpha1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *rbacv1alpha1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *v1alpha1.ClusterRole, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *rbacv1alpha1.ClusterRole, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]v1alpha1.PolicyRule)(unsafe.Pointer(&in.Rules))
-	out.AggregationRule = (*v1alpha1.AggregationRule)(unsafe.Pointer(in.AggregationRule))
+	out.Rules = *(*[]rbacv1alpha1.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.AggregationRule = (*rbacv1alpha1.AggregationRule)(unsafe.Pointer(in.AggregationRule))
 	return nil
 }
 
 // Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole is an autogenerated conversion function.
-func Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *v1alpha1.ClusterRole, s conversion.Scope) error {
+func Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *rbacv1alpha1.ClusterRole, s conversion.Scope) error {
 	return autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1alpha1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *rbacv1alpha1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
@@ -225,15 +225,15 @@ func autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1al
 }
 
 // Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1alpha1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *rbacv1alpha1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *v1alpha1.ClusterRoleBinding, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *rbacv1alpha1.ClusterRoleBinding, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
-		*out = make([]v1alpha1.Subject, len(*in))
+		*out = make([]rbacv1alpha1.Subject, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_Subject_To_v1alpha1_Subject(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -249,11 +249,11 @@ func autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac
 }
 
 // Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *v1alpha1.ClusterRoleBinding, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *rbacv1alpha1.ClusterRoleBinding, s conversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1alpha1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *rbacv1alpha1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -270,15 +270,15 @@ func autoConvert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(
 }
 
 // Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1alpha1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *rbacv1alpha1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *v1alpha1.ClusterRoleBindingList, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *rbacv1alpha1.ClusterRoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1alpha1.ClusterRoleBinding, len(*in))
+		*out = make([]rbacv1alpha1.ClusterRoleBinding, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -291,33 +291,33 @@ func autoConvert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(
 }
 
 // Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *v1alpha1.ClusterRoleBindingList, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *rbacv1alpha1.ClusterRoleBindingList, s conversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1alpha1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in *rbacv1alpha1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]rbac.ClusterRole)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1alpha1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in *rbacv1alpha1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.ClusterRoleList, out *v1alpha1.ClusterRoleList, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.ClusterRoleList, out *rbacv1alpha1.ClusterRoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.ClusterRole)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]rbacv1alpha1.ClusterRole)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.ClusterRoleList, out *v1alpha1.ClusterRoleList, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.ClusterRoleList, out *rbacv1alpha1.ClusterRoleList, s conversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in, out, s)
 }
 
-func autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *v1alpha1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
+func autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *rbacv1alpha1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -327,11 +327,11 @@ func autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *v1alpha1.PolicyRule,
 }
 
 // Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule is an autogenerated conversion function.
-func Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *v1alpha1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
+func Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *rbacv1alpha1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
 	return autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in, out, s)
 }
 
-func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *v1alpha1.PolicyRule, s conversion.Scope) error {
+func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *rbacv1alpha1.PolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -341,33 +341,33 @@ func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out
 }
 
 // Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule is an autogenerated conversion function.
-func Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *v1alpha1.PolicyRule, s conversion.Scope) error {
+func Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *rbacv1alpha1.PolicyRule, s conversion.Scope) error {
 	return autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in, out, s)
 }
 
-func autoConvert_v1alpha1_Role_To_rbac_Role(in *v1alpha1.Role, out *rbac.Role, s conversion.Scope) error {
+func autoConvert_v1alpha1_Role_To_rbac_Role(in *rbacv1alpha1.Role, out *rbac.Role, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]rbac.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_v1alpha1_Role_To_rbac_Role is an autogenerated conversion function.
-func Convert_v1alpha1_Role_To_rbac_Role(in *v1alpha1.Role, out *rbac.Role, s conversion.Scope) error {
+func Convert_v1alpha1_Role_To_rbac_Role(in *rbacv1alpha1.Role, out *rbac.Role, s conversion.Scope) error {
 	return autoConvert_v1alpha1_Role_To_rbac_Role(in, out, s)
 }
 
-func autoConvert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *v1alpha1.Role, s conversion.Scope) error {
+func autoConvert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *rbacv1alpha1.Role, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]v1alpha1.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.Rules = *(*[]rbacv1alpha1.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_rbac_Role_To_v1alpha1_Role is an autogenerated conversion function.
-func Convert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *v1alpha1.Role, s conversion.Scope) error {
+func Convert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *rbacv1alpha1.Role, s conversion.Scope) error {
 	return autoConvert_rbac_Role_To_v1alpha1_Role(in, out, s)
 }
 
-func autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *v1alpha1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
+func autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *rbacv1alpha1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
@@ -387,15 +387,15 @@ func autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *v1alpha1.RoleBindi
 }
 
 // Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding is an autogenerated conversion function.
-func Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *v1alpha1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
+func Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *rbacv1alpha1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
 	return autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in, out, s)
 }
 
-func autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, out *v1alpha1.RoleBinding, s conversion.Scope) error {
+func autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, out *rbacv1alpha1.RoleBinding, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
-		*out = make([]v1alpha1.Subject, len(*in))
+		*out = make([]rbacv1alpha1.Subject, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_Subject_To_v1alpha1_Subject(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -411,11 +411,11 @@ func autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, 
 }
 
 // Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding is an autogenerated conversion function.
-func Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, out *v1alpha1.RoleBinding, s conversion.Scope) error {
+func Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, out *rbacv1alpha1.RoleBinding, s conversion.Scope) error {
 	return autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in, out, s)
 }
 
-func autoConvert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in *v1alpha1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
+func autoConvert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in *rbacv1alpha1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -432,15 +432,15 @@ func autoConvert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in *v1alpha1.R
 }
 
 // Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList is an autogenerated conversion function.
-func Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in *v1alpha1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
+func Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in *rbacv1alpha1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList(in, out, s)
 }
 
-func autoConvert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in *rbac.RoleBindingList, out *v1alpha1.RoleBindingList, s conversion.Scope) error {
+func autoConvert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in *rbac.RoleBindingList, out *rbacv1alpha1.RoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1alpha1.RoleBinding, len(*in))
+		*out = make([]rbacv1alpha1.RoleBinding, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -453,33 +453,33 @@ func autoConvert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in *rbac.RoleB
 }
 
 // Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList is an autogenerated conversion function.
-func Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in *rbac.RoleBindingList, out *v1alpha1.RoleBindingList, s conversion.Scope) error {
+func Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in *rbac.RoleBindingList, out *rbacv1alpha1.RoleBindingList, s conversion.Scope) error {
 	return autoConvert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList(in, out, s)
 }
 
-func autoConvert_v1alpha1_RoleList_To_rbac_RoleList(in *v1alpha1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
+func autoConvert_v1alpha1_RoleList_To_rbac_RoleList(in *rbacv1alpha1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]rbac.Role)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1alpha1_RoleList_To_rbac_RoleList is an autogenerated conversion function.
-func Convert_v1alpha1_RoleList_To_rbac_RoleList(in *v1alpha1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
+func Convert_v1alpha1_RoleList_To_rbac_RoleList(in *rbacv1alpha1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_RoleList_To_rbac_RoleList(in, out, s)
 }
 
-func autoConvert_rbac_RoleList_To_v1alpha1_RoleList(in *rbac.RoleList, out *v1alpha1.RoleList, s conversion.Scope) error {
+func autoConvert_rbac_RoleList_To_v1alpha1_RoleList(in *rbac.RoleList, out *rbacv1alpha1.RoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.Role)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]rbacv1alpha1.Role)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_RoleList_To_v1alpha1_RoleList is an autogenerated conversion function.
-func Convert_rbac_RoleList_To_v1alpha1_RoleList(in *rbac.RoleList, out *v1alpha1.RoleList, s conversion.Scope) error {
+func Convert_rbac_RoleList_To_v1alpha1_RoleList(in *rbac.RoleList, out *rbacv1alpha1.RoleList, s conversion.Scope) error {
 	return autoConvert_rbac_RoleList_To_v1alpha1_RoleList(in, out, s)
 }
 
-func autoConvert_v1alpha1_RoleRef_To_rbac_RoleRef(in *v1alpha1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
+func autoConvert_v1alpha1_RoleRef_To_rbac_RoleRef(in *rbacv1alpha1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
 	out.APIGroup = in.APIGroup
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -487,11 +487,11 @@ func autoConvert_v1alpha1_RoleRef_To_rbac_RoleRef(in *v1alpha1.RoleRef, out *rba
 }
 
 // Convert_v1alpha1_RoleRef_To_rbac_RoleRef is an autogenerated conversion function.
-func Convert_v1alpha1_RoleRef_To_rbac_RoleRef(in *v1alpha1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
+func Convert_v1alpha1_RoleRef_To_rbac_RoleRef(in *rbacv1alpha1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
 	return autoConvert_v1alpha1_RoleRef_To_rbac_RoleRef(in, out, s)
 }
 
-func autoConvert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *v1alpha1.RoleRef, s conversion.Scope) error {
+func autoConvert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *rbacv1alpha1.RoleRef, s conversion.Scope) error {
 	out.APIGroup = in.APIGroup
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -499,11 +499,11 @@ func autoConvert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *v1alpha
 }
 
 // Convert_rbac_RoleRef_To_v1alpha1_RoleRef is an autogenerated conversion function.
-func Convert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *v1alpha1.RoleRef, s conversion.Scope) error {
+func Convert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *rbacv1alpha1.RoleRef, s conversion.Scope) error {
 	return autoConvert_rbac_RoleRef_To_v1alpha1_RoleRef(in, out, s)
 }
 
-func autoConvert_v1alpha1_Subject_To_rbac_Subject(in *v1alpha1.Subject, out *rbac.Subject, s conversion.Scope) error {
+func autoConvert_v1alpha1_Subject_To_rbac_Subject(in *rbacv1alpha1.Subject, out *rbac.Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
 	// INFO: in.APIVersion opted out of conversion generation
 	out.Name = in.Name
@@ -511,7 +511,7 @@ func autoConvert_v1alpha1_Subject_To_rbac_Subject(in *v1alpha1.Subject, out *rba
 	return nil
 }
 
-func autoConvert_rbac_Subject_To_v1alpha1_Subject(in *rbac.Subject, out *v1alpha1.Subject, s conversion.Scope) error {
+func autoConvert_rbac_Subject_To_v1alpha1_Subject(in *rbac.Subject, out *rbacv1alpha1.Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
 	// WARNING: in.APIGroup requires manual conversion: does not exist in peer-type
 	out.Name = in.Name

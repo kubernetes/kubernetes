@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ExampleLister helps list Examples.
@@ -30,7 +30,7 @@ import (
 type ExampleLister interface {
 	// List lists all Examples in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Example, err error)
+	List(selector labels.Selector) (ret []*crv1.Example, err error)
 	// Examples returns an object that can list and get Examples.
 	Examples(namespace string) ExampleNamespaceLister
 	ExampleListerExpansion
@@ -38,17 +38,17 @@ type ExampleLister interface {
 
 // exampleLister implements the ExampleLister interface.
 type exampleLister struct {
-	listers.ResourceIndexer[*v1.Example]
+	listers.ResourceIndexer[*crv1.Example]
 }
 
 // NewExampleLister returns a new ExampleLister.
 func NewExampleLister(indexer cache.Indexer) ExampleLister {
-	return &exampleLister{listers.New[*v1.Example](indexer, v1.Resource("example"))}
+	return &exampleLister{listers.New[*crv1.Example](indexer, crv1.Resource("example"))}
 }
 
 // Examples returns an object that can list and get Examples.
 func (s *exampleLister) Examples(namespace string) ExampleNamespaceLister {
-	return exampleNamespaceLister{listers.NewNamespaced[*v1.Example](s.ResourceIndexer, namespace)}
+	return exampleNamespaceLister{listers.NewNamespaced[*crv1.Example](s.ResourceIndexer, namespace)}
 }
 
 // ExampleNamespaceLister helps list and get Examples.
@@ -56,15 +56,15 @@ func (s *exampleLister) Examples(namespace string) ExampleNamespaceLister {
 type ExampleNamespaceLister interface {
 	// List lists all Examples in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Example, err error)
+	List(selector labels.Selector) (ret []*crv1.Example, err error)
 	// Get retrieves the Example from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Example, error)
+	Get(name string) (*crv1.Example, error)
 	ExampleNamespaceListerExpansion
 }
 
 // exampleNamespaceLister implements the ExampleNamespaceLister
 // interface.
 type exampleNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Example]
+	listers.ResourceIndexer[*crv1.Example]
 }

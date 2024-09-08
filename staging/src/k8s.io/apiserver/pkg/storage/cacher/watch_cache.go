@@ -83,55 +83,6 @@ type watchCacheEvent struct {
 	RecordTime      time.Time
 }
 
-// Computing a key of an object is generally non-trivial (it performs
-// e.g. validation underneath). Similarly computing object fields and
-// labels. To avoid computing them multiple times (to serve the event
-// in different List/Watch requests), in the underlying store we are
-// keeping structs (key, object, labels, fields).
-type storeElement struct {
-	Key    string
-	Object runtime.Object
-	Labels labels.Set
-	Fields fields.Set
-}
-
-func storeElementKey(obj interface{}) (string, error) {
-	elem, ok := obj.(*storeElement)
-	if !ok {
-		return "", fmt.Errorf("not a storeElement: %v", obj)
-	}
-	return elem.Key, nil
-}
-
-func storeElementObject(obj interface{}) (runtime.Object, error) {
-	elem, ok := obj.(*storeElement)
-	if !ok {
-		return nil, fmt.Errorf("not a storeElement: %v", obj)
-	}
-	return elem.Object, nil
-}
-
-func storeElementIndexFunc(objIndexFunc cache.IndexFunc) cache.IndexFunc {
-	return func(obj interface{}) (strings []string, e error) {
-		seo, err := storeElementObject(obj)
-		if err != nil {
-			return nil, err
-		}
-		return objIndexFunc(seo)
-	}
-}
-
-func storeElementIndexers(indexers *cache.Indexers) cache.Indexers {
-	if indexers == nil {
-		return cache.Indexers{}
-	}
-	ret := cache.Indexers{}
-	for indexName, indexFunc := range *indexers {
-		ret[indexName] = storeElementIndexFunc(indexFunc)
-	}
-	return ret
-}
-
 // watchCache implements a Store interface.
 // However, it depends on the elements implementing runtime.Object interface.
 //
@@ -173,7 +124,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store cache.Indexer
+	store storeIndexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -223,7 +174,7 @@ func newWatchCache(
 		upperBoundCapacity:  defaultUpperBoundCapacity,
 		startIndex:          0,
 		endIndex:            0,
-		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
+		store:               newStoreIndexer(indexers),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
@@ -506,19 +457,10 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	if err != nil {
 		return nil, 0, "", err
 	}
-
-	var result []interface{}
-	for _, item := range items {
-		elem, ok := item.(*storeElement)
-		if !ok {
-			return nil, 0, "", fmt.Errorf("non *storeElement returned from storage: %v", item)
-		}
-		if !hasPathPrefix(elem.Key, key) {
-			continue
-		}
-		result = append(result, item)
+	result, err := filterPrefix(key, items)
+	if err != nil {
+		return nil, 0, "", err
 	}
-
 	sort.Sort(sortableStoreElements(result))
 	return result, rv, index, nil
 }
@@ -552,6 +494,21 @@ func (w *watchCache) waitUntilFreshAndListItems(ctx context.Context, resourceVer
 	}()
 
 	return result, rv, index, err
+}
+
+func filterPrefix(prefix string, items []interface{}) ([]interface{}, error) {
+	var result []interface{}
+	for _, item := range items {
+		elem, ok := item.(*storeElement)
+		if !ok {
+			return nil, fmt.Errorf("non *storeElement returned from storage: %v", item)
+		}
+		if !hasPathPrefix(elem.Key, prefix) {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {

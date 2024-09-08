@@ -128,6 +128,9 @@ const (
 
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute
+
+	// ControlPlaneLabel is valid label for kubeadm based clusters like kops ONLY
+	ControlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
 var (
@@ -662,6 +665,17 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
+// GetNodeExternalIPs returns a list of external ip address(es) if any for a node
+func GetNodeExternalIPs(node *v1.Node) (ips []string) {
+	for j := range node.Status.Addresses {
+		nodeAddress := &node.Status.Addresses[j]
+		if nodeAddress.Type == v1.NodeExternalIP && nodeAddress.Address != "" {
+			ips = append(ips, nodeAddress.Address)
+		}
+	}
+	return
+}
+
 // getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
 // If any of these is unavailable, empty slices are returned.
 func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]string, []string, []string) {
@@ -692,6 +706,33 @@ func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]str
 	}
 
 	return externalIPs, internalIPs, hostnames
+}
+
+// GetControlPlaneNodes returns a list of control plane nodes
+func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
+	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	ExpectNoError(err, "error reading all nodes")
+
+	var cpNodes v1.NodeList
+
+	for _, node := range allNodes.Items {
+		// Check for the control plane label
+		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
+			cpNodes.Items = append(cpNodes.Items, node)
+			continue
+		}
+
+		// Check for the specific taint
+		for _, taint := range node.Spec.Taints {
+			// NOTE the taint key is the same as the control plane label
+			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+				cpNodes.Items = append(cpNodes.Items, node)
+				continue
+			}
+		}
+	}
+
+	return &cpNodes
 }
 
 // GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.

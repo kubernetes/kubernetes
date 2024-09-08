@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
@@ -37,33 +37,33 @@ type APIServicesGetter interface {
 
 // APIServiceInterface has methods to work with APIService resources.
 type APIServiceInterface interface {
-	Create(ctx context.Context, aPIService *v1.APIService, opts metav1.CreateOptions) (*v1.APIService, error)
-	Update(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (*v1.APIService, error)
+	Create(ctx context.Context, aPIService *apiregistrationv1.APIService, opts metav1.CreateOptions) (*apiregistrationv1.APIService, error)
+	Update(ctx context.Context, aPIService *apiregistrationv1.APIService, opts metav1.UpdateOptions) (*apiregistrationv1.APIService, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (*v1.APIService, error)
+	UpdateStatus(ctx context.Context, aPIService *apiregistrationv1.APIService, opts metav1.UpdateOptions) (*apiregistrationv1.APIService, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.APIService, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.APIServiceList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiregistrationv1.APIService, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*apiregistrationv1.APIServiceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIService, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apiregistrationv1.APIService, err error)
 	APIServiceExpansion
 }
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	*gentype.ClientWithList[*v1.APIService, *v1.APIServiceList]
+	*gentype.ClientWithList[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1Client) *aPIServices {
 	return &aPIServices{
-		gentype.NewClientWithList[*v1.APIService, *v1.APIServiceList](
+		gentype.NewClientWithList[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList](
 			"apiservices",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.APIService { return &v1.APIService{} },
-			func() *v1.APIServiceList { return &v1.APIServiceList{} }),
+			func() *apiregistrationv1.APIService { return &apiregistrationv1.APIService{} },
+			func() *apiregistrationv1.APIServiceList { return &apiregistrationv1.APIServiceList{} }),
 	}
 }

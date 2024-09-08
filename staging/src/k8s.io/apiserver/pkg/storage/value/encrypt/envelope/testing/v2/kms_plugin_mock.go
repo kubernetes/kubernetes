@@ -31,6 +31,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -61,7 +62,16 @@ type Base64Plugin struct {
 
 // NewBase64Plugin is a constructor for Base64Plugin.
 func NewBase64Plugin(t testing.TB, socketPath string) *Base64Plugin {
-	server := grpc.NewServer()
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(
+			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+				if val := metadata.ValueFromIncomingContext(ctx, ":authority"); len(val) != 1 || val[0] != "localhost" {
+					t.Errorf("wanted localhost authority, got: %v", val)
+				}
+				return handler(ctx, req)
+			},
+		),
+	)
 	result := &Base64Plugin{
 		grpcServer: server,
 		mu:         &sync.Mutex{},

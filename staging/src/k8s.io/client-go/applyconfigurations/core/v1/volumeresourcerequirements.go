@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // VolumeResourceRequirementsApplyConfiguration represents a declarative configuration of the VolumeResourceRequirements type for use
 // with apply.
 type VolumeResourceRequirementsApplyConfiguration struct {
-	Limits   *v1.ResourceList `json:"limits,omitempty"`
-	Requests *v1.ResourceList `json:"requests,omitempty"`
+	Limits   *corev1.ResourceList `json:"limits,omitempty"`
+	Requests *corev1.ResourceList `json:"requests,omitempty"`
 }
 
 // VolumeResourceRequirementsApplyConfiguration constructs a declarative configuration of the VolumeResourceRequirements type for use with
@@ -38,7 +38,7 @@ func VolumeResourceRequirements() *VolumeResourceRequirementsApplyConfiguration 
 // WithLimits sets the Limits field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Limits field is set to the value of the last call.
-func (b *VolumeResourceRequirementsApplyConfiguration) WithLimits(value v1.ResourceList) *VolumeResourceRequirementsApplyConfiguration {
+func (b *VolumeResourceRequirementsApplyConfiguration) WithLimits(value corev1.ResourceList) *VolumeResourceRequirementsApplyConfiguration {
 	b.Limits = &value
 	return b
 }
@@ -46,7 +46,7 @@ func (b *VolumeResourceRequirementsApplyConfiguration) WithLimits(value v1.Resou
 // WithRequests sets the Requests field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Requests field is set to the value of the last call.
-func (b *VolumeResourceRequirementsApplyConfiguration) WithRequests(value v1.ResourceList) *VolumeResourceRequirementsApplyConfiguration {
+func (b *VolumeResourceRequirementsApplyConfiguration) WithRequests(value corev1.ResourceList) *VolumeResourceRequirementsApplyConfiguration {
 	b.Requests = &value
 	return b
 }

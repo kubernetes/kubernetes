@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/events/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	eventsv1 "k8s.io/api/events/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EventLister helps list Events.
@@ -30,7 +30,7 @@ import (
 type EventLister interface {
 	// List lists all Events in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Event, err error)
+	List(selector labels.Selector) (ret []*eventsv1.Event, err error)
 	// Events returns an object that can list and get Events.
 	Events(namespace string) EventNamespaceLister
 	EventListerExpansion
@@ -38,17 +38,17 @@ type EventLister interface {
 
 // eventLister implements the EventLister interface.
 type eventLister struct {
-	listers.ResourceIndexer[*v1.Event]
+	listers.ResourceIndexer[*eventsv1.Event]
 }
 
 // NewEventLister returns a new EventLister.
 func NewEventLister(indexer cache.Indexer) EventLister {
-	return &eventLister{listers.New[*v1.Event](indexer, v1.Resource("event"))}
+	return &eventLister{listers.New[*eventsv1.Event](indexer, eventsv1.Resource("event"))}
 }
 
 // Events returns an object that can list and get Events.
 func (s *eventLister) Events(namespace string) EventNamespaceLister {
-	return eventNamespaceLister{listers.NewNamespaced[*v1.Event](s.ResourceIndexer, namespace)}
+	return eventNamespaceLister{listers.NewNamespaced[*eventsv1.Event](s.ResourceIndexer, namespace)}
 }
 
 // EventNamespaceLister helps list and get Events.
@@ -56,15 +56,15 @@ func (s *eventLister) Events(namespace string) EventNamespaceLister {
 type EventNamespaceLister interface {
 	// List lists all Events in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Event, err error)
+	List(selector labels.Selector) (ret []*eventsv1.Event, err error)
 	// Get retrieves the Event from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Event, error)
+	Get(name string) (*eventsv1.Event, error)
 	EventNamespaceListerExpansion
 }
 
 // eventNamespaceLister implements the EventNamespaceLister
 // interface.
 type eventNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Event]
+	listers.ResourceIndexer[*eventsv1.Event]
 }

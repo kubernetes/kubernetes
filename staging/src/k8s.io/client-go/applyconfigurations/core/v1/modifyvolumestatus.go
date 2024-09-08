@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ModifyVolumeStatusApplyConfiguration represents a declarative configuration of the ModifyVolumeStatus type for use
 // with apply.
 type ModifyVolumeStatusApplyConfiguration struct {
-	TargetVolumeAttributesClassName *string                                     `json:"targetVolumeAttributesClassName,omitempty"`
-	Status                          *v1.PersistentVolumeClaimModifyVolumeStatus `json:"status,omitempty"`
+	TargetVolumeAttributesClassName *string                                         `json:"targetVolumeAttributesClassName,omitempty"`
+	Status                          *corev1.PersistentVolumeClaimModifyVolumeStatus `json:"status,omitempty"`
 }
 
 // ModifyVolumeStatusApplyConfiguration constructs a declarative configuration of the ModifyVolumeStatus type for use with
@@ -46,7 +46,7 @@ func (b *ModifyVolumeStatusApplyConfiguration) WithTargetVolumeAttributesClassNa
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ModifyVolumeStatusApplyConfiguration) WithStatus(value v1.PersistentVolumeClaimModifyVolumeStatus) *ModifyVolumeStatusApplyConfiguration {
+func (b *ModifyVolumeStatusApplyConfiguration) WithStatus(value corev1.PersistentVolumeClaimModifyVolumeStatus) *ModifyVolumeStatusApplyConfiguration {
 	b.Status = &value
 	return b
 }

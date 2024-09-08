@@ -106,9 +106,6 @@ rm -fr "${DISCOVERY_ROOT_DIR}"
 mkdir -p "${DISCOVERY_ROOT_DIR}"
 curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2.json"
 
-# Deprecated, remove before v1.33
-curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2beta1.json"
-
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 
 rm -f "${OPENAPI_ROOT_DIR}/swagger.json"

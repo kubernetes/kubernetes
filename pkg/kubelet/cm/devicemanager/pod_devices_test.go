@@ -183,9 +183,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},
@@ -203,9 +200,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2,vendor3.com/class3=device3,vendor4.com/class4=device4"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},
@@ -225,9 +219,6 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 				),
 			},
 			expected: &DeviceRunContainerOptions{
-				Annotations: []kubecontainer.Annotation{
-					{Name: "cdi.k8s.io/devicemanager_pod-container", Value: "vendor1.com/class1=device1,vendor2.com/class2=device2,vendor3.com/class3=device3"},
-				},
 				CDIDevices: []kubecontainer.CDIDevice{
 					{Name: "vendor1.com/class1=device1"},
 					{Name: "vendor2.com/class2=device2"},

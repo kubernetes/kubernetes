@@ -20,7 +20,7 @@ package v1
 
 import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ParamRefApplyConfiguration represents a declarative configuration of the ParamRef type for use
@@ -28,7 +28,7 @@ import (
 type ParamRefApplyConfiguration struct {
 	Name                    *string                                              `json:"name,omitempty"`
 	Namespace               *string                                              `json:"namespace,omitempty"`
-	Selector                *v1.LabelSelectorApplyConfiguration                  `json:"selector,omitempty"`
+	Selector                *metav1.LabelSelectorApplyConfiguration              `json:"selector,omitempty"`
 	ParameterNotFoundAction *admissionregistrationv1.ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty"`
 }
 
@@ -57,7 +57,7 @@ func (b *ParamRefApplyConfiguration) WithNamespace(value string) *ParamRefApplyC
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *ParamRefApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *ParamRefApplyConfiguration {
+func (b *ParamRefApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *ParamRefApplyConfiguration {
 	b.Selector = value
 	return b
 }

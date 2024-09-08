@@ -24,14 +24,19 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/vishvananda/netlink"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy"
+	netutils "k8s.io/utils/net"
 )
 
 const (
+	testIPFamily       = v1.IPv4Protocol
 	testClusterIP      = "172.30.1.1"
 	testExternalIP     = "192.168.99.100"
 	testLoadBalancerIP = "1.2.3.4"
@@ -245,7 +250,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fake := NewFake()
-			CleanStaleEntries(fake, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
+			CleanStaleEntries(fake, testIPFamily, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
 			if !fake.ClearedIPs.Equal(tc.result.ClearedIPs) {
 				t.Errorf("Expected ClearedIPs=%v, got %v", tc.result.ClearedIPs, fake.ClearedIPs)
 			}
@@ -258,6 +263,155 @@ func TestCleanStaleEntries(t *testing.T) {
 			if !reflect.DeepEqual(fake.ClearedPortNATs, tc.result.ClearedPortNATs) {
 				t.Errorf("Expected ClearedPortNATs=%v, got %v", tc.result.ClearedPortNATs, fake.ClearedPortNATs)
 			}
+		})
+	}
+}
+
+func TestFilterForIP(t *testing.T) {
+	testCases := []struct {
+		name           string
+		ip             string
+		protocol       v1.Protocol
+		expectedFamily netlink.InetFamily
+		expectedFilter *conntrackFilter
+	}{
+		{
+			name:     "ipv4 + UDP",
+			ip:       "10.96.0.10",
+			protocol: v1.ProtocolUDP,
+			expectedFilter: &conntrackFilter{
+				protocol: 17,
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
+			},
+		},
+		{
+			name:     "ipv6 + TCP",
+			ip:       "2001:db8:1::2",
+			protocol: v1.ProtocolTCP,
+			expectedFilter: &conntrackFilter{
+				protocol: 6,
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedFilter, filterForIP(tc.ip, tc.protocol))
+		})
+	}
+}
+
+func TestFilterForPort(t *testing.T) {
+	testCases := []struct {
+		name           string
+		port           int
+		protocol       v1.Protocol
+		expectedFilter *conntrackFilter
+	}{
+		{
+			name:     "UDP",
+			port:     5000,
+			protocol: v1.ProtocolUDP,
+
+			expectedFilter: &conntrackFilter{
+				protocol: 17,
+				original: &connectionTuple{dstPort: 5000},
+			},
+		},
+		{
+			name:     "SCTP",
+			port:     3000,
+			protocol: v1.ProtocolSCTP,
+			expectedFilter: &conntrackFilter{
+				protocol: 132,
+				original: &connectionTuple{dstPort: 3000},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedFilter, filterForPort(tc.port, tc.protocol))
+		})
+	}
+}
+
+func TestFilterForNAT(t *testing.T) {
+	testCases := []struct {
+		name           string
+		orig           string
+		dest           string
+		protocol       v1.Protocol
+		expectedFilter *conntrackFilter
+	}{
+		{
+			name:     "ipv4 + SCTP",
+			orig:     "10.96.0.10",
+			dest:     "10.244.0.3",
+			protocol: v1.ProtocolSCTP,
+			expectedFilter: &conntrackFilter{
+				protocol: 132,
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+			},
+		},
+		{
+			name:     "ipv6 + UDP",
+			orig:     "2001:db8:1::2",
+			dest:     "4001:ab8::2",
+			protocol: v1.ProtocolUDP,
+			expectedFilter: &conntrackFilter{
+				protocol: 17,
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("4001:ab8::2")},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedFilter, filterForNAT(tc.orig, tc.dest, tc.protocol))
+		})
+	}
+}
+
+func TestFilterForPortNAT(t *testing.T) {
+	testCases := []struct {
+		name           string
+		dest           string
+		port           int
+		protocol       v1.Protocol
+		expectedFamily netlink.InetFamily
+		expectedFilter *conntrackFilter
+	}{
+		{
+			name:     "ipv4 + TCP",
+			dest:     "10.96.0.10",
+			port:     80,
+			protocol: v1.ProtocolTCP,
+			expectedFilter: &conntrackFilter{
+				protocol: 6,
+				original: &connectionTuple{dstPort: 80},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.96.0.10")},
+			},
+		},
+		{
+			name:     "ipv6 + UDP",
+			dest:     "2001:db8:1::2",
+			port:     8000,
+			protocol: v1.ProtocolUDP,
+			expectedFilter: &conntrackFilter{
+				protocol: 17,
+				original: &connectionTuple{dstPort: 8000},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedFilter, filterForPortNAT(tc.dest, tc.port, tc.protocol))
 		})
 	}
 }

@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // LeaseCandidateLister helps list LeaseCandidates.
@@ -30,7 +30,7 @@ import (
 type LeaseCandidateLister interface {
 	// List lists all LeaseCandidates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.LeaseCandidate, err error)
+	List(selector labels.Selector) (ret []*coordinationv1alpha1.LeaseCandidate, err error)
 	// LeaseCandidates returns an object that can list and get LeaseCandidates.
 	LeaseCandidates(namespace string) LeaseCandidateNamespaceLister
 	LeaseCandidateListerExpansion
@@ -38,17 +38,17 @@ type LeaseCandidateLister interface {
 
 // leaseCandidateLister implements the LeaseCandidateLister interface.
 type leaseCandidateLister struct {
-	listers.ResourceIndexer[*v1alpha1.LeaseCandidate]
+	listers.ResourceIndexer[*coordinationv1alpha1.LeaseCandidate]
 }
 
 // NewLeaseCandidateLister returns a new LeaseCandidateLister.
 func NewLeaseCandidateLister(indexer cache.Indexer) LeaseCandidateLister {
-	return &leaseCandidateLister{listers.New[*v1alpha1.LeaseCandidate](indexer, v1alpha1.Resource("leasecandidate"))}
+	return &leaseCandidateLister{listers.New[*coordinationv1alpha1.LeaseCandidate](indexer, coordinationv1alpha1.Resource("leasecandidate"))}
 }
 
 // LeaseCandidates returns an object that can list and get LeaseCandidates.
 func (s *leaseCandidateLister) LeaseCandidates(namespace string) LeaseCandidateNamespaceLister {
-	return leaseCandidateNamespaceLister{listers.NewNamespaced[*v1alpha1.LeaseCandidate](s.ResourceIndexer, namespace)}
+	return leaseCandidateNamespaceLister{listers.NewNamespaced[*coordinationv1alpha1.LeaseCandidate](s.ResourceIndexer, namespace)}
 }
 
 // LeaseCandidateNamespaceLister helps list and get LeaseCandidates.
@@ -56,15 +56,15 @@ func (s *leaseCandidateLister) LeaseCandidates(namespace string) LeaseCandidateN
 type LeaseCandidateNamespaceLister interface {
 	// List lists all LeaseCandidates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.LeaseCandidate, err error)
+	List(selector labels.Selector) (ret []*coordinationv1alpha1.LeaseCandidate, err error)
 	// Get retrieves the LeaseCandidate from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.LeaseCandidate, error)
+	Get(name string) (*coordinationv1alpha1.LeaseCandidate, error)
 	LeaseCandidateNamespaceListerExpansion
 }
 
 // leaseCandidateNamespaceLister implements the LeaseCandidateNamespaceLister
 // interface.
 type leaseCandidateNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.LeaseCandidate]
+	listers.ResourceIndexer[*coordinationv1alpha1.LeaseCandidate]
 }

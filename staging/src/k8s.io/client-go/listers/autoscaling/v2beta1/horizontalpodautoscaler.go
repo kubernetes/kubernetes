@@ -19,10 +19,10 @@ limitations under the License.
 package v2beta1
 
 import (
-	v2beta1 "k8s.io/api/autoscaling/v2beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // HorizontalPodAutoscalerLister helps list HorizontalPodAutoscalers.
@@ -30,7 +30,7 @@ import (
 type HorizontalPodAutoscalerLister interface {
 	// List lists all HorizontalPodAutoscalers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2beta1.HorizontalPodAutoscaler, err error)
+	List(selector labels.Selector) (ret []*autoscalingv2beta1.HorizontalPodAutoscaler, err error)
 	// HorizontalPodAutoscalers returns an object that can list and get HorizontalPodAutoscalers.
 	HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerNamespaceLister
 	HorizontalPodAutoscalerListerExpansion
@@ -38,17 +38,17 @@ type HorizontalPodAutoscalerLister interface {
 
 // horizontalPodAutoscalerLister implements the HorizontalPodAutoscalerLister interface.
 type horizontalPodAutoscalerLister struct {
-	listers.ResourceIndexer[*v2beta1.HorizontalPodAutoscaler]
+	listers.ResourceIndexer[*autoscalingv2beta1.HorizontalPodAutoscaler]
 }
 
 // NewHorizontalPodAutoscalerLister returns a new HorizontalPodAutoscalerLister.
 func NewHorizontalPodAutoscalerLister(indexer cache.Indexer) HorizontalPodAutoscalerLister {
-	return &horizontalPodAutoscalerLister{listers.New[*v2beta1.HorizontalPodAutoscaler](indexer, v2beta1.Resource("horizontalpodautoscaler"))}
+	return &horizontalPodAutoscalerLister{listers.New[*autoscalingv2beta1.HorizontalPodAutoscaler](indexer, autoscalingv2beta1.Resource("horizontalpodautoscaler"))}
 }
 
 // HorizontalPodAutoscalers returns an object that can list and get HorizontalPodAutoscalers.
 func (s *horizontalPodAutoscalerLister) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerNamespaceLister {
-	return horizontalPodAutoscalerNamespaceLister{listers.NewNamespaced[*v2beta1.HorizontalPodAutoscaler](s.ResourceIndexer, namespace)}
+	return horizontalPodAutoscalerNamespaceLister{listers.NewNamespaced[*autoscalingv2beta1.HorizontalPodAutoscaler](s.ResourceIndexer, namespace)}
 }
 
 // HorizontalPodAutoscalerNamespaceLister helps list and get HorizontalPodAutoscalers.
@@ -56,15 +56,15 @@ func (s *horizontalPodAutoscalerLister) HorizontalPodAutoscalers(namespace strin
 type HorizontalPodAutoscalerNamespaceLister interface {
 	// List lists all HorizontalPodAutoscalers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2beta1.HorizontalPodAutoscaler, err error)
+	List(selector labels.Selector) (ret []*autoscalingv2beta1.HorizontalPodAutoscaler, err error)
 	// Get retrieves the HorizontalPodAutoscaler from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2beta1.HorizontalPodAutoscaler, error)
+	Get(name string) (*autoscalingv2beta1.HorizontalPodAutoscaler, error)
 	HorizontalPodAutoscalerNamespaceListerExpansion
 }
 
 // horizontalPodAutoscalerNamespaceLister implements the HorizontalPodAutoscalerNamespaceLister
 // interface.
 type horizontalPodAutoscalerNamespaceLister struct {
-	listers.ResourceIndexer[*v2beta1.HorizontalPodAutoscaler]
+	listers.ResourceIndexer[*autoscalingv2beta1.HorizontalPodAutoscaler]
 }

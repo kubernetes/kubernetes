@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -32,7 +32,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	Template                             *corev1.PodTemplateSpecApplyConfiguration                          `json:"template,omitempty"`
 	VolumeClaimTemplates                 []corev1.PersistentVolumeClaimApplyConfiguration                   `json:"volumeClaimTemplates,omitempty"`
 	ServiceName                          *string                                                            `json:"serviceName,omitempty"`
-	PodManagementPolicy                  *v1beta1.PodManagementPolicyType                                   `json:"podManagementPolicy,omitempty"`
+	PodManagementPolicy                  *appsv1beta1.PodManagementPolicyType                               `json:"podManagementPolicy,omitempty"`
 	UpdateStrategy                       *StatefulSetUpdateStrategyApplyConfiguration                       `json:"updateStrategy,omitempty"`
 	RevisionHistoryLimit                 *int32                                                             `json:"revisionHistoryLimit,omitempty"`
 	MinReadySeconds                      *int32                                                             `json:"minReadySeconds,omitempty"`
@@ -94,7 +94,7 @@ func (b *StatefulSetSpecApplyConfiguration) WithServiceName(value string) *State
 // WithPodManagementPolicy sets the PodManagementPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PodManagementPolicy field is set to the value of the last call.
-func (b *StatefulSetSpecApplyConfiguration) WithPodManagementPolicy(value v1beta1.PodManagementPolicyType) *StatefulSetSpecApplyConfiguration {
+func (b *StatefulSetSpecApplyConfiguration) WithPodManagementPolicy(value appsv1beta1.PodManagementPolicyType) *StatefulSetSpecApplyConfiguration {
 	b.PodManagementPolicy = &value
 	return b
 }

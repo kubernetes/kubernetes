@@ -19,7 +19,7 @@ limitations under the License.
 package informers
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"

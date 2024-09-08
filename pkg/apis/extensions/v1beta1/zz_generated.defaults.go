@@ -23,7 +23,7 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -32,20 +32,20 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*v1beta1.DaemonSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*v1beta1.DaemonSetList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1beta1.Deployment)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1beta1.DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*v1beta1.Ingress)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*v1beta1.IngressList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1beta1.NetworkPolicy)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1beta1.NetworkPolicyList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*v1beta1.ReplicaSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*v1beta1.ReplicaSetList)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*extensionsv1beta1.DaemonSet)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*extensionsv1beta1.DaemonSetList)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*extensionsv1beta1.Deployment)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*extensionsv1beta1.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*extensionsv1beta1.Ingress)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*extensionsv1beta1.IngressList)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*extensionsv1beta1.NetworkPolicy)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*extensionsv1beta1.NetworkPolicyList)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*extensionsv1beta1.ReplicaSet)) })
+	scheme.AddTypeDefaultingFunc(&extensionsv1beta1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*extensionsv1beta1.ReplicaSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
+func SetObjectDefaults_DaemonSet(in *extensionsv1beta1.DaemonSet) {
 	SetDefaults_DaemonSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -343,14 +343,14 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_DaemonSetList(in *v1beta1.DaemonSetList) {
+func SetObjectDefaults_DaemonSetList(in *extensionsv1beta1.DaemonSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_DaemonSet(a)
 	}
 }
 
-func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
+func SetObjectDefaults_Deployment(in *extensionsv1beta1.Deployment) {
 	SetDefaults_Deployment(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -648,14 +648,14 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
+func SetObjectDefaults_DeploymentList(in *extensionsv1beta1.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
 	}
 }
 
-func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
+func SetObjectDefaults_Ingress(in *extensionsv1beta1.Ingress) {
 	for i := range in.Spec.Rules {
 		a := &in.Spec.Rules[i]
 		if a.IngressRuleValue.HTTP != nil {
@@ -667,25 +667,25 @@ func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
 	}
 }
 
-func SetObjectDefaults_IngressList(in *v1beta1.IngressList) {
+func SetObjectDefaults_IngressList(in *extensionsv1beta1.IngressList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Ingress(a)
 	}
 }
 
-func SetObjectDefaults_NetworkPolicy(in *v1beta1.NetworkPolicy) {
+func SetObjectDefaults_NetworkPolicy(in *extensionsv1beta1.NetworkPolicy) {
 	SetDefaults_NetworkPolicy(in)
 }
 
-func SetObjectDefaults_NetworkPolicyList(in *v1beta1.NetworkPolicyList) {
+func SetObjectDefaults_NetworkPolicyList(in *extensionsv1beta1.NetworkPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_NetworkPolicy(a)
 	}
 }
 
-func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
+func SetObjectDefaults_ReplicaSet(in *extensionsv1beta1.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -983,7 +983,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_ReplicaSetList(in *v1beta1.ReplicaSetList) {
+func SetObjectDefaults_ReplicaSetList(in *extensionsv1beta1.ReplicaSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicaSet(a)

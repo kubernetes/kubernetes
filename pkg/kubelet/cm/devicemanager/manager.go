@@ -203,12 +203,15 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 		if filePath == m.checkpointFile() {
 			continue
 		}
-		stat, err := os.Stat(filePath)
+		// TODO: Until the bug - https://github.com/golang/go/issues/33357 is fixed, os.stat wouldn't return the
+		// right mode(socket) on windows. Hence deleting the file, without checking whether
+		// its a socket, on windows.
+		stat, err := os.Lstat(filePath)
 		if err != nil {
 			klog.ErrorS(err, "Failed to stat file", "path", filePath)
 			continue
 		}
-		if stat.IsDir() || stat.Mode()&os.ModeSocket == 0 {
+		if stat.IsDir() {
 			continue
 		}
 		err = os.RemoveAll(filePath)

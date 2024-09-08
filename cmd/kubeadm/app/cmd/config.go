@@ -59,7 +59,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 		Long: fmt.Sprintf(dedent.Dedent(`
 			There is a ConfigMap in the %s namespace called %q that kubeadm uses to store internal configuration about the
 			cluster. kubeadm CLI v1.8.0+ automatically creates this ConfigMap with the config used with 'kubeadm init', but if you
-			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'kubeadm init phase upload-config' command to 
+			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'kubeadm init phase upload-config' command to
 			create this ConfigMap. This is required so that 'kubeadm upgrade' can configure your upgraded cluster correctly.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		// Without this callback, if a user runs just the "upload"

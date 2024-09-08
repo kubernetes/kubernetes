@@ -198,7 +198,7 @@ func TestAutoApproveNodeCertificateRotation(t *testing.T) {
 	}
 }
 
-func TestAllowBoostrapTokensToGetNodes(t *testing.T) {
+func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 	tests := []struct {
 		name   string
 		client clientset.Interface
@@ -270,8 +270,8 @@ func TestAllowBoostrapTokensToGetNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AllowBoostrapTokensToGetNodes(tt.client); err != nil {
-				t.Errorf("AllowBoostrapTokensToGetNodes() return error = %v", err)
+			if err := AllowBootstrapTokensToGetNodes(tt.client); err != nil {
+				t.Errorf("AllowBootstrapTokensToGetNodes() return error = %v", err)
 			}
 		})
 	}

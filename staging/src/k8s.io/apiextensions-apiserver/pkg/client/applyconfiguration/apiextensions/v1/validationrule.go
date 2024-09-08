@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // ValidationRuleApplyConfiguration represents a declarative configuration of the ValidationRule type for use
 // with apply.
 type ValidationRuleApplyConfiguration struct {
-	Rule              *string                   `json:"rule,omitempty"`
-	Message           *string                   `json:"message,omitempty"`
-	MessageExpression *string                   `json:"messageExpression,omitempty"`
-	Reason            *v1.FieldValueErrorReason `json:"reason,omitempty"`
-	FieldPath         *string                   `json:"fieldPath,omitempty"`
-	OptionalOldSelf   *bool                     `json:"optionalOldSelf,omitempty"`
+	Rule              *string                                `json:"rule,omitempty"`
+	Message           *string                                `json:"message,omitempty"`
+	MessageExpression *string                                `json:"messageExpression,omitempty"`
+	Reason            *apiextensionsv1.FieldValueErrorReason `json:"reason,omitempty"`
+	FieldPath         *string                                `json:"fieldPath,omitempty"`
+	OptionalOldSelf   *bool                                  `json:"optionalOldSelf,omitempty"`
 }
 
 // ValidationRuleApplyConfiguration constructs a declarative configuration of the ValidationRule type for use with
@@ -66,7 +66,7 @@ func (b *ValidationRuleApplyConfiguration) WithMessageExpression(value string) *
 // WithReason sets the Reason field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Reason field is set to the value of the last call.
-func (b *ValidationRuleApplyConfiguration) WithReason(value v1.FieldValueErrorReason) *ValidationRuleApplyConfiguration {
+func (b *ValidationRuleApplyConfiguration) WithReason(value apiextensionsv1.FieldValueErrorReason) *ValidationRuleApplyConfiguration {
 	b.Reason = &value
 	return b
 }

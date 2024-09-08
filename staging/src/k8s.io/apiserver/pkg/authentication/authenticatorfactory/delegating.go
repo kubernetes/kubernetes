@@ -77,6 +77,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 			c.RequestHeaderConfig.CAContentProvider.VerifyOptions,
 			c.RequestHeaderConfig.AllowedClientNames,
 			c.RequestHeaderConfig.UsernameHeaders,
+			c.RequestHeaderConfig.UIDHeaders,
 			c.RequestHeaderConfig.GroupHeaders,
 			c.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)

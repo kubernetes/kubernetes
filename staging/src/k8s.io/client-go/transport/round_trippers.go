@@ -86,6 +86,7 @@ func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 
 type authProxyRoundTripper struct {
 	username string
+	uid      string
 	groups   []string
 	extra    map[string][]string
 
@@ -98,15 +99,17 @@ var _ utilnet.RoundTripperWrapper = &authProxyRoundTripper{}
 // authentication terminating proxy cases
 // assuming you pull the user from the context:
 // username is the user.Info.GetName() of the user
+// uid is the user.Info.GetUID() of the user
 // groups is the user.Info.GetGroups() of the user
 // extra is the user.Info.GetExtra() of the user
 // extra can contain any additional information that the authenticator
 // thought was interesting, for example authorization scopes.
 // In order to faithfully round-trip through an impersonation flow, these keys
 // MUST be lowercase.
-func NewAuthProxyRoundTripper(username string, groups []string, extra map[string][]string, rt http.RoundTripper) http.RoundTripper {
+func NewAuthProxyRoundTripper(username, uid string, groups []string, extra map[string][]string, rt http.RoundTripper) http.RoundTripper {
 	return &authProxyRoundTripper{
 		username: username,
+		uid:      uid,
 		groups:   groups,
 		extra:    extra,
 		rt:       rt,
@@ -115,14 +118,15 @@ func NewAuthProxyRoundTripper(username string, groups []string, extra map[string
 
 func (rt *authProxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = utilnet.CloneRequest(req)
-	SetAuthProxyHeaders(req, rt.username, rt.groups, rt.extra)
+	SetAuthProxyHeaders(req, rt.username, rt.uid, rt.groups, rt.extra)
 
 	return rt.rt.RoundTrip(req)
 }
 
 // SetAuthProxyHeaders stomps the auth proxy header fields.  It mutates its argument.
-func SetAuthProxyHeaders(req *http.Request, username string, groups []string, extra map[string][]string) {
+func SetAuthProxyHeaders(req *http.Request, username, uid string, groups []string, extra map[string][]string) {
 	req.Header.Del("X-Remote-User")
+	req.Header.Del("X-Remote-Uid")
 	req.Header.Del("X-Remote-Group")
 	for key := range req.Header {
 		if strings.HasPrefix(strings.ToLower(key), strings.ToLower("X-Remote-Extra-")) {
@@ -131,6 +135,9 @@ func SetAuthProxyHeaders(req *http.Request, username string, groups []string, ex
 	}
 
 	req.Header.Set("X-Remote-User", username)
+	if len(uid) > 0 {
+		req.Header.Set("X-Remote-Uid", uid)
+	}
 	for _, group := range groups {
 		req.Header.Add("X-Remote-Group", group)
 	}

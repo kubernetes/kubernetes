@@ -39,7 +39,7 @@ func New(s *etcdserver.EtcdServer) *clientv3.Client {
 	wc := adapter.WatchServerToWatchClient(v3rpc.NewWatchServer(s))
 	c.Watcher = &watchWrapper{clientv3.NewWatchFromWatchClient(wc, c)}
 
-	mc := adapter.MaintenanceServerToMaintenanceClient(v3rpc.NewMaintenanceServer(s))
+	mc := adapter.MaintenanceServerToMaintenanceClient(v3rpc.NewMaintenanceServer(s, nil))
 	c.Maintenance = clientv3.NewMaintenanceFromMaintenanceClient(mc, c)
 
 	clc := adapter.ClusterServerToClusterClient(v3rpc.NewClusterServer(s))

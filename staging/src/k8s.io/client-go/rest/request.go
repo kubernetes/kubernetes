@@ -752,8 +752,9 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// the server must have sent us an error in 'err'
 				return true, nil
 			}
-			if result := r.transformResponse(resp, req); result.err != nil {
-				return true, result.err
+			result := r.transformResponse(resp, req)
+			if err := result.Error(); err != nil {
+				return true, err
 			}
 			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 		}()
@@ -1143,7 +1144,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return false
 		}
 		// For connection errors and apiserver shutdown errors retry.
-		if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) {
 			return true
 		}
 		return false

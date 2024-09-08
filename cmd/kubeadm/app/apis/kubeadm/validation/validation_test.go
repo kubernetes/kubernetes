@@ -1067,7 +1067,7 @@ func TestValidateSocketPath(t *testing.T) {
 		{name: "valid socket URL", criSocket: kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + "/some/path", expectedErrors: false},
 		{name: "unsupported URL scheme", criSocket: "bla:///some/path", expectedErrors: true},
 		{name: "missing URL scheme", criSocket: "/some/path", expectedErrors: true},
-		{name: "unparseable URL", criSocket: ":::", expectedErrors: true},
+		{name: "unparsable URL", criSocket: ":::", expectedErrors: true},
 		{name: "empty CRISocket", criSocket: "", expectedErrors: true},
 	}
 	for _, tc := range tests {

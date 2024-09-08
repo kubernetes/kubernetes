@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	configv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 )
 
@@ -38,30 +38,30 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*config.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GroupResource_To_config_GroupResource(a.(*v1alpha1.GroupResource), b.(*config.GroupResource), scope)
+	if err := s.AddGeneratedConversionFunc((*configv1alpha1.GroupResource)(nil), (*config.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GroupResource_To_config_GroupResource(a.(*configv1alpha1.GroupResource), b.(*config.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_GroupResource_To_v1alpha1_GroupResource(a.(*config.GroupResource), b.(*v1alpha1.GroupResource), scope)
+	if err := s.AddGeneratedConversionFunc((*config.GroupResource)(nil), (*configv1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_GroupResource_To_v1alpha1_GroupResource(a.(*config.GroupResource), b.(*configv1alpha1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.GarbageCollectorControllerConfiguration)(nil), (*v1alpha1.GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(a.(*config.GarbageCollectorControllerConfiguration), b.(*v1alpha1.GarbageCollectorControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*config.GarbageCollectorControllerConfiguration)(nil), (*configv1alpha1.GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(a.(*config.GarbageCollectorControllerConfiguration), b.(*configv1alpha1.GarbageCollectorControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.GarbageCollectorControllerConfiguration)(nil), (*config.GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(a.(*v1alpha1.GarbageCollectorControllerConfiguration), b.(*config.GarbageCollectorControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*configv1alpha1.GarbageCollectorControllerConfiguration)(nil), (*config.GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(a.(*configv1alpha1.GarbageCollectorControllerConfiguration), b.(*config.GarbageCollectorControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(in *v1alpha1.GarbageCollectorControllerConfiguration, out *config.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(in *configv1alpha1.GarbageCollectorControllerConfiguration, out *config.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
 		return err
 	}
@@ -70,33 +70,33 @@ func autoConvert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_Garb
 	return nil
 }
 
-func autoConvert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(in *config.GarbageCollectorControllerConfiguration, out *v1alpha1.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(in *config.GarbageCollectorControllerConfiguration, out *configv1alpha1.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
 		return err
 	}
 	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
-	out.GCIgnoredResources = *(*[]v1alpha1.GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
+	out.GCIgnoredResources = *(*[]configv1alpha1.GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
 	return nil
 }
 
-func autoConvert_v1alpha1_GroupResource_To_config_GroupResource(in *v1alpha1.GroupResource, out *config.GroupResource, s conversion.Scope) error {
+func autoConvert_v1alpha1_GroupResource_To_config_GroupResource(in *configv1alpha1.GroupResource, out *config.GroupResource, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1alpha1_GroupResource_To_config_GroupResource is an autogenerated conversion function.
-func Convert_v1alpha1_GroupResource_To_config_GroupResource(in *v1alpha1.GroupResource, out *config.GroupResource, s conversion.Scope) error {
+func Convert_v1alpha1_GroupResource_To_config_GroupResource(in *configv1alpha1.GroupResource, out *config.GroupResource, s conversion.Scope) error {
 	return autoConvert_v1alpha1_GroupResource_To_config_GroupResource(in, out, s)
 }
 
-func autoConvert_config_GroupResource_To_v1alpha1_GroupResource(in *config.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func autoConvert_config_GroupResource_To_v1alpha1_GroupResource(in *config.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_config_GroupResource_To_v1alpha1_GroupResource is an autogenerated conversion function.
-func Convert_config_GroupResource_To_v1alpha1_GroupResource(in *config.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func Convert_config_GroupResource_To_v1alpha1_GroupResource(in *config.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
 	return autoConvert_config_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }

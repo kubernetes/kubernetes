@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apiresourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // PodSchedulingContexts.
 type PodSchedulingContextInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha3.PodSchedulingContextLister
+	Lister() resourcev1alpha3.PodSchedulingContextLister
 }
 
 type podSchedulingContextInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredPodSchedulingContextInformer(client kubernetes.Interface, namesp
 				return client.ResourceV1alpha3().PodSchedulingContexts(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&resourcev1alpha3.PodSchedulingContext{},
+		&apiresourcev1alpha3.PodSchedulingContext{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *podSchedulingContextInformer) defaultInformer(client kubernetes.Interfa
 }
 
 func (f *podSchedulingContextInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resourcev1alpha3.PodSchedulingContext{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiresourcev1alpha3.PodSchedulingContext{}, f.defaultInformer)
 }
 
-func (f *podSchedulingContextInformer) Lister() v1alpha3.PodSchedulingContextLister {
-	return v1alpha3.NewPodSchedulingContextLister(f.Informer().GetIndexer())
+func (f *podSchedulingContextInformer) Lister() resourcev1alpha3.PodSchedulingContextLister {
+	return resourcev1alpha3.NewPodSchedulingContextLister(f.Informer().GetIndexer())
 }

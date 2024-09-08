@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/authentication/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -35,23 +35,23 @@ type TokenReviewsGetter interface {
 
 // TokenReviewInterface has methods to work with TokenReview resources.
 type TokenReviewInterface interface {
-	Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (*v1.TokenReview, error)
+	Create(ctx context.Context, tokenReview *authenticationv1.TokenReview, opts metav1.CreateOptions) (*authenticationv1.TokenReview, error)
 	TokenReviewExpansion
 }
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	*gentype.Client[*v1.TokenReview]
+	*gentype.Client[*authenticationv1.TokenReview]
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 	return &tokenReviews{
-		gentype.NewClient[*v1.TokenReview](
+		gentype.NewClient[*authenticationv1.TokenReview](
 			"tokenreviews",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.TokenReview { return &v1.TokenReview{} }),
+			func() *authenticationv1.TokenReview { return &authenticationv1.TokenReview{} }),
 	}
 }

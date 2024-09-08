@@ -60,11 +60,11 @@ type StaticPodPathManager interface {
 	TempManifestPath(component string) string
 	// TempManifestDir should point to the temporary directory created for generating new manifests for the upgrade
 	TempManifestDir() string
-	// BackupManifestPath gets the file path for the component in the backup directory used for backuping manifests during the transition
+	// BackupManifestPath gets the file path for the component in the backup directory used for backing up manifests during the transition
 	BackupManifestPath(component string) string
-	// BackupManifestDir should point to the backup directory used for backuping manifests during the transition
+	// BackupManifestDir should point to the backup directory used for backing up manifests during the transition
 	BackupManifestDir() string
-	// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
+	// BackupEtcdDir should point to the backup directory used for backing up manifests during the transition
 	BackupEtcdDir() string
 	// CleanupDirs cleans up all temporary directories
 	CleanupDirs() error
@@ -151,17 +151,17 @@ func (spm *KubeStaticPodPathManager) TempManifestDir() string {
 	return spm.tempManifestDir
 }
 
-// BackupManifestPath gets the file path for the component in the backup directory used for backuping manifests during the transition
+// BackupManifestPath gets the file path for the component in the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.backupManifestDir)
 }
 
-// BackupManifestDir should point to the backup directory used for backuping manifests during the transition
+// BackupManifestDir should point to the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
 }
 
-// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
+// BackupEtcdDir should point to the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }

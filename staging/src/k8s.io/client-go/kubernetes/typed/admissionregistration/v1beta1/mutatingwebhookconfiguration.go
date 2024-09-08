@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
+	applyconfigurationsadmissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,36 @@ type MutatingWebhookConfigurationsGetter interface {
 
 // MutatingWebhookConfigurationInterface has methods to work with MutatingWebhookConfiguration resources.
 type MutatingWebhookConfigurationInterface interface {
-	Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
-	Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
+	Create(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+	Update(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.MutatingWebhookConfiguration, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.MutatingWebhookConfigurationList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1beta1.MutatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error)
-	Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.MutatingWebhookConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1beta1.MutatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, mutatingWebhookConfiguration *applyconfigurationsadmissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1beta1.MutatingWebhookConfiguration, err error)
 	MutatingWebhookConfigurationExpansion
 }
 
 // mutatingWebhookConfigurations implements MutatingWebhookConfigurationInterface
 type mutatingWebhookConfigurations struct {
-	*gentype.ClientWithListAndApply[*v1beta1.MutatingWebhookConfiguration, *v1beta1.MutatingWebhookConfigurationList, *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*admissionregistrationv1beta1.MutatingWebhookConfiguration, *admissionregistrationv1beta1.MutatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration]
 }
 
 // newMutatingWebhookConfigurations returns a MutatingWebhookConfigurations
 func newMutatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *mutatingWebhookConfigurations {
 	return &mutatingWebhookConfigurations{
-		gentype.NewClientWithListAndApply[*v1beta1.MutatingWebhookConfiguration, *v1beta1.MutatingWebhookConfigurationList, *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*admissionregistrationv1beta1.MutatingWebhookConfiguration, *admissionregistrationv1beta1.MutatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration](
 			"mutatingwebhookconfigurations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.MutatingWebhookConfiguration { return &v1beta1.MutatingWebhookConfiguration{} },
-			func() *v1beta1.MutatingWebhookConfigurationList { return &v1beta1.MutatingWebhookConfigurationList{} }),
+			func() *admissionregistrationv1beta1.MutatingWebhookConfiguration {
+				return &admissionregistrationv1beta1.MutatingWebhookConfiguration{}
+			},
+			func() *admissionregistrationv1beta1.MutatingWebhookConfigurationList {
+				return &admissionregistrationv1beta1.MutatingWebhookConfigurationList{}
+			}),
 	}
 }

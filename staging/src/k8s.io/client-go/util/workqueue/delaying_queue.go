@@ -64,24 +64,31 @@ type TypedDelayingQueueConfig[T comparable] struct {
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewDelayingQueueWithConfig instead and specify a name.
 //
-// Deprecated: use TypedNewDelayingQueue instead.
+// Deprecated: use NewTypedDelayingQueue instead.
 func NewDelayingQueue() DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{})
 }
 
-// TypedNewDelayingQueue constructs a new workqueue with delayed queuing ability.
-// TypedNewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
-// TypedNewDelayingQueueWithConfig instead and specify a name.
-func TypedNewDelayingQueue[T comparable]() TypedDelayingInterface[T] {
+// NewTypedDelayingQueue constructs a new workqueue with delayed queuing ability.
+// NewTypedDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
+// NewTypedDelayingQueueWithConfig instead and specify a name.
+func NewTypedDelayingQueue[T comparable]() TypedDelayingInterface[T] {
 	return NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[T]{})
 }
 
 // NewDelayingQueueWithConfig constructs a new workqueue with options to
 // customize different properties.
 //
-// Deprecated: use TypedNewDelayingQueueWithConfig instead.
+// Deprecated: use NewTypedDelayingQueueWithConfig instead.
 func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
 	return NewTypedDelayingQueueWithConfig[any](config)
+}
+
+// TypedNewDelayingQueue exists for backwards compatibility only.
+//
+// Deprecated: use NewTypedDelayingQueueWithConfig instead.
+func TypedNewDelayingQueue[T comparable](config TypedDelayingQueueConfig[T]) TypedDelayingInterface[T] {
+	return NewTypedDelayingQueueWithConfig(config)
 }
 
 // NewTypedDelayingQueueWithConfig constructs a new workqueue with options to

@@ -58,7 +58,7 @@ var DefaultZapLoggerConfig = zap.Config{
 
 		// Custom EncodeTime function to ensure we match format and precision of historic capnslog timestamps
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-			enc.AppendString(t.Format("2006-01-02T15:04:05.999999Z0700"))
+			enc.AppendString(t.Format("2006-01-02T15:04:05.000000Z0700"))
 		},
 
 		EncodeDuration: zapcore.StringDurationEncoder,

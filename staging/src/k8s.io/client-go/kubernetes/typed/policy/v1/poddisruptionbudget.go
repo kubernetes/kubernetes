@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	policyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
+	applyconfigurationspolicyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type PodDisruptionBudgetsGetter interface {
 
 // PodDisruptionBudgetInterface has methods to work with PodDisruptionBudget resources.
 type PodDisruptionBudgetInterface interface {
-	Create(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.CreateOptions) (*v1.PodDisruptionBudget, error)
-	Update(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (*v1.PodDisruptionBudget, error)
+	Create(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.CreateOptions) (*policyv1.PodDisruptionBudget, error)
+	Update(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1.PodDisruptionBudget, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (*v1.PodDisruptionBudget, error)
+	UpdateStatus(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1.PodDisruptionBudget, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PodDisruptionBudget, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodDisruptionBudgetList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*policyv1.PodDisruptionBudget, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*policyv1.PodDisruptionBudgetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodDisruptionBudget, err error)
-	Apply(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *policyv1.PodDisruptionBudget, err error)
+	Apply(ctx context.Context, podDisruptionBudget *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *policyv1.PodDisruptionBudget, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error)
+	ApplyStatus(ctx context.Context, podDisruptionBudget *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *policyv1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	*gentype.ClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudgetList, *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration]
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyV1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		gentype.NewClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudgetList, *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration](
 			"poddisruptionbudgets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.PodDisruptionBudget { return &v1.PodDisruptionBudget{} },
-			func() *v1.PodDisruptionBudgetList { return &v1.PodDisruptionBudgetList{} }),
+			func() *policyv1.PodDisruptionBudget { return &policyv1.PodDisruptionBudget{} },
+			func() *policyv1.PodDisruptionBudgetList { return &policyv1.PodDisruptionBudgetList{} }),
 	}
 }

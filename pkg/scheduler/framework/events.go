@@ -61,6 +61,10 @@ var (
 	PodRequestScaledDown = ClusterEvent{Resource: Pod, ActionType: UpdatePodScaleDown, Label: "PodRequestScaledDown"}
 	// PodLabelChange is the event when a pod's label is changed.
 	PodLabelChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodLabel, Label: "PodLabelChange"}
+	// PodTolerationChange is the event when a pod's toleration is changed.
+	PodTolerationChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodTolerations, Label: "PodTolerationChange"}
+	// PodSchedulingGateEliminatedChange is the event when a pod's scheduling gate is changed.
+	PodSchedulingGateEliminatedChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodSchedulingGatesEliminated, Label: "PodSchedulingGateChange"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = ClusterEvent{Resource: Node, ActionType: UpdateNodeTaint, Label: "NodeSpecUnschedulableChange"}
 	// NodeAllocatableChange is the event when node allocatable is changed.
@@ -109,6 +113,8 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 	podChangeExtracters := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
+		extractPodSchedulingGateEliminatedChange,
+		extractPodTolerationChange,
 	}
 
 	for _, fn := range podChangeExtracters {
@@ -156,6 +162,27 @@ func extractPodLabelsChange(newPod *v1.Pod, oldPod *v1.Pod) *ClusterEvent {
 	if isLabelChanged(newPod.GetLabels(), oldPod.GetLabels()) {
 		return &PodLabelChange
 	}
+	return nil
+}
+
+func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) *ClusterEvent {
+	if len(newPod.Spec.Tolerations) != len(oldPod.Spec.Tolerations) {
+		// A Pod got a new toleration.
+		// Due to API validation, the user can add, but cannot modify or remove tolerations.
+		// So, it's enough to just check the length of tolerations to notice the update.
+		// And, any updates in tolerations could make Pod schedulable.
+		return &PodTolerationChange
+	}
+
+	return nil
+}
+
+func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) *ClusterEvent {
+	if len(newPod.Spec.SchedulingGates) == 0 && len(oldPod.Spec.SchedulingGates) != 0 {
+		// A scheduling gate on the pod is completely removed.
+		return &PodSchedulingGateEliminatedChange
+	}
+
 	return nil
 }
 

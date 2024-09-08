@@ -19,15 +19,15 @@ limitations under the License.
 package v2beta2
 
 import (
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 )
 
 // HPAScalingPolicyApplyConfiguration represents a declarative configuration of the HPAScalingPolicy type for use
 // with apply.
 type HPAScalingPolicyApplyConfiguration struct {
-	Type          *v2beta2.HPAScalingPolicyType `json:"type,omitempty"`
-	Value         *int32                        `json:"value,omitempty"`
-	PeriodSeconds *int32                        `json:"periodSeconds,omitempty"`
+	Type          *autoscalingv2beta2.HPAScalingPolicyType `json:"type,omitempty"`
+	Value         *int32                                   `json:"value,omitempty"`
+	PeriodSeconds *int32                                   `json:"periodSeconds,omitempty"`
 }
 
 // HPAScalingPolicyApplyConfiguration constructs a declarative configuration of the HPAScalingPolicy type for use with
@@ -39,7 +39,7 @@ func HPAScalingPolicy() *HPAScalingPolicyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *HPAScalingPolicyApplyConfiguration) WithType(value v2beta2.HPAScalingPolicyType) *HPAScalingPolicyApplyConfiguration {
+func (b *HPAScalingPolicyApplyConfiguration) WithType(value autoscalingv2beta2.HPAScalingPolicyType) *HPAScalingPolicyApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apiadmissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ValidatingAdmissionPolicies.
 type ValidatingAdmissionPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.ValidatingAdmissionPolicyLister
+	Lister() admissionregistrationv1beta1.ValidatingAdmissionPolicyLister
 }
 
 type validatingAdmissionPolicyInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, r
 				return client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Watch(context.TODO(), options)
 			},
 		},
-		&admissionregistrationv1beta1.ValidatingAdmissionPolicy{},
+		&apiadmissionregistrationv1beta1.ValidatingAdmissionPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *validatingAdmissionPolicyInformer) defaultInformer(client kubernetes.In
 }
 
 func (f *validatingAdmissionPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistrationv1beta1.ValidatingAdmissionPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiadmissionregistrationv1beta1.ValidatingAdmissionPolicy{}, f.defaultInformer)
 }
 
-func (f *validatingAdmissionPolicyInformer) Lister() v1beta1.ValidatingAdmissionPolicyLister {
-	return v1beta1.NewValidatingAdmissionPolicyLister(f.Informer().GetIndexer())
+func (f *validatingAdmissionPolicyInformer) Lister() admissionregistrationv1beta1.ValidatingAdmissionPolicyLister {
+	return admissionregistrationv1beta1.NewValidatingAdmissionPolicyLister(f.Informer().GetIndexer())
 }

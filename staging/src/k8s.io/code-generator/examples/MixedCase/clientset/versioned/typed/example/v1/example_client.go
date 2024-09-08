@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	"net/http"
+	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
-	"k8s.io/code-generator/examples/MixedCase/clientset/versioned/scheme"
+	examplev1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
+	scheme "k8s.io/code-generator/examples/MixedCase/clientset/versioned/scheme"
 )
 
 type ExampleV1Interface interface {
@@ -90,7 +90,7 @@ func New(c rest.Interface) *ExampleV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+	gv := examplev1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

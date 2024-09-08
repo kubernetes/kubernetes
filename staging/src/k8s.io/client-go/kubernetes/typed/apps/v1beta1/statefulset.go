@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
+	applyconfigurationsappsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type StatefulSetsGetter interface {
 
 // StatefulSetInterface has methods to work with StatefulSet resources.
 type StatefulSetInterface interface {
-	Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (*v1beta1.StatefulSet, error)
-	Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
+	Create(ctx context.Context, statefulSet *appsv1beta1.StatefulSet, opts v1.CreateOptions) (*appsv1beta1.StatefulSet, error)
+	Update(ctx context.Context, statefulSet *appsv1beta1.StatefulSet, opts v1.UpdateOptions) (*appsv1beta1.StatefulSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
+	UpdateStatus(ctx context.Context, statefulSet *appsv1beta1.StatefulSet, opts v1.UpdateOptions) (*appsv1beta1.StatefulSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.StatefulSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.StatefulSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta1.StatefulSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta1.StatefulSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error)
-	Apply(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta1.StatefulSet, err error)
+	Apply(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta1.StatefulSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error)
+	ApplyStatus(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta1.StatefulSet, err error)
 	StatefulSetExpansion
 }
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	*gentype.ClientWithListAndApply[*v1beta1.StatefulSet, *v1beta1.StatefulSetList, *appsv1beta1.StatefulSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta1.StatefulSet, *appsv1beta1.StatefulSetList, *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration]
 }
 
 // newStatefulSets returns a StatefulSets
 func newStatefulSets(c *AppsV1beta1Client, namespace string) *statefulSets {
 	return &statefulSets{
-		gentype.NewClientWithListAndApply[*v1beta1.StatefulSet, *v1beta1.StatefulSetList, *appsv1beta1.StatefulSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta1.StatefulSet, *appsv1beta1.StatefulSetList, *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration](
 			"statefulsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.StatefulSet { return &v1beta1.StatefulSet{} },
-			func() *v1beta1.StatefulSetList { return &v1beta1.StatefulSetList{} }),
+			func() *appsv1beta1.StatefulSet { return &appsv1beta1.StatefulSet{} },
+			func() *appsv1beta1.StatefulSetList { return &appsv1beta1.StatefulSetList{} }),
 	}
 }

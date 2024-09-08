@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/opencontainers/selinux/go-selinux"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -34,7 +35,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 )
 
 // Run this single test locally using a running CRI-O instance by:
@@ -44,12 +44,16 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	const (
-		podName          = "test-pod"
-		containerName    = "test-container"
-		validImageRef    = "quay.io/crio/artifact:v1"
-		invalidImageRef  = "localhost/invalid"
-		volumeName       = "volume"
-		volumePathPrefix = "/volume"
+		podName             = "test-pod"
+		containerName       = "test-container"
+		validImageRef       = "quay.io/crio/artifact:v1"
+		invalidImageRef     = "localhost/invalid"
+		volumeName          = "volume"
+		volumePathPrefix    = "/volume"
+		defaultSELinuxUser  = "system_u"
+		defaultSELinuxRole  = "system_r"
+		defaultSELinuxType  = "svirt_lxc_net_t"
+		defaultSELinuxLevel = "s0:c1,c5"
 	)
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -57,6 +61,16 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 	})
 
 	createPod := func(ctx context.Context, volumes []v1.Volume, volumeMounts []v1.VolumeMount) {
+		var selinuxOptions *v1.SELinuxOptions
+		if selinux.GetEnabled() {
+			selinuxOptions = &v1.SELinuxOptions{
+				User:  defaultSELinuxUser,
+				Role:  defaultSELinuxRole,
+				Type:  defaultSELinuxType,
+				Level: defaultSELinuxLevel,
+			}
+			ginkgo.By(fmt.Sprintf("Using SELinux on pod: %v", selinuxOptions))
+		}
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      podName,
@@ -64,13 +78,15 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 			},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
+				SecurityContext: &v1.PodSecurityContext{
+					SELinuxOptions: selinuxOptions,
+				},
 				Containers: []v1.Container{
 					{
-						Name:            containerName,
-						Image:           busyboxImage,
-						Command:         ExecCommand(podName, execCommand{LoopForever: true}),
-						SecurityContext: &v1.SecurityContext{Privileged: ptr.To(true)},
-						VolumeMounts:    volumeMounts,
+						Name:         containerName,
+						Image:        busyboxImage,
+						Command:      ExecCommand(podName, execCommand{LoopForever: true}),
+						VolumeMounts: volumeMounts,
 					},
 				},
 				Volumes: volumes,

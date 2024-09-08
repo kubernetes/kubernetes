@@ -68,6 +68,10 @@ func parseProtinfo(infos []syscall.NetlinkRouteAttr) (pi Protinfo) {
 			pi.ProxyArp = byteToBool(info.Value[0])
 		case nl.IFLA_BRPORT_PROXYARP_WIFI:
 			pi.ProxyArpWiFi = byteToBool(info.Value[0])
+		case nl.IFLA_BRPORT_ISOLATED:
+			pi.Isolated = byteToBool(info.Value[0])
+		case nl.IFLA_BRPORT_NEIGH_SUPPRESS:
+			pi.NeighSuppress = byteToBool(info.Value[0])
 		}
 	}
 	return

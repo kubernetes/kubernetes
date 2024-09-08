@@ -19,15 +19,15 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use
 // with apply.
 type BasicDeviceApplyConfiguration struct {
-	Attributes map[v1alpha3.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity   map[v1alpha3.QualifiedName]resource.Quantity                 `json:"capacity,omitempty"`
+	Attributes map[resourcev1alpha3.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	Capacity   map[resourcev1alpha3.QualifiedName]resource.Quantity                 `json:"capacity,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with
@@ -40,9 +40,9 @@ func BasicDevice() *BasicDeviceApplyConfiguration {
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Attributes field,
 // overwriting an existing map entries in Attributes field with the same key.
-func (b *BasicDeviceApplyConfiguration) WithAttributes(entries map[v1alpha3.QualifiedName]DeviceAttributeApplyConfiguration) *BasicDeviceApplyConfiguration {
+func (b *BasicDeviceApplyConfiguration) WithAttributes(entries map[resourcev1alpha3.QualifiedName]DeviceAttributeApplyConfiguration) *BasicDeviceApplyConfiguration {
 	if b.Attributes == nil && len(entries) > 0 {
-		b.Attributes = make(map[v1alpha3.QualifiedName]DeviceAttributeApplyConfiguration, len(entries))
+		b.Attributes = make(map[resourcev1alpha3.QualifiedName]DeviceAttributeApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
 		b.Attributes[k] = v
@@ -54,9 +54,9 @@ func (b *BasicDeviceApplyConfiguration) WithAttributes(entries map[v1alpha3.Qual
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Capacity field,
 // overwriting an existing map entries in Capacity field with the same key.
-func (b *BasicDeviceApplyConfiguration) WithCapacity(entries map[v1alpha3.QualifiedName]resource.Quantity) *BasicDeviceApplyConfiguration {
+func (b *BasicDeviceApplyConfiguration) WithCapacity(entries map[resourcev1alpha3.QualifiedName]resource.Quantity) *BasicDeviceApplyConfiguration {
 	if b.Capacity == nil && len(entries) > 0 {
-		b.Capacity = make(map[v1alpha3.QualifiedName]resource.Quantity, len(entries))
+		b.Capacity = make(map[resourcev1alpha3.QualifiedName]resource.Quantity, len(entries))
 	}
 	for k, v := range entries {
 		b.Capacity[k] = v

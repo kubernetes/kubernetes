@@ -19,24 +19,24 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	apiswardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 	versioned "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/generated/informers/externalversions/internalinterfaces"
-	v1beta1 "k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1beta1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1beta1"
 )
 
 // FlunderInformer provides access to a shared informer and lister for
 // Flunders.
 type FlunderInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.FlunderLister
+	Lister() wardlev1beta1.FlunderLister
 }
 
 type flunderInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 				return client.WardleV1beta1().Flunders(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&wardlev1beta1.Flunder{},
+		&apiswardlev1beta1.Flunder{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *flunderInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardlev1beta1.Flunder{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiswardlev1beta1.Flunder{}, f.defaultInformer)
 }
 
-func (f *flunderInformer) Lister() v1beta1.FlunderLister {
-	return v1beta1.NewFlunderLister(f.Informer().GetIndexer())
+func (f *flunderInformer) Lister() wardlev1beta1.FlunderLister {
+	return wardlev1beta1.NewFlunderLister(f.Informer().GetIndexer())
 }

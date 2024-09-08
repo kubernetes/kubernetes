@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Nodes.
 type NodeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.NodeLister
+	Lister() corev1.NodeLister
 }
 
 type nodeInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Dura
 				return client.CoreV1().Nodes().Watch(context.TODO(), options)
 			},
 		},
-		&corev1.Node{},
+		&apicorev1.Node{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *nodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Node{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.Node{}, f.defaultInformer)
 }
 
-func (f *nodeInformer) Lister() v1.NodeLister {
-	return v1.NewNodeLister(f.Informer().GetIndexer())
+func (f *nodeInformer) Lister() corev1.NodeLister {
+	return corev1.NewNodeLister(f.Informer().GetIndexer())
 }

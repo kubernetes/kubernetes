@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ComponentConditionApplyConfiguration represents a declarative configuration of the ComponentCondition type for use
 // with apply.
 type ComponentConditionApplyConfiguration struct {
-	Type    *v1.ComponentConditionType `json:"type,omitempty"`
-	Status  *v1.ConditionStatus        `json:"status,omitempty"`
-	Message *string                    `json:"message,omitempty"`
-	Error   *string                    `json:"error,omitempty"`
+	Type    *corev1.ComponentConditionType `json:"type,omitempty"`
+	Status  *corev1.ConditionStatus        `json:"status,omitempty"`
+	Message *string                        `json:"message,omitempty"`
+	Error   *string                        `json:"error,omitempty"`
 }
 
 // ComponentConditionApplyConfiguration constructs a declarative configuration of the ComponentCondition type for use with
@@ -40,7 +40,7 @@ func ComponentCondition() *ComponentConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *ComponentConditionApplyConfiguration) WithType(value v1.ComponentConditionType) *ComponentConditionApplyConfiguration {
+func (b *ComponentConditionApplyConfiguration) WithType(value corev1.ComponentConditionType) *ComponentConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -48,7 +48,7 @@ func (b *ComponentConditionApplyConfiguration) WithType(value v1.ComponentCondit
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ComponentConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *ComponentConditionApplyConfiguration {
+func (b *ComponentConditionApplyConfiguration) WithStatus(value corev1.ConditionStatus) *ComponentConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

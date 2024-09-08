@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	certificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
+	applyconfigurationscertificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type ClusterTrustBundlesGetter interface {
 
 // ClusterTrustBundleInterface has methods to work with ClusterTrustBundle resources.
 type ClusterTrustBundleInterface interface {
-	Create(ctx context.Context, clusterTrustBundle *v1alpha1.ClusterTrustBundle, opts v1.CreateOptions) (*v1alpha1.ClusterTrustBundle, error)
-	Update(ctx context.Context, clusterTrustBundle *v1alpha1.ClusterTrustBundle, opts v1.UpdateOptions) (*v1alpha1.ClusterTrustBundle, error)
+	Create(ctx context.Context, clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, opts v1.CreateOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
+	Update(ctx context.Context, clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, opts v1.UpdateOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ClusterTrustBundle, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterTrustBundleList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
+	List(ctx context.Context, opts v1.ListOptions) (*certificatesv1alpha1.ClusterTrustBundleList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterTrustBundle, err error)
-	Apply(ctx context.Context, clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterTrustBundle, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *certificatesv1alpha1.ClusterTrustBundle, err error)
+	Apply(ctx context.Context, clusterTrustBundle *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration, opts v1.ApplyOptions) (result *certificatesv1alpha1.ClusterTrustBundle, err error)
 	ClusterTrustBundleExpansion
 }
 
 // clusterTrustBundles implements ClusterTrustBundleInterface
 type clusterTrustBundles struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.ClusterTrustBundle, *v1alpha1.ClusterTrustBundleList, *certificatesv1alpha1.ClusterTrustBundleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*certificatesv1alpha1.ClusterTrustBundle, *certificatesv1alpha1.ClusterTrustBundleList, *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration]
 }
 
 // newClusterTrustBundles returns a ClusterTrustBundles
 func newClusterTrustBundles(c *CertificatesV1alpha1Client) *clusterTrustBundles {
 	return &clusterTrustBundles{
-		gentype.NewClientWithListAndApply[*v1alpha1.ClusterTrustBundle, *v1alpha1.ClusterTrustBundleList, *certificatesv1alpha1.ClusterTrustBundleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*certificatesv1alpha1.ClusterTrustBundle, *certificatesv1alpha1.ClusterTrustBundleList, *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration](
 			"clustertrustbundles",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.ClusterTrustBundle { return &v1alpha1.ClusterTrustBundle{} },
-			func() *v1alpha1.ClusterTrustBundleList { return &v1alpha1.ClusterTrustBundleList{} }),
+			func() *certificatesv1alpha1.ClusterTrustBundle { return &certificatesv1alpha1.ClusterTrustBundle{} },
+			func() *certificatesv1alpha1.ClusterTrustBundleList {
+				return &certificatesv1alpha1.ClusterTrustBundleList{}
+			}),
 	}
 }

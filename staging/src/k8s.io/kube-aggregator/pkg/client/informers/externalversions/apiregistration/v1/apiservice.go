@@ -19,24 +19,24 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apisapiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 // APIServiceInformer provides access to a shared informer and lister for
 // APIServices.
 type APIServiceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.APIServiceLister
+	Lister() apiregistrationv1.APIServiceLister
 }
 
 type aPIServiceInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time
 				return client.ApiregistrationV1().APIServices().Watch(context.TODO(), options)
 			},
 		},
-		&apiregistrationv1.APIService{},
+		&apisapiregistrationv1.APIService{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *aPIServiceInformer) defaultInformer(client clientset.Interface, resyncP
 }
 
 func (f *aPIServiceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiregistrationv1.APIService{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisapiregistrationv1.APIService{}, f.defaultInformer)
 }
 
-func (f *aPIServiceInformer) Lister() v1.APIServiceLister {
-	return v1.NewAPIServiceLister(f.Informer().GetIndexer())
+func (f *aPIServiceInformer) Lister() apiregistrationv1.APIServiceLister {
+	return apiregistrationv1.NewAPIServiceLister(f.Informer().GetIndexer())
 }

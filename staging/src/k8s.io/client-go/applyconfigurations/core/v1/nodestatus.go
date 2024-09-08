@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // NodeStatusApplyConfiguration represents a declarative configuration of the NodeStatus type for use
 // with apply.
 type NodeStatusApplyConfiguration struct {
-	Capacity        *v1.ResourceList                       `json:"capacity,omitempty"`
-	Allocatable     *v1.ResourceList                       `json:"allocatable,omitempty"`
-	Phase           *v1.NodePhase                          `json:"phase,omitempty"`
+	Capacity        *corev1.ResourceList                   `json:"capacity,omitempty"`
+	Allocatable     *corev1.ResourceList                   `json:"allocatable,omitempty"`
+	Phase           *corev1.NodePhase                      `json:"phase,omitempty"`
 	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty"`
 	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty"`
 	DaemonEndpoints *NodeDaemonEndpointsApplyConfiguration `json:"daemonEndpoints,omitempty"`
 	NodeInfo        *NodeSystemInfoApplyConfiguration      `json:"nodeInfo,omitempty"`
 	Images          []ContainerImageApplyConfiguration     `json:"images,omitempty"`
-	VolumesInUse    []v1.UniqueVolumeName                  `json:"volumesInUse,omitempty"`
+	VolumesInUse    []corev1.UniqueVolumeName              `json:"volumesInUse,omitempty"`
 	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty"`
 	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty"`
 	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
@@ -49,7 +49,7 @@ func NodeStatus() *NodeStatusApplyConfiguration {
 // WithCapacity sets the Capacity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Capacity field is set to the value of the last call.
-func (b *NodeStatusApplyConfiguration) WithCapacity(value v1.ResourceList) *NodeStatusApplyConfiguration {
+func (b *NodeStatusApplyConfiguration) WithCapacity(value corev1.ResourceList) *NodeStatusApplyConfiguration {
 	b.Capacity = &value
 	return b
 }
@@ -57,7 +57,7 @@ func (b *NodeStatusApplyConfiguration) WithCapacity(value v1.ResourceList) *Node
 // WithAllocatable sets the Allocatable field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Allocatable field is set to the value of the last call.
-func (b *NodeStatusApplyConfiguration) WithAllocatable(value v1.ResourceList) *NodeStatusApplyConfiguration {
+func (b *NodeStatusApplyConfiguration) WithAllocatable(value corev1.ResourceList) *NodeStatusApplyConfiguration {
 	b.Allocatable = &value
 	return b
 }
@@ -65,7 +65,7 @@ func (b *NodeStatusApplyConfiguration) WithAllocatable(value v1.ResourceList) *N
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *NodeStatusApplyConfiguration) WithPhase(value v1.NodePhase) *NodeStatusApplyConfiguration {
+func (b *NodeStatusApplyConfiguration) WithPhase(value corev1.NodePhase) *NodeStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -128,7 +128,7 @@ func (b *NodeStatusApplyConfiguration) WithImages(values ...*ContainerImageApply
 // WithVolumesInUse adds the given value to the VolumesInUse field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumesInUse field.
-func (b *NodeStatusApplyConfiguration) WithVolumesInUse(values ...v1.UniqueVolumeName) *NodeStatusApplyConfiguration {
+func (b *NodeStatusApplyConfiguration) WithVolumesInUse(values ...corev1.UniqueVolumeName) *NodeStatusApplyConfiguration {
 	for i := range values {
 		b.VolumesInUse = append(b.VolumesInUse, values[i])
 	}

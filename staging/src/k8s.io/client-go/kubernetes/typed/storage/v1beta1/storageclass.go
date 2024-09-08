@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
+	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type StorageClassesGetter interface {
 
 // StorageClassInterface has methods to work with StorageClass resources.
 type StorageClassInterface interface {
-	Create(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.CreateOptions) (*v1beta1.StorageClass, error)
-	Update(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.UpdateOptions) (*v1beta1.StorageClass, error)
+	Create(ctx context.Context, storageClass *storagev1beta1.StorageClass, opts v1.CreateOptions) (*storagev1beta1.StorageClass, error)
+	Update(ctx context.Context, storageClass *storagev1beta1.StorageClass, opts v1.UpdateOptions) (*storagev1beta1.StorageClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.StorageClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.StorageClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1beta1.StorageClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagev1beta1.StorageClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StorageClass, err error)
-	Apply(ctx context.Context, storageClass *storagev1beta1.StorageClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StorageClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1beta1.StorageClass, err error)
+	Apply(ctx context.Context, storageClass *applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration, opts v1.ApplyOptions) (result *storagev1beta1.StorageClass, err error)
 	StorageClassExpansion
 }
 
 // storageClasses implements StorageClassInterface
 type storageClasses struct {
-	*gentype.ClientWithListAndApply[*v1beta1.StorageClass, *v1beta1.StorageClassList, *storagev1beta1.StorageClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagev1beta1.StorageClass, *storagev1beta1.StorageClassList, *applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration]
 }
 
 // newStorageClasses returns a StorageClasses
 func newStorageClasses(c *StorageV1beta1Client) *storageClasses {
 	return &storageClasses{
-		gentype.NewClientWithListAndApply[*v1beta1.StorageClass, *v1beta1.StorageClassList, *storagev1beta1.StorageClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagev1beta1.StorageClass, *storagev1beta1.StorageClassList, *applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration](
 			"storageclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.StorageClass { return &v1beta1.StorageClass{} },
-			func() *v1beta1.StorageClassList { return &v1beta1.StorageClassList{} }),
+			func() *storagev1beta1.StorageClass { return &storagev1beta1.StorageClass{} },
+			func() *storagev1beta1.StorageClassList { return &storagev1beta1.StorageClassList{} }),
 	}
 }

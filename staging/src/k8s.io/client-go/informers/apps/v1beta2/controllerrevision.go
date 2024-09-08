@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	apiappsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta2 "k8s.io/client-go/listers/apps/v1beta2"
+	appsv1beta2 "k8s.io/client-go/listers/apps/v1beta2"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ControllerRevisions.
 type ControllerRevisionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta2.ControllerRevisionLister
+	Lister() appsv1beta2.ControllerRevisionLister
 }
 
 type controllerRevisionInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespac
 				return client.AppsV1beta2().ControllerRevisions(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1beta2.ControllerRevision{},
+		&apiappsv1beta2.ControllerRevision{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *controllerRevisionInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1beta2.ControllerRevision{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1beta2.ControllerRevision{}, f.defaultInformer)
 }
 
-func (f *controllerRevisionInformer) Lister() v1beta2.ControllerRevisionLister {
-	return v1beta2.NewControllerRevisionLister(f.Informer().GetIndexer())
+func (f *controllerRevisionInformer) Lister() appsv1beta2.ControllerRevisionLister {
+	return appsv1beta2.NewControllerRevisionLister(f.Informer().GetIndexer())
 }

@@ -21,14 +21,14 @@ package v1
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // StatefulSetSpecApplyConfiguration represents a declarative configuration of the StatefulSetSpec type for use
 // with apply.
 type StatefulSetSpecApplyConfiguration struct {
 	Replicas                             *int32                                                             `json:"replicas,omitempty"`
-	Selector                             *v1.LabelSelectorApplyConfiguration                                `json:"selector,omitempty"`
+	Selector                             *metav1.LabelSelectorApplyConfiguration                            `json:"selector,omitempty"`
 	Template                             *corev1.PodTemplateSpecApplyConfiguration                          `json:"template,omitempty"`
 	VolumeClaimTemplates                 []corev1.PersistentVolumeClaimApplyConfiguration                   `json:"volumeClaimTemplates,omitempty"`
 	ServiceName                          *string                                                            `json:"serviceName,omitempty"`
@@ -57,7 +57,7 @@ func (b *StatefulSetSpecApplyConfiguration) WithReplicas(value int32) *StatefulS
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *StatefulSetSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *StatefulSetSpecApplyConfiguration {
+func (b *StatefulSetSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *StatefulSetSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

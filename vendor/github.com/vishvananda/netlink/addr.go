@@ -17,6 +17,7 @@ type Addr struct {
 	Broadcast   net.IP
 	PreferedLft int
 	ValidLft    int
+	LinkIndex   int
 }
 
 // String returns $ip/$netmask $label

@@ -21,14 +21,14 @@ package v1
 import (
 	policyv1 "k8s.io/api/policy/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetSpecApplyConfiguration represents a declarative configuration of the PodDisruptionBudgetSpec type for use
 // with apply.
 type PodDisruptionBudgetSpecApplyConfiguration struct {
 	MinAvailable               *intstr.IntOrString                      `json:"minAvailable,omitempty"`
-	Selector                   *v1.LabelSelectorApplyConfiguration      `json:"selector,omitempty"`
+	Selector                   *metav1.LabelSelectorApplyConfiguration  `json:"selector,omitempty"`
 	MaxUnavailable             *intstr.IntOrString                      `json:"maxUnavailable,omitempty"`
 	UnhealthyPodEvictionPolicy *policyv1.UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty"`
 }
@@ -50,7 +50,7 @@ func (b *PodDisruptionBudgetSpecApplyConfiguration) WithMinAvailable(value intst
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *PodDisruptionBudgetSpecApplyConfiguration {
+func (b *PodDisruptionBudgetSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *PodDisruptionBudgetSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

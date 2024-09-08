@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	storagev1 "k8s.io/api/storage/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // StorageClassLister helps list StorageClasses.
@@ -30,19 +30,19 @@ import (
 type StorageClassLister interface {
 	// List lists all StorageClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.StorageClass, err error)
+	List(selector labels.Selector) (ret []*storagev1.StorageClass, err error)
 	// Get retrieves the StorageClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.StorageClass, error)
+	Get(name string) (*storagev1.StorageClass, error)
 	StorageClassListerExpansion
 }
 
 // storageClassLister implements the StorageClassLister interface.
 type storageClassLister struct {
-	listers.ResourceIndexer[*v1.StorageClass]
+	listers.ResourceIndexer[*storagev1.StorageClass]
 }
 
 // NewStorageClassLister returns a new StorageClassLister.
 func NewStorageClassLister(indexer cache.Indexer) StorageClassLister {
-	return &storageClassLister{listers.New[*v1.StorageClass](indexer, v1.Resource("storageclass"))}
+	return &storageClassLister{listers.New[*storagev1.StorageClass](indexer, storagev1.Resource("storageclass"))}
 }

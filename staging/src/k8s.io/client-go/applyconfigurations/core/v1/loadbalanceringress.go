@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // LoadBalancerIngressApplyConfiguration represents a declarative configuration of the LoadBalancerIngress type for use
@@ -27,7 +27,7 @@ import (
 type LoadBalancerIngressApplyConfiguration struct {
 	IP       *string                        `json:"ip,omitempty"`
 	Hostname *string                        `json:"hostname,omitempty"`
-	IPMode   *v1.LoadBalancerIPMode         `json:"ipMode,omitempty"`
+	IPMode   *corev1.LoadBalancerIPMode     `json:"ipMode,omitempty"`
 	Ports    []PortStatusApplyConfiguration `json:"ports,omitempty"`
 }
 
@@ -56,7 +56,7 @@ func (b *LoadBalancerIngressApplyConfiguration) WithHostname(value string) *Load
 // WithIPMode sets the IPMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the IPMode field is set to the value of the last call.
-func (b *LoadBalancerIngressApplyConfiguration) WithIPMode(value v1.LoadBalancerIPMode) *LoadBalancerIngressApplyConfiguration {
+func (b *LoadBalancerIngressApplyConfiguration) WithIPMode(value corev1.LoadBalancerIPMode) *LoadBalancerIngressApplyConfiguration {
 	b.IPMode = &value
 	return b
 }

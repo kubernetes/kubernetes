@@ -25,7 +25,7 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/node/v1beta1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -39,70 +39,70 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Overhead)(nil), (*node.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Overhead_To_node_Overhead(a.(*v1beta1.Overhead), b.(*node.Overhead), scope)
+	if err := s.AddGeneratedConversionFunc((*nodev1beta1.Overhead)(nil), (*node.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Overhead_To_node_Overhead(a.(*nodev1beta1.Overhead), b.(*node.Overhead), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*node.Overhead)(nil), (*v1beta1.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_node_Overhead_To_v1beta1_Overhead(a.(*node.Overhead), b.(*v1beta1.Overhead), scope)
+	if err := s.AddGeneratedConversionFunc((*node.Overhead)(nil), (*nodev1beta1.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_Overhead_To_v1beta1_Overhead(a.(*node.Overhead), b.(*nodev1beta1.Overhead), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RuntimeClass)(nil), (*node.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(a.(*v1beta1.RuntimeClass), b.(*node.RuntimeClass), scope)
+	if err := s.AddGeneratedConversionFunc((*nodev1beta1.RuntimeClass)(nil), (*node.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(a.(*nodev1beta1.RuntimeClass), b.(*node.RuntimeClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*node.RuntimeClass)(nil), (*v1beta1.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_node_RuntimeClass_To_v1beta1_RuntimeClass(a.(*node.RuntimeClass), b.(*v1beta1.RuntimeClass), scope)
+	if err := s.AddGeneratedConversionFunc((*node.RuntimeClass)(nil), (*nodev1beta1.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_RuntimeClass_To_v1beta1_RuntimeClass(a.(*node.RuntimeClass), b.(*nodev1beta1.RuntimeClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RuntimeClassList)(nil), (*node.RuntimeClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(a.(*v1beta1.RuntimeClassList), b.(*node.RuntimeClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*nodev1beta1.RuntimeClassList)(nil), (*node.RuntimeClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(a.(*nodev1beta1.RuntimeClassList), b.(*node.RuntimeClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*node.RuntimeClassList)(nil), (*v1beta1.RuntimeClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(a.(*node.RuntimeClassList), b.(*v1beta1.RuntimeClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*node.RuntimeClassList)(nil), (*nodev1beta1.RuntimeClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(a.(*node.RuntimeClassList), b.(*nodev1beta1.RuntimeClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Scheduling)(nil), (*node.Scheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Scheduling_To_node_Scheduling(a.(*v1beta1.Scheduling), b.(*node.Scheduling), scope)
+	if err := s.AddGeneratedConversionFunc((*nodev1beta1.Scheduling)(nil), (*node.Scheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Scheduling_To_node_Scheduling(a.(*nodev1beta1.Scheduling), b.(*node.Scheduling), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*node.Scheduling)(nil), (*v1beta1.Scheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_node_Scheduling_To_v1beta1_Scheduling(a.(*node.Scheduling), b.(*v1beta1.Scheduling), scope)
+	if err := s.AddGeneratedConversionFunc((*node.Scheduling)(nil), (*nodev1beta1.Scheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_Scheduling_To_v1beta1_Scheduling(a.(*node.Scheduling), b.(*nodev1beta1.Scheduling), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_Overhead_To_node_Overhead(in *v1beta1.Overhead, out *node.Overhead, s conversion.Scope) error {
+func autoConvert_v1beta1_Overhead_To_node_Overhead(in *nodev1beta1.Overhead, out *node.Overhead, s conversion.Scope) error {
 	out.PodFixed = *(*core.ResourceList)(unsafe.Pointer(&in.PodFixed))
 	return nil
 }
 
 // Convert_v1beta1_Overhead_To_node_Overhead is an autogenerated conversion function.
-func Convert_v1beta1_Overhead_To_node_Overhead(in *v1beta1.Overhead, out *node.Overhead, s conversion.Scope) error {
+func Convert_v1beta1_Overhead_To_node_Overhead(in *nodev1beta1.Overhead, out *node.Overhead, s conversion.Scope) error {
 	return autoConvert_v1beta1_Overhead_To_node_Overhead(in, out, s)
 }
 
-func autoConvert_node_Overhead_To_v1beta1_Overhead(in *node.Overhead, out *v1beta1.Overhead, s conversion.Scope) error {
+func autoConvert_node_Overhead_To_v1beta1_Overhead(in *node.Overhead, out *nodev1beta1.Overhead, s conversion.Scope) error {
 	out.PodFixed = *(*v1.ResourceList)(unsafe.Pointer(&in.PodFixed))
 	return nil
 }
 
 // Convert_node_Overhead_To_v1beta1_Overhead is an autogenerated conversion function.
-func Convert_node_Overhead_To_v1beta1_Overhead(in *node.Overhead, out *v1beta1.Overhead, s conversion.Scope) error {
+func Convert_node_Overhead_To_v1beta1_Overhead(in *node.Overhead, out *nodev1beta1.Overhead, s conversion.Scope) error {
 	return autoConvert_node_Overhead_To_v1beta1_Overhead(in, out, s)
 }
 
-func autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *v1beta1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
+func autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *nodev1beta1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Handler
 	out.Overhead = (*node.Overhead)(unsafe.Pointer(in.Overhead))
@@ -111,63 +111,63 @@ func autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *v1beta1.RuntimeCl
 }
 
 // Convert_v1beta1_RuntimeClass_To_node_RuntimeClass is an autogenerated conversion function.
-func Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *v1beta1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
+func Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *nodev1beta1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	return autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in, out, s)
 }
 
-func autoConvert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass, out *v1beta1.RuntimeClass, s conversion.Scope) error {
+func autoConvert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass, out *nodev1beta1.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Handler
-	out.Overhead = (*v1beta1.Overhead)(unsafe.Pointer(in.Overhead))
-	out.Scheduling = (*v1beta1.Scheduling)(unsafe.Pointer(in.Scheduling))
+	out.Overhead = (*nodev1beta1.Overhead)(unsafe.Pointer(in.Overhead))
+	out.Scheduling = (*nodev1beta1.Scheduling)(unsafe.Pointer(in.Scheduling))
 	return nil
 }
 
 // Convert_node_RuntimeClass_To_v1beta1_RuntimeClass is an autogenerated conversion function.
-func Convert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass, out *v1beta1.RuntimeClass, s conversion.Scope) error {
+func Convert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass, out *nodev1beta1.RuntimeClass, s conversion.Scope) error {
 	return autoConvert_node_RuntimeClass_To_v1beta1_RuntimeClass(in, out, s)
 }
 
-func autoConvert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(in *v1beta1.RuntimeClassList, out *node.RuntimeClassList, s conversion.Scope) error {
+func autoConvert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(in *nodev1beta1.RuntimeClassList, out *node.RuntimeClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]node.RuntimeClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_RuntimeClassList_To_node_RuntimeClassList is an autogenerated conversion function.
-func Convert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(in *v1beta1.RuntimeClassList, out *node.RuntimeClassList, s conversion.Scope) error {
+func Convert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(in *nodev1beta1.RuntimeClassList, out *node.RuntimeClassList, s conversion.Scope) error {
 	return autoConvert_v1beta1_RuntimeClassList_To_node_RuntimeClassList(in, out, s)
 }
 
-func autoConvert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(in *node.RuntimeClassList, out *v1beta1.RuntimeClassList, s conversion.Scope) error {
+func autoConvert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(in *node.RuntimeClassList, out *nodev1beta1.RuntimeClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.RuntimeClass)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]nodev1beta1.RuntimeClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_node_RuntimeClassList_To_v1beta1_RuntimeClassList is an autogenerated conversion function.
-func Convert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(in *node.RuntimeClassList, out *v1beta1.RuntimeClassList, s conversion.Scope) error {
+func Convert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(in *node.RuntimeClassList, out *nodev1beta1.RuntimeClassList, s conversion.Scope) error {
 	return autoConvert_node_RuntimeClassList_To_v1beta1_RuntimeClassList(in, out, s)
 }
 
-func autoConvert_v1beta1_Scheduling_To_node_Scheduling(in *v1beta1.Scheduling, out *node.Scheduling, s conversion.Scope) error {
+func autoConvert_v1beta1_Scheduling_To_node_Scheduling(in *nodev1beta1.Scheduling, out *node.Scheduling, s conversion.Scope) error {
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
 	out.Tolerations = *(*[]core.Toleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
 // Convert_v1beta1_Scheduling_To_node_Scheduling is an autogenerated conversion function.
-func Convert_v1beta1_Scheduling_To_node_Scheduling(in *v1beta1.Scheduling, out *node.Scheduling, s conversion.Scope) error {
+func Convert_v1beta1_Scheduling_To_node_Scheduling(in *nodev1beta1.Scheduling, out *node.Scheduling, s conversion.Scope) error {
 	return autoConvert_v1beta1_Scheduling_To_node_Scheduling(in, out, s)
 }
 
-func autoConvert_node_Scheduling_To_v1beta1_Scheduling(in *node.Scheduling, out *v1beta1.Scheduling, s conversion.Scope) error {
+func autoConvert_node_Scheduling_To_v1beta1_Scheduling(in *node.Scheduling, out *nodev1beta1.Scheduling, s conversion.Scope) error {
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
 	out.Tolerations = *(*[]v1.Toleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
 // Convert_node_Scheduling_To_v1beta1_Scheduling is an autogenerated conversion function.
-func Convert_node_Scheduling_To_v1beta1_Scheduling(in *node.Scheduling, out *v1beta1.Scheduling, s conversion.Scope) error {
+func Convert_node_Scheduling_To_v1beta1_Scheduling(in *node.Scheduling, out *nodev1beta1.Scheduling, s conversion.Scope) error {
 	return autoConvert_node_Scheduling_To_v1beta1_Scheduling(in, out, s)
 }

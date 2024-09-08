@@ -19,24 +19,24 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apiv1 "k8s.io/code-generator/examples/single/api/v1"
+	singleapiv1 "k8s.io/code-generator/examples/single/api/v1"
 	versioned "k8s.io/code-generator/examples/single/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
-	v1 "k8s.io/code-generator/examples/single/listers/api/v1"
+	apiv1 "k8s.io/code-generator/examples/single/listers/api/v1"
 )
 
 // ClusterTestTypeInformer provides access to a shared informer and lister for
 // ClusterTestTypes.
 type ClusterTestTypeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ClusterTestTypeLister
+	Lister() apiv1.ClusterTestTypeLister
 }
 
 type clusterTestTypeInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 				return client.ExampleV1().ClusterTestTypes().Watch(context.TODO(), options)
 			},
 		},
-		&apiv1.ClusterTestType{},
+		&singleapiv1.ClusterTestType{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *clusterTestTypeInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *clusterTestTypeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiv1.ClusterTestType{}, f.defaultInformer)
+	return f.factory.InformerFor(&singleapiv1.ClusterTestType{}, f.defaultInformer)
 }
 
-func (f *clusterTestTypeInformer) Lister() v1.ClusterTestTypeLister {
-	return v1.NewClusterTestTypeLister(f.Informer().GetIndexer())
+func (f *clusterTestTypeInformer) Lister() apiv1.ClusterTestTypeLister {
+	return apiv1.NewClusterTestTypeLister(f.Informer().GetIndexer())
 }

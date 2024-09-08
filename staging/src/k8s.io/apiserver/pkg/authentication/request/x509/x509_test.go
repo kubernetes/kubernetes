@@ -23,11 +23,11 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -581,9 +581,8 @@ func TestX509(t *testing.T) {
 		Opts x509.VerifyOptions
 		User UserConversion
 
-		ExpectUserName string
-		ExpectGroups   []string
 		ExpectOK       bool
+		ExpectResponse *authenticator.Response
 		ExpectErr      bool
 	}{
 		"non-tls": {
@@ -618,10 +617,17 @@ func TestX509(t *testing.T) {
 			Certs: getCerts(t, serverCert),
 			User:  CommonNameUserConversion,
 
-			ExpectUserName: "127.0.0.1",
-			ExpectGroups:   []string{"My Org"},
-			ExpectOK:       true,
-			ExpectErr:      false,
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "127.0.0.1",
+					Groups: []string{"My Org"},
+					Extra: map[string][]string{
+						user.CredentialIDKey: {"X509SHA256=92209d1e0dd36a018f244f5e1b88e2d47b049e9cfcd4b7c87c65875866872230"},
+					},
+				},
+			},
+			ExpectErr: false,
 		},
 
 		"common name": {
@@ -629,10 +635,17 @@ func TestX509(t *testing.T) {
 			Certs: getCerts(t, clientCNCert),
 			User:  CommonNameUserConversion,
 
-			ExpectUserName: "client_cn",
-			ExpectGroups:   []string{"My Org"},
-			ExpectOK:       true,
-			ExpectErr:      false,
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "client_cn",
+					Groups: []string{"My Org"},
+					Extra: map[string][]string{
+						user.CredentialIDKey: {"X509SHA256=dd0a6a295055fa94455c522b0d54ef0499186f454a7cf978b8b346dc35b254f7"},
+					},
+				},
+			},
+			ExpectErr: false,
 		},
 		"ca with multiple organizations": {
 			Opts: x509.VerifyOptions{
@@ -641,10 +654,17 @@ func TestX509(t *testing.T) {
 			Certs: getCerts(t, caWithGroups),
 			User:  CommonNameUserConversion,
 
-			ExpectUserName: "ROOT CA WITH GROUPS",
-			ExpectGroups:   []string{"My Org", "My Org 1", "My Org 2"},
-			ExpectOK:       true,
-			ExpectErr:      false,
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "ROOT CA WITH GROUPS",
+					Groups: []string{"My Org", "My Org 1", "My Org 2"},
+					Extra: map[string][]string{
+						user.CredentialIDKey: {"X509SHA256=6f337bb6576b6f942bd5ac5256f621e352aa7b34d971bda9b8f8981f51bba456"},
+					},
+				},
+			},
+			ExpectErr: false,
 		},
 
 		"custom conversion error": {
@@ -664,9 +684,13 @@ func TestX509(t *testing.T) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "custom"}}, true, nil
 			}),
 
-			ExpectUserName: "custom",
-			ExpectOK:       true,
-			ExpectErr:      false,
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name: "custom",
+				},
+			},
+			ExpectErr: false,
 		},
 
 		"future cert": {
@@ -697,9 +721,16 @@ func TestX509(t *testing.T) {
 			Certs: getCertsFromFile(t, "client-valid", "intermediate"),
 			User:  CommonNameUserConversion,
 
-			ExpectUserName: "My Client",
-			ExpectOK:       true,
-			ExpectErr:      false,
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name: "My Client",
+					Extra: map[string][]string{
+						user.CredentialIDKey: {"X509SHA256=794b0529fd1a72d55d52d98be9bab5b822d16f9ae86c4373fa7beee3cafe8582"},
+					},
+				},
+			},
+			ExpectErr: false,
 		},
 		"multi-level, expired": {
 			Opts:  multilevelOpts,
@@ -712,42 +743,36 @@ func TestX509(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		req, _ := http.NewRequest("GET", "/", nil)
-		if !testCase.Insecure {
-			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
-		}
-
-		// this effectively tests the simple dynamic verify function.
-		a := New(testCase.Opts, testCase.User)
-
-		resp, ok, err := a.AuthenticateRequest(req)
-
-		if testCase.ExpectErr && err == nil {
-			t.Errorf("%s: Expected error, got none", k)
-			continue
-		}
-		if !testCase.ExpectErr && err != nil {
-			t.Errorf("%s: Got unexpected error: %v", k, err)
-			continue
-		}
-
-		if testCase.ExpectOK != ok {
-			t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
-			continue
-		}
-
-		if testCase.ExpectOK {
-			if testCase.ExpectUserName != resp.User.GetName() {
-				t.Errorf("%s: Expected user.name=%v, got %v", k, testCase.ExpectUserName, resp.User.GetName())
+		t.Run(k, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "/", nil)
+			if !testCase.Insecure {
+				req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
 			}
 
-			groups := resp.User.GetGroups()
-			sort.Strings(testCase.ExpectGroups)
-			sort.Strings(groups)
-			if !reflect.DeepEqual(testCase.ExpectGroups, groups) {
-				t.Errorf("%s: Expected user.groups=%v, got %v", k, testCase.ExpectGroups, groups)
+			// this effectively tests the simple dynamic verify function.
+			a := New(testCase.Opts, testCase.User)
+
+			resp, ok, err := a.AuthenticateRequest(req)
+
+			if testCase.ExpectErr && err == nil {
+				t.Fatalf("Expected error, got none")
 			}
-		}
+			if !testCase.ExpectErr && err != nil {
+				t.Fatalf("Got unexpected error: %v", err)
+			}
+
+			if testCase.ExpectOK != ok {
+				t.Fatalf("Expected ok=%v, got %v", testCase.ExpectOK, ok)
+			}
+
+			if testCase.ExpectOK {
+				sort.Strings(testCase.ExpectResponse.User.GetGroups())
+				sort.Strings(resp.User.GetGroups())
+				if diff := cmp.Diff(testCase.ExpectResponse, resp); diff != "" {
+					t.Errorf("Bad response; diff (-want +got)\n%s", diff)
+				}
+			}
+		})
 	}
 }
 

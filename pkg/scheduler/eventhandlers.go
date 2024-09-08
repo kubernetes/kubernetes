@@ -605,6 +605,13 @@ func addAllEventHandlers(
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+		// QHint is initially created from the motivation of replacing this preCheck.
+		// It assumes that the scheduler only has in-tree plugins, which is problematic for our extensibility.
+		// Here, we skip preCheck if QHint is enabled, and we eventually remove it after QHint is graduated.
+		return nil
+	}
+
 	// Note: the following checks doesn't take preemption into considerations, in very rare
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.

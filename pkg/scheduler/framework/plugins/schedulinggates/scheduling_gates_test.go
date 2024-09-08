@@ -88,13 +88,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			newObj:       st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).UID("uid1").Obj(),
 			expectedHint: framework.QueueSkip,
 		},
-		"skip-queue-on-gates-not-empty": {
-			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			oldObj:       st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			newObj:       st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
-			expectedHint: framework.QueueSkip,
-		},
-		"queue-on-gates-become-empty": {
+		"queue-on-the-unsched-pod-updated": {
 			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
 			oldObj:       st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
 			newObj:       st.MakePod().Name("p").SchedulingGates([]string{}).Obj(),
@@ -109,7 +103,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
-			actualHint, err := p.(*SchedulingGates).isSchedulableAfterPodChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdatePodSchedulingGatesEliminated(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return

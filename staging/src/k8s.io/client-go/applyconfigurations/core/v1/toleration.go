@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // TolerationApplyConfiguration represents a declarative configuration of the Toleration type for use
 // with apply.
 type TolerationApplyConfiguration struct {
-	Key               *string                `json:"key,omitempty"`
-	Operator          *v1.TolerationOperator `json:"operator,omitempty"`
-	Value             *string                `json:"value,omitempty"`
-	Effect            *v1.TaintEffect        `json:"effect,omitempty"`
-	TolerationSeconds *int64                 `json:"tolerationSeconds,omitempty"`
+	Key               *string                    `json:"key,omitempty"`
+	Operator          *corev1.TolerationOperator `json:"operator,omitempty"`
+	Value             *string                    `json:"value,omitempty"`
+	Effect            *corev1.TaintEffect        `json:"effect,omitempty"`
+	TolerationSeconds *int64                     `json:"tolerationSeconds,omitempty"`
 }
 
 // TolerationApplyConfiguration constructs a declarative configuration of the Toleration type for use with
@@ -49,7 +49,7 @@ func (b *TolerationApplyConfiguration) WithKey(value string) *TolerationApplyCon
 // WithOperator sets the Operator field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operator field is set to the value of the last call.
-func (b *TolerationApplyConfiguration) WithOperator(value v1.TolerationOperator) *TolerationApplyConfiguration {
+func (b *TolerationApplyConfiguration) WithOperator(value corev1.TolerationOperator) *TolerationApplyConfiguration {
 	b.Operator = &value
 	return b
 }
@@ -65,7 +65,7 @@ func (b *TolerationApplyConfiguration) WithValue(value string) *TolerationApplyC
 // WithEffect sets the Effect field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Effect field is set to the value of the last call.
-func (b *TolerationApplyConfiguration) WithEffect(value v1.TaintEffect) *TolerationApplyConfiguration {
+func (b *TolerationApplyConfiguration) WithEffect(value corev1.TaintEffect) *TolerationApplyConfiguration {
 	b.Effect = &value
 	return b
 }

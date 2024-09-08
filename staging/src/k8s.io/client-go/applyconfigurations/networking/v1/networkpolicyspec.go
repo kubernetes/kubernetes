@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // NetworkPolicySpecApplyConfiguration represents a declarative configuration of the NetworkPolicySpec type for use
 // with apply.
 type NetworkPolicySpecApplyConfiguration struct {
-	PodSelector *v1.LabelSelectorApplyConfiguration          `json:"podSelector,omitempty"`
+	PodSelector *metav1.LabelSelectorApplyConfiguration      `json:"podSelector,omitempty"`
 	Ingress     []NetworkPolicyIngressRuleApplyConfiguration `json:"ingress,omitempty"`
 	Egress      []NetworkPolicyEgressRuleApplyConfiguration  `json:"egress,omitempty"`
-	PolicyTypes []apinetworkingv1.PolicyType                 `json:"policyTypes,omitempty"`
+	PolicyTypes []networkingv1.PolicyType                    `json:"policyTypes,omitempty"`
 }
 
 // NetworkPolicySpecApplyConfiguration constructs a declarative configuration of the NetworkPolicySpec type for use with
@@ -41,7 +41,7 @@ func NetworkPolicySpec() *NetworkPolicySpecApplyConfiguration {
 // WithPodSelector sets the PodSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PodSelector field is set to the value of the last call.
-func (b *NetworkPolicySpecApplyConfiguration) WithPodSelector(value *v1.LabelSelectorApplyConfiguration) *NetworkPolicySpecApplyConfiguration {
+func (b *NetworkPolicySpecApplyConfiguration) WithPodSelector(value *metav1.LabelSelectorApplyConfiguration) *NetworkPolicySpecApplyConfiguration {
 	b.PodSelector = value
 	return b
 }
@@ -75,7 +75,7 @@ func (b *NetworkPolicySpecApplyConfiguration) WithEgress(values ...*NetworkPolic
 // WithPolicyTypes adds the given value to the PolicyTypes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PolicyTypes field.
-func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...apinetworkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
+func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...networkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
 	for i := range values {
 		b.PolicyTypes = append(b.PolicyTypes, values[i])
 	}

@@ -67,7 +67,7 @@ message NodePrepareResourceResponse {
     // may have zero or more devices.
     repeated Device devices = 1;
     // If non-empty, preparing the ResourceClaim failed.
-    // cdi_devices is ignored in that case.
+    // Devices are ignored in that case.
     string error = 2;
 }
 

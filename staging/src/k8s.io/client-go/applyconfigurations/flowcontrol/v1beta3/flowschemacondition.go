@@ -19,18 +19,18 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // FlowSchemaConditionApplyConfiguration represents a declarative configuration of the FlowSchemaCondition type for use
 // with apply.
 type FlowSchemaConditionApplyConfiguration struct {
-	Type               *v1beta3.FlowSchemaConditionType `json:"type,omitempty"`
-	Status             *v1beta3.ConditionStatus         `json:"status,omitempty"`
-	LastTransitionTime *v1.Time                         `json:"lastTransitionTime,omitempty"`
-	Reason             *string                          `json:"reason,omitempty"`
-	Message            *string                          `json:"message,omitempty"`
+	Type               *flowcontrolv1beta3.FlowSchemaConditionType `json:"type,omitempty"`
+	Status             *flowcontrolv1beta3.ConditionStatus         `json:"status,omitempty"`
+	LastTransitionTime *v1.Time                                    `json:"lastTransitionTime,omitempty"`
+	Reason             *string                                     `json:"reason,omitempty"`
+	Message            *string                                     `json:"message,omitempty"`
 }
 
 // FlowSchemaConditionApplyConfiguration constructs a declarative configuration of the FlowSchemaCondition type for use with
@@ -42,7 +42,7 @@ func FlowSchemaCondition() *FlowSchemaConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *FlowSchemaConditionApplyConfiguration) WithType(value v1beta3.FlowSchemaConditionType) *FlowSchemaConditionApplyConfiguration {
+func (b *FlowSchemaConditionApplyConfiguration) WithType(value flowcontrolv1beta3.FlowSchemaConditionType) *FlowSchemaConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -50,7 +50,7 @@ func (b *FlowSchemaConditionApplyConfiguration) WithType(value v1beta3.FlowSchem
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *FlowSchemaConditionApplyConfiguration) WithStatus(value v1beta3.ConditionStatus) *FlowSchemaConditionApplyConfiguration {
+func (b *FlowSchemaConditionApplyConfiguration) WithStatus(value flowcontrolv1beta3.ConditionStatus) *FlowSchemaConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	apinetworkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/networking/v1alpha1"
+	networkingv1alpha1 "k8s.io/client-go/listers/networking/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ServiceCIDRs.
 type ServiceCIDRInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ServiceCIDRLister
+	Lister() networkingv1alpha1.ServiceCIDRLister
 }
 
 type serviceCIDRInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod ti
 				return client.NetworkingV1alpha1().ServiceCIDRs().Watch(context.TODO(), options)
 			},
 		},
-		&networkingv1alpha1.ServiceCIDR{},
+		&apinetworkingv1alpha1.ServiceCIDR{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *serviceCIDRInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *serviceCIDRInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networkingv1alpha1.ServiceCIDR{}, f.defaultInformer)
+	return f.factory.InformerFor(&apinetworkingv1alpha1.ServiceCIDR{}, f.defaultInformer)
 }
 
-func (f *serviceCIDRInformer) Lister() v1alpha1.ServiceCIDRLister {
-	return v1alpha1.NewServiceCIDRLister(f.Informer().GetIndexer())
+func (f *serviceCIDRInformer) Lister() networkingv1alpha1.ServiceCIDRLister {
+	return networkingv1alpha1.NewServiceCIDRLister(f.Informer().GetIndexer())
 }

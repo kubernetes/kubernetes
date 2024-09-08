@@ -86,6 +86,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"cacheNewSharedIndexInformer":     c.Universe.Function(cacheNewSharedIndexInformer),
 		"cacheSharedIndexInformer":        c.Universe.Type(cacheSharedIndexInformer),
 		"clientSetInterface":              clientSetInterface,
+		"contextTODO":                     c.Universe.Type(contextTODOFunc),
 		"group":                           namer.IC(g.groupGoName),
 		"informerFor":                     informerFor,
 		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
@@ -151,13 +152,13 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(context.TODO(), options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List($.contextTODO|raw$(), options)
 			},
 			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(context.TODO(), options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch($.contextTODO|raw$(), options)
 			},
 		},
 		&$.type|raw${},

@@ -19,14 +19,14 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 // CustomResourceSubresourcesApplyConfiguration represents a declarative configuration of the CustomResourceSubresources type for use
 // with apply.
 type CustomResourceSubresourcesApplyConfiguration struct {
-	Status *v1beta1.CustomResourceSubresourceStatus          `json:"status,omitempty"`
-	Scale  *CustomResourceSubresourceScaleApplyConfiguration `json:"scale,omitempty"`
+	Status *apiextensionsv1beta1.CustomResourceSubresourceStatus `json:"status,omitempty"`
+	Scale  *CustomResourceSubresourceScaleApplyConfiguration     `json:"scale,omitempty"`
 }
 
 // CustomResourceSubresourcesApplyConfiguration constructs a declarative configuration of the CustomResourceSubresources type for use with
@@ -38,7 +38,7 @@ func CustomResourceSubresources() *CustomResourceSubresourcesApplyConfiguration 
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *CustomResourceSubresourcesApplyConfiguration) WithStatus(value v1beta1.CustomResourceSubresourceStatus) *CustomResourceSubresourcesApplyConfiguration {
+func (b *CustomResourceSubresourcesApplyConfiguration) WithStatus(value apiextensionsv1beta1.CustomResourceSubresourceStatus) *CustomResourceSubresourcesApplyConfiguration {
 	b.Status = &value
 	return b
 }

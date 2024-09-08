@@ -11,6 +11,9 @@ type InetFamily uint8
 // ConntrackFlow placeholder
 type ConntrackFlow struct{}
 
+// CustomConntrackFilter placeholder
+type CustomConntrackFilter struct{}
+
 // ConntrackFilter placeholder
 type ConntrackFilter struct{}
 
@@ -29,7 +32,15 @@ func ConntrackTableFlush(table ConntrackTableType) error {
 
 // ConntrackDeleteFilter deletes entries on the specified table on the base of the filter
 // conntrack -D [table] parameters         Delete conntrack or expectation
+//
+// Deprecated: use [ConntrackDeleteFilter] instead.
 func ConntrackDeleteFilter(table ConntrackTableType, family InetFamily, filter *ConntrackFilter) (uint, error) {
+	return 0, ErrNotImplemented
+}
+
+// ConntrackDeleteFilters deletes entries on the specified table matching any of the specified filters
+// conntrack -D [table] parameters         Delete conntrack or expectation
+func ConntrackDeleteFilters(table ConntrackTableType, family InetFamily, filters ...CustomConntrackFilter) (uint, error) {
 	return 0, ErrNotImplemented
 }
 
@@ -48,6 +59,14 @@ func (h *Handle) ConntrackTableFlush(table ConntrackTableType) error {
 
 // ConntrackDeleteFilter deletes entries on the specified table on the base of the filter using the netlink handle passed
 // conntrack -D [table] parameters         Delete conntrack or expectation
+//
+// Deprecated: use [Handle.ConntrackDeleteFilters] instead.
 func (h *Handle) ConntrackDeleteFilter(table ConntrackTableType, family InetFamily, filter *ConntrackFilter) (uint, error) {
+	return 0, ErrNotImplemented
+}
+
+// ConntrackDeleteFilters deletes entries on the specified table matching any of the specified filters using the netlink handle passed
+// conntrack -D [table] parameters         Delete conntrack or expectation
+func (h *Handle) ConntrackDeleteFilters(table ConntrackTableType, family InetFamily, filters ...CustomConntrackFilter) (uint, error) {
 	return 0, ErrNotImplemented
 }

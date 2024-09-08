@@ -249,7 +249,7 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 					OutputFilename: "factory.go",
 				},
 				outputPackage:             outputPkgBase,
-				imports:                   generator.NewImportTracker(),
+				imports:                   generator.NewImportTrackerForPackage(outputPkgBase),
 				groupVersions:             groupVersions,
 				clientSetPackage:          clientSetPackage,
 				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
@@ -261,7 +261,7 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 					OutputFilename: "generic.go",
 				},
 				outputPackage:        outputPkgBase,
-				imports:              generator.NewImportTracker(),
+				imports:              generator.NewImportTrackerForPackage(outputPkgBase),
 				groupVersions:        groupVersions,
 				pluralExceptions:     pluralExceptions,
 				typesForGroupVersion: typesForGroupVersion,
@@ -288,7 +288,7 @@ func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []b
 					OutputFilename: "factory_interfaces.go",
 				},
 				outputPackage:    outputPkg,
-				imports:          generator.NewImportTracker(),
+				imports:          generator.NewImportTrackerForPackage(outputPkg),
 				clientSetPackage: clientSetPackage,
 			})
 
@@ -314,7 +314,7 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 				},
 				outputPackage:             outputPkg,
 				groupVersions:             groupVersions,
-				imports:                   generator.NewImportTracker(),
+				imports:                   generator.NewImportTrackerForPackage(outputPkg),
 				internalInterfacesPackage: path.Join(outputPackageBase, subdirForInternalInterfaces),
 			})
 			return generators
@@ -342,7 +342,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 					OutputFilename: "interface.go",
 				},
 				outputPackage:             outputPkg,
-				imports:                   generator.NewImportTracker(),
+				imports:                   generator.NewImportTrackerForPackage(outputPkg),
 				types:                     typesToGenerate,
 				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 			})
@@ -357,7 +357,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 					groupVersion:              gv,
 					groupGoName:               groupGoName,
 					typeToGenerate:            t,
-					imports:                   generator.NewImportTracker(),
+					imports:                   generator.NewImportTrackerForPackage(outputPkg),
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
 					internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 )
 
@@ -32,8 +32,8 @@ type ObjectMetaApplyConfiguration struct {
 	UID                        *types.UID                         `json:"uid,omitempty"`
 	ResourceVersion            *string                            `json:"resourceVersion,omitempty"`
 	Generation                 *int64                             `json:"generation,omitempty"`
-	CreationTimestamp          *v1.Time                           `json:"creationTimestamp,omitempty"`
-	DeletionTimestamp          *v1.Time                           `json:"deletionTimestamp,omitempty"`
+	CreationTimestamp          *metav1.Time                       `json:"creationTimestamp,omitempty"`
+	DeletionTimestamp          *metav1.Time                       `json:"deletionTimestamp,omitempty"`
 	DeletionGracePeriodSeconds *int64                             `json:"deletionGracePeriodSeconds,omitempty"`
 	Labels                     map[string]string                  `json:"labels,omitempty"`
 	Annotations                map[string]string                  `json:"annotations,omitempty"`
@@ -98,7 +98,7 @@ func (b *ObjectMetaApplyConfiguration) WithGeneration(value int64) *ObjectMetaAp
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithCreationTimestamp(value v1.Time) *ObjectMetaApplyConfiguration {
+func (b *ObjectMetaApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ObjectMetaApplyConfiguration {
 	b.CreationTimestamp = &value
 	return b
 }
@@ -106,7 +106,7 @@ func (b *ObjectMetaApplyConfiguration) WithCreationTimestamp(value v1.Time) *Obj
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithDeletionTimestamp(value v1.Time) *ObjectMetaApplyConfiguration {
+func (b *ObjectMetaApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ObjectMetaApplyConfiguration {
 	b.DeletionTimestamp = &value
 	return b
 }

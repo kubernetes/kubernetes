@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ResourceQuotas.
 type ResourceQuotaInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ResourceQuotaLister
+	Lister() corev1.ResourceQuotaLister
 }
 
 type resourceQuotaInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredResourceQuotaInformer(client kubernetes.Interface, namespace str
 				return client.CoreV1().ResourceQuotas(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&corev1.ResourceQuota{},
+		&apicorev1.ResourceQuota{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *resourceQuotaInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ResourceQuota{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.ResourceQuota{}, f.defaultInformer)
 }
 
-func (f *resourceQuotaInformer) Lister() v1.ResourceQuotaLister {
-	return v1.NewResourceQuotaLister(f.Informer().GetIndexer())
+func (f *resourceQuotaInformer) Lister() corev1.ResourceQuotaLister {
+	return corev1.NewResourceQuotaLister(f.Informer().GetIndexer())
 }

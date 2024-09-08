@@ -45,7 +45,7 @@ var (
 
 	uploadKubeadmConfigExample = cmdutil.Examples(`
 		# upload the configuration of your cluster
-		kubeadm init phase upload-config --config=myConfig.yaml
+		kubeadm init phase upload-config kubeadm --config=myConfig.yaml
 		`)
 
 	uploadKubeletConfigLongDesc = cmdutil.LongDesc(`

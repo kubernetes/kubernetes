@@ -111,15 +111,15 @@ type SchedulingQueue interface {
 	Done(types.UID)
 	Update(logger klog.Logger, oldPod, newPod *v1.Pod)
 	Delete(pod *v1.Pod)
-	// TODO(sanposhiho): move all PreEnqueueCheck to Requeue and delete it from this parameter eventually.
-	// Some PreEnqueueCheck include event filtering logic based on some in-tree plugins
-	// and it affect badly to other plugins.
-	// See https://github.com/kubernetes/kubernetes/issues/110175
+	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
+	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
+	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent)
 	PendingPods() ([]*v1.Pod, string)
 	PodsInActiveQ() []*v1.Pod
+	InFlightPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -331,7 +331,7 @@ func NewPriorityQueue(
 		podInitialBackoffDuration:         options.podInitialBackoffDuration,
 		podMaxBackoffDuration:             options.podMaxBackoffDuration,
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
-		activeQ:                           newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled),
+		activeQ:                           newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
@@ -627,9 +627,6 @@ func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
 func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
-	if podInfo.Gated {
-		return false
-	}
 	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
 }
@@ -838,6 +835,15 @@ func (p *PriorityQueue) Done(pod types.UID) {
 		return
 	}
 	p.activeQ.done(pod)
+}
+
+func (p *PriorityQueue) InFlightPods() []*v1.Pod {
+	if !p.isSchedulingQueueHintEnabled {
+		// do nothing if schedulingQueueHint is disabled.
+		// In that case, we don't have inFlightPods and inFlightEvents.
+		return nil
+	}
+	return p.activeQ.listInFlightPods()
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
@@ -1239,6 +1245,12 @@ func (p *PriorityQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
 func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInfo) time.Duration {
+	if podInfo.Attempts == 0 {
+		// When the Pod hasn't experienced any scheduling attempts,
+		// they aren't obliged to get a backoff penalty at all.
+		return 0
+	}
+
 	duration := p.podInitialBackoffDuration
 	for i := 1; i < podInfo.Attempts; i++ {
 		// Use subtraction instead of addition or multiplication to avoid overflow.

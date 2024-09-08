@@ -195,7 +195,7 @@ const (
 
 	// KubeletBaseConfigMapRole defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
-	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
+	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy ClusterRoleBinding
 	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
 	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
 	NodeKubeletBootstrap = "kubeadm:kubelet-bootstrap"
@@ -236,7 +236,7 @@ const (
 	// KubeletHealthCheckTimeout specifies the default kubelet timeout
 	KubeletHealthCheckTimeout = 4 * time.Minute
 
-	// UpgradeManifestsTimeout specifies the default timeout for upgradring static Pod manifests
+	// UpgradeManifestsTimeout specifies the default timeout for upgrading static Pod manifests
 	UpgradeManifestsTimeout = 5 * time.Minute
 
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
@@ -403,6 +403,9 @@ const (
 	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	KubeControllerManagerPort = 10257
+	// KubeAPIServerPort is the default port for the apiserver.
+	// May be overridden by a flag at startup.
+	KubeAPIServerPort = 6443
 
 	// EtcdAdvertiseClientUrlsAnnotationKey is the annotation key on every etcd pod, describing the
 	// advertise client URLs

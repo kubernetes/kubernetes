@@ -22,6 +22,8 @@ package conntrack
 import (
 	"fmt"
 
+	"github.com/vishvananda/netlink"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -51,48 +53,44 @@ func (fake *FakeInterface) Reset() {
 	fake.ClearedPortNATs = make(map[int]string)
 }
 
-// ClearEntriesForIP is part of Interface
-func (fake *FakeInterface) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
+// ClearEntries is part of Interface
+func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) error {
+	for _, anyFilter := range filters {
+		filter := anyFilter.(*conntrackFilter)
+		if filter.protocol != protocolMap[v1.ProtocolUDP] {
+			return fmt.Errorf("FakeInterface currently only supports UDP")
+		}
+
+		// record IP and Port entries
+		if filter.original != nil && filter.reply == nil {
+			if filter.original.dstIP != nil {
+				fake.ClearedIPs.Insert(filter.original.dstIP.String())
+			}
+			if filter.original.dstPort != 0 {
+				fake.ClearedPorts.Insert(int(filter.original.dstPort))
+			}
+		}
+
+		// record NAT and NATPort entries
+		if filter.original != nil && filter.reply != nil {
+			if filter.original.dstIP != nil && filter.reply.srcIP != nil {
+				origin := filter.original.dstIP.String()
+				dest := filter.reply.srcIP.String()
+				if previous, exists := fake.ClearedNATs[origin]; exists && previous != dest {
+					return fmt.Errorf("filter for NAT passed with same origin (%s), different destination (%s / %s)", origin, previous, dest)
+				}
+				fake.ClearedNATs[filter.original.dstIP.String()] = filter.reply.srcIP.String()
+			}
+
+			if filter.original.dstPort != 0 && filter.reply.srcIP != nil {
+				dest := filter.reply.srcIP.String()
+				port := int(filter.original.dstPort)
+				if previous, exists := fake.ClearedPortNATs[port]; exists && previous != dest {
+					return fmt.Errorf("filter for PortNAT passed with same port (%d), different destination (%s / %s)", port, previous, dest)
+				}
+				fake.ClearedPortNATs[port] = dest
+			}
+		}
 	}
-
-	fake.ClearedIPs.Insert(ip)
-	return nil
-}
-
-// ClearEntriesForPort is part of Interface
-func (fake *FakeInterface) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
-
-	fake.ClearedPorts.Insert(port)
-	return nil
-}
-
-// ClearEntriesForNAT is part of Interface
-func (fake *FakeInterface) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
-	if previous, exists := fake.ClearedNATs[origin]; exists && previous != dest {
-		return fmt.Errorf("ClearEntriesForNAT called with same origin (%s), different destination (%s / %s)", origin, previous, dest)
-	}
-
-	fake.ClearedNATs[origin] = dest
-	return nil
-}
-
-// ClearEntriesForPortNAT is part of Interface
-func (fake *FakeInterface) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
-	if previous, exists := fake.ClearedPortNATs[port]; exists && previous != dest {
-		return fmt.Errorf("ClearEntriesForPortNAT called with same port (%d), different destination (%s / %s)", port, previous, dest)
-	}
-
-	fake.ClearedPortNATs[port] = dest
 	return nil
 }

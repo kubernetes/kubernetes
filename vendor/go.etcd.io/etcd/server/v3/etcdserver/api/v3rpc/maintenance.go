@@ -76,10 +76,12 @@ type maintenanceServer struct {
 	hdr    header
 	cs     ClusterStatusGetter
 	d      Downgrader
+
+	healthNotifier notifier
 }
 
-func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
-	srv := &maintenanceServer{lg: s.Cfg.Logger, rg: s, hasher: s.KV().HashStorage(), kg: s, bg: s, a: s, lt: s, hdr: newHeader(s), cs: s, d: s}
+func NewMaintenanceServer(s *etcdserver.EtcdServer, healthNotifier notifier) pb.MaintenanceServer {
+	srv := &maintenanceServer{lg: s.Cfg.Logger, rg: s, hasher: s.KV().HashStorage(), kg: s, bg: s, a: s, lt: s, hdr: newHeader(s), cs: s, d: s, healthNotifier: healthNotifier}
 	if srv.lg == nil {
 		srv.lg = zap.NewNop()
 	}
@@ -88,6 +90,8 @@ func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
 
 func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRequest) (*pb.DefragmentResponse, error) {
 	ms.lg.Info("starting defragment")
+	ms.healthNotifier.defragStarted()
+	defer ms.healthNotifier.defragFinished()
 	err := ms.bg.Backend().Defrag()
 	if err != nil {
 		ms.lg.Warn("failed to defragment", zap.Error(err))

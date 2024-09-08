@@ -439,14 +439,14 @@ func TestGroupVersionKindsHasClusterConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "does not have ClusterConfiguraiton",
+			name: "does not have ClusterConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 			},
 			expected: false,
 		},
 		{
-			name: "has ClusterConfiguraiton",
+			name: "has ClusterConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 				{Group: "foo.k8s.io", Version: "v1", Kind: "ClusterConfiguration"},

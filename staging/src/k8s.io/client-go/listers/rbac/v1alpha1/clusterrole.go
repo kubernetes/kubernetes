@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/rbac/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterRoleLister helps list ClusterRoles.
@@ -30,19 +30,19 @@ import (
 type ClusterRoleLister interface {
 	// List lists all ClusterRoles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterRole, err error)
+	List(selector labels.Selector) (ret []*rbacv1alpha1.ClusterRole, err error)
 	// Get retrieves the ClusterRole from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ClusterRole, error)
+	Get(name string) (*rbacv1alpha1.ClusterRole, error)
 	ClusterRoleListerExpansion
 }
 
 // clusterRoleLister implements the ClusterRoleLister interface.
 type clusterRoleLister struct {
-	listers.ResourceIndexer[*v1alpha1.ClusterRole]
+	listers.ResourceIndexer[*rbacv1alpha1.ClusterRole]
 }
 
 // NewClusterRoleLister returns a new ClusterRoleLister.
 func NewClusterRoleLister(indexer cache.Indexer) ClusterRoleLister {
-	return &clusterRoleLister{listers.New[*v1alpha1.ClusterRole](indexer, v1alpha1.Resource("clusterrole"))}
+	return &clusterRoleLister{listers.New[*rbacv1alpha1.ClusterRole](indexer, rbacv1alpha1.Resource("clusterrole"))}
 }

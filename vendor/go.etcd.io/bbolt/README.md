@@ -421,10 +421,19 @@ Prev()   Move to the previous key.
 ```
 
 Each of those functions has a return signature of `(key []byte, value []byte)`.
-When you have iterated to the end of the cursor then `Next()` will return a
-`nil` key.  You must seek to a position using `First()`, `Last()`, or `Seek()`
-before calling `Next()` or `Prev()`. If you do not seek to a position then
-these functions will return a `nil` key.
+You must seek to a position using `First()`, `Last()`, or `Seek()` before calling
+`Next()` or `Prev()`. If you do not seek to a position then these functions will
+return a `nil` key.
+
+When you have iterated to the end of the cursor, then `Next()` will return a
+`nil` key and the cursor still points to the last element if present. When you
+have iterated to the beginning of the cursor, then `Prev()` will return a `nil`
+key and the cursor still points to the first element if present.
+
+If you remove key/value pairs during iteration, the cursor may automatically
+move to the next position if present in current node each time removing a key.
+When you call `c.Next()` after removing a key, it may skip one key/value pair.
+Refer to [pull/611](https://github.com/etcd-io/bbolt/pull/611) to get more detailed info.
 
 During iteration, if the key is non-`nil` but the value is `nil`, that means
 the key refers to a bucket rather than a value.  Use `Bucket.Bucket()` to
@@ -849,6 +858,12 @@ Here are a few things to note when evaluating and using Bolt:
   transactions. This works well for many use cases as databases generally tend
   to grow. However, it's important to note that deleting large chunks of data
   will not allow you to reclaim that space on disk.
+
+* Removing key/values pairs in a bucket during iteration on the bucket using
+  cursor may not work properly. Each time when removing a key/value pair, the
+  cursor may automatically move to the next position if present. When users
+  call `c.Next()` after removing a key, it may skip one key/value pair.
+  Refer to https://github.com/etcd-io/bbolt/pull/611 for more detailed info.
 
   For more information on page allocation, [see this comment][page-allocation].
 

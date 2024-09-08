@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HorizontalPodAutoscalerStatusApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerStatus type for use
 // with apply.
 type HorizontalPodAutoscalerStatusApplyConfiguration struct {
-	ObservedGeneration              *int64   `json:"observedGeneration,omitempty"`
-	LastScaleTime                   *v1.Time `json:"lastScaleTime,omitempty"`
-	CurrentReplicas                 *int32   `json:"currentReplicas,omitempty"`
-	DesiredReplicas                 *int32   `json:"desiredReplicas,omitempty"`
-	CurrentCPUUtilizationPercentage *int32   `json:"currentCPUUtilizationPercentage,omitempty"`
+	ObservedGeneration              *int64       `json:"observedGeneration,omitempty"`
+	LastScaleTime                   *metav1.Time `json:"lastScaleTime,omitempty"`
+	CurrentReplicas                 *int32       `json:"currentReplicas,omitempty"`
+	DesiredReplicas                 *int32       `json:"desiredReplicas,omitempty"`
+	CurrentCPUUtilizationPercentage *int32       `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
 // HorizontalPodAutoscalerStatusApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerStatus type for use with
@@ -49,7 +49,7 @@ func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithObservedGeneration
 // WithLastScaleTime sets the LastScaleTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LastScaleTime field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithLastScaleTime(value v1.Time) *HorizontalPodAutoscalerStatusApplyConfiguration {
+func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithLastScaleTime(value metav1.Time) *HorizontalPodAutoscalerStatusApplyConfiguration {
 	b.LastScaleTime = &value
 	return b
 }

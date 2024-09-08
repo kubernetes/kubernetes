@@ -19,19 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ManagedFieldsEntryApplyConfiguration represents a declarative configuration of the ManagedFieldsEntry type for use
 // with apply.
 type ManagedFieldsEntryApplyConfiguration struct {
-	Manager     *string                        `json:"manager,omitempty"`
-	Operation   *v1.ManagedFieldsOperationType `json:"operation,omitempty"`
-	APIVersion  *string                        `json:"apiVersion,omitempty"`
-	Time        *v1.Time                       `json:"time,omitempty"`
-	FieldsType  *string                        `json:"fieldsType,omitempty"`
-	FieldsV1    *v1.FieldsV1                   `json:"fieldsV1,omitempty"`
-	Subresource *string                        `json:"subresource,omitempty"`
+	Manager     *string                            `json:"manager,omitempty"`
+	Operation   *metav1.ManagedFieldsOperationType `json:"operation,omitempty"`
+	APIVersion  *string                            `json:"apiVersion,omitempty"`
+	Time        *metav1.Time                       `json:"time,omitempty"`
+	FieldsType  *string                            `json:"fieldsType,omitempty"`
+	FieldsV1    *metav1.FieldsV1                   `json:"fieldsV1,omitempty"`
+	Subresource *string                            `json:"subresource,omitempty"`
 }
 
 // ManagedFieldsEntryApplyConfiguration constructs a declarative configuration of the ManagedFieldsEntry type for use with
@@ -51,7 +51,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithManager(value string) *Manage
 // WithOperation sets the Operation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operation field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithOperation(value v1.ManagedFieldsOperationType) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithOperation(value metav1.ManagedFieldsOperationType) *ManagedFieldsEntryApplyConfiguration {
 	b.Operation = &value
 	return b
 }
@@ -67,7 +67,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithAPIVersion(value string) *Man
 // WithTime sets the Time field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Time field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithTime(value v1.Time) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithTime(value metav1.Time) *ManagedFieldsEntryApplyConfiguration {
 	b.Time = &value
 	return b
 }
@@ -83,7 +83,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsType(value string) *Man
 // WithFieldsV1 sets the FieldsV1 field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FieldsV1 field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsV1(value v1.FieldsV1) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsV1(value metav1.FieldsV1) *ManagedFieldsEntryApplyConfiguration {
 	b.FieldsV1 = &value
 	return b
 }

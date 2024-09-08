@@ -50,7 +50,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithResourceNames(values ...
 // If called multiple times, values provided by each call will be appended to the Operations field.
 func (b *NamedRuleWithOperationsApplyConfiguration) WithOperations(values ...admissionregistrationv1.OperationType) *NamedRuleWithOperationsApplyConfiguration {
 	for i := range values {
-		b.Operations = append(b.Operations, values[i])
+		b.RuleWithOperationsApplyConfiguration.Operations = append(b.RuleWithOperationsApplyConfiguration.Operations, values[i])
 	}
 	return b
 }
@@ -60,7 +60,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithOperations(values ...adm
 // If called multiple times, values provided by each call will be appended to the APIGroups field.
 func (b *NamedRuleWithOperationsApplyConfiguration) WithAPIGroups(values ...string) *NamedRuleWithOperationsApplyConfiguration {
 	for i := range values {
-		b.APIGroups = append(b.APIGroups, values[i])
+		b.RuleApplyConfiguration.APIGroups = append(b.RuleApplyConfiguration.APIGroups, values[i])
 	}
 	return b
 }
@@ -70,7 +70,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithAPIGroups(values ...stri
 // If called multiple times, values provided by each call will be appended to the APIVersions field.
 func (b *NamedRuleWithOperationsApplyConfiguration) WithAPIVersions(values ...string) *NamedRuleWithOperationsApplyConfiguration {
 	for i := range values {
-		b.APIVersions = append(b.APIVersions, values[i])
+		b.RuleApplyConfiguration.APIVersions = append(b.RuleApplyConfiguration.APIVersions, values[i])
 	}
 	return b
 }
@@ -80,7 +80,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithAPIVersions(values ...st
 // If called multiple times, values provided by each call will be appended to the Resources field.
 func (b *NamedRuleWithOperationsApplyConfiguration) WithResources(values ...string) *NamedRuleWithOperationsApplyConfiguration {
 	for i := range values {
-		b.Resources = append(b.Resources, values[i])
+		b.RuleApplyConfiguration.Resources = append(b.RuleApplyConfiguration.Resources, values[i])
 	}
 	return b
 }
@@ -89,6 +89,6 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithResources(values ...stri
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
 func (b *NamedRuleWithOperationsApplyConfiguration) WithScope(value admissionregistrationv1.ScopeType) *NamedRuleWithOperationsApplyConfiguration {
-	b.Scope = &value
+	b.RuleApplyConfiguration.Scope = &value
 	return b
 }

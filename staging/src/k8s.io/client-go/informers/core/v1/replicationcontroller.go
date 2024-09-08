@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ReplicationControllers.
 type ReplicationControllerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ReplicationControllerLister
+	Lister() corev1.ReplicationControllerLister
 }
 
 type replicationControllerInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredReplicationControllerInformer(client kubernetes.Interface, names
 				return client.CoreV1().ReplicationControllers(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&corev1.ReplicationController{},
+		&apicorev1.ReplicationController{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *replicationControllerInformer) defaultInformer(client kubernetes.Interf
 }
 
 func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ReplicationController{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.ReplicationController{}, f.defaultInformer)
 }
 
-func (f *replicationControllerInformer) Lister() v1.ReplicationControllerLister {
-	return v1.NewReplicationControllerLister(f.Informer().GetIndexer())
+func (f *replicationControllerInformer) Lister() corev1.ReplicationControllerLister {
+	return corev1.NewReplicationControllerLister(f.Informer().GetIndexer())
 }

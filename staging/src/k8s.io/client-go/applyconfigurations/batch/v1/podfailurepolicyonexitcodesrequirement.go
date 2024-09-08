@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 // PodFailurePolicyOnExitCodesRequirementApplyConfiguration represents a declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use
 // with apply.
 type PodFailurePolicyOnExitCodesRequirementApplyConfiguration struct {
-	ContainerName *string                                 `json:"containerName,omitempty"`
-	Operator      *v1.PodFailurePolicyOnExitCodesOperator `json:"operator,omitempty"`
-	Values        []int32                                 `json:"values,omitempty"`
+	ContainerName *string                                      `json:"containerName,omitempty"`
+	Operator      *batchv1.PodFailurePolicyOnExitCodesOperator `json:"operator,omitempty"`
+	Values        []int32                                      `json:"values,omitempty"`
 }
 
 // PodFailurePolicyOnExitCodesRequirementApplyConfiguration constructs a declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use with
@@ -47,7 +47,7 @@ func (b *PodFailurePolicyOnExitCodesRequirementApplyConfiguration) WithContainer
 // WithOperator sets the Operator field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operator field is set to the value of the last call.
-func (b *PodFailurePolicyOnExitCodesRequirementApplyConfiguration) WithOperator(value v1.PodFailurePolicyOnExitCodesOperator) *PodFailurePolicyOnExitCodesRequirementApplyConfiguration {
+func (b *PodFailurePolicyOnExitCodesRequirementApplyConfiguration) WithOperator(value batchv1.PodFailurePolicyOnExitCodesOperator) *PodFailurePolicyOnExitCodesRequirementApplyConfiguration {
 	b.Operator = &value
 	return b
 }

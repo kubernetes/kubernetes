@@ -131,7 +131,15 @@ func (x *XfrmAddress) ToIP() net.IP {
 	return ip
 }
 
-func (x *XfrmAddress) ToIPNet(prefixlen uint8) *net.IPNet {
+// family is only used when x and prefixlen are both 0
+func (x *XfrmAddress) ToIPNet(prefixlen uint8, family uint16) *net.IPNet {
+	empty := [SizeofXfrmAddress]byte{}
+	if bytes.Equal(x[:], empty[:]) && prefixlen == 0 {
+		if family == FAMILY_V6 {
+			return &net.IPNet{IP: net.ParseIP("::"), Mask: net.CIDRMask(int(prefixlen), 128)}
+		}
+		return &net.IPNet{IP: net.ParseIP("0.0.0.0"), Mask: net.CIDRMask(int(prefixlen), 32)}
+	}
 	ip := x.ToIP()
 	if GetIPFamily(ip) == FAMILY_V4 {
 		return &net.IPNet{IP: ip, Mask: net.CIDRMask(int(prefixlen), 32)}

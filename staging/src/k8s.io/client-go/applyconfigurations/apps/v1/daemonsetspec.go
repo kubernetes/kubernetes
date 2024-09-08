@@ -20,13 +20,13 @@ package v1
 
 import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DaemonSetSpecApplyConfiguration represents a declarative configuration of the DaemonSetSpec type for use
 // with apply.
 type DaemonSetSpecApplyConfiguration struct {
-	Selector             *v1.LabelSelectorApplyConfiguration        `json:"selector,omitempty"`
+	Selector             *metav1.LabelSelectorApplyConfiguration    `json:"selector,omitempty"`
 	Template             *corev1.PodTemplateSpecApplyConfiguration  `json:"template,omitempty"`
 	UpdateStrategy       *DaemonSetUpdateStrategyApplyConfiguration `json:"updateStrategy,omitempty"`
 	MinReadySeconds      *int32                                     `json:"minReadySeconds,omitempty"`
@@ -42,7 +42,7 @@ func DaemonSetSpec() *DaemonSetSpecApplyConfiguration {
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *DaemonSetSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *DaemonSetSpecApplyConfiguration {
+func (b *DaemonSetSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *DaemonSetSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

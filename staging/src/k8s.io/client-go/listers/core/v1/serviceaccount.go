@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ServiceAccountLister helps list ServiceAccounts.
@@ -30,7 +30,7 @@ import (
 type ServiceAccountLister interface {
 	// List lists all ServiceAccounts in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ServiceAccount, err error)
+	List(selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
 	// ServiceAccounts returns an object that can list and get ServiceAccounts.
 	ServiceAccounts(namespace string) ServiceAccountNamespaceLister
 	ServiceAccountListerExpansion
@@ -38,17 +38,17 @@ type ServiceAccountLister interface {
 
 // serviceAccountLister implements the ServiceAccountLister interface.
 type serviceAccountLister struct {
-	listers.ResourceIndexer[*v1.ServiceAccount]
+	listers.ResourceIndexer[*corev1.ServiceAccount]
 }
 
 // NewServiceAccountLister returns a new ServiceAccountLister.
 func NewServiceAccountLister(indexer cache.Indexer) ServiceAccountLister {
-	return &serviceAccountLister{listers.New[*v1.ServiceAccount](indexer, v1.Resource("serviceaccount"))}
+	return &serviceAccountLister{listers.New[*corev1.ServiceAccount](indexer, corev1.Resource("serviceaccount"))}
 }
 
 // ServiceAccounts returns an object that can list and get ServiceAccounts.
 func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountNamespaceLister {
-	return serviceAccountNamespaceLister{listers.NewNamespaced[*v1.ServiceAccount](s.ResourceIndexer, namespace)}
+	return serviceAccountNamespaceLister{listers.NewNamespaced[*corev1.ServiceAccount](s.ResourceIndexer, namespace)}
 }
 
 // ServiceAccountNamespaceLister helps list and get ServiceAccounts.
@@ -56,15 +56,15 @@ func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountN
 type ServiceAccountNamespaceLister interface {
 	// List lists all ServiceAccounts in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ServiceAccount, err error)
+	List(selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
 	// Get retrieves the ServiceAccount from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ServiceAccount, error)
+	Get(name string) (*corev1.ServiceAccount, error)
 	ServiceAccountNamespaceListerExpansion
 }
 
 // serviceAccountNamespaceLister implements the ServiceAccountNamespaceLister
 // interface.
 type serviceAccountNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ServiceAccount]
+	listers.ResourceIndexer[*corev1.ServiceAccount]
 }

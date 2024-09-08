@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 
 // FlunderSpecApplyConfiguration represents a declarative configuration of the FlunderSpec type for use
 // with apply.
 type FlunderSpecApplyConfiguration struct {
-	FlunderReference *string                `json:"flunderReference,omitempty"`
-	FischerReference *string                `json:"fischerReference,omitempty"`
-	ReferenceType    *v1beta1.ReferenceType `json:"referenceType,omitempty"`
+	FlunderReference *string                      `json:"flunderReference,omitempty"`
+	FischerReference *string                      `json:"fischerReference,omitempty"`
+	ReferenceType    *wardlev1beta1.ReferenceType `json:"referenceType,omitempty"`
 }
 
 // FlunderSpecApplyConfiguration constructs a declarative configuration of the FlunderSpec type for use with
@@ -55,7 +55,7 @@ func (b *FlunderSpecApplyConfiguration) WithFischerReference(value string) *Flun
 // WithReferenceType sets the ReferenceType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ReferenceType field is set to the value of the last call.
-func (b *FlunderSpecApplyConfiguration) WithReferenceType(value v1beta1.ReferenceType) *FlunderSpecApplyConfiguration {
+func (b *FlunderSpecApplyConfiguration) WithReferenceType(value wardlev1beta1.ReferenceType) *FlunderSpecApplyConfiguration {
 	b.ReferenceType = &value
 	return b
 }

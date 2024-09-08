@@ -214,6 +214,7 @@ func (o objectTrackerReact) Apply(action PatchActionImpl) (runtime.Object, error
 	if err := yaml.Unmarshal(action.GetPatch(), &patchObj.Object); err != nil {
 		return nil, err
 	}
+	patchObj.SetName(action.GetName())
 	err := o.tracker.Apply(gvr, patchObj, ns, action.PatchOptions)
 	if err != nil {
 		return nil, err

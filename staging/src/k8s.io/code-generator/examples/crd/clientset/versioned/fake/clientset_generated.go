@@ -26,6 +26,8 @@ import (
 	"k8s.io/client-go/testing"
 	applyconfiguration "k8s.io/code-generator/examples/crd/applyconfiguration"
 	clientset "k8s.io/code-generator/examples/crd/clientset/versioned"
+	conflictingexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1"
+	fakeconflictingexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1/fake"
 	examplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1"
 	fakeexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1/fake"
 	secondexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example2/v1"
@@ -117,6 +119,11 @@ var (
 	_ clientset.Interface = &Clientset{}
 	_ testing.FakeClient  = &Clientset{}
 )
+
+// ConflictingExampleV1 retrieves the ConflictingExampleV1Client
+func (c *Clientset) ConflictingExampleV1() conflictingexamplev1.ConflictingExampleV1Interface {
+	return &fakeconflictingexamplev1.FakeConflictingExampleV1{Fake: &c.Fake}
+}
 
 // ExampleV1 retrieves the ExampleV1Client
 func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {

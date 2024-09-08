@@ -87,7 +87,7 @@ func (h *Handle) getNetNsId(attrType int, val uint32) (int, error) {
 	rtgen := nl.NewRtGenMsg()
 	req.AddData(rtgen)
 
-	b := make([]byte, 4, 4)
+	b := make([]byte, 4)
 	native.PutUint32(b, val)
 	attr := nl.NewRtAttr(attrType, b)
 	req.AddData(attr)
@@ -126,12 +126,12 @@ func (h *Handle) setNetNsId(attrType int, val uint32, newnsid uint32) error {
 	rtgen := nl.NewRtGenMsg()
 	req.AddData(rtgen)
 
-	b := make([]byte, 4, 4)
+	b := make([]byte, 4)
 	native.PutUint32(b, val)
 	attr := nl.NewRtAttr(attrType, b)
 	req.AddData(attr)
 
-	b1 := make([]byte, 4, 4)
+	b1 := make([]byte, 4)
 	native.PutUint32(b1, newnsid)
 	attr1 := nl.NewRtAttr(NETNSA_NSID, b1)
 	req.AddData(attr1)

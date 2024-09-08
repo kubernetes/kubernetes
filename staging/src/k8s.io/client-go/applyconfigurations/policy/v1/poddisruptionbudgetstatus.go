@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetStatusApplyConfiguration represents a declarative configuration of the PodDisruptionBudgetStatus type for use
 // with apply.
 type PodDisruptionBudgetStatusApplyConfiguration struct {
-	ObservedGeneration *int64                               `json:"observedGeneration,omitempty"`
-	DisruptedPods      map[string]v1.Time                   `json:"disruptedPods,omitempty"`
-	DisruptionsAllowed *int32                               `json:"disruptionsAllowed,omitempty"`
-	CurrentHealthy     *int32                               `json:"currentHealthy,omitempty"`
-	DesiredHealthy     *int32                               `json:"desiredHealthy,omitempty"`
-	ExpectedPods       *int32                               `json:"expectedPods,omitempty"`
-	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	ObservedGeneration *int64                                                  `json:"observedGeneration,omitempty"`
+	DisruptedPods      map[string]metav1.Time                                  `json:"disruptedPods,omitempty"`
+	DisruptionsAllowed *int32                                                  `json:"disruptionsAllowed,omitempty"`
+	CurrentHealthy     *int32                                                  `json:"currentHealthy,omitempty"`
+	DesiredHealthy     *int32                                                  `json:"desiredHealthy,omitempty"`
+	ExpectedPods       *int32                                                  `json:"expectedPods,omitempty"`
+	Conditions         []applyconfigurationsmetav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // PodDisruptionBudgetStatusApplyConfiguration constructs a declarative configuration of the PodDisruptionBudgetStatus type for use with
@@ -53,9 +53,9 @@ func (b *PodDisruptionBudgetStatusApplyConfiguration) WithObservedGeneration(val
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the DisruptedPods field,
 // overwriting an existing map entries in DisruptedPods field with the same key.
-func (b *PodDisruptionBudgetStatusApplyConfiguration) WithDisruptedPods(entries map[string]v1.Time) *PodDisruptionBudgetStatusApplyConfiguration {
+func (b *PodDisruptionBudgetStatusApplyConfiguration) WithDisruptedPods(entries map[string]metav1.Time) *PodDisruptionBudgetStatusApplyConfiguration {
 	if b.DisruptedPods == nil && len(entries) > 0 {
-		b.DisruptedPods = make(map[string]v1.Time, len(entries))
+		b.DisruptedPods = make(map[string]metav1.Time, len(entries))
 	}
 	for k, v := range entries {
 		b.DisruptedPods[k] = v
@@ -98,7 +98,7 @@ func (b *PodDisruptionBudgetStatusApplyConfiguration) WithExpectedPods(value int
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *PodDisruptionBudgetStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *PodDisruptionBudgetStatusApplyConfiguration {
+func (b *PodDisruptionBudgetStatusApplyConfiguration) WithConditions(values ...*applyconfigurationsmetav1.ConditionApplyConfiguration) *PodDisruptionBudgetStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

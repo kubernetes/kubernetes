@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type EndpointsGetter interface {
 
 // EndpointsInterface has methods to work with Endpoints resources.
 type EndpointsInterface interface {
-	Create(ctx context.Context, endpoints *v1.Endpoints, opts metav1.CreateOptions) (*v1.Endpoints, error)
-	Update(ctx context.Context, endpoints *v1.Endpoints, opts metav1.UpdateOptions) (*v1.Endpoints, error)
+	Create(ctx context.Context, endpoints *corev1.Endpoints, opts metav1.CreateOptions) (*corev1.Endpoints, error)
+	Update(ctx context.Context, endpoints *corev1.Endpoints, opts metav1.UpdateOptions) (*corev1.Endpoints, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Endpoints, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointsList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Endpoints, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.EndpointsList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoints, err error)
-	Apply(ctx context.Context, endpoints *corev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoints, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.Endpoints, err error)
+	Apply(ctx context.Context, endpoints *applyconfigurationscorev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.Endpoints, err error)
 	EndpointsExpansion
 }
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	*gentype.ClientWithListAndApply[*v1.Endpoints, *v1.EndpointsList, *corev1.EndpointsApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.Endpoints, *corev1.EndpointsList, *applyconfigurationscorev1.EndpointsApplyConfiguration]
 }
 
 // newEndpoints returns a Endpoints
 func newEndpoints(c *CoreV1Client, namespace string) *endpoints {
 	return &endpoints{
-		gentype.NewClientWithListAndApply[*v1.Endpoints, *v1.EndpointsList, *corev1.EndpointsApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.Endpoints, *corev1.EndpointsList, *applyconfigurationscorev1.EndpointsApplyConfiguration](
 			"endpoints",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Endpoints { return &v1.Endpoints{} },
-			func() *v1.EndpointsList { return &v1.EndpointsList{} }),
+			func() *corev1.Endpoints { return &corev1.Endpoints{} },
+			func() *corev1.EndpointsList { return &corev1.EndpointsList{} }),
 	}
 }

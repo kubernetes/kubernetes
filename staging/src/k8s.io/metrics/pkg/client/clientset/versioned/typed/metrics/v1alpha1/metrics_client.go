@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"net/http"
+	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
+	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type MetricsV1alpha1Interface interface {
@@ -90,7 +90,7 @@ func New(c rest.Interface) *MetricsV1alpha1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := metricsv1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

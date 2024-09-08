@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apistoragev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CSINodeApplyConfiguration represents a declarative configuration of the CSINode type for use
 // with apply.
 type CSINodeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSINode constructs a declarative configuration of the CSINode type for use with
@@ -56,18 +56,18 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSINode(cSINode *apistoragev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+func ExtractCSINode(cSINode *storagev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return extractCSINode(cSINode, fieldManager, "")
 }
 
 // ExtractCSINodeStatus is the same as ExtractCSINode except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCSINodeStatus(cSINode *apistoragev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+func ExtractCSINodeStatus(cSINode *storagev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return extractCSINode(cSINode, fieldManager, "status")
 }
 
-func extractCSINode(cSINode *apistoragev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
+func extractCSINode(cSINode *storagev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
 	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b, subresource)
 	if err != nil {
@@ -84,7 +84,7 @@ func extractCSINode(cSINode *apistoragev1.CSINode, fieldManager string, subresou
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithKind(value string) *CSINodeApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +92,7 @@ func (b *CSINodeApplyConfiguration) WithKind(value string) *CSINodeApplyConfigur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithAPIVersion(value string) *CSINodeApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +101,7 @@ func (b *CSINodeApplyConfiguration) WithAPIVersion(value string) *CSINodeApplyCo
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithName(value string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +110,7 @@ func (b *CSINodeApplyConfiguration) WithName(value string) *CSINodeApplyConfigur
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithGenerateName(value string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +119,7 @@ func (b *CSINodeApplyConfiguration) WithGenerateName(value string) *CSINodeApply
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithNamespace(value string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +128,7 @@ func (b *CSINodeApplyConfiguration) WithNamespace(value string) *CSINodeApplyCon
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithUID(value types.UID) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +137,7 @@ func (b *CSINodeApplyConfiguration) WithUID(value types.UID) *CSINodeApplyConfig
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithResourceVersion(value string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,25 +146,25 @@ func (b *CSINodeApplyConfiguration) WithResourceVersion(value string) *CSINodeAp
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithGeneration(value int64) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CSINodeApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CSINodeApplyConfiguration {
+func (b *CSINodeApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CSINodeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CSINodeApplyConfiguration {
+func (b *CSINodeApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +173,7 @@ func (b *CSINodeApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CS
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +183,11 @@ func (b *CSINodeApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *CSINodeApplyConfiguration) WithLabels(entries map[string]string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +198,11 @@ func (b *CSINodeApplyConfiguration) WithLabels(entries map[string]string) *CSINo
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *CSINodeApplyConfiguration) WithAnnotations(entries map[string]string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -210,13 +210,13 @@ func (b *CSINodeApplyConfiguration) WithAnnotations(entries map[string]string) *
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CSINodeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CSINodeApplyConfiguration {
+func (b *CSINodeApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,14 +227,14 @@ func (b *CSINodeApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 func (b *CSINodeApplyConfiguration) WithFinalizers(values ...string) *CSINodeApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *CSINodeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -249,5 +249,5 @@ func (b *CSINodeApplyConfiguration) WithSpec(value *CSINodeSpecApplyConfiguratio
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CSINodeApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

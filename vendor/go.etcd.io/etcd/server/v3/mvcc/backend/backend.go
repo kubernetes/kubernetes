@@ -36,10 +36,10 @@ var (
 
 	defragLimit = 10000
 
-	// initialMmapSize is the initial size of the mmapped region. Setting this larger than
+	// InitialMmapSize is the initial size of the mmapped region. Setting this larger than
 	// the potential max db size can prevent writer from blocking reader.
 	// This only works for linux.
-	initialMmapSize = uint64(10 * 1024 * 1024 * 1024)
+	InitialMmapSize = uint64(10 * 1024 * 1024 * 1024)
 
 	// minSnapshotWarningTimeout is the minimum threshold to trigger a long running snapshot warning.
 	minSnapshotWarningTimeout = 30 * time.Second
@@ -151,11 +151,13 @@ type BackendConfig struct {
 	Hooks Hooks
 }
 
+type BackendConfigOption func(*BackendConfig)
+
 func DefaultBackendConfig() BackendConfig {
 	return BackendConfig{
 		BatchInterval: defaultBatchInterval,
 		BatchLimit:    defaultBatchLimit,
-		MmapSize:      initialMmapSize,
+		MmapSize:      InitialMmapSize,
 	}
 }
 
@@ -163,9 +165,19 @@ func New(bcfg BackendConfig) Backend {
 	return newBackend(bcfg)
 }
 
-func NewDefaultBackend(path string) Backend {
+func WithMmapSize(size uint64) BackendConfigOption {
+	return func(bcfg *BackendConfig) {
+		bcfg.MmapSize = size
+	}
+}
+
+func NewDefaultBackend(path string, opts ...BackendConfigOption) Backend {
 	bcfg := DefaultBackendConfig()
 	bcfg.Path = path
+	for _, opt := range opts {
+		opt(&bcfg)
+	}
+
 	return newBackend(bcfg)
 }
 

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 )
 
 // CSIDriverSpecApplyConfiguration represents a declarative configuration of the CSIDriverSpec type for use
@@ -27,9 +27,9 @@ import (
 type CSIDriverSpecApplyConfiguration struct {
 	AttachRequired       *bool                            `json:"attachRequired,omitempty"`
 	PodInfoOnMount       *bool                            `json:"podInfoOnMount,omitempty"`
-	VolumeLifecycleModes []v1.VolumeLifecycleMode         `json:"volumeLifecycleModes,omitempty"`
+	VolumeLifecycleModes []storagev1.VolumeLifecycleMode  `json:"volumeLifecycleModes,omitempty"`
 	StorageCapacity      *bool                            `json:"storageCapacity,omitempty"`
-	FSGroupPolicy        *v1.FSGroupPolicy                `json:"fsGroupPolicy,omitempty"`
+	FSGroupPolicy        *storagev1.FSGroupPolicy         `json:"fsGroupPolicy,omitempty"`
 	TokenRequests        []TokenRequestApplyConfiguration `json:"tokenRequests,omitempty"`
 	RequiresRepublish    *bool                            `json:"requiresRepublish,omitempty"`
 	SELinuxMount         *bool                            `json:"seLinuxMount,omitempty"`
@@ -60,7 +60,7 @@ func (b *CSIDriverSpecApplyConfiguration) WithPodInfoOnMount(value bool) *CSIDri
 // WithVolumeLifecycleModes adds the given value to the VolumeLifecycleModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeLifecycleModes field.
-func (b *CSIDriverSpecApplyConfiguration) WithVolumeLifecycleModes(values ...v1.VolumeLifecycleMode) *CSIDriverSpecApplyConfiguration {
+func (b *CSIDriverSpecApplyConfiguration) WithVolumeLifecycleModes(values ...storagev1.VolumeLifecycleMode) *CSIDriverSpecApplyConfiguration {
 	for i := range values {
 		b.VolumeLifecycleModes = append(b.VolumeLifecycleModes, values[i])
 	}
@@ -78,7 +78,7 @@ func (b *CSIDriverSpecApplyConfiguration) WithStorageCapacity(value bool) *CSIDr
 // WithFSGroupPolicy sets the FSGroupPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FSGroupPolicy field is set to the value of the last call.
-func (b *CSIDriverSpecApplyConfiguration) WithFSGroupPolicy(value v1.FSGroupPolicy) *CSIDriverSpecApplyConfiguration {
+func (b *CSIDriverSpecApplyConfiguration) WithFSGroupPolicy(value storagev1.FSGroupPolicy) *CSIDriverSpecApplyConfiguration {
 	b.FSGroupPolicy = &value
 	return b
 }

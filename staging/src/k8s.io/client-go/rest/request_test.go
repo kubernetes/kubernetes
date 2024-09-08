@@ -977,7 +977,7 @@ func TestRequestWatch(t *testing.T) {
 			Err:              true,
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden with json content",
 			Request: &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),
@@ -986,41 +986,27 @@ func TestRequestWatch(t *testing.T) {
 			},
 			serverReturns: []responseErr{
 				{response: &http.Response{
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
 					StatusCode: http.StatusForbidden,
-					Body:       io.NopCloser(bytes.NewReader([]byte{})),
+					Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: "secrets is forbidden",
+						Reason:  metav1.StatusReasonForbidden,
+						Code:    http.StatusForbidden,
+					})))),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
-			Expect: []watch.Event{
-				{
-					Type: watch.Error,
-					Object: &metav1.Status{
-						Status:  "Failure",
-						Code:    500,
-						Reason:  "InternalError",
-						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
-						Details: &metav1.StatusDetails{
-							Causes: []metav1.StatusCause{
-								{
-									Type:    "UnexpectedServerResponse",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-								{
-									Type:    "ClientWatchDecoding",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-							},
-						},
-					},
-				},
-			},
-			Err: true,
+			Err:              true,
 			ErrFn: func(err error) bool {
+				if err.Error() != "secrets is forbidden" {
+					return false
+				}
 				return apierrors.IsForbidden(err)
 			},
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden without content",
 			Request: &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),

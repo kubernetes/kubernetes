@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type ResourceQuotasGetter interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	Create(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.CreateOptions) (*v1.ResourceQuota, error)
-	Update(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (*v1.ResourceQuota, error)
+	Create(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts metav1.CreateOptions) (*corev1.ResourceQuota, error)
+	Update(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts metav1.UpdateOptions) (*corev1.ResourceQuota, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (*v1.ResourceQuota, error)
+	UpdateStatus(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts metav1.UpdateOptions) (*corev1.ResourceQuota, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ResourceQuotaList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.ResourceQuota, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.ResourceQuotaList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error)
-	Apply(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.ResourceQuota, err error)
+	Apply(ctx context.Context, resourceQuota *applyconfigurationscorev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.ResourceQuota, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error)
+	ApplyStatus(ctx context.Context, resourceQuota *applyconfigurationscorev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
 
 // resourceQuotas implements ResourceQuotaInterface
 type resourceQuotas struct {
-	*gentype.ClientWithListAndApply[*v1.ResourceQuota, *v1.ResourceQuotaList, *corev1.ResourceQuotaApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.ResourceQuota, *corev1.ResourceQuotaList, *applyconfigurationscorev1.ResourceQuotaApplyConfiguration]
 }
 
 // newResourceQuotas returns a ResourceQuotas
 func newResourceQuotas(c *CoreV1Client, namespace string) *resourceQuotas {
 	return &resourceQuotas{
-		gentype.NewClientWithListAndApply[*v1.ResourceQuota, *v1.ResourceQuotaList, *corev1.ResourceQuotaApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.ResourceQuota, *corev1.ResourceQuotaList, *applyconfigurationscorev1.ResourceQuotaApplyConfiguration](
 			"resourcequotas",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ResourceQuota { return &v1.ResourceQuota{} },
-			func() *v1.ResourceQuotaList { return &v1.ResourceQuotaList{} }),
+			func() *corev1.ResourceQuota { return &corev1.ResourceQuota{} },
+			func() *corev1.ResourceQuotaList { return &corev1.ResourceQuotaList{} }),
 	}
 }

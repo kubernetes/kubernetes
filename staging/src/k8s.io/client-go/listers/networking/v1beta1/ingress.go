@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // IngressLister helps list Ingresses.
@@ -30,7 +30,7 @@ import (
 type IngressLister interface {
 	// List lists all Ingresses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.Ingress, err error)
+	List(selector labels.Selector) (ret []*networkingv1beta1.Ingress, err error)
 	// Ingresses returns an object that can list and get Ingresses.
 	Ingresses(namespace string) IngressNamespaceLister
 	IngressListerExpansion
@@ -38,17 +38,17 @@ type IngressLister interface {
 
 // ingressLister implements the IngressLister interface.
 type ingressLister struct {
-	listers.ResourceIndexer[*v1beta1.Ingress]
+	listers.ResourceIndexer[*networkingv1beta1.Ingress]
 }
 
 // NewIngressLister returns a new IngressLister.
 func NewIngressLister(indexer cache.Indexer) IngressLister {
-	return &ingressLister{listers.New[*v1beta1.Ingress](indexer, v1beta1.Resource("ingress"))}
+	return &ingressLister{listers.New[*networkingv1beta1.Ingress](indexer, networkingv1beta1.Resource("ingress"))}
 }
 
 // Ingresses returns an object that can list and get Ingresses.
 func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
-	return ingressNamespaceLister{listers.NewNamespaced[*v1beta1.Ingress](s.ResourceIndexer, namespace)}
+	return ingressNamespaceLister{listers.NewNamespaced[*networkingv1beta1.Ingress](s.ResourceIndexer, namespace)}
 }
 
 // IngressNamespaceLister helps list and get Ingresses.
@@ -56,15 +56,15 @@ func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
 type IngressNamespaceLister interface {
 	// List lists all Ingresses in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.Ingress, err error)
+	List(selector labels.Selector) (ret []*networkingv1beta1.Ingress, err error)
 	// Get retrieves the Ingress from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.Ingress, error)
+	Get(name string) (*networkingv1beta1.Ingress, error)
 	IngressNamespaceListerExpansion
 }
 
 // ingressNamespaceLister implements the IngressNamespaceLister
 // interface.
 type ingressNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.Ingress]
+	listers.ResourceIndexer[*networkingv1beta1.Ingress]
 }

@@ -88,7 +88,7 @@ func runBootstrapToken(c workflow.RunData) error {
 		return errors.Wrap(err, "error updating or creating token")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptokenphase.AllowBoostrapTokensToGetNodes(client); err != nil {
+	if err := nodebootstraptokenphase.AllowBootstrapTokensToGetNodes(client); err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to get Nodes")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs

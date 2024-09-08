@@ -377,6 +377,9 @@ func (s *EtcdServer) leaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveR
 		if err := s.waitAppliedIndex(); err != nil {
 			return nil, err
 		}
+
+		// gofail: var beforeLookupWhenLeaseTimeToLive struct{}
+
 		// primary; timetolive directly from leader
 		le := s.lessor.Lookup(lease.LeaseID(r.ID))
 		if le == nil {
@@ -391,6 +394,15 @@ func (s *EtcdServer) leaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveR
 				kbs[i] = []byte(ks[i])
 			}
 			resp.Keys = kbs
+		}
+
+		// The leasor could be demoted if leader changed during lookup.
+		// We should return error to force retry instead of returning
+		// incorrect remaining TTL.
+		if le.Demoted() {
+			// NOTE: lease.ErrNotPrimary is not retryable error for
+			// client. Instead, uses ErrLeaderChanged.
+			return nil, ErrLeaderChanged
 		}
 		return resp, nil
 	}

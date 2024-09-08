@@ -58,6 +58,7 @@ func NewGRPCService(ctx context.Context, endpoint, providerName string, callTime
 	s := &gRPCService{callTimeout: callTimeout}
 	s.connection, err = grpc.Dial(
 		addr,
+		grpc.WithAuthority("localhost"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithContextDialer(

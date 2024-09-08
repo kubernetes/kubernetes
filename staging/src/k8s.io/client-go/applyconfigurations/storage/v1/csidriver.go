@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	apistoragev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CSIDriverApplyConfiguration represents a declarative configuration of the CSIDriver type for use
 // with apply.
 type CSIDriverApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSIDriver constructs a declarative configuration of the CSIDriver type for use with
@@ -56,18 +56,18 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+func ExtractCSIDriver(cSIDriver *storagev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
 	return extractCSIDriver(cSIDriver, fieldManager, "")
 }
 
 // ExtractCSIDriverStatus is the same as ExtractCSIDriver except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCSIDriverStatus(cSIDriver *apistoragev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+func ExtractCSIDriverStatus(cSIDriver *storagev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
 	return extractCSIDriver(cSIDriver, fieldManager, "status")
 }
 
-func extractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
+func extractCSIDriver(cSIDriver *storagev1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
 	b := &CSIDriverApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1.CSIDriver"), fieldManager, b, subresource)
 	if err != nil {
@@ -84,7 +84,7 @@ func extractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string, su
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithKind(value string) *CSIDriverApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +92,7 @@ func (b *CSIDriverApplyConfiguration) WithKind(value string) *CSIDriverApplyConf
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithAPIVersion(value string) *CSIDriverApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +101,7 @@ func (b *CSIDriverApplyConfiguration) WithAPIVersion(value string) *CSIDriverApp
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithName(value string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +110,7 @@ func (b *CSIDriverApplyConfiguration) WithName(value string) *CSIDriverApplyConf
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithGenerateName(value string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +119,7 @@ func (b *CSIDriverApplyConfiguration) WithGenerateName(value string) *CSIDriverA
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithNamespace(value string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +128,7 @@ func (b *CSIDriverApplyConfiguration) WithNamespace(value string) *CSIDriverAppl
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithUID(value types.UID) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +137,7 @@ func (b *CSIDriverApplyConfiguration) WithUID(value types.UID) *CSIDriverApplyCo
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithResourceVersion(value string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,25 +146,25 @@ func (b *CSIDriverApplyConfiguration) WithResourceVersion(value string) *CSIDriv
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithGeneration(value int64) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CSIDriverApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CSIDriverApplyConfiguration {
+func (b *CSIDriverApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CSIDriverApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CSIDriverApplyConfiguration {
+func (b *CSIDriverApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +173,7 @@ func (b *CSIDriverApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *CSIDriverApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +183,11 @@ func (b *CSIDriverApplyConfiguration) WithDeletionGracePeriodSeconds(value int64
 // overwriting an existing map entries in Labels field with the same key.
 func (b *CSIDriverApplyConfiguration) WithLabels(entries map[string]string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +198,11 @@ func (b *CSIDriverApplyConfiguration) WithLabels(entries map[string]string) *CSI
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *CSIDriverApplyConfiguration) WithAnnotations(entries map[string]string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -210,13 +210,13 @@ func (b *CSIDriverApplyConfiguration) WithAnnotations(entries map[string]string)
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CSIDriverApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CSIDriverApplyConfiguration {
+func (b *CSIDriverApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,14 +227,14 @@ func (b *CSIDriverApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRef
 func (b *CSIDriverApplyConfiguration) WithFinalizers(values ...string) *CSIDriverApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *CSIDriverApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -249,5 +249,5 @@ func (b *CSIDriverApplyConfiguration) WithSpec(value *CSIDriverSpecApplyConfigur
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CSIDriverApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

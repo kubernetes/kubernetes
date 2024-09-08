@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // NodeSelectorRequirementApplyConfiguration represents a declarative configuration of the NodeSelectorRequirement type for use
 // with apply.
 type NodeSelectorRequirementApplyConfiguration struct {
-	Key      *string                  `json:"key,omitempty"`
-	Operator *v1.NodeSelectorOperator `json:"operator,omitempty"`
-	Values   []string                 `json:"values,omitempty"`
+	Key      *string                      `json:"key,omitempty"`
+	Operator *corev1.NodeSelectorOperator `json:"operator,omitempty"`
+	Values   []string                     `json:"values,omitempty"`
 }
 
 // NodeSelectorRequirementApplyConfiguration constructs a declarative configuration of the NodeSelectorRequirement type for use with
@@ -47,7 +47,7 @@ func (b *NodeSelectorRequirementApplyConfiguration) WithKey(value string) *NodeS
 // WithOperator sets the Operator field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operator field is set to the value of the last call.
-func (b *NodeSelectorRequirementApplyConfiguration) WithOperator(value v1.NodeSelectorOperator) *NodeSelectorRequirementApplyConfiguration {
+func (b *NodeSelectorRequirementApplyConfiguration) WithOperator(value corev1.NodeSelectorOperator) *NodeSelectorRequirementApplyConfiguration {
 	b.Operator = &value
 	return b
 }

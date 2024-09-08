@@ -123,14 +123,17 @@ type activeQueue struct {
 
 	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
 	isSchedulingQueueHintEnabled bool
+
+	metricsRecorder metrics.MetricAsyncRecorder
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder) *activeQueue {
 	aq := &activeQueue{
 		queue:                        queue,
 		inFlightPods:                 make(map[types.UID]*list.Element),
 		inFlightEvents:               list.New(),
 		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
+		metricsRecorder:              metricRecorder,
 	}
 	aq.cond.L = &aq.lock
 
@@ -183,6 +186,11 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
+
+	return aq.unlockedPop(logger)
+}
+
+func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	for aq.queue.Len() == 0 {
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the p.closed is set and the condition is broadcast,
@@ -198,11 +206,22 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 		return nil, err
 	}
 	pInfo.Attempts++
-	aq.schedCycle++
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
+		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
+		// https://github.com/kubernetes/kubernetes/pull/127016
+		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+			// Just report it as an error, but no need to stop the scheduler
+			// because it likely doesn't cause any visible issues from the scheduling perspective.
+			logger.Error(nil, "the same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
+			// Just ignore/discard this duplicated pod and try to pop the next one.
+			return aq.unlockedPop(logger)
+		}
+
+		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
 	}
+	aq.schedCycle++
 
 	// Update metrics and reset the set of unschedulable plugins for the next attempt.
 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
@@ -293,6 +312,7 @@ func (aq *activeQueue) addEventIfPodInFlight(oldPod, newPod *v1.Pod, event frame
 
 	_, ok := aq.inFlightPods[newPod.UID]
 	if ok {
+		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
 			oldObj: oldPod,
@@ -309,6 +329,7 @@ func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event f
 	defer aq.lock.Unlock()
 
 	if len(aq.inFlightPods) != 0 {
+		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label, 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
 			oldObj: oldObj,
@@ -341,6 +362,7 @@ func (aq *activeQueue) done(pod types.UID) {
 	// Remove the pod from the list.
 	aq.inFlightEvents.Remove(inFlightPod)
 
+	aggrMetricsCounter := map[string]int{}
 	// Remove events which are only referred to by this Pod
 	// so that the inFlightEvents list doesn't grow infinitely.
 	// If the pod was at the head of the list, then all
@@ -352,16 +374,34 @@ func (aq *activeQueue) done(pod types.UID) {
 			// Empty list.
 			break
 		}
-		if _, ok := e.Value.(*clusterEvent); !ok {
+		ev, ok := e.Value.(*clusterEvent)
+		if !ok {
 			// A pod, must stop pruning.
 			break
 		}
 		aq.inFlightEvents.Remove(e)
+		aggrMetricsCounter[ev.event.Label]--
 	}
+
+	for evLabel, count := range aggrMetricsCounter {
+		aq.metricsRecorder.ObserveInFlightEventsAsync(evLabel, float64(count), false)
+	}
+
+	aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, -1,
+		// If it's the last Pod in inFlightPods, we should force-flush the metrics.
+		// Otherwise, especially in small clusters, which don't get a new Pod frequently,
+		// the metrics might not be flushed for a long time.
+		len(aq.inFlightPods) == 0)
 }
 
 // close closes the activeQueue.
 func (aq *activeQueue) close() {
+	// We should call done() for all in-flight pods to clean up the inFlightEvents metrics.
+	// It's safe even if the binding cycle running asynchronously calls done() afterwards
+	// done() will just be a no-op.
+	for pod := range aq.inFlightPods {
+		aq.done(pod)
+	}
 	aq.lock.Lock()
 	aq.closed = true
 	aq.lock.Unlock()

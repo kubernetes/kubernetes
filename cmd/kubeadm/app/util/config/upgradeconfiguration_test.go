@@ -104,7 +104,7 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 			}
 			docmap, err := kubeadmutil.SplitYAMLDocuments(b)
 			if err != nil {
-				t.Fatalf("Unexpect error of SplitYAMLDocuments: %v", err)
+				t.Fatalf("Unexpected error of SplitYAMLDocuments: %v", err)
 			}
 			cfg, err := DocMapToUpgradeConfiguration(docmap)
 			if err != nil {

@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
-	examplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
+	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
+	applyconfigurationexamplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 	scheme "k8s.io/code-generator/examples/crd/clientset/versioned/scheme"
 )
 
@@ -38,45 +38,45 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (*v1.TestType, error)
-	Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	Create(ctx context.Context, testType *examplev1.TestType, opts metav1.CreateOptions) (*examplev1.TestType, error)
+	Update(ctx context.Context, testType *examplev1.TestType, opts metav1.UpdateOptions) (*examplev1.TestType, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	UpdateStatus(ctx context.Context, testType *examplev1.TestType, opts metav1.UpdateOptions) (*examplev1.TestType, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TestType, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.TestTypeList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*examplev1.TestType, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*examplev1.TestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error)
-	Apply(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *examplev1.TestType, err error)
+	Apply(ctx context.Context, testType *applyconfigurationexamplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *examplev1.TestType, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
-	GetClusterTestType(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TestType, error)
+	ApplyStatus(ctx context.Context, testType *applyconfigurationexamplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *examplev1.TestType, err error)
+	GetClusterTestType(ctx context.Context, name string, opts metav1.GetOptions) (*examplev1.TestType, error)
 
 	TestTypeExpansion
 }
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	*gentype.ClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *examplev1.TestTypeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*examplev1.TestType, *examplev1.TestTypeList, *applyconfigurationexamplev1.TestTypeApplyConfiguration]
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *ExampleV1Client, namespace string) *testTypes {
 	return &testTypes{
-		gentype.NewClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *examplev1.TestTypeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*examplev1.TestType, *examplev1.TestTypeList, *applyconfigurationexamplev1.TestTypeApplyConfiguration](
 			"testtypes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.TestType { return &v1.TestType{} },
-			func() *v1.TestTypeList { return &v1.TestTypeList{} }),
+			func() *examplev1.TestType { return &examplev1.TestType{} },
+			func() *examplev1.TestTypeList { return &examplev1.TestTypeList{} }),
 	}
 }
 
 // GetClusterTestType takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
-	result = &v1.TestType{}
+func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *examplev1.TestType, err error) {
+	result = &examplev1.TestType{}
 	err = c.GetClient().Get().
 		Namespace(c.GetNamespace()).
 		Resource("testtypes").

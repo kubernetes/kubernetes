@@ -378,6 +378,10 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	compactorsMu.Lock()
 	defer compactorsMu.Unlock()
 
+	if interval == 0 {
+		// short circuit, if the compaction request from apiserver is disabled
+		return func() {}, nil
+	}
 	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
 		compactorClient, err := newETCD3Client(c)

@@ -370,6 +370,24 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
 			want:   []ClusterEvent{assignedPodOtherUpdate},
 		},
+		{
+			name:   "scheduling gate is eliminated",
+			newPod: st.MakePod().SchedulingGates([]string{}).Obj(),
+			oldPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
+			want:   []ClusterEvent{PodSchedulingGateEliminatedChange},
+		},
+		{
+			name:   "scheduling gate is removed, but not completely eliminated",
+			newPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
+			oldPod: st.MakePod().SchedulingGates([]string{"foo", "bar"}).Obj(),
+			want:   []ClusterEvent{assignedPodOtherUpdate},
+		},
+		{
+			name:   "pod's tolerations are updated",
+			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
+			oldPod: st.MakePod().Toleration("key").Obj(),
+			want:   []ClusterEvent{PodTolerationChange},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

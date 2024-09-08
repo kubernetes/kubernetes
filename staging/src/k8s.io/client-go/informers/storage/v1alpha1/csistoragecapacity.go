@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	apistoragev1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // CSIStorageCapacities.
 type CSIStorageCapacityInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.CSIStorageCapacityLister
+	Lister() storagev1alpha1.CSIStorageCapacityLister
 }
 
 type cSIStorageCapacityInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespac
 				return client.StorageV1alpha1().CSIStorageCapacities(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&storagev1alpha1.CSIStorageCapacity{},
+		&apistoragev1alpha1.CSIStorageCapacity{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *cSIStorageCapacityInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *cSIStorageCapacityInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1alpha1.CSIStorageCapacity{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistoragev1alpha1.CSIStorageCapacity{}, f.defaultInformer)
 }
 
-func (f *cSIStorageCapacityInformer) Lister() v1alpha1.CSIStorageCapacityLister {
-	return v1alpha1.NewCSIStorageCapacityLister(f.Informer().GetIndexer())
+func (f *cSIStorageCapacityInformer) Lister() storagev1alpha1.CSIStorageCapacityLister {
+	return storagev1alpha1.NewCSIStorageCapacityLister(f.Informer().GetIndexer())
 }

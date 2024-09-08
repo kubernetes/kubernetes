@@ -12,6 +12,7 @@ type Neigh struct {
 	State        int
 	Type         int
 	Flags        int
+	FlagsExt     int
 	IP           net.IP
 	HardwareAddr net.HardwareAddr
 	LLIPAddr     net.IP //Used in the case of NHRP

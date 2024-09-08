@@ -20,18 +20,18 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DaemonSetConditionApplyConfiguration represents a declarative configuration of the DaemonSetCondition type for use
 // with apply.
 type DaemonSetConditionApplyConfiguration struct {
-	Type               *v1beta1.DaemonSetConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus             `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                    `json:"lastTransitionTime,omitempty"`
-	Reason             *string                         `json:"reason,omitempty"`
-	Message            *string                         `json:"message,omitempty"`
+	Type               *extensionsv1beta1.DaemonSetConditionType `json:"type,omitempty"`
+	Status             *v1.ConditionStatus                       `json:"status,omitempty"`
+	LastTransitionTime *metav1.Time                              `json:"lastTransitionTime,omitempty"`
+	Reason             *string                                   `json:"reason,omitempty"`
+	Message            *string                                   `json:"message,omitempty"`
 }
 
 // DaemonSetConditionApplyConfiguration constructs a declarative configuration of the DaemonSetCondition type for use with
@@ -43,7 +43,7 @@ func DaemonSetCondition() *DaemonSetConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DaemonSetConditionApplyConfiguration) WithType(value v1beta1.DaemonSetConditionType) *DaemonSetConditionApplyConfiguration {
+func (b *DaemonSetConditionApplyConfiguration) WithType(value extensionsv1beta1.DaemonSetConditionType) *DaemonSetConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

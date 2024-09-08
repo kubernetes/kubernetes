@@ -25,7 +25,7 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -44,460 +44,460 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSet_To_apps_DaemonSet(a.(*v1beta1.DaemonSet), b.(*apps.DaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSet_To_apps_DaemonSet(a.(*extensionsv1beta1.DaemonSet), b.(*apps.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSet)(nil), (*v1beta1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSet_To_v1beta1_DaemonSet(a.(*apps.DaemonSet), b.(*v1beta1.DaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSet)(nil), (*extensionsv1beta1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSet_To_v1beta1_DaemonSet(a.(*apps.DaemonSet), b.(*extensionsv1beta1.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*v1beta1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*extensionsv1beta1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetCondition)(nil), (*v1beta1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(a.(*apps.DaemonSetCondition), b.(*v1beta1.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetCondition)(nil), (*extensionsv1beta1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(a.(*apps.DaemonSetCondition), b.(*extensionsv1beta1.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetList)(nil), (*apps.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList(a.(*v1beta1.DaemonSetList), b.(*apps.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSetList)(nil), (*apps.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList(a.(*extensionsv1beta1.DaemonSetList), b.(*apps.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*v1beta1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetList_To_v1beta1_DaemonSetList(a.(*apps.DaemonSetList), b.(*v1beta1.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*extensionsv1beta1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetList_To_v1beta1_DaemonSetList(a.(*apps.DaemonSetList), b.(*extensionsv1beta1.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1beta1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*extensionsv1beta1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetSpec)(nil), (*v1beta1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1beta1.DaemonSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetSpec)(nil), (*extensionsv1beta1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*extensionsv1beta1.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetStatus)(nil), (*apps.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(a.(*v1beta1.DaemonSetStatus), b.(*apps.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSetStatus)(nil), (*apps.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(a.(*extensionsv1beta1.DaemonSetStatus), b.(*apps.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetStatus)(nil), (*v1beta1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(a.(*apps.DaemonSetStatus), b.(*v1beta1.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetStatus)(nil), (*extensionsv1beta1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(a.(*apps.DaemonSetStatus), b.(*extensionsv1beta1.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*v1beta1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*extensionsv1beta1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*v1beta1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*v1beta1.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*extensionsv1beta1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*extensionsv1beta1.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Deployment_To_apps_Deployment(a.(*v1beta1.Deployment), b.(*apps.Deployment), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Deployment_To_apps_Deployment(a.(*extensionsv1beta1.Deployment), b.(*apps.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.Deployment)(nil), (*v1beta1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_Deployment_To_v1beta1_Deployment(a.(*apps.Deployment), b.(*v1beta1.Deployment), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.Deployment)(nil), (*extensionsv1beta1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_Deployment_To_v1beta1_Deployment(a.(*apps.Deployment), b.(*extensionsv1beta1.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(a.(*v1beta1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(a.(*extensionsv1beta1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentCondition)(nil), (*v1beta1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(a.(*apps.DeploymentCondition), b.(*v1beta1.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentCondition)(nil), (*extensionsv1beta1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(a.(*apps.DeploymentCondition), b.(*extensionsv1beta1.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentList)(nil), (*apps.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentList_To_apps_DeploymentList(a.(*v1beta1.DeploymentList), b.(*apps.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentList)(nil), (*apps.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentList_To_apps_DeploymentList(a.(*extensionsv1beta1.DeploymentList), b.(*apps.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*v1beta1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentList_To_v1beta1_DeploymentList(a.(*apps.DeploymentList), b.(*v1beta1.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*extensionsv1beta1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentList_To_v1beta1_DeploymentList(a.(*apps.DeploymentList), b.(*extensionsv1beta1.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentRollback)(nil), (*apps.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(a.(*v1beta1.DeploymentRollback), b.(*apps.DeploymentRollback), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentRollback)(nil), (*apps.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(a.(*extensionsv1beta1.DeploymentRollback), b.(*apps.DeploymentRollback), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentRollback)(nil), (*v1beta1.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(a.(*apps.DeploymentRollback), b.(*v1beta1.DeploymentRollback), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentRollback)(nil), (*extensionsv1beta1.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(a.(*apps.DeploymentRollback), b.(*extensionsv1beta1.DeploymentRollback), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(a.(*v1beta1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(a.(*extensionsv1beta1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentSpec)(nil), (*v1beta1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*v1beta1.DeploymentSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentSpec)(nil), (*extensionsv1beta1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*extensionsv1beta1.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentStatus)(nil), (*apps.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(a.(*v1beta1.DeploymentStatus), b.(*apps.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentStatus)(nil), (*apps.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(a.(*extensionsv1beta1.DeploymentStatus), b.(*apps.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStatus)(nil), (*v1beta1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(a.(*apps.DeploymentStatus), b.(*v1beta1.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStatus)(nil), (*extensionsv1beta1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(a.(*apps.DeploymentStatus), b.(*extensionsv1beta1.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*v1beta1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*extensionsv1beta1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStrategy)(nil), (*v1beta1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*v1beta1.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStrategy)(nil), (*extensionsv1beta1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*extensionsv1beta1.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressPath)(nil), (*networking.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*v1beta1.HTTPIngressPath), b.(*networking.HTTPIngressPath), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.HTTPIngressPath)(nil), (*networking.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*extensionsv1beta1.HTTPIngressPath), b.(*networking.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressPath)(nil), (*v1beta1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(a.(*networking.HTTPIngressPath), b.(*v1beta1.HTTPIngressPath), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressPath)(nil), (*extensionsv1beta1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(a.(*networking.HTTPIngressPath), b.(*extensionsv1beta1.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressRuleValue)(nil), (*networking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*v1beta1.HTTPIngressRuleValue), b.(*networking.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.HTTPIngressRuleValue)(nil), (*networking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*extensionsv1beta1.HTTPIngressRuleValue), b.(*networking.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*v1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*v1beta1.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*extensionsv1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*extensionsv1beta1.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Ingress)(nil), (*networking.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Ingress_To_networking_Ingress(a.(*v1beta1.Ingress), b.(*networking.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.Ingress)(nil), (*networking.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Ingress_To_networking_Ingress(a.(*extensionsv1beta1.Ingress), b.(*networking.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.Ingress)(nil), (*v1beta1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_Ingress_To_v1beta1_Ingress(a.(*networking.Ingress), b.(*v1beta1.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.Ingress)(nil), (*extensionsv1beta1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_Ingress_To_v1beta1_Ingress(a.(*networking.Ingress), b.(*extensionsv1beta1.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressList_To_networking_IngressList(a.(*v1beta1.IngressList), b.(*networking.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressList_To_networking_IngressList(a.(*extensionsv1beta1.IngressList), b.(*networking.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressList)(nil), (*v1beta1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressList_To_v1beta1_IngressList(a.(*networking.IngressList), b.(*v1beta1.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressList)(nil), (*extensionsv1beta1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressList_To_v1beta1_IngressList(a.(*networking.IngressList), b.(*extensionsv1beta1.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressLoadBalancerIngress)(nil), (*networking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*v1beta1.IngressLoadBalancerIngress), b.(*networking.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressLoadBalancerIngress)(nil), (*networking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*extensionsv1beta1.IngressLoadBalancerIngress), b.(*networking.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerIngress)(nil), (*v1beta1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(a.(*networking.IngressLoadBalancerIngress), b.(*v1beta1.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerIngress)(nil), (*extensionsv1beta1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(a.(*networking.IngressLoadBalancerIngress), b.(*extensionsv1beta1.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressLoadBalancerStatus)(nil), (*networking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*v1beta1.IngressLoadBalancerStatus), b.(*networking.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressLoadBalancerStatus)(nil), (*networking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*extensionsv1beta1.IngressLoadBalancerStatus), b.(*networking.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerStatus)(nil), (*v1beta1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(a.(*networking.IngressLoadBalancerStatus), b.(*v1beta1.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerStatus)(nil), (*extensionsv1beta1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(a.(*networking.IngressLoadBalancerStatus), b.(*extensionsv1beta1.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressPortStatus)(nil), (*networking.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(a.(*v1beta1.IngressPortStatus), b.(*networking.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressPortStatus)(nil), (*networking.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(a.(*extensionsv1beta1.IngressPortStatus), b.(*networking.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressPortStatus)(nil), (*v1beta1.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(a.(*networking.IngressPortStatus), b.(*v1beta1.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressPortStatus)(nil), (*extensionsv1beta1.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(a.(*networking.IngressPortStatus), b.(*extensionsv1beta1.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRule)(nil), (*networking.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressRule_To_networking_IngressRule(a.(*v1beta1.IngressRule), b.(*networking.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressRule)(nil), (*networking.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressRule_To_networking_IngressRule(a.(*extensionsv1beta1.IngressRule), b.(*networking.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRule)(nil), (*v1beta1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRule_To_v1beta1_IngressRule(a.(*networking.IngressRule), b.(*v1beta1.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressRule)(nil), (*extensionsv1beta1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressRule_To_v1beta1_IngressRule(a.(*networking.IngressRule), b.(*extensionsv1beta1.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRuleValue)(nil), (*networking.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(a.(*v1beta1.IngressRuleValue), b.(*networking.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressRuleValue)(nil), (*networking.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(a.(*extensionsv1beta1.IngressRuleValue), b.(*networking.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*v1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*v1beta1.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*extensionsv1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*extensionsv1beta1.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressStatus)(nil), (*networking.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressStatus_To_networking_IngressStatus(a.(*v1beta1.IngressStatus), b.(*networking.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressStatus)(nil), (*networking.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressStatus_To_networking_IngressStatus(a.(*extensionsv1beta1.IngressStatus), b.(*networking.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressStatus)(nil), (*v1beta1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressStatus_To_v1beta1_IngressStatus(a.(*networking.IngressStatus), b.(*v1beta1.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressStatus)(nil), (*extensionsv1beta1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressStatus_To_v1beta1_IngressStatus(a.(*networking.IngressStatus), b.(*extensionsv1beta1.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressTLS)(nil), (*networking.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressTLS_To_networking_IngressTLS(a.(*v1beta1.IngressTLS), b.(*networking.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.IngressTLS)(nil), (*networking.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressTLS_To_networking_IngressTLS(a.(*extensionsv1beta1.IngressTLS), b.(*networking.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressTLS)(nil), (*v1beta1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressTLS_To_v1beta1_IngressTLS(a.(*networking.IngressTLS), b.(*v1beta1.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressTLS)(nil), (*extensionsv1beta1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressTLS_To_v1beta1_IngressTLS(a.(*networking.IngressTLS), b.(*extensionsv1beta1.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NetworkPolicy)(nil), (*networking.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(a.(*v1beta1.NetworkPolicy), b.(*networking.NetworkPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.NetworkPolicy)(nil), (*networking.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(a.(*extensionsv1beta1.NetworkPolicy), b.(*networking.NetworkPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicy)(nil), (*v1beta1.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(a.(*networking.NetworkPolicy), b.(*v1beta1.NetworkPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicy)(nil), (*extensionsv1beta1.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(a.(*networking.NetworkPolicy), b.(*extensionsv1beta1.NetworkPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NetworkPolicyList)(nil), (*networking.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(a.(*v1beta1.NetworkPolicyList), b.(*networking.NetworkPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.NetworkPolicyList)(nil), (*networking.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(a.(*extensionsv1beta1.NetworkPolicyList), b.(*networking.NetworkPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyList)(nil), (*v1beta1.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(a.(*networking.NetworkPolicyList), b.(*v1beta1.NetworkPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyList)(nil), (*extensionsv1beta1.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(a.(*networking.NetworkPolicyList), b.(*extensionsv1beta1.NetworkPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NetworkPolicyPeer)(nil), (*networking.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(a.(*v1beta1.NetworkPolicyPeer), b.(*networking.NetworkPolicyPeer), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.NetworkPolicyPeer)(nil), (*networking.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(a.(*extensionsv1beta1.NetworkPolicyPeer), b.(*networking.NetworkPolicyPeer), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPeer)(nil), (*v1beta1.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(a.(*networking.NetworkPolicyPeer), b.(*v1beta1.NetworkPolicyPeer), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPeer)(nil), (*extensionsv1beta1.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(a.(*networking.NetworkPolicyPeer), b.(*extensionsv1beta1.NetworkPolicyPeer), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NetworkPolicyPort)(nil), (*networking.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(a.(*v1beta1.NetworkPolicyPort), b.(*networking.NetworkPolicyPort), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.NetworkPolicyPort)(nil), (*networking.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(a.(*extensionsv1beta1.NetworkPolicyPort), b.(*networking.NetworkPolicyPort), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPort)(nil), (*v1beta1.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(a.(*networking.NetworkPolicyPort), b.(*v1beta1.NetworkPolicyPort), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPort)(nil), (*extensionsv1beta1.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(a.(*networking.NetworkPolicyPort), b.(*extensionsv1beta1.NetworkPolicyPort), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSet)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet(a.(*v1beta1.ReplicaSet), b.(*apps.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ReplicaSet)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet(a.(*extensionsv1beta1.ReplicaSet), b.(*apps.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSet)(nil), (*v1beta1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet(a.(*apps.ReplicaSet), b.(*v1beta1.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSet)(nil), (*extensionsv1beta1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet(a.(*apps.ReplicaSet), b.(*extensionsv1beta1.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetCondition)(nil), (*apps.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(a.(*v1beta1.ReplicaSetCondition), b.(*apps.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ReplicaSetCondition)(nil), (*apps.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(a.(*extensionsv1beta1.ReplicaSetCondition), b.(*apps.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetCondition)(nil), (*v1beta1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(a.(*apps.ReplicaSetCondition), b.(*v1beta1.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetCondition)(nil), (*extensionsv1beta1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(a.(*apps.ReplicaSetCondition), b.(*extensionsv1beta1.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetList)(nil), (*apps.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(a.(*v1beta1.ReplicaSetList), b.(*apps.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ReplicaSetList)(nil), (*apps.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(a.(*extensionsv1beta1.ReplicaSetList), b.(*apps.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetList)(nil), (*v1beta1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(a.(*apps.ReplicaSetList), b.(*v1beta1.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetList)(nil), (*extensionsv1beta1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(a.(*apps.ReplicaSetList), b.(*extensionsv1beta1.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*v1beta1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*extensionsv1beta1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1beta1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*v1beta1.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetSpec)(nil), (*extensionsv1beta1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*extensionsv1beta1.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(a.(*v1beta1.ReplicaSetStatus), b.(*apps.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ReplicaSetStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(a.(*extensionsv1beta1.ReplicaSetStatus), b.(*apps.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetStatus)(nil), (*v1beta1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(a.(*apps.ReplicaSetStatus), b.(*v1beta1.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetStatus)(nil), (*extensionsv1beta1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(a.(*apps.ReplicaSetStatus), b.(*extensionsv1beta1.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RollbackConfig)(nil), (*apps.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(a.(*v1beta1.RollbackConfig), b.(*apps.RollbackConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.RollbackConfig)(nil), (*apps.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(a.(*extensionsv1beta1.RollbackConfig), b.(*apps.RollbackConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollbackConfig)(nil), (*v1beta1.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(a.(*apps.RollbackConfig), b.(*v1beta1.RollbackConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollbackConfig)(nil), (*extensionsv1beta1.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(a.(*apps.RollbackConfig), b.(*extensionsv1beta1.RollbackConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*v1beta1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*extensionsv1beta1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*v1beta1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*v1beta1.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*extensionsv1beta1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*extensionsv1beta1.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*v1beta1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*extensionsv1beta1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDeployment)(nil), (*v1beta1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*v1beta1.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDeployment)(nil), (*extensionsv1beta1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*extensionsv1beta1.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Scale)(nil), (*autoscaling.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Scale_To_autoscaling_Scale(a.(*v1beta1.Scale), b.(*autoscaling.Scale), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.Scale)(nil), (*autoscaling.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Scale_To_autoscaling_Scale(a.(*extensionsv1beta1.Scale), b.(*autoscaling.Scale), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.Scale)(nil), (*v1beta1.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_Scale_To_v1beta1_Scale(a.(*autoscaling.Scale), b.(*v1beta1.Scale), scope)
+	if err := s.AddGeneratedConversionFunc((*autoscaling.Scale)(nil), (*extensionsv1beta1.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_Scale_To_v1beta1_Scale(a.(*autoscaling.Scale), b.(*extensionsv1beta1.Scale), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ScaleSpec)(nil), (*autoscaling.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(a.(*v1beta1.ScaleSpec), b.(*autoscaling.ScaleSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*extensionsv1beta1.ScaleSpec)(nil), (*autoscaling.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(a.(*extensionsv1beta1.ScaleSpec), b.(*autoscaling.ScaleSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ScaleSpec)(nil), (*v1beta1.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(a.(*autoscaling.ScaleSpec), b.(*v1beta1.ScaleSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*autoscaling.ScaleSpec)(nil), (*extensionsv1beta1.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(a.(*autoscaling.ScaleSpec), b.(*extensionsv1beta1.ScaleSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*autoscaling.ScaleStatus)(nil), (*v1beta1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(a.(*autoscaling.ScaleStatus), b.(*v1beta1.ScaleStatus), scope)
+	if err := s.AddConversionFunc((*autoscaling.ScaleStatus)(nil), (*extensionsv1beta1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(a.(*autoscaling.ScaleStatus), b.(*extensionsv1beta1.ScaleStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.IPBlock)(nil), (*v1beta1.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IPBlock_To_v1beta1_IPBlock(a.(*networking.IPBlock), b.(*v1beta1.IPBlock), scope)
+	if err := s.AddConversionFunc((*networking.IPBlock)(nil), (*extensionsv1beta1.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPBlock_To_v1beta1_IPBlock(a.(*networking.IPBlock), b.(*extensionsv1beta1.IPBlock), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*v1beta1.IngressBackend), scope)
+	if err := s.AddConversionFunc((*networking.IngressBackend)(nil), (*extensionsv1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*extensionsv1beta1.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.IngressSpec)(nil), (*v1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*networking.IngressSpec), b.(*v1beta1.IngressSpec), scope)
+	if err := s.AddConversionFunc((*networking.IngressSpec)(nil), (*extensionsv1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*networking.IngressSpec), b.(*extensionsv1beta1.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*v1beta1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*v1beta1.NetworkPolicyEgressRule), scope)
+	if err := s.AddConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*extensionsv1beta1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*extensionsv1beta1.NetworkPolicyEgressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.NetworkPolicyIngressRule)(nil), (*v1beta1.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(a.(*networking.NetworkPolicyIngressRule), b.(*v1beta1.NetworkPolicyIngressRule), scope)
+	if err := s.AddConversionFunc((*networking.NetworkPolicyIngressRule)(nil), (*extensionsv1beta1.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(a.(*networking.NetworkPolicyIngressRule), b.(*extensionsv1beta1.NetworkPolicyIngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.NetworkPolicySpec)(nil), (*v1beta1.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(a.(*networking.NetworkPolicySpec), b.(*v1beta1.NetworkPolicySpec), scope)
+	if err := s.AddConversionFunc((*networking.NetworkPolicySpec)(nil), (*extensionsv1beta1.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(a.(*networking.NetworkPolicySpec), b.(*extensionsv1beta1.NetworkPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IPBlock_To_networking_IPBlock(a.(*v1beta1.IPBlock), b.(*networking.IPBlock), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IPBlock_To_networking_IPBlock(a.(*extensionsv1beta1.IPBlock), b.(*networking.IPBlock), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*v1beta1.IngressBackend), b.(*networking.IngressBackend), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*extensionsv1beta1.IngressBackend), b.(*networking.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*v1beta1.IngressSpec), b.(*networking.IngressSpec), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*extensionsv1beta1.IngressSpec), b.(*networking.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyEgressRule)(nil), (*networking.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(a.(*v1beta1.NetworkPolicyEgressRule), b.(*networking.NetworkPolicyEgressRule), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.NetworkPolicyEgressRule)(nil), (*networking.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(a.(*extensionsv1beta1.NetworkPolicyEgressRule), b.(*networking.NetworkPolicyEgressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyIngressRule)(nil), (*networking.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(a.(*v1beta1.NetworkPolicyIngressRule), b.(*networking.NetworkPolicyIngressRule), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.NetworkPolicyIngressRule)(nil), (*networking.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(a.(*extensionsv1beta1.NetworkPolicyIngressRule), b.(*networking.NetworkPolicyIngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.NetworkPolicySpec)(nil), (*networking.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(a.(*v1beta1.NetworkPolicySpec), b.(*networking.NetworkPolicySpec), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.NetworkPolicySpec)(nil), (*networking.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(a.(*extensionsv1beta1.NetworkPolicySpec), b.(*networking.NetworkPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*v1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
+	if err := s.AddConversionFunc((*extensionsv1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*extensionsv1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_DaemonSet_To_apps_DaemonSet(in *v1beta1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSet_To_apps_DaemonSet(in *extensionsv1beta1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -509,11 +509,11 @@ func autoConvert_v1beta1_DaemonSet_To_apps_DaemonSet(in *v1beta1.DaemonSet, out 
 }
 
 // Convert_v1beta1_DaemonSet_To_apps_DaemonSet is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSet_To_apps_DaemonSet(in *v1beta1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSet_To_apps_DaemonSet(in *extensionsv1beta1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSet_To_apps_DaemonSet(in, out, s)
 }
 
-func autoConvert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *v1beta1.DaemonSet, s conversion.Scope) error {
+func autoConvert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *extensionsv1beta1.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -525,11 +525,11 @@ func autoConvert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *v1
 }
 
 // Convert_apps_DaemonSet_To_v1beta1_DaemonSet is an autogenerated conversion function.
-func Convert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *v1beta1.DaemonSet, s conversion.Scope) error {
+func Convert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *extensionsv1beta1.DaemonSet, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSet_To_v1beta1_DaemonSet(in, out, s)
 }
 
-func autoConvert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1beta1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in *extensionsv1beta1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
 	out.Type = apps.DaemonSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -539,12 +539,12 @@ func autoConvert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1bet
 }
 
 // Convert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1beta1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in *extensionsv1beta1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetCondition_To_apps_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1beta1.DaemonSetCondition, s conversion.Scope) error {
-	out.Type = v1beta1.DaemonSetConditionType(in.Type)
+func autoConvert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in *apps.DaemonSetCondition, out *extensionsv1beta1.DaemonSetCondition, s conversion.Scope) error {
+	out.Type = extensionsv1beta1.DaemonSetConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -553,11 +553,11 @@ func autoConvert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in *apps.
 }
 
 // Convert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition is an autogenerated conversion function.
-func Convert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1beta1.DaemonSetCondition, s conversion.Scope) error {
+func Convert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in *apps.DaemonSetCondition, out *extensionsv1beta1.DaemonSetCondition, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetCondition_To_v1beta1_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *v1beta1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *extensionsv1beta1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -574,15 +574,15 @@ func autoConvert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *v1beta1.DaemonS
 }
 
 // Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *v1beta1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *extensionsv1beta1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetList, out *v1beta1.DaemonSetList, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetList, out *extensionsv1beta1.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.DaemonSet, len(*in))
+		*out = make([]extensionsv1beta1.DaemonSet, len(*in))
 		for i := range *in {
 			if err := Convert_apps_DaemonSet_To_v1beta1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -595,11 +595,11 @@ func autoConvert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetL
 }
 
 // Convert_apps_DaemonSetList_To_v1beta1_DaemonSetList is an autogenerated conversion function.
-func Convert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetList, out *v1beta1.DaemonSetList, s conversion.Scope) error {
+func Convert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetList, out *extensionsv1beta1.DaemonSetList, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in, out, s)
 }
 
-func autoConvert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1beta1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *extensionsv1beta1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -614,11 +614,11 @@ func autoConvert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1beta1.DaemonS
 }
 
 // Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1beta1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *extensionsv1beta1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetSpec, out *v1beta1.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetSpec, out *extensionsv1beta1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -633,11 +633,11 @@ func autoConvert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetS
 }
 
 // Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec is an autogenerated conversion function.
-func Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetSpec, out *v1beta1.DaemonSetSpec, s conversion.Scope) error {
+func Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetSpec, out *extensionsv1beta1.DaemonSetSpec, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1beta1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in *extensionsv1beta1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -652,11 +652,11 @@ func autoConvert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1beta1.Dae
 }
 
 // Convert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1beta1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in *extensionsv1beta1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetStatus_To_apps_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1beta1.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *apps.DaemonSetStatus, out *extensionsv1beta1.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -666,16 +666,16 @@ func autoConvert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *apps.Daemon
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]v1beta1.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]extensionsv1beta1.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus is an autogenerated conversion function.
-func Convert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1beta1.DaemonSetStatus, s conversion.Scope) error {
+func Convert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *apps.DaemonSetStatus, out *extensionsv1beta1.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1beta1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *extensionsv1beta1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
@@ -690,15 +690,15 @@ func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy
 }
 
 // Convert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy is an autogenerated conversion function.
-func Convert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1beta1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func Convert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *extensionsv1beta1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in, out, s)
 }
 
-func autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1beta1.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = v1beta1.DaemonSetUpdateStrategyType(in.Type)
+func autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *extensionsv1beta1.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = extensionsv1beta1.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(v1beta1.RollingUpdateDaemonSet)
+		*out = new(extensionsv1beta1.RollingUpdateDaemonSet)
 		if err := Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(*in, *out, s); err != nil {
 			return err
 		}
@@ -709,11 +709,11 @@ func autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy
 }
 
 // Convert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy is an autogenerated conversion function.
-func Convert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1beta1.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *extensionsv1beta1.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	return autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in, out, s)
 }
 
-func autoConvert_v1beta1_Deployment_To_apps_Deployment(in *v1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
+func autoConvert_v1beta1_Deployment_To_apps_Deployment(in *extensionsv1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -725,11 +725,11 @@ func autoConvert_v1beta1_Deployment_To_apps_Deployment(in *v1beta1.Deployment, o
 }
 
 // Convert_v1beta1_Deployment_To_apps_Deployment is an autogenerated conversion function.
-func Convert_v1beta1_Deployment_To_apps_Deployment(in *v1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
+func Convert_v1beta1_Deployment_To_apps_Deployment(in *extensionsv1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	return autoConvert_v1beta1_Deployment_To_apps_Deployment(in, out, s)
 }
 
-func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *v1beta1.Deployment, s conversion.Scope) error {
+func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *extensionsv1beta1.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -741,11 +741,11 @@ func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out 
 }
 
 // Convert_apps_Deployment_To_v1beta1_Deployment is an autogenerated conversion function.
-func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *v1beta1.Deployment, s conversion.Scope) error {
+func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *extensionsv1beta1.Deployment, s conversion.Scope) error {
 	return autoConvert_apps_Deployment_To_v1beta1_Deployment(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *v1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *extensionsv1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
 	out.Type = apps.DeploymentConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
@@ -756,12 +756,12 @@ func autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *v1b
 }
 
 // Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *v1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *extensionsv1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *apps.DeploymentCondition, out *v1beta1.DeploymentCondition, s conversion.Scope) error {
-	out.Type = v1beta1.DeploymentConditionType(in.Type)
+func autoConvert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *apps.DeploymentCondition, out *extensionsv1beta1.DeploymentCondition, s conversion.Scope) error {
+	out.Type = extensionsv1beta1.DeploymentConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -771,11 +771,11 @@ func autoConvert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *app
 }
 
 // Convert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition is an autogenerated conversion function.
-func Convert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *apps.DeploymentCondition, out *v1beta1.DeploymentCondition, s conversion.Scope) error {
+func Convert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *apps.DeploymentCondition, out *extensionsv1beta1.DeploymentCondition, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentList_To_apps_DeploymentList(in *v1beta1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentList_To_apps_DeploymentList(in *extensionsv1beta1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -792,15 +792,15 @@ func autoConvert_v1beta1_DeploymentList_To_apps_DeploymentList(in *v1beta1.Deplo
 }
 
 // Convert_v1beta1_DeploymentList_To_apps_DeploymentList is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentList_To_apps_DeploymentList(in *v1beta1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentList_To_apps_DeploymentList(in *extensionsv1beta1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentList_To_apps_DeploymentList(in, out, s)
 }
 
-func autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *v1beta1.DeploymentList, s conversion.Scope) error {
+func autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *extensionsv1beta1.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.Deployment, len(*in))
+		*out = make([]extensionsv1beta1.Deployment, len(*in))
 		for i := range *in {
 			if err := Convert_apps_Deployment_To_v1beta1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -813,11 +813,11 @@ func autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.Deployme
 }
 
 // Convert_apps_DeploymentList_To_v1beta1_DeploymentList is an autogenerated conversion function.
-func Convert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *v1beta1.DeploymentList, s conversion.Scope) error {
+func Convert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *extensionsv1beta1.DeploymentList, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *v1beta1.DeploymentRollback, out *apps.DeploymentRollback, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *extensionsv1beta1.DeploymentRollback, out *apps.DeploymentRollback, s conversion.Scope) error {
 	out.Name = in.Name
 	out.UpdatedAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
 	if err := Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
@@ -827,11 +827,11 @@ func autoConvert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *v1bet
 }
 
 // Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *v1beta1.DeploymentRollback, out *apps.DeploymentRollback, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *extensionsv1beta1.DeploymentRollback, out *apps.DeploymentRollback, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in, out, s)
 }
 
-func autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *v1beta1.DeploymentRollback, s conversion.Scope) error {
+func autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *extensionsv1beta1.DeploymentRollback, s conversion.Scope) error {
 	out.Name = in.Name
 	out.UpdatedAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
 	if err := Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
@@ -841,11 +841,11 @@ func autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.
 }
 
 // Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback is an autogenerated conversion function.
-func Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *v1beta1.DeploymentRollback, s conversion.Scope) error {
+func Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *extensionsv1beta1.DeploymentRollback, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *extensionsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -865,11 +865,11 @@ func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta1.Deplo
 }
 
 // Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *extensionsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
 }
 
-func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *v1beta1.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *extensionsv1beta1.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -883,17 +883,17 @@ func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.Deployme
 	out.MinReadySeconds = in.MinReadySeconds
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	out.Paused = in.Paused
-	out.RollbackTo = (*v1beta1.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
+	out.RollbackTo = (*extensionsv1beta1.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
 	return nil
 }
 
 // Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec is an autogenerated conversion function.
-func Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *v1beta1.DeploymentSpec, s conversion.Scope) error {
+func Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *extensionsv1beta1.DeploymentSpec, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *extensionsv1beta1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
@@ -906,28 +906,28 @@ func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta1.D
 }
 
 // Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *extensionsv1beta1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.DeploymentStatus, out *v1beta1.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.DeploymentStatus, out *extensionsv1beta1.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
-	out.Conditions = *(*[]v1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]extensionsv1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
 // Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus is an autogenerated conversion function.
-func Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.DeploymentStatus, out *v1beta1.DeploymentStatus, s conversion.Scope) error {
+func Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.DeploymentStatus, out *extensionsv1beta1.DeploymentStatus, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1beta1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+func autoConvert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *extensionsv1beta1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
@@ -942,15 +942,15 @@ func autoConvert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1bet
 }
 
 // Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1beta1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+func Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *extensionsv1beta1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in, out, s)
 }
 
-func autoConvert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta1.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = v1beta1.DeploymentStrategyType(in.Type)
+func autoConvert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.DeploymentStrategy, out *extensionsv1beta1.DeploymentStrategy, s conversion.Scope) error {
+	out.Type = extensionsv1beta1.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(v1beta1.RollingUpdateDeployment)
+		*out = new(extensionsv1beta1.RollingUpdateDeployment)
 		if err := Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
@@ -961,11 +961,11 @@ func autoConvert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.
 }
 
 // Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy is an autogenerated conversion function.
-func Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta1.DeploymentStrategy, s conversion.Scope) error {
+func Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.DeploymentStrategy, out *extensionsv1beta1.DeploymentStrategy, s conversion.Scope) error {
 	return autoConvert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in, out, s)
 }
 
-func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *extensionsv1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
 	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
@@ -975,13 +975,13 @@ func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1bet
 }
 
 // Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath is an autogenerated conversion function.
-func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *extensionsv1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	return autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *extensionsv1beta1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
-	out.PathType = (*v1beta1.PathType)(unsafe.Pointer(in.PathType))
+	out.PathType = (*extensionsv1beta1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -989,11 +989,11 @@ func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *netwo
 }
 
 // Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath is an autogenerated conversion function.
-func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
+func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *extensionsv1beta1.HTTPIngressPath, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *extensionsv1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
 		*out = make([]networking.HTTPIngressPath, len(*in))
@@ -1009,14 +1009,14 @@ func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue
 }
 
 // Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *extensionsv1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *extensionsv1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
-		*out = make([]v1beta1.HTTPIngressPath, len(*in))
+		*out = make([]extensionsv1beta1.HTTPIngressPath, len(*in))
 		for i := range *in {
 			if err := Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1029,23 +1029,23 @@ func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue
 }
 
 // Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *extensionsv1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1beta1_IPBlock_To_networking_IPBlock(in *v1beta1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
+func autoConvert_v1beta1_IPBlock_To_networking_IPBlock(in *extensionsv1beta1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
 	out.CIDR = in.CIDR
 	out.Except = *(*[]string)(unsafe.Pointer(&in.Except))
 	return nil
 }
 
-func autoConvert_networking_IPBlock_To_v1beta1_IPBlock(in *networking.IPBlock, out *v1beta1.IPBlock, s conversion.Scope) error {
+func autoConvert_networking_IPBlock_To_v1beta1_IPBlock(in *networking.IPBlock, out *extensionsv1beta1.IPBlock, s conversion.Scope) error {
 	out.CIDR = in.CIDR
 	out.Except = *(*[]string)(unsafe.Pointer(&in.Except))
 	return nil
 }
 
-func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *extensionsv1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_IngressSpec_To_networking_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1057,11 +1057,11 @@ func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out 
 }
 
 // Convert_v1beta1_Ingress_To_networking_Ingress is an autogenerated conversion function.
-func Convert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func Convert_v1beta1_Ingress_To_networking_Ingress(in *extensionsv1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
 	return autoConvert_v1beta1_Ingress_To_networking_Ingress(in, out, s)
 }
 
-func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *extensionsv1beta1.Ingress, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1073,24 +1073,24 @@ func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, o
 }
 
 // Convert_networking_Ingress_To_v1beta1_Ingress is an autogenerated conversion function.
-func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *extensionsv1beta1.Ingress, s conversion.Scope) error {
 	return autoConvert_networking_Ingress_To_v1beta1_Ingress(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *extensionsv1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
 	// WARNING: in.ServiceName requires manual conversion: does not exist in peer-type
 	// WARNING: in.ServicePort requires manual conversion: does not exist in peer-type
 	out.Resource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
-func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *v1beta1.IngressBackend, s conversion.Scope) error {
+func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *extensionsv1beta1.IngressBackend, s conversion.Scope) error {
 	// WARNING: in.Service requires manual conversion: does not exist in peer-type
 	out.Resource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
-func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *extensionsv1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1107,15 +1107,15 @@ func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.Ingre
 }
 
 // Convert_v1beta1_IngressList_To_networking_IngressList is an autogenerated conversion function.
-func Convert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func Convert_v1beta1_IngressList_To_networking_IngressList(in *extensionsv1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressList_To_networking_IngressList(in, out, s)
 }
 
-func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *extensionsv1beta1.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.Ingress, len(*in))
+		*out = make([]extensionsv1beta1.Ingress, len(*in))
 		for i := range *in {
 			if err := Convert_networking_Ingress_To_v1beta1_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1128,11 +1128,11 @@ func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.In
 }
 
 // Convert_networking_IngressList_To_v1beta1_IngressList is an autogenerated conversion function.
-func Convert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+func Convert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *extensionsv1beta1.IngressList, s conversion.Scope) error {
 	return autoConvert_networking_IngressList_To_v1beta1_IngressList(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *extensionsv1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
 	out.Ports = *(*[]networking.IngressPortStatus)(unsafe.Pointer(&in.Ports))
@@ -1140,43 +1140,43 @@ func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBal
 }
 
 // Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *extensionsv1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *extensionsv1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.Ports = *(*[]v1beta1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	out.Ports = *(*[]extensionsv1beta1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *extensionsv1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *extensionsv1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
 	out.Ingress = *(*[]networking.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *extensionsv1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]v1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+func autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *extensionsv1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
+	out.Ingress = *(*[]extensionsv1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *extensionsv1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *v1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *extensionsv1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Protocol = core.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
@@ -1184,11 +1184,11 @@ func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *v
 }
 
 // Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *v1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *extensionsv1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *v1beta1.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *extensionsv1beta1.IngressPortStatus, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Protocol = v1.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
@@ -1196,11 +1196,11 @@ func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *n
 }
 
 // Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus is an autogenerated conversion function.
-func Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *v1beta1.IngressPortStatus, s conversion.Scope) error {
+func Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *extensionsv1beta1.IngressPortStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *extensionsv1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -1209,11 +1209,11 @@ func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.Ingre
 }
 
 // Convert_v1beta1_IngressRule_To_networking_IngressRule is an autogenerated conversion function.
-func Convert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func Convert_v1beta1_IngressRule_To_networking_IngressRule(in *extensionsv1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in, out, s)
 }
 
-func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *v1beta1.IngressRule, s conversion.Scope) error {
+func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *extensionsv1beta1.IngressRule, s conversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -1222,11 +1222,11 @@ func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.In
 }
 
 // Convert_networking_IngressRule_To_v1beta1_IngressRule is an autogenerated conversion function.
-func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *v1beta1.IngressRule, s conversion.Scope) error {
+func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *extensionsv1beta1.IngressRule, s conversion.Scope) error {
 	return autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *extensionsv1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
 	if in.HTTP != nil {
 		in, out := &in.HTTP, &out.HTTP
 		*out = new(networking.HTTPIngressRuleValue)
@@ -1240,14 +1240,14 @@ func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1b
 }
 
 // Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue is an autogenerated conversion function.
-func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *extensionsv1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *v1beta1.IngressRuleValue, s conversion.Scope) error {
+func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *extensionsv1beta1.IngressRuleValue, s conversion.Scope) error {
 	if in.HTTP != nil {
 		in, out := &in.HTTP, &out.HTTP
-		*out = new(v1beta1.HTTPIngressRuleValue)
+		*out = new(extensionsv1beta1.HTTPIngressRuleValue)
 		if err := Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(*in, *out, s); err != nil {
 			return err
 		}
@@ -1258,11 +1258,11 @@ func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *net
 }
 
 // Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue is an autogenerated conversion function.
-func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *v1beta1.IngressRuleValue, s conversion.Scope) error {
+func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *extensionsv1beta1.IngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *extensionsv1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	// WARNING: in.Backend requires manual conversion: does not exist in peer-type
 	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
@@ -1280,13 +1280,13 @@ func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.Ingre
 	return nil
 }
 
-func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
+func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *extensionsv1beta1.IngressSpec, s conversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	// WARNING: in.DefaultBackend requires manual conversion: does not exist in peer-type
-	out.TLS = *(*[]v1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
+	out.TLS = *(*[]extensionsv1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]v1beta1.IngressRule, len(*in))
+		*out = make([]extensionsv1beta1.IngressRule, len(*in))
 		for i := range *in {
 			if err := Convert_networking_IngressRule_To_v1beta1_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1298,7 +1298,7 @@ func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.In
 	return nil
 }
 
-func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *extensionsv1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
 	if err := Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -1306,11 +1306,11 @@ func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.I
 }
 
 // Convert_v1beta1_IngressStatus_To_networking_IngressStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *extensionsv1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *extensionsv1beta1.IngressStatus, s conversion.Scope) error {
 	if err := Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -1318,33 +1318,33 @@ func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networkin
 }
 
 // Convert_networking_IngressStatus_To_v1beta1_IngressStatus is an autogenerated conversion function.
-func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
+func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *extensionsv1beta1.IngressStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in *v1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in *extensionsv1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_v1beta1_IngressTLS_To_networking_IngressTLS is an autogenerated conversion function.
-func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *v1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *extensionsv1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in, out, s)
 }
 
-func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *v1beta1.IngressTLS, s conversion.Scope) error {
+func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *extensionsv1beta1.IngressTLS, s conversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_networking_IngressTLS_To_v1beta1_IngressTLS is an autogenerated conversion function.
-func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *v1beta1.IngressTLS, s conversion.Scope) error {
+func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *extensionsv1beta1.IngressTLS, s conversion.Scope) error {
 	return autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in, out, s)
 }
 
-func autoConvert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *v1beta1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *extensionsv1beta1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1353,11 +1353,11 @@ func autoConvert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *v1beta1.N
 }
 
 // Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy is an autogenerated conversion function.
-func Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *v1beta1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
+func Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *extensionsv1beta1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
 	return autoConvert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networking.NetworkPolicy, out *v1beta1.NetworkPolicy, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networking.NetworkPolicy, out *extensionsv1beta1.NetworkPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1366,11 +1366,11 @@ func autoConvert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networkin
 }
 
 // Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy is an autogenerated conversion function.
-func Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networking.NetworkPolicy, out *v1beta1.NetworkPolicy, s conversion.Scope) error {
+func Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networking.NetworkPolicy, out *extensionsv1beta1.NetworkPolicy, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in, out, s)
 }
 
-func autoConvert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *v1beta1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *extensionsv1beta1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
 	out.Ports = *(*[]networking.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	if in.To != nil {
 		in, out := &in.To, &out.To
@@ -1386,11 +1386,11 @@ func autoConvert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgre
 	return nil
 }
 
-func autoConvert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *v1beta1.NetworkPolicyEgressRule, s conversion.Scope) error {
-	out.Ports = *(*[]v1beta1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
+func autoConvert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *extensionsv1beta1.NetworkPolicyEgressRule, s conversion.Scope) error {
+	out.Ports = *(*[]extensionsv1beta1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	if in.To != nil {
 		in, out := &in.To, &out.To
-		*out = make([]v1beta1.NetworkPolicyPeer, len(*in))
+		*out = make([]extensionsv1beta1.NetworkPolicyPeer, len(*in))
 		for i := range *in {
 			if err := Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1402,7 +1402,7 @@ func autoConvert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgre
 	return nil
 }
 
-func autoConvert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *v1beta1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *extensionsv1beta1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
 	out.Ports = *(*[]networking.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	if in.From != nil {
 		in, out := &in.From, &out.From
@@ -1418,11 +1418,11 @@ func autoConvert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIng
 	return nil
 }
 
-func autoConvert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *v1beta1.NetworkPolicyIngressRule, s conversion.Scope) error {
-	out.Ports = *(*[]v1beta1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
+func autoConvert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *extensionsv1beta1.NetworkPolicyIngressRule, s conversion.Scope) error {
+	out.Ports = *(*[]extensionsv1beta1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	if in.From != nil {
 		in, out := &in.From, &out.From
-		*out = make([]v1beta1.NetworkPolicyPeer, len(*in))
+		*out = make([]extensionsv1beta1.NetworkPolicyPeer, len(*in))
 		for i := range *in {
 			if err := Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1434,7 +1434,7 @@ func autoConvert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIng
 	return nil
 }
 
-func autoConvert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1beta1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *extensionsv1beta1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1451,15 +1451,15 @@ func autoConvert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v
 }
 
 // Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList is an autogenerated conversion function.
-func Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1beta1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
+func Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *extensionsv1beta1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
 	return autoConvert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1beta1.NetworkPolicyList, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *networking.NetworkPolicyList, out *extensionsv1beta1.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.NetworkPolicy, len(*in))
+		*out = make([]extensionsv1beta1.NetworkPolicy, len(*in))
 		for i := range *in {
 			if err := Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1472,11 +1472,11 @@ func autoConvert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *n
 }
 
 // Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1beta1.NetworkPolicyList, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *networking.NetworkPolicyList, out *extensionsv1beta1.NetworkPolicyList, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in, out, s)
 }
 
-func autoConvert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1beta1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *extensionsv1beta1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
 	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	if in.IPBlock != nil {
@@ -1492,16 +1492,16 @@ func autoConvert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v
 }
 
 // Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer is an autogenerated conversion function.
-func Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1beta1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
+func Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *extensionsv1beta1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
 	return autoConvert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *v1beta1.NetworkPolicyPeer, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *extensionsv1beta1.NetworkPolicyPeer, s conversion.Scope) error {
 	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	if in.IPBlock != nil {
 		in, out := &in.IPBlock, &out.IPBlock
-		*out = new(v1beta1.IPBlock)
+		*out = new(extensionsv1beta1.IPBlock)
 		if err := Convert_networking_IPBlock_To_v1beta1_IPBlock(*in, *out, s); err != nil {
 			return err
 		}
@@ -1512,11 +1512,11 @@ func autoConvert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *n
 }
 
 // Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *v1beta1.NetworkPolicyPeer, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *extensionsv1beta1.NetworkPolicyPeer, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in, out, s)
 }
 
-func autoConvert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1beta1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *extensionsv1beta1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*core.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	out.EndPort = (*int32)(unsafe.Pointer(in.EndPort))
@@ -1524,11 +1524,11 @@ func autoConvert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v
 }
 
 // Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort is an autogenerated conversion function.
-func Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1beta1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
+func Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *extensionsv1beta1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
 	return autoConvert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1beta1.NetworkPolicyPort, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *extensionsv1beta1.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*v1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	out.EndPort = (*int32)(unsafe.Pointer(in.EndPort))
@@ -1536,11 +1536,11 @@ func autoConvert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *n
 }
 
 // Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1beta1.NetworkPolicyPort, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *extensionsv1beta1.NetworkPolicyPort, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in, out, s)
 }
 
-func autoConvert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *v1beta1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
+func autoConvert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *extensionsv1beta1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
 	out.PodSelector = in.PodSelector
 	if in.Ingress != nil {
 		in, out := &in.Ingress, &out.Ingress
@@ -1568,11 +1568,11 @@ func autoConvert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *v
 	return nil
 }
 
-func autoConvert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *v1beta1.NetworkPolicySpec, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *extensionsv1beta1.NetworkPolicySpec, s conversion.Scope) error {
 	out.PodSelector = in.PodSelector
 	if in.Ingress != nil {
 		in, out := &in.Ingress, &out.Ingress
-		*out = make([]v1beta1.NetworkPolicyIngressRule, len(*in))
+		*out = make([]extensionsv1beta1.NetworkPolicyIngressRule, len(*in))
 		for i := range *in {
 			if err := Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1583,7 +1583,7 @@ func autoConvert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *n
 	}
 	if in.Egress != nil {
 		in, out := &in.Egress, &out.Egress
-		*out = make([]v1beta1.NetworkPolicyEgressRule, len(*in))
+		*out = make([]extensionsv1beta1.NetworkPolicyEgressRule, len(*in))
 		for i := range *in {
 			if err := Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1592,11 +1592,11 @@ func autoConvert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *n
 	} else {
 		out.Egress = nil
 	}
-	out.PolicyTypes = *(*[]v1beta1.PolicyType)(unsafe.Pointer(&in.PolicyTypes))
+	out.PolicyTypes = *(*[]extensionsv1beta1.PolicyType)(unsafe.Pointer(&in.PolicyTypes))
 	return nil
 }
 
-func autoConvert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *v1beta1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+func autoConvert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *extensionsv1beta1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1608,11 +1608,11 @@ func autoConvert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *v1beta1.ReplicaSet, o
 }
 
 // Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet is an autogenerated conversion function.
-func Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *v1beta1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+func Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *extensionsv1beta1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	return autoConvert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out *v1beta1.ReplicaSet, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out *extensionsv1beta1.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1624,11 +1624,11 @@ func autoConvert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out 
 }
 
 // Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet is an autogenerated conversion function.
-func Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out *v1beta1.ReplicaSet, s conversion.Scope) error {
+func Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out *extensionsv1beta1.ReplicaSet, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in, out, s)
 }
 
-func autoConvert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1beta1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+func autoConvert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *extensionsv1beta1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = apps.ReplicaSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -1638,12 +1638,12 @@ func autoConvert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1b
 }
 
 // Convert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1beta1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+func Convert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *extensionsv1beta1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
 	return autoConvert_v1beta1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1beta1.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = v1beta1.ReplicaSetConditionType(in.Type)
+func autoConvert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *extensionsv1beta1.ReplicaSetCondition, s conversion.Scope) error {
+	out.Type = extensionsv1beta1.ReplicaSetConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -1652,11 +1652,11 @@ func autoConvert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *app
 }
 
 // Convert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1beta1.ReplicaSetCondition, s conversion.Scope) error {
+func Convert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *extensionsv1beta1.ReplicaSetCondition, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *extensionsv1beta1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1673,15 +1673,15 @@ func autoConvert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta1.Repli
 }
 
 // Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList is an autogenerated conversion function.
-func Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+func Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *extensionsv1beta1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	return autoConvert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaSetList, out *v1beta1.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaSetList, out *extensionsv1beta1.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.ReplicaSet, len(*in))
+		*out = make([]extensionsv1beta1.ReplicaSet, len(*in))
 		for i := range *in {
 			if err := Convert_apps_ReplicaSet_To_v1beta1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1694,11 +1694,11 @@ func autoConvert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaS
 }
 
 // Convert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList is an autogenerated conversion function.
-func Convert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaSetList, out *v1beta1.ReplicaSetList, s conversion.Scope) error {
+func Convert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaSetList, out *extensionsv1beta1.ReplicaSetList, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *extensionsv1beta1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1711,11 +1711,11 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta1.Repli
 }
 
 // Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec is an autogenerated conversion function.
-func Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *extensionsv1beta1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	return autoConvert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta1.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *extensionsv1beta1.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1728,11 +1728,11 @@ func autoConvert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *apps.ReplicaS
 }
 
 // Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec is an autogenerated conversion function.
-func Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta1.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *extensionsv1beta1.ReplicaSetSpec, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *extensionsv1beta1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -1743,46 +1743,46 @@ func autoConvert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta1.R
 }
 
 // Convert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *extensionsv1beta1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1beta1.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *extensionsv1beta1.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]v1beta1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]extensionsv1beta1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1beta1.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *extensionsv1beta1.ReplicaSetStatus, s conversion.Scope) error {
 	return autoConvert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *v1beta1.RollbackConfig, out *apps.RollbackConfig, s conversion.Scope) error {
+func autoConvert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *extensionsv1beta1.RollbackConfig, out *apps.RollbackConfig, s conversion.Scope) error {
 	out.Revision = in.Revision
 	return nil
 }
 
 // Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig is an autogenerated conversion function.
-func Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *v1beta1.RollbackConfig, out *apps.RollbackConfig, s conversion.Scope) error {
+func Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *extensionsv1beta1.RollbackConfig, out *apps.RollbackConfig, s conversion.Scope) error {
 	return autoConvert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in, out, s)
 }
 
-func autoConvert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConfig, out *v1beta1.RollbackConfig, s conversion.Scope) error {
+func autoConvert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConfig, out *extensionsv1beta1.RollbackConfig, s conversion.Scope) error {
 	out.Revision = in.Revision
 	return nil
 }
 
 // Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig is an autogenerated conversion function.
-func Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConfig, out *v1beta1.RollbackConfig, s conversion.Scope) error {
+func Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConfig, out *extensionsv1beta1.RollbackConfig, s conversion.Scope) error {
 	return autoConvert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in, out, s)
 }
 
-func autoConvert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1beta1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *extensionsv1beta1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1793,11 +1793,11 @@ func autoConvert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(i
 }
 
 // Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet is an autogenerated conversion function.
-func Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1beta1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *extensionsv1beta1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	return autoConvert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in, out, s)
 }
 
-func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *extensionsv1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1808,11 +1808,11 @@ func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(i
 }
 
 // Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet is an autogenerated conversion function.
-func Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *extensionsv1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	return autoConvert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in, out, s)
 }
 
-func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *extensionsv1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1823,11 +1823,11 @@ func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment
 }
 
 // Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment is an autogenerated conversion function.
-func Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *extensionsv1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	return autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in, out, s)
 }
 
-func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta1.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *extensionsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
@@ -1838,11 +1838,11 @@ func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment
 }
 
 // Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment is an autogenerated conversion function.
-func Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta1.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *extensionsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
 	return autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in, out, s)
 }
 
-func autoConvert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
+func autoConvert_v1beta1_Scale_To_autoscaling_Scale(in *extensionsv1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1854,11 +1854,11 @@ func autoConvert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *auto
 }
 
 // Convert_v1beta1_Scale_To_autoscaling_Scale is an autogenerated conversion function.
-func Convert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
+func Convert_v1beta1_Scale_To_autoscaling_Scale(in *extensionsv1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
 	return autoConvert_v1beta1_Scale_To_autoscaling_Scale(in, out, s)
 }
 
-func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *extensionsv1beta1.Scale, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1870,38 +1870,38 @@ func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *
 }
 
 // Convert_autoscaling_Scale_To_v1beta1_Scale is an autogenerated conversion function.
-func Convert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+func Convert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *extensionsv1beta1.Scale, s conversion.Scope) error {
 	return autoConvert_autoscaling_Scale_To_v1beta1_Scale(in, out, s)
 }
 
-func autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *v1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *extensionsv1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	return nil
 }
 
 // Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec is an autogenerated conversion function.
-func Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *v1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
+func Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *extensionsv1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
 	return autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in, out, s)
 }
 
-func autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
+func autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *extensionsv1beta1.ScaleSpec, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	return nil
 }
 
 // Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec is an autogenerated conversion function.
-func Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
+func Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *extensionsv1beta1.ScaleSpec, s conversion.Scope) error {
 	return autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(in *v1beta1.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(in *extensionsv1beta1.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs string)
 	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-func autoConvert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.ScaleStatus, out *v1beta1.ScaleStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.ScaleStatus, out *extensionsv1beta1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	// WARNING: in.Selector requires manual conversion: inconvertible types (string vs map[string]string)
 	return nil

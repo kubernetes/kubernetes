@@ -77,7 +77,6 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		"fakediscovery \"k8s.io/client-go/discovery/fake\"",
 		"k8s.io/apimachinery/pkg/runtime",
 		"k8s.io/apimachinery/pkg/watch",
-		"k8s.io/apimachinery/pkg/api/meta/testrestmapper",
 	)
 
 	return

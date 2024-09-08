@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apiresourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // DeviceClasses.
 type DeviceClassInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha3.DeviceClassLister
+	Lister() resourcev1alpha3.DeviceClassLister
 }
 
 type deviceClassInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod ti
 				return client.ResourceV1alpha3().DeviceClasses().Watch(context.TODO(), options)
 			},
 		},
-		&resourcev1alpha3.DeviceClass{},
+		&apiresourcev1alpha3.DeviceClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *deviceClassInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *deviceClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resourcev1alpha3.DeviceClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiresourcev1alpha3.DeviceClass{}, f.defaultInformer)
 }
 
-func (f *deviceClassInformer) Lister() v1alpha3.DeviceClassLister {
-	return v1alpha3.NewDeviceClassLister(f.Informer().GetIndexer())
+func (f *deviceClassInformer) Lister() resourcev1alpha3.DeviceClassLister {
+	return resourcev1alpha3.NewDeviceClassLister(f.Informer().GetIndexer())
 }
