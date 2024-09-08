@@ -80,13 +80,13 @@ func (i *IPerfResults) ToTSV() string {
 // NewIPerf parses an IPerf CSV output line into an IPerfCSVResult.
 func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	if len(csvLine) == 0 {
-		return nil, fmt.Errorf("No iperf output received in csv line")
+		return nil, fmt.Errorf("no iperf output received in csv line")
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
 	// iperf 2.19+ reportes 15 fields, before it was just 9
 	if len(slice) != 15 {
-		return nil, fmt.Errorf("Incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
+		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
 	}
 	i := IPerfCSVResult{}
 	i.date = slice.get(0)
@@ -150,7 +150,7 @@ func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults
 		}
 		parsedResults = append(parsedResults, parsed)
 	}
-	if parsedResults == nil || len(parsedResults) == 0 {
+	if len(parsedResults) == 0 {
 		return nil, fmt.Errorf("no results parsed from iperf2 output")
 	}
 	// format:
