@@ -283,6 +283,10 @@ var (
 	// and whether the pod can consume configmap/secret that key starts with a number.
 	RelaxedEnvironmentVariableValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedEnvironmentVariableValidation"))
 
+	// Owner: sig-network
+	// Marks tests of KEP-4427 that require the `RelaxedDNSSearchValidation` feature gate
+	RelaxedDNSSearchValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedDNSSearchValidation"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Recreate = framework.WithFeature(framework.ValidFeatures.Add("Recreate"))
 
