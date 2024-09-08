@@ -59,19 +59,26 @@ func (pl *TaintToleration) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	clusterEventWithHint := []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+	if pl.enableSchedulingQueueHint {
+		return []framework.ClusterEventWithHint{
+			// When the QueueingHint feature is enabled, preCheck is eliminated and we don't need additional UpdateNodeLabel.
+			{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+			// When the QueueingHint feature is enabled,
+			// the scheduling queue uses Pod/Update Queueing Hint
+			// to determine whether a Pod's update makes the Pod schedulable or not.
+			// https://github.com/kubernetes/kubernetes/pull/122234
+			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+		}, nil
 	}
-	if !pl.enableSchedulingQueueHint {
-		return clusterEventWithHint, nil
-	}
-	// When the QueueingHint feature is enabled,
-	// the scheduling queue uses Pod/Update Queueing Hint
-	// to determine whether a Pod's update makes the Pod schedulable or not.
-	// https://github.com/kubernetes/kubernetes/pull/122234
-	clusterEventWithHint = append(clusterEventWithHint,
-		framework.ClusterEventWithHint{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange})
-	return clusterEventWithHint, nil
+
+	return []framework.ClusterEventWithHint{
+		// A note about UpdateNodeLabel event:
+		// Ideally, it's supposed to register only Add | UpdateNodeTaint because UpdateNodeLabel will never change the result from this plugin.
+		// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+		// See: https://github.com/kubernetes/kubernetes/issues/109437
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		// No need to register the Pod event; the update to the unschedulable Pods already triggers the scheduling retry when QHint is disabled.
+	}, nil
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by

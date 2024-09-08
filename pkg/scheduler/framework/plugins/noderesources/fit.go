@@ -88,6 +88,7 @@ type Fit struct {
 	ignoredResourceGroups           sets.Set[string]
 	enableInPlacePodVerticalScaling bool
 	enableSidecarContainers         bool
+	enableSchedulingQueueHint       bool
 	handle                          framework.Handle
 	resourceAllocationScorer
 }
@@ -172,6 +173,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts fe
 		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 		enableSidecarContainers:         fts.EnableSidecarContainers,
+		enableSchedulingQueueHint:       fts.EnableSchedulingQueueHint,
 		handle:                          h,
 		resourceAllocationScorer:        *scorePlugin(args),
 	}, nil
@@ -254,9 +256,20 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithH
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
 		podActionType |= framework.UpdatePodScaleDown
 	}
+
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add | UpdateNodeAllocatable because the only resource update could change the node resource fit plugin's result.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel
+	if f.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = framework.Add | framework.UpdateNodeAllocatable
+	}
+
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodChange},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: f.isSchedulableAfterNodeChange},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
 	}, nil
 }
 

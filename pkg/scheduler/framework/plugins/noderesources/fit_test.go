@@ -1087,31 +1087,40 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
-		name                             string
-		inPlacePodVerticalScalingEnabled bool
-		expectedClusterEvents            []framework.ClusterEventWithHint
+		name                            string
+		enableInPlacePodVerticalScaling bool
+		enableSchedulingQueueHint       bool
+		expectedClusterEvents           []framework.ClusterEventWithHint
 	}{
 		{
-			"Register events with InPlacePodVerticalScaling feature enabled",
-			true,
-			[]framework.ClusterEventWithHint{
+			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
+			enableInPlacePodVerticalScaling: true,
+			expectedClusterEvents: []framework.ClusterEventWithHint{
 				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.UpdatePodScaleDown | framework.Delete}},
-				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
 			},
 		},
 		{
-			"Register events with InPlacePodVerticalScaling feature disabled",
-			false,
-			[]framework.ClusterEventWithHint{
+			name:                      "Register events with SchedulingQueueHint feature enabled",
+			enableSchedulingQueueHint: true,
+			expectedClusterEvents: []framework.ClusterEventWithHint{
 				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
-				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable}},
+			},
+		},
+		{
+			name:                            "Register events with InPlacePodVerticalScaling feature disabled",
+			enableInPlacePodVerticalScaling: false,
+			expectedClusterEvents: []framework.ClusterEventWithHint{
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.inPlacePodVerticalScalingEnabled}
+			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableSchedulingQueueHint: test.enableSchedulingQueueHint}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {

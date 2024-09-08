@@ -867,11 +867,11 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[framework.GVK]framework.ActionType{},
 		},
 		{
-			name:    "plugins with default profile (InPlacePodVerticalScaling: disabled)",
+			name:    "plugins with default profile (No feature gate enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
-				framework.Node:                  framework.All,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.All - framework.Delete,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,
@@ -885,7 +885,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
-				framework.Node:                  framework.All,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.All - framework.Delete,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,
@@ -896,11 +896,11 @@ func Test_UnionedGVKs(t *testing.T) {
 			enableInPlacePodVerticalScaling: true,
 		},
 		{
-			name:    "plugins with default profile (queueingHint: enabled)",
+			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
-				framework.Node:                  framework.All,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.All - framework.Delete,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,

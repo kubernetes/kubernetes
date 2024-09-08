@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -56,7 +57,7 @@ func TestNodeName(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
 			_, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil)
+			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
