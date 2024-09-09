@@ -223,7 +223,7 @@ func TestNewDRAPluginClient(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NotNil(t, client)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}

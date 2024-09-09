@@ -196,7 +196,7 @@ func TestNewManagerImpl(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
 		})
@@ -355,7 +355,7 @@ func TestGetResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -593,7 +593,7 @@ func TestPrepareResources(t *testing.T) {
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -735,7 +735,7 @@ func TestUnprepareResources(t *testing.T) {
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -859,7 +859,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, claimInfos, 1)
 			assert.Equal(t, test.expectedClaimName, claimInfos[0].ClaimInfoState.ClaimName)
 		})
