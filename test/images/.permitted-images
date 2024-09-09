@@ -12,7 +12,6 @@ registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver
 registry.k8s.io/e2e-test-images/agnhost
 registry.k8s.io/e2e-test-images/apparmor-loader
 registry.k8s.io/e2e-test-images/busybox
-registry.k8s.io/e2e-test-images/cuda-vector-add
 registry.k8s.io/e2e-test-images/httpd
 registry.k8s.io/e2e-test-images/ipc-utils
 registry.k8s.io/e2e-test-images/jessie-dnsutils
