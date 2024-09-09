@@ -1400,7 +1400,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 		{
 			name: "pod is required to be placed on zone0, so only node-1 fits",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				NodeAffinityIn("zone", []string{"zone-0"}).
+				NodeAffinityIn("zone", []string{"zone-0"}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
 				Obj(),
 			existingPods: []*v1.Pod{
@@ -1583,7 +1583,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity, pods spread across zone as 1/~2~",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil, &ignorePolicy, nil, nil).
 				Obj(),
 			existingPods: []*v1.Pod{

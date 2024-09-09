@@ -40,17 +40,28 @@ func MakeNodeSelector() *NodeSelectorWrapper {
 	return &NodeSelectorWrapper{v1.NodeSelector{}}
 }
 
+type NodeSelectorType int
+
+const (
+	NodeSelectorTypeMatchExpressions NodeSelectorType = iota
+	NodeSelectorTypeMatchFields
+)
+
 // In injects a matchExpression (with an operator IN) as a selectorTerm
 // to the inner nodeSelector.
 // NOTE: appended selecterTerms are ORed.
-func (s *NodeSelectorWrapper) In(key string, vals []string) *NodeSelectorWrapper {
+func (s *NodeSelectorWrapper) In(key string, vals []string, t NodeSelectorType) *NodeSelectorWrapper {
 	expression := v1.NodeSelectorRequirement{
 		Key:      key,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   vals,
 	}
 	selectorTerm := v1.NodeSelectorTerm{}
-	selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, expression)
+	if t == NodeSelectorTypeMatchExpressions {
+		selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, expression)
+	} else {
+		selectorTerm.MatchFields = append(selectorTerm.MatchFields, expression)
+	}
 	s.NodeSelectorTerms = append(s.NodeSelectorTerms, selectorTerm)
 	return s
 }
@@ -320,19 +331,19 @@ func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 
 // NodeAffinityIn creates a HARD node affinity (with the operator In)
 // and injects into the inner pod.
-func (p *PodWrapper) NodeAffinityIn(key string, vals []string) *PodWrapper {
+func (p *PodWrapper) NodeAffinityIn(key string, vals []string, t NodeSelectorType) *PodWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
 	}
 	if p.Spec.Affinity.NodeAffinity == nil {
 		p.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{}
 	}
-	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	nodeSelector := MakeNodeSelector().In(key, vals, t).Obj()
 	p.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
 	return p
 }
 
-// NodeAffinityNotIn creates a HARD node affinity (with the operator NotIn)
+// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressinos and the operator NotIn)
 // and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
@@ -882,7 +893,7 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
-// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// NodeAffinityIn creates a HARD node affinity (with MatchExpressions and the operator In)
 // and injects into the pv.
 func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
 	if p.Spec.NodeAffinity == nil {
@@ -891,7 +902,7 @@ func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *Per
 	if p.Spec.NodeAffinity.Required == nil {
 		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
 	}
-	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	nodeSelector := MakeNodeSelector().In(key, vals, NodeSelectorTypeMatchExpressions).Obj()
 	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
 	return p
 }

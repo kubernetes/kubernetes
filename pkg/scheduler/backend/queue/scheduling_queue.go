@@ -35,6 +35,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -117,14 +118,18 @@ type SchedulingQueue interface {
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent)
-	PendingPods() ([]*v1.Pod, string)
-	PodsInActiveQ() []*v1.Pod
-	InFlightPods() []*v1.Pod
+
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
 	// Run starts the goroutines managing the queue.
 	Run(logger klog.Logger)
+
+	// The following functions are supposed to be used only for testing or debugging.
+	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
+	PendingPods() ([]*v1.Pod, string)
+	InFlightPods() []*v1.Pod
+	PodsInActiveQ() []*v1.Pod
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -1148,6 +1153,34 @@ func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
+
+// GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
+func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedPodInfo, ok bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	pInfoLookup := &framework.QueuedPodInfo{
+		PodInfo: &framework.PodInfo{
+			Pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			},
+		},
+	}
+	if pInfo, ok = p.podBackoffQ.Get(pInfoLookup); ok {
+		return pInfo, true
+	}
+	if pInfo = p.unschedulablePods.get(pInfoLookup.Pod); pInfo != nil {
+		return pInfo, true
+	}
+
+	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+		pInfo, ok = unlockedActiveQ.Get(pInfoLookup)
+	})
+	return
+}
 
 // PendingPods returns all the pending pods in the queue; accompanied by a debugging string
 // recording showing the number of pods in each queue respectively.

@@ -3964,6 +3964,92 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_GetPod(t *testing.T) {
+	activeQPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "default",
+		},
+	}
+	backoffQPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod2",
+			Namespace: "default",
+		},
+	}
+	unschedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod3",
+			Namespace: "default",
+		},
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+	q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
+		unlockedActiveQ.AddOrUpdate(newQueuedPodInfoForLookup(activeQPod))
+	})
+	q.podBackoffQ.AddOrUpdate(newQueuedPodInfoForLookup(backoffQPod))
+	q.unschedulablePods.addOrUpdate(newQueuedPodInfoForLookup(unschedPod))
+
+	tests := []struct {
+		name        string
+		podName     string
+		namespace   string
+		expectedPod *v1.Pod
+		expectedOK  bool
+	}{
+		{
+			name:        "pod is found in activeQ",
+			podName:     "pod1",
+			namespace:   "default",
+			expectedPod: activeQPod,
+			expectedOK:  true,
+		},
+		{
+			name:        "pod is found in backoffQ",
+			podName:     "pod2",
+			namespace:   "default",
+			expectedPod: backoffQPod,
+			expectedOK:  true,
+		},
+		{
+			name:        "pod is found in unschedulablePods",
+			podName:     "pod3",
+			namespace:   "default",
+			expectedPod: unschedPod,
+			expectedOK:  true,
+		},
+		{
+			name:        "pod is not found",
+			podName:     "pod4",
+			namespace:   "default",
+			expectedPod: nil,
+			expectedOK:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pInfo, ok := q.GetPod(tt.podName, tt.namespace)
+			if ok != tt.expectedOK {
+				t.Errorf("Expected ok=%v, but got ok=%v", tt.expectedOK, ok)
+			}
+
+			if tt.expectedPod == nil {
+				if pInfo == nil {
+					return
+				}
+				t.Fatalf("Expected pod is empty, but got pod=%v", pInfo.Pod)
+			}
+
+			if !cmp.Equal(pInfo.Pod, tt.expectedPod) {
+				t.Errorf("Expected pod=%v, but got pod=%v", tt.expectedPod, pInfo.Pod)
+			}
+		})
+	}
+}
+
 func attemptQueuedPodInfo(podInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
 	podInfo.Attempts++
 	return podInfo

@@ -1233,7 +1233,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 }
 
 func Test_isSchedulableAfterNodeChange(t *testing.T) {
-	podWithNodeAffinity := st.MakePod().NodeAffinityIn("foo", []string{"bar"})
+	podWithNodeAffinity := st.MakePod().NodeAffinityIn("foo", []string{"bar"}, st.NodeSelectorTypeMatchExpressions)
 	testcases := map[string]struct {
 		args           *config.NodeAffinityArgs
 		pod            *v1.Pod
