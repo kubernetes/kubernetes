@@ -996,6 +996,50 @@ func BenchmarkWriteIndexMaintenance(b *testing.B) {
 	})
 }
 
+func BenchmarkUnauthorizedRequests(b *testing.B) {
+
+	// Run with:
+	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench BenchmarkUnauthorizedRequests -run None
+
+	opts := &sampleDataOpts{
+		nodes:                  5000,
+		namespaces:             1,
+		podsPerNode:            1,
+		sharedConfigMapsPerPod: 1,
+	}
+	nodes, pods, pvs, attachments, slices := generate(opts)
+
+	// Create an additional Node that doesn't have access to a shared ConfigMap
+	// that all the other Nodes are authorized to read.
+	additionalNodeName := "nodeX"
+	nsName := "ns0"
+	additionalNode := &user.DefaultInfo{Name: fmt.Sprintf("system:node:%s", additionalNodeName), Groups: []string{"system:nodes"}}
+	pod := &corev1.Pod{}
+	pod.Name = "pod-X"
+	pod.Namespace = nsName
+	pod.Spec.NodeName = additionalNodeName
+	pod.Spec.ServiceAccountName = "svcacct-X"
+	pods = append(pods, pod)
+
+	g := NewGraph()
+	populate(g, nodes, pods, pvs, attachments, slices)
+
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	attrs := authorizer.AttributesRecord{User: additionalNode, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-shared", Namespace: nsName}
+
+	b.SetParallelism(500)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			decision, _, _ := authz.Authorize(context.Background(), attrs)
+			if decision != authorizer.DecisionNoOpinion {
+				b.Errorf("expected %v, got %v", authorizer.DecisionNoOpinion, decision)
+			}
+		}
+	})
+}
+
 func BenchmarkAuthorization(b *testing.B) {
 	g := NewGraph()
 

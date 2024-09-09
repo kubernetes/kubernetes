@@ -458,9 +458,17 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return false, fmt.Errorf("node '%s' cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
-	// Fast check to see if we know of a destination edge
-	if r.graph.destinationEdgeIndex[startingVertex.ID()].has(nodeVertex.ID()) {
-		return true, nil
+	if index, indexExists := r.graph.destinationEdgeIndex[startingVertex.ID()]; indexExists {
+		// Fast check to see if we know of a destination edge
+		if index.has(nodeVertex.ID()) {
+			return true, nil
+		}
+		// For some types of vertices, the destination edge index is authoritative
+		// (as long as it exists), hence we can fail-fast here instead of running
+		// a potentially costly DFS below.
+		if vertexTypeWithAuthoritativeIndex[startingType] {
+			return false, fmt.Errorf("node '%s' cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		}
 	}
 
 	found := false
