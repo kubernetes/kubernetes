@@ -289,11 +289,12 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 	if err != nil {
 		return nil, err
 	}
-	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	obj := &unstructured.Unstructured{}
+	err = runtime.DecodeInto(unstructured.UnstructuredJSONScheme, retBytes, obj)
 	if err != nil {
 		return nil, err
 	}
-	return uncastObj.(*unstructured.Unstructured), nil
+	return obj, nil
 }
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
