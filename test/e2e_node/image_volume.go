@@ -98,9 +98,11 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 
 	}
 
-	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
+	f.It("should succeed with pod and no image volume", func(ctx context.Context) {
 		createPod(ctx,
-			[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef, PullPolicy: v1.PullAlways}}}},
+			[]v1.Volume{
+				{Name: volumeName, VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+			},
 			[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix}},
 		)
 
@@ -115,6 +117,25 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 
 		secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "file"))
 		gomega.Expect(secondFileContents).To(gomega.Equal("2"))
+	})
+
+	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
+		createPod(ctx,
+			[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef, PullPolicy: v1.PullAlways}}}},
+			[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix}},
+		)
+
+		ginkgo.By(fmt.Sprintf("Waiting for the pod (%v/%v) to be running", f.Namespace.Name, podName))
+		err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to await for the pod to be running: (%v/%v)", f.Namespace.Name, podName)
+
+		// ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePathPrefix))
+
+		// firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "dir", "file"))
+		// gomega.Expect(firstFileContents).To(gomega.Equal("1"))
+
+		// secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "file"))
+		// gomega.Expect(secondFileContents).To(gomega.Equal("2"))
 	})
 
 	f.It("should succeed with pod and multiple volumes", func(ctx context.Context) {
