@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -36,7 +37,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe(feature.ServiceCIDRs, func() {
+var _ = common.SIGDescribe(feature.ServiceCIDRs, framework.WithFeatureGate(features.MultiCIDRServiceAllocator), func() {
 
 	fr := framework.NewDefaultFramework("servicecidrs")
 	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
