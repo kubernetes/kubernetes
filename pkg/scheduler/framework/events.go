@@ -105,6 +105,42 @@ var (
 	WildCardEvent = ClusterEvent{Resource: WildCard, ActionType: All, Label: "WildCardEvent"}
 	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
 	UnschedulableTimeout = ClusterEvent{Resource: WildCard, ActionType: All, Label: "UnschedulableTimeout"}
+	// AllEvents contains all events defined above.
+	AllEvents = []ClusterEvent{
+		AssignedPodAdd,
+		NodeAdd,
+		NodeDelete,
+		AssignedPodUpdate,
+		UnscheduledPodAdd,
+		UnscheduledPodUpdate,
+		UnscheduledPodDelete,
+		assignedPodOtherUpdate,
+		AssignedPodDelete,
+		PodRequestScaledDown,
+		PodLabelChange,
+		PodTolerationChange,
+		PodSchedulingGateEliminatedChange,
+		NodeSpecUnschedulableChange,
+		NodeAllocatableChange,
+		NodeLabelChange,
+		NodeAnnotationChange,
+		NodeTaintChange,
+		NodeConditionChange,
+		PvAdd,
+		PvUpdate,
+		PvcAdd,
+		PvcUpdate,
+		StorageClassAdd,
+		StorageClassUpdate,
+		CSINodeAdd,
+		CSINodeUpdate,
+		CSIDriverAdd,
+		CSIDriverUpdate,
+		CSIStorageCapacityAdd,
+		CSIStorageCapacityUpdate,
+		WildCardEvent,
+		UnschedulableTimeout,
+	}
 )
 
 // PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).

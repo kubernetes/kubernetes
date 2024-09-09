@@ -52,10 +52,13 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	schedframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -927,6 +930,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 						}
 					}
 
+					if tc.FeatureGates[features.SchedulerQueueingHints] {
+						// In any case, we should make sure InFlightEvents is empty after running the scenario.
+						if err = checkEmptyInFlightEvents(); err != nil {
+							tCtx.Errorf("%s: %s", w.Name, err)
+						}
+					}
+
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
 					legacyregistry.Reset()
@@ -1022,6 +1032,23 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 				return fmt.Errorf("%s: expected %s Average to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
 			}
 			return fmt.Errorf("%s: expected %s Average to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
+		}
+	}
+	return nil
+}
+
+func checkEmptyInFlightEvents() error {
+	labels := []string{metrics.PodPoppedInFlightEvent}
+	for _, event := range schedframework.AllEvents {
+		labels = append(labels, event.Label)
+	}
+	for _, label := range labels {
+		value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
+		if err != nil {
+			return fmt.Errorf("failed to get InFlightEvents metric for label %s", label)
+		}
+		if value > 0 {
+			return fmt.Errorf("InFlightEvents for label %s should be empty, but has %v items", label, value)
 		}
 	}
 	return nil
@@ -1139,7 +1166,10 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
-					collector.init()
+					err = collector.init()
+					if err != nil {
+						tCtx.Fatalf("op %d: Failed to initialize data collector: %v", opIndex, err)
+					}
 					collectorWG.Add(1)
 					go func() {
 						defer collectorWG.Done()
@@ -1203,13 +1233,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 						}
 					}
 				}()
-			}
-
-			if !concreteOp.SkipWaitToCompletion {
-				// SkipWaitToCompletion=false indicates this step has waited for the Pods to be scheduled.
-				// So we reset the metrics in global registry; otherwise metrics gathered in this step
-				// will be carried over to next step.
-				legacyregistry.Reset()
 			}
 
 		case *churnOp:
@@ -1376,7 +1399,7 @@ func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsP
 }
 
 type testDataCollector interface {
-	init()
+	init() error
 	run(tCtx ktesting.TContext)
 	collect() []DataItem
 }
