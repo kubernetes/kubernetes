@@ -32,12 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
@@ -91,7 +93,16 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return true
 	}
 
-	if !apierrors.IsAlreadyExists(err) {
+	switch {
+	case apierrors.IsAlreadyExists(err):
+		// Node already exists, proceed to reconcile node.
+	case apierrors.IsForbidden(err):
+		// Creating nodes is forbidden, but node may still exist, attempt to get the node.
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRegistrationGetOnExistsOnly) {
+			klog.ErrorS(err, "Unable to register node with API server, reason is forbidden", "node", klog.KObj(node))
+			return false
+		}
+	default:
 		klog.ErrorS(err, "Unable to register node with API server", "node", klog.KObj(node))
 		return false
 	}
@@ -101,6 +112,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		klog.ErrorS(err, "Unable to register node with API server, error getting existing node", "node", klog.KObj(node))
 		return false
 	}
+
 	if existingNode == nil {
 		klog.InfoS("Unable to register node with API server, no node instance returned", "node", klog.KObj(node))
 		return false
