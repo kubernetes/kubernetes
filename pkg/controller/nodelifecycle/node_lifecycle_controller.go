@@ -270,9 +270,7 @@ type Controller struct {
 	// Controller will not proactively sync node health, but will monitor node
 	// health signal updated from kubelet. There are 2 kinds of node healthiness
 	// signals: NodeStatus and NodeLease. If it doesn't receive update for this amount
-	// of time, it will start posting "NodeReady==ConditionUnknown". The amount of
-	// time before which Controller start evicting pods is controlled via flag
-	// 'pod-eviction-timeout'.
+	// of time, it will start posting "NodeReady==ConditionUnknown".
 	// Note: be cautious when changing the constant, it must work with
 	// nodeStatusUpdateFrequency in kubelet and renewInterval in NodeLease
 	// controller. The node health signal update frequency is the minimal of the
