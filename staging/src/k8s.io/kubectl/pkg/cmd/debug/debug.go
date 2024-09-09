@@ -399,6 +399,11 @@ func (o *DebugOptions) Validate() error {
 		}
 	}
 
+	// Warning for legacy profile
+	if o.Profile == ProfileLegacy {
+		fmt.Fprintln(o.ErrOut, "Legacy profile is planned to be deprecated in the near future. It is recommended to specify other profiles such as \"--profile=general\".")
+	}
+
 	return nil
 }
 
