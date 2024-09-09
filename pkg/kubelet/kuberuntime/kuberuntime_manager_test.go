@@ -49,6 +49,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 var (
@@ -1426,6 +1427,20 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				ContainersToKill:  getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
+		"an init container is in the created state due to an unknown error when starting container; restart it": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses[2].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				KillPod:                  false,
+				SandboxID:                baseStatus.SandboxStatuses[0].Id,
+				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
+				InitContainersToStart:    []int{2},
+				ContainersToStart:        []int{},
+				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
 	} {
 		pod, status := makeBasePodAndStatusWithInitContainers()
 		if test.mutatePodFn != nil {
@@ -1436,12 +1451,15 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 		}
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
-		if !sidecarContainersEnabled {
-			// If sidecar containers are disabled, we should not see any
+		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
+		if !handleRestartableInitContainers {
+			// If sidecar containers are disabled or the pod does not have any
+			// restartable init container, we should not see any
 			// InitContainersToStart in the actions.
 			test.actions.InitContainersToStart = nil
 		} else {
-			// If sidecar containers are enabled, we should not see any
+			// If sidecar containers are enabled and the pod has any
+			// restartable init container, we should not see any
 			// NextInitContainerToStart in the actions.
 			test.actions.NextInitContainerToStart = nil
 		}
@@ -2039,12 +2057,15 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 		}
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
-		if !sidecarContainersEnabled {
-			// If sidecar containers are disabled, we should not see any
+		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
+		if !handleRestartableInitContainers {
+			// If sidecar containers are disabled or the pod does not have any
+			// restartable init container, we should not see any
 			// InitContainersToStart in the actions.
 			test.actions.InitContainersToStart = nil
 		} else {
-			// If sidecar containers are enabled, we should not see any
+			// If sidecar containers are enabled and the pod has any
+			// restartable init container, we should not see any
 			// NextInitContainerToStart in the actions.
 			test.actions.NextInitContainerToStart = nil
 		}
