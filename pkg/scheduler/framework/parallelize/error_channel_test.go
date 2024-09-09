@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestErrorChannel(t *testing.T) {
@@ -35,7 +37,8 @@ func TestErrorChannel(t *testing.T) {
 		t.Errorf("expect %v from err channel, but got %v", err, actualErr)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	errCh.SendErrorWithCancel(err, cancel)
 	if actualErr := errCh.ReceiveError(); actualErr != err {
 		t.Errorf("expect %v from err channel, but got %v", err, actualErr)

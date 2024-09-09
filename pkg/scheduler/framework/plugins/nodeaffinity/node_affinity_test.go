@@ -915,7 +915,7 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *framework.Status
 			if test.runPreFilter {
-				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
 				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
 					t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
 				}
@@ -923,7 +923,7 @@ func TestNodeAffinity(t *testing.T) {
 					t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
 				}
 			}
-			gotStatus = p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfo)
+			gotStatus = p.(framework.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}

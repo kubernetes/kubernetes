@@ -421,7 +421,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
 	client := clientsetfake.NewClientset(objs...)
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -528,7 +529,8 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 		t.Skip("Skip failing test on Windows.")
 	}
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var (
@@ -1170,7 +1172,8 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
 			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, t, fakeVolumeBinder, eventBroadcaster)
@@ -1476,7 +1479,8 @@ func TestUpdatePod(t *testing.T) {
 
 			pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			if err := updatePod(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
@@ -2535,7 +2539,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	nodes := makeNodeList([]string{"3", "2", "1"})
@@ -2578,7 +2583,8 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	nodes := makeNodeList([]string{"3", "2", "1"})
@@ -2812,7 +2818,8 @@ func TestZeroRequest(t *testing.T) {
 				tf.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(fts, noderesources.NewBalancedAllocation), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := tf.NewFramework(
 				ctx,
@@ -3207,7 +3214,8 @@ func Test_prioritizeNodes(t *testing.T) {
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			cache := internalcache.New(ctx, time.Duration(0))
 			for _, node := range test.nodes {
@@ -3328,7 +3336,8 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	sched := makeScheduler(ctx, nodes)
 

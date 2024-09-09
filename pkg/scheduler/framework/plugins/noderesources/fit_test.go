@@ -732,7 +732,7 @@ func TestRestartableInitContainers(t *testing.T) {
 				t.Fatal(err)
 			}
 			cycleState := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Error("status does not match (-expected +actual):\n", diff)
 			}
@@ -1112,7 +1112,8 @@ func TestEventsToRegister(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fp := &Fit{enableInPlacePodVerticalScaling: test.inPlacePodVerticalScalingEnabled}
-			actualClusterEvents, err := fp.EventsToRegister(context.TODO())
+			_, ctx := ktesting.NewTestContext(t)
+			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}

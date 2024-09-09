@@ -1425,7 +1425,8 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			logger := klog.FromContext(ctx)
 			defer cancel()
 
@@ -1507,7 +1508,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 	for _, tt := range tests {
 		for _, podsInUnschedulablePods := range []int{1000, 5000} {
 			b.Run(fmt.Sprintf("%v-%v", tt.name, podsInUnschedulablePods), func(b *testing.B) {
-				logger, _ := ktesting.NewTestContext(b)
+				logger, ctx := ktesting.NewTestContext(b)
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
@@ -1528,7 +1529,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 						}
 					}
 
-					ctx, cancel := context.WithCancel(context.Background())
+					ctx, cancel := context.WithCancel(ctx)
 					defer cancel()
 					q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
 
@@ -2103,14 +2104,14 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			cs := fake.NewClientset(tt.podInfo.Pod)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podLister := informerFactory.Core().V1().Pods().Lister()
 
 			// Build a PriorityQueue.
 			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(podLister))
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
@@ -2269,7 +2270,8 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 }
 
 func TestPriorityQueue_NewWithOptions(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	q := NewTestQueue(ctx,
 		newDefaultQueueSort(),
@@ -3631,7 +3633,8 @@ func TestPriorityQueue_calculateBackoffDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPodInitialBackoffDuration(tt.initialBackoffDuration), WithPodMaxBackoffDuration(tt.maxBackoffDuration))
 			if got := q.calculateBackoffDuration(tt.podInfo); got != tt.want {

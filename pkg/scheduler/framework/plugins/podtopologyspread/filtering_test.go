@@ -3064,7 +3064,7 @@ func TestSingleConstraint(t *testing.T) {
 
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(ctx, state, tt.pod, nodeInfo)
 				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
 					t.Errorf("[%s]: expected status code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
@@ -3408,7 +3408,7 @@ func TestMultipleConstraints(t *testing.T) {
 
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(ctx, state, tt.pod, nodeInfo)
 				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
 					t.Errorf("[%s]: expected error code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
@@ -3425,7 +3425,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
+	gotStatus := p.(*PodTopologySpread).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
