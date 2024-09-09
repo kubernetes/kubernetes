@@ -22,6 +22,7 @@ import (
 	context "context"
 	json "encoding/json"
 	fmt "fmt"
+	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -32,6 +33,7 @@ import (
 	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 	applyconfigurationextensionsv1 "k8s.io/code-generator/examples/crd/applyconfiguration/extensions/v1"
 	scheme "k8s.io/code-generator/examples/crd/clientset/versioned/scheme"
+	v2 "k8s.io/klog/v2"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.
@@ -103,14 +105,14 @@ func (c *testTypes) GetExtended(ctx context.Context, name string, options metav1
 // ListExtended takes label and field selectors, and returns the list of TestTypes that match those selectors.
 func (c *testTypes) ListExtended(ctx context.Context, opts metav1.ListOptions) (*extensionsv1.TestTypeList, error) {
 	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for testtypes, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+		v2.Warningf("Failed preparing watchlist options for testtypes, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
 	} else if hasWatchListOptionsPrepared {
 		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
 			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for testtypes", c.list, opts, result)
 			return result, nil
 		}
-		klog.Warningf("The watchlist request for testtypes ended with an error, falling back to the standard LIST semantics, err = %v", err)
+		v2.Warningf("The watchlist request for testtypes ended with an error, falling back to the standard LIST semantics, err = %v", err)
 	}
 	result, err := c.list(ctx, opts)
 	if err == nil {
@@ -143,8 +145,8 @@ func (c *testTypes) watchList(ctx context.Context, opts metav1.ListOptions) (res
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	result = &extensionsv1.TestTypeList{}
-	err = c.client.Get().
-		Namespace(c.ns).
+	err = c.GetClient().Get().
+		Namespace(c.GetNamespace()).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
