@@ -91,10 +91,50 @@ const (
 
 	// This is the sleep interval specified in the command executed in the pod so that container is restarted within the expected test run time
 	sleepIntervalWithRestart string = "60s"
+
+	// This is the sleep interval specified in the command executed in the pod so that container is restarted within the expected test run time
+	sleepIntervalToCompletion string = "5s"
 )
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
+
+	type ResourceValue struct {
+		Allocatable int
+		Capacity    int
+	}
+
+	devicePluginGracefulTimeout := 5 * time.Minute // see endpointStopGracePeriod in pkg/kubelet/cm/devicemanager/types.go
+
+	var getNodeResourceValues = func(ctx context.Context, resourceName string) ResourceValue {
+		ginkgo.GinkgoHelper()
+		node := getLocalNode(ctx, f)
+
+		// -1 represents that the resource is not found
+		result := ResourceValue{
+			Allocatable: -1,
+			Capacity:    -1,
+		}
+
+		for key, val := range node.Status.Capacity {
+			resource := string(key)
+			if resource == resourceName {
+				result.Capacity = int(val.Value())
+				break
+			}
+		}
+
+		for key, val := range node.Status.Allocatable {
+			resource := string(key)
+			if resource == resourceName {
+				result.Allocatable = int(val.Value())
+				break
+			}
+		}
+
+		return result
+	}
+
 	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod, dptemplate *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
@@ -427,6 +467,55 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
+		})
+
+		ginkgo.It("will not attempt to admit the succeeded pod after the kubelet restart and device plugin removed", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalToCompletion)
+			podSpec := makeBusyboxPod(SampleDeviceResourceName, podRECMD)
+			podSpec.Spec.RestartPolicy = v1.RestartPolicyNever
+			// Making sure the pod will not be garbage collected and will stay thru the kubelet restart after
+			// it reached the terminated state. Using finalizers makes the test more reliable.
+			podSpec.ObjectMeta.Finalizers = []string{testFinalizer}
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, podSpec)
+
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+			devID1, err := parseLog(ctx, f, pod.Name, pod.Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q", pod.Name)
+
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod requested a device but started successfully without")
+
+			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Wait for node to be ready")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Waiting for pod to succeed")
+			gomega.Expect(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)).To(gomega.Succeed())
+
+			ginkgo.By("Deleting the device plugin")
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+
+			gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(SampleDeviceResourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: int(expectedSampleDevsAmount)}))
+
+			ginkgo.By("Restarting Kubelet")
+			restartKubelet(true)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Pod should still be in Succeed state")
+			// This ensures that the pod was admitted successfully.
+			// In the past we had and issue when kubelet will attempt to re-admit the terminated pod and will change it's phase to Failed.
+			// There are no indication that the pod was re-admitted so we just wait for a minute after the node became ready.
+			gomega.Consistently(func() v1.PodPhase {
+				pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				return pod.Status.Phase
+			}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.Equal(v1.PodSucceeded))
+
+			ginkgo.By("Removing the finalizer from the pod so it can be deleted now")
+			e2epod.NewPodClient(f).RemoveFinalizer(context.TODO(), podSpec.Name, testFinalizer)
 		})
 
 		// simulate device plugin re-registration, *but not* container and kubelet restart.
@@ -824,6 +913,9 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				if p.Namespace != f.Namespace.Name {
 					continue
 				}
+
+				ginkgo.By("Removing the finalizer from the pod in case it was used")
+				e2epod.NewPodClient(f).RemoveFinalizer(context.TODO(), p.Name, testFinalizer)
 
 				framework.Logf("Deleting pod: %s", p.Name)
 				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
