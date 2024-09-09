@@ -35,7 +35,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -77,7 +77,7 @@
       initPods: 1
       measurePods: 4
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 100
@@ -114,7 +114,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -154,7 +154,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -203,7 +203,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -250,7 +250,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -296,7 +296,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -338,7 +338,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -380,7 +380,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -454,7 +454,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -496,7 +496,7 @@
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -538,7 +538,7 @@
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -599,7 +599,7 @@
       initPods: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 200
@@ -708,7 +708,7 @@
       initPods: 2
       measurePods: 10
   - name: 500Nodes/200InitPods
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 200
@@ -755,7 +755,7 @@
       initNodes: 10
       measurePods: 100
   - name: 1000Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 1000
       measurePods: 1000
@@ -1011,7 +1011,7 @@
       normalNodes: 4
       measurePods: 4
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       taintNodes: 100
       normalNodes: 400
