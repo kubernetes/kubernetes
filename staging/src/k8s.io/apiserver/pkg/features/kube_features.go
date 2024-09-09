@@ -91,7 +91,7 @@ const (
 	APIServerTracing featuregate.Feature = "APIServerTracing"
 
 	// owner: @linxiulei
-	// beta: v1.30
+	// alpha: v1.30
 	//
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
