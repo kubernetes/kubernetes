@@ -133,12 +133,13 @@ for more information about scheduling and the kube-scheduler component.`,
 // runCommand runs the scheduler.
 func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
+	fg := opts.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
 	// Activate logging as soon as possible, after that
 	// show flags with the final logging configuration.
-	if err := logsapi.ValidateAndApply(opts.Logs, opts.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)); err != nil {
+	if err := logsapi.ValidateAndApply(opts.Logs, fg); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
-	}	
+	}
 	cliflag.PrintFlags(cmd.Flags())
 
 	ctx, cancel := context.WithCancel(context.Background())
