@@ -69,7 +69,7 @@ func CreateProber(c storagebackend.Config) (Prober, error) {
 	case storagebackend.StorageTypeETCD2:
 		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
-		return newETCD3ProberMonitor(c)
+		return newRetryingETCD3ProberMonitor(c)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
@@ -80,7 +80,7 @@ func CreateMonitor(c storagebackend.Config) (metrics.Monitor, error) {
 	case storagebackend.StorageTypeETCD2:
 		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
-		return newETCD3ProberMonitor(c)
+		return newRetryingETCD3ProberMonitor(c)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
