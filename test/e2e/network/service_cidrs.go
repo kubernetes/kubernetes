@@ -61,7 +61,7 @@ var _ = common.SIGDescribe(feature.ServiceCIDRs, framework.WithFeatureGate(featu
 
 	})
 
-	ginkgo.It("should create Services and servce on different Service CIDRs", func(ctx context.Context) {
+	ginkgo.It("should create Services and serve on different Service CIDRs", func(ctx context.Context) {
 		// create a new service CIDR
 		svcCIDR := &networkingv1beta1.ServiceCIDR{
 			ObjectMeta: metav1.ObjectMeta{
