@@ -225,7 +225,7 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 		framework.ExpectNoError(err, "Failed to get a ready schedulable node")
 
 		baseName := "test-pod"
-		anotherSELinuxLevel := "s1:c6,c10"
+		anotherSELinuxLevel := "s0:c100,c200"
 
 		for i := range 2 {
 			podName := fmt.Sprintf("%s-%d", baseName, i)
