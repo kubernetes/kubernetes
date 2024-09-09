@@ -529,7 +529,7 @@ func TestFilter(t *testing.T) {
 					*simpleLabelSelector,
 				},
 			}),
-			enableSelectors:      true,
+			enableSelectors:      false,
 			compatibilityVersion: v130,
 		},
 		{
@@ -602,7 +602,7 @@ func TestFilter(t *testing.T) {
 			attributes: newValidAttribute(&podObject, false),
 			results: []EvaluationResult{
 				{
-					EvalResult: celtypes.True,
+					Error: fmt.Errorf("fieldSelector"),
 				},
 			},
 			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
@@ -615,6 +615,7 @@ func TestFilter(t *testing.T) {
 				Verb:            "create",
 				APIVersion:      "*",
 			}),
+			enableSelectors:      false,
 			compatibilityVersion: v131,
 		},
 		{
@@ -871,6 +872,7 @@ func TestFilter(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			environment.DisableBaseEnvSetCachingForTests()
 			if tc.enableSelectors {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 			}
@@ -896,6 +898,7 @@ func TestFilter(t *testing.T) {
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
+
 			validations := tc.validations
 			CompilationResults := f.(*filter).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
@@ -913,8 +916,13 @@ func TestFilter(t *testing.T) {
 			}
 			require.Equal(t, len(evalResults), len(tc.results))
 			for i, result := range tc.results {
+				if result.Error != nil && evalResults[i].Error == nil {
+					t.Errorf("Expected error result containing '%v' but got non-error", result.Error)
+					continue
+				}
 				if result.Error != nil && !strings.Contains(evalResults[i].Error.Error(), result.Error.Error()) {
 					t.Errorf("Expected result '%v' but got '%v'", result.Error, evalResults[i].Error)
+					continue
 				}
 				if result.Error == nil && evalResults[i].Error != nil {
 					t.Errorf("Expected result '%v' but got error '%v'", result.EvalResult, evalResults[i].Error)
