@@ -353,11 +353,11 @@ func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *re
 }
 
 func TestAllocator(t *testing.T) {
-	nonExistentAttribute := resourceapi.FullyQualifiedName("NonExistentAttribute")
-	boolAttribute := resourceapi.FullyQualifiedName("boolAttribute")
-	stringAttribute := resourceapi.FullyQualifiedName("stringAttribute")
-	versionAttribute := resourceapi.FullyQualifiedName("driverVersion")
-	intAttribute := resourceapi.FullyQualifiedName("numa")
+	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
+	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
+	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
+	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
+	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
 
 	testcases := map[string]struct {
 		adminAccess      bool
