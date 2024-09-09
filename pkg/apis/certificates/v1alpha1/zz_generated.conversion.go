@@ -25,9 +25,12 @@ import (
 	unsafe "unsafe"
 
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -64,6 +67,56 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundleSpec)(nil), (*certificatesv1alpha1.ClusterTrustBundleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(a.(*certificates.ClusterTrustBundleSpec), b.(*certificatesv1alpha1.ClusterTrustBundleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.PodCertificateRequest)(nil), (*certificates.PodCertificateRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCertificateRequest_To_certificates_PodCertificateRequest(a.(*certificatesv1alpha1.PodCertificateRequest), b.(*certificates.PodCertificateRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.PodCertificateRequest)(nil), (*certificatesv1alpha1.PodCertificateRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_PodCertificateRequest_To_v1alpha1_PodCertificateRequest(a.(*certificates.PodCertificateRequest), b.(*certificatesv1alpha1.PodCertificateRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.PodCertificateRequestCondition)(nil), (*certificates.PodCertificateRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCertificateRequestCondition_To_certificates_PodCertificateRequestCondition(a.(*certificatesv1alpha1.PodCertificateRequestCondition), b.(*certificates.PodCertificateRequestCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.PodCertificateRequestCondition)(nil), (*certificatesv1alpha1.PodCertificateRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_PodCertificateRequestCondition_To_v1alpha1_PodCertificateRequestCondition(a.(*certificates.PodCertificateRequestCondition), b.(*certificatesv1alpha1.PodCertificateRequestCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.PodCertificateRequestList)(nil), (*certificates.PodCertificateRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCertificateRequestList_To_certificates_PodCertificateRequestList(a.(*certificatesv1alpha1.PodCertificateRequestList), b.(*certificates.PodCertificateRequestList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.PodCertificateRequestList)(nil), (*certificatesv1alpha1.PodCertificateRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_PodCertificateRequestList_To_v1alpha1_PodCertificateRequestList(a.(*certificates.PodCertificateRequestList), b.(*certificatesv1alpha1.PodCertificateRequestList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.PodCertificateRequestSpec)(nil), (*certificates.PodCertificateRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec(a.(*certificatesv1alpha1.PodCertificateRequestSpec), b.(*certificates.PodCertificateRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.PodCertificateRequestSpec)(nil), (*certificatesv1alpha1.PodCertificateRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec(a.(*certificates.PodCertificateRequestSpec), b.(*certificatesv1alpha1.PodCertificateRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.PodCertificateRequestStatus)(nil), (*certificates.PodCertificateRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(a.(*certificatesv1alpha1.PodCertificateRequestStatus), b.(*certificates.PodCertificateRequestStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.PodCertificateRequestStatus)(nil), (*certificatesv1alpha1.PodCertificateRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus(a.(*certificates.PodCertificateRequestStatus), b.(*certificatesv1alpha1.PodCertificateRequestStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -138,4 +191,154 @@ func autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBun
 // Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec is an autogenerated conversion function.
 func Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *certificatesv1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
 	return autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCertificateRequest_To_certificates_PodCertificateRequest(in *certificatesv1alpha1.PodCertificateRequest, out *certificates.PodCertificateRequest, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_PodCertificateRequest_To_certificates_PodCertificateRequest is an autogenerated conversion function.
+func Convert_v1alpha1_PodCertificateRequest_To_certificates_PodCertificateRequest(in *certificatesv1alpha1.PodCertificateRequest, out *certificates.PodCertificateRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCertificateRequest_To_certificates_PodCertificateRequest(in, out, s)
+}
+
+func autoConvert_certificates_PodCertificateRequest_To_v1alpha1_PodCertificateRequest(in *certificates.PodCertificateRequest, out *certificatesv1alpha1.PodCertificateRequest, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_certificates_PodCertificateRequest_To_v1alpha1_PodCertificateRequest is an autogenerated conversion function.
+func Convert_certificates_PodCertificateRequest_To_v1alpha1_PodCertificateRequest(in *certificates.PodCertificateRequest, out *certificatesv1alpha1.PodCertificateRequest, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequest_To_v1alpha1_PodCertificateRequest(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCertificateRequestCondition_To_certificates_PodCertificateRequestCondition(in *certificatesv1alpha1.PodCertificateRequestCondition, out *certificates.PodCertificateRequestCondition, s conversion.Scope) error {
+	out.Type = certificates.PodCertificateRequestConditionType(in.Type)
+	out.Status = core.ConditionStatus(in.Status)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
+	return nil
+}
+
+// Convert_v1alpha1_PodCertificateRequestCondition_To_certificates_PodCertificateRequestCondition is an autogenerated conversion function.
+func Convert_v1alpha1_PodCertificateRequestCondition_To_certificates_PodCertificateRequestCondition(in *certificatesv1alpha1.PodCertificateRequestCondition, out *certificates.PodCertificateRequestCondition, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCertificateRequestCondition_To_certificates_PodCertificateRequestCondition(in, out, s)
+}
+
+func autoConvert_certificates_PodCertificateRequestCondition_To_v1alpha1_PodCertificateRequestCondition(in *certificates.PodCertificateRequestCondition, out *certificatesv1alpha1.PodCertificateRequestCondition, s conversion.Scope) error {
+	out.Type = certificatesv1alpha1.PodCertificateRequestConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
+	return nil
+}
+
+// Convert_certificates_PodCertificateRequestCondition_To_v1alpha1_PodCertificateRequestCondition is an autogenerated conversion function.
+func Convert_certificates_PodCertificateRequestCondition_To_v1alpha1_PodCertificateRequestCondition(in *certificates.PodCertificateRequestCondition, out *certificatesv1alpha1.PodCertificateRequestCondition, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequestCondition_To_v1alpha1_PodCertificateRequestCondition(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCertificateRequestList_To_certificates_PodCertificateRequestList(in *certificatesv1alpha1.PodCertificateRequestList, out *certificates.PodCertificateRequestList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]certificates.PodCertificateRequest)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_PodCertificateRequestList_To_certificates_PodCertificateRequestList is an autogenerated conversion function.
+func Convert_v1alpha1_PodCertificateRequestList_To_certificates_PodCertificateRequestList(in *certificatesv1alpha1.PodCertificateRequestList, out *certificates.PodCertificateRequestList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCertificateRequestList_To_certificates_PodCertificateRequestList(in, out, s)
+}
+
+func autoConvert_certificates_PodCertificateRequestList_To_v1alpha1_PodCertificateRequestList(in *certificates.PodCertificateRequestList, out *certificatesv1alpha1.PodCertificateRequestList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]certificatesv1alpha1.PodCertificateRequest)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_certificates_PodCertificateRequestList_To_v1alpha1_PodCertificateRequestList is an autogenerated conversion function.
+func Convert_certificates_PodCertificateRequestList_To_v1alpha1_PodCertificateRequestList(in *certificates.PodCertificateRequestList, out *certificatesv1alpha1.PodCertificateRequestList, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequestList_To_v1alpha1_PodCertificateRequestList(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec(in *certificatesv1alpha1.PodCertificateRequestSpec, out *certificates.PodCertificateRequestSpec, s conversion.Scope) error {
+	out.SignerName = in.SignerName
+	out.PodName = in.PodName
+	out.PodUID = types.UID(in.PodUID)
+	out.ServiceAccountName = in.ServiceAccountName
+	out.ServiceAccountUID = types.UID(in.ServiceAccountUID)
+	out.NodeName = types.NodeName(in.NodeName)
+	out.NodeUID = types.UID(in.NodeUID)
+	out.PKIXPublicKey = *(*[]byte)(unsafe.Pointer(&in.PKIXPublicKey))
+	out.ProofOfPossession = *(*[]byte)(unsafe.Pointer(&in.ProofOfPossession))
+	return nil
+}
+
+// Convert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec is an autogenerated conversion function.
+func Convert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec(in *certificatesv1alpha1.PodCertificateRequestSpec, out *certificates.PodCertificateRequestSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCertificateRequestSpec_To_certificates_PodCertificateRequestSpec(in, out, s)
+}
+
+func autoConvert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec(in *certificates.PodCertificateRequestSpec, out *certificatesv1alpha1.PodCertificateRequestSpec, s conversion.Scope) error {
+	out.SignerName = in.SignerName
+	out.PodName = in.PodName
+	out.PodUID = types.UID(in.PodUID)
+	out.ServiceAccountName = in.ServiceAccountName
+	out.ServiceAccountUID = types.UID(in.ServiceAccountUID)
+	out.NodeName = types.NodeName(in.NodeName)
+	out.NodeUID = types.UID(in.NodeUID)
+	out.PKIXPublicKey = *(*[]byte)(unsafe.Pointer(&in.PKIXPublicKey))
+	out.ProofOfPossession = *(*[]byte)(unsafe.Pointer(&in.ProofOfPossession))
+	return nil
+}
+
+// Convert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec is an autogenerated conversion function.
+func Convert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec(in *certificates.PodCertificateRequestSpec, out *certificatesv1alpha1.PodCertificateRequestSpec, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequestSpec_To_v1alpha1_PodCertificateRequestSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(in *certificatesv1alpha1.PodCertificateRequestStatus, out *certificates.PodCertificateRequestStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]certificates.PodCertificateRequestCondition)(unsafe.Pointer(&in.Conditions))
+	out.CertificateChain = *(*[][]byte)(unsafe.Pointer(&in.CertificateChain))
+	out.IssuedAt = in.IssuedAt
+	out.NotBefore = in.NotBefore
+	out.BeginRefreshAt = in.BeginRefreshAt
+	out.NotAfter = in.NotAfter
+	return nil
+}
+
+// Convert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus is an autogenerated conversion function.
+func Convert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(in *certificatesv1alpha1.PodCertificateRequestStatus, out *certificates.PodCertificateRequestStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(in, out, s)
+}
+
+func autoConvert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus(in *certificates.PodCertificateRequestStatus, out *certificatesv1alpha1.PodCertificateRequestStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]certificatesv1alpha1.PodCertificateRequestCondition)(unsafe.Pointer(&in.Conditions))
+	out.CertificateChain = *(*[][]byte)(unsafe.Pointer(&in.CertificateChain))
+	out.IssuedAt = in.IssuedAt
+	out.NotBefore = in.NotBefore
+	out.BeginRefreshAt = in.BeginRefreshAt
+	out.NotAfter = in.NotAfter
+	return nil
+}
+
+// Convert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus is an autogenerated conversion function.
+func Convert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus(in *certificates.PodCertificateRequestStatus, out *certificatesv1alpha1.PodCertificateRequestStatus, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequestStatus_To_v1alpha1_PodCertificateRequestStatus(in, out, s)
 }
