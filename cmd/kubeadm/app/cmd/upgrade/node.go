@@ -99,6 +99,8 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	nodeRunner.AppendPhase(phases.NewControlPlane())
 	nodeRunner.AppendPhase(phases.NewKubeconfigPhase())
 	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
+	nodeRunner.AppendPhase(phases.NewAddonPhase())
+	nodeRunner.AppendPhase(phases.NewPostUpgradePhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases

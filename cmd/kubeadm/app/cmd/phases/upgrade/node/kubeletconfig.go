@@ -29,11 +29,11 @@ import (
 
 var (
 	kubeletConfigLongDesc = cmdutil.LongDesc(`
-		Download the kubelet configuration from the kubelet-config ConfigMap stored in the cluster
+		Upgrade the kubelet configuration for this node by downloading it from the kubelet-config ConfigMap stored in the cluster
 		`)
 )
 
-// NewKubeletConfigPhase creates a kubeadm workflow phase that implements handling of kubelet-config upgrade.
+// NewKubeletConfigPhase returns a new kubelet-config phase.
 func NewKubeletConfigPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "kubelet-config",
@@ -41,6 +41,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 		Long:  kubeletConfigLongDesc,
 		Run:   runKubeletConfigPhase(),
 		InheritFlags: []string{
+			options.CfgPath,
 			options.DryRun,
 			options.KubeconfigPath,
 			options.Patches,
@@ -56,20 +57,15 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return errors.New("kubelet-config phase invoked with an invalid data struct")
 		}
 
-		// otherwise, retrieve all the info required for kubelet config upgrade
-		cfg := data.InitCfg()
-		dryRun := data.DryRun()
-
 		// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
 		// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
 		// recovered if there is anything goes wrong.
-		err := upgrade.WriteKubeletConfigFiles(cfg, data.PatchesDir(), dryRun, data.OutputWriter())
+		err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), data.PatchesDir(), data.DryRun(), data.OutputWriter())
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
-		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
+		fmt.Println("[upgrade/kubelet-config] The configuration for this node was successfully upgraded!")
 		return nil
 	}
 }

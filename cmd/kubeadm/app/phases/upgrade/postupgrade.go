@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
@@ -36,78 +35,10 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
-
-// PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
-func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
-	unupgradedControlPlanes, err := UnupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
-	if err != nil {
-		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
-	}
-	if len(unupgradedControlPlanes) > 0 {
-		fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
-		return nil
-	}
-
-	var errs []error
-
-	// If the coredns ConfigMap is missing, show a warning and assume that the
-	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
-	//
-	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
-	//   https://github.com/kubernetes/kubeadm/issues/1318
-	var missingCoreDNSConfigMap bool
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.CoreDNSConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		missingCoreDNSConfigMap = true
-	}
-	if missingCoreDNSConfigMap {
-		klog.Warningf("the ConfigMaps %q in the namespace %q were not found. "+
-			"Assuming that a DNS server was not deployed for this cluster. "+
-			"Note that once 'kubeadm upgrade apply' supports phases you "+
-			"will have to skip the DNS upgrade manually",
-			kubeadmconstants.CoreDNSConfigMap,
-			metav1.NamespaceSystem)
-	} else {
-		// Upgrade CoreDNS
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, false); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	// If the kube-proxy ConfigMap is missing, show a warning and assume that kube-proxy
-	// was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
-	//
-	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
-	//   https://github.com/kubernetes/kubeadm/issues/1318
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.KubeProxyConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		klog.Warningf("the ConfigMap %q in the namespace %q was not found. "+
-			"Assuming that kube-proxy was not deployed for this cluster. "+
-			"Note that once 'kubeadm upgrade apply' supports phases you "+
-			"will have to skip the kube-proxy upgrade manually",
-			kubeadmconstants.KubeProxyConfigMap,
-			metav1.NamespaceSystem)
-	} else {
-		// Upgrade kube-proxy
-		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, false); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errorsutil.NewAggregate(errs)
-}
 
 // UnupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
 //

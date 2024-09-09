@@ -57,16 +57,14 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 		return errors.New("kubelet-config phase invoked with an invalid data struct")
 	}
 
-	initCfg, dryRun := data.InitCfg(), data.DryRun()
-
 	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
 	// If not dry-running, the kubelet config file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
 	// recovered if anything goes wrong.
-	err := upgrade.WriteKubeletConfigFiles(initCfg, data.PatchesDir(), dryRun, data.OutputWriter())
+	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), data.PatchesDir(), data.DryRun(), data.OutputWriter())
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully updated!")
+	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully upgraded!")
 	return nil
 }
