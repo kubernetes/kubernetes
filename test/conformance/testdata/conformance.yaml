@@ -2267,6 +2267,15 @@
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
   file: test/e2e/node/taints.go
+- testname: Node, resource lifecycle
+  codename: '[sig-node] Node Lifecycle should run through the lifecycle of a node
+    [Conformance]'
+  description: Creating and Reading a Node MUST succeed with required name retrieved.
+    Patching a Node MUST succeed with its new label found. Listing Nodes with a labelSelector
+    MUST succeed with only a single node found. Updating a Node MUST succeed with
+    its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
+  release: v1.32
+  file: test/e2e/node/node_lifecycle.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
