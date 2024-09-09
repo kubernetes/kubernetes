@@ -53,7 +53,7 @@ var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
 		defaultSELinuxUser  = "system_u"
 		defaultSELinuxRole  = "system_r"
 		defaultSELinuxType  = "svirt_lxc_net_t"
-		defaultSELinuxLevel = "s0:c1,c5"
+		defaultSELinuxLevel = "s1:c1,c5"
 	)
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
