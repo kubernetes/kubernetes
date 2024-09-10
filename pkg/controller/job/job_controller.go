@@ -767,6 +767,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	// if job was finished previously, we don't want to redo the termination
 	if util.IsJobFinished(&job) {
 		// The job shouldn't be marked as finished until all pod finalizers are removed.
+		// Cleaning pod finalizers one more time just in case.
 		jm.cleanupPodFinalizers(&job)
 		err := jm.podBackoffStore.removeBackoffRecord(key)
 		if err != nil {
