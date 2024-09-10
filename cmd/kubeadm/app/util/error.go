@@ -38,8 +38,6 @@ const (
 )
 
 var (
-	// ErrInvalidSubCommandMsg is an error message returned on invalid subcommands
-	ErrInvalidSubCommandMsg = "invalid subcommand"
 	// ErrExit is an error returned when kubeadm is about to exit
 	ErrExit = errors.New("exit")
 )
@@ -80,10 +78,10 @@ func checkErr(err error, handleErr func(string, int)) {
 	}
 
 	msg := fmt.Sprintf("%s\nTo see the stack trace of this error execute with --v=5 or higher", err.Error())
-	// check if the verbosity level in klog is high enough and print a stack trace.
+	// Check if the verbosity level in klog is high enough and print a stack trace.
 	f := flag.CommandLine.Lookup("v")
 	if f != nil {
-		// assume that the "v" flag contains a parseable Int32 as per klog's "Level" type alias,
+		// Assume that the "v" flag contains a parsable Int32 as per klog's "Level" type alias,
 		// thus no error from ParseInt is handled here.
 		if v, e := strconv.ParseInt(f.Value.String(), 10, 32); e == nil {
 			// https://git.k8s.io/community/contributors/devel/sig-instrumentation/logging.md
@@ -97,15 +95,12 @@ func checkErr(err error, handleErr func(string, int)) {
 	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-	case strings.Contains(err.Error(), ErrInvalidSubCommandMsg):
-		handleErr(err.Error(), DefaultErrorExitCode)
 	default:
 		switch err.(type) {
 		case preflightError:
 			handleErr(msg, PreFlightExitCode)
 		case errorsutil.Aggregate:
 			handleErr(msg, ValidationExitCode)
-
 		default:
 			handleErr(msg, DefaultErrorExitCode)
 		}

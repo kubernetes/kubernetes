@@ -57,7 +57,6 @@ func NewCertsPhase() workflow.Phase {
 		Short:  "Certificate generation",
 		Phases: newCertSubPhases(),
 		Run:    runCerts,
-		Long:   cmdutil.MacroCommandLongDescription,
 	}
 }
 

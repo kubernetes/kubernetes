@@ -25,11 +25,6 @@ var (
 	AlphaDisclaimer = `
 		Alpha Disclaimer: this command is currently alpha.
 	`
-
-	// MacroCommandLongDescription provide a standard description for "macro" commands
-	MacroCommandLongDescription = LongDesc(`
-		This command is not meant to be run on its own. See list of available subcommands.
-	`)
 )
 
 // LongDesc is designed to help with producing better long command line descriptions in code.

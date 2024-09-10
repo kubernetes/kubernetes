@@ -34,27 +34,23 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-// SubCmdRun returns a function that handles a case where a subcommand must be specified
-// Without this callback, if a user runs just the command without a subcommand,
-// or with an invalid subcommand, cobra will print usage information, but still exit cleanly.
-func SubCmdRun() func(c *cobra.Command, args []string) {
-	return func(c *cobra.Command, args []string) {
-		if len(args) > 0 {
-			kubeadmutil.CheckErr(usageErrorf(c, "invalid subcommand %q", strings.Join(args, " ")))
-		}
-		c.Help()
-		kubeadmutil.CheckErr(kubeadmutil.ErrExit)
-	}
-}
+// ErrorSubcommandRequired is an error returned when a parent command cannot be executed.
+// It starts with a new line so that it's separated from previous information like a Help() screen.
+var ErrorSubcommandRequired = errors.New("\nerror: subcommand is required")
 
-func usageErrorf(c *cobra.Command, format string, args ...interface{}) error {
-	msg := fmt.Sprintf(format, args...)
-	return errors.Errorf("%s\nSee '%s -h' for help and examples", msg, c.CommandPath())
+// RequireSubcommand can be used to set an empty Run function and NoArgs on a Cobra command.
+// This handles a case where a subcommand must be specified for a parent command 'c'.
+// If no subcommand is specified the CLI exist with an error.
+func RequireSubcommand(c *cobra.Command) {
+	c.RunE = func(c *cobra.Command, args []string) error {
+		_ = c.Help()
+		return ErrorSubcommandRequired
+	}
+	c.Args = cobra.NoArgs
 }
 
 // ValidateExactArgNumber validates that the required top-level arguments are specified
