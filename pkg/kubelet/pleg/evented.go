@@ -34,7 +34,7 @@ import (
 // The frequency with which global timestamp of the cache is to
 // is to be updated periodically. If pod workers get stuck at cache.GetNewerThan
 // call, after this period it will be unblocked.
-const globalCacheUpdatePeriod = 1 * time.Second
+const globalCacheUpdatePeriod = 5 * time.Second
 
 var (
 	eventedPLEGUsage   = false
