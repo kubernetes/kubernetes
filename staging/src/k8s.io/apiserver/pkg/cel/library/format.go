@@ -91,7 +91,7 @@ var formatLib = &format{}
 type format struct{}
 
 func (*format) LibraryName() string {
-	return "format"
+	return "kubernetes.format"
 }
 
 func (*format) Types() []*cel.Type {

@@ -52,7 +52,7 @@ var regexLib = &regex{}
 type regex struct{}
 
 func (*regex) LibraryName() string {
-	return "k8s.regex"
+	return "kubernetes.regex"
 }
 
 func (*regex) Types() []*cel.Type {

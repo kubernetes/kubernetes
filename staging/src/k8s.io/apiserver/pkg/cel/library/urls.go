@@ -113,7 +113,7 @@ var urlsLib = &urls{}
 type urls struct{}
 
 func (*urls) LibraryName() string {
-	return "k8s.urls"
+	return "kubernetes.urls"
 }
 
 func (*urls) Types() []*cel.Type {

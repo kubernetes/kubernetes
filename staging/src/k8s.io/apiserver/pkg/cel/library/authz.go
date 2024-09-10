@@ -232,7 +232,7 @@ var authzLib = &authz{}
 type authz struct{}
 
 func (*authz) LibraryName() string {
-	return "k8s.authz"
+	return "kubernetes.authz"
 }
 
 func (*authz) Types() []*cel.Type {
@@ -337,7 +337,7 @@ var authzSelectorsLib = &authzSelectors{}
 type authzSelectors struct{}
 
 func (*authzSelectors) LibraryName() string {
-	return "k8s.authzSelectors"
+	return "kubernetes.authzSelectors"
 }
 
 func (*authzSelectors) Types() []*cel.Type {

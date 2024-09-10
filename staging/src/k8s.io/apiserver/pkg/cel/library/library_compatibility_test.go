@@ -20,6 +20,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,6 +29,9 @@ import (
 func TestLibraryCompatibility(t *testing.T) {
 	functionNames := sets.New[string]()
 	for _, lib := range KnownLibraries() {
+		if !strings.HasPrefix(lib.LibraryName(), "kubernetes.") {
+			t.Errorf("Expected all kubernetes CEL libraries to have a name package with a 'kubernetes.' prefix but got %v", lib.LibraryName())
+		}
 		for name := range lib.declarations() {
 			functionNames[name] = struct{}{}
 		}
@@ -93,8 +97,11 @@ func TestTypeRegistration(t *testing.T) {
 				}
 			}
 		}
-		for _, t := range lib.Types() {
-			registeredTypes.Insert(t)
+		for _, lb := range lib.Types() {
+			registeredTypes.Insert(lb)
+			if !strings.HasPrefix(lb.TypeName(), "kubernetes.") && !legacyTypeNames.Has(lb.TypeName()) {
+				t.Errorf("Expected all types in kubernetes CEL libraries to have a type name packaged with a 'kubernetes.' prefix but got %v", lb.TypeName())
+			}
 		}
 		unregistered := usedTypes.Difference(registeredTypes)
 		if len(unregistered) != 0 {
@@ -102,3 +109,6 @@ func TestTypeRegistration(t *testing.T) {
 		}
 	}
 }
+
+// TODO: Consider renaming these to "kubernetes.net.IP" and "kubernetes.net.CIDR" if we decide not to promote them to cel-go
+var legacyTypeNames = sets.New[string]("net.IP", "net.CIDR")

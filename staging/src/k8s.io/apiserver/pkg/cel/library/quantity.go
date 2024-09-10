@@ -143,7 +143,7 @@ var quantityLib = &quantity{}
 type quantity struct{}
 
 func (*quantity) LibraryName() string {
-	return "k8s.quantity"
+	return "kubernetes.quantity"
 }
 
 func (*quantity) Types() []*cel.Type {
