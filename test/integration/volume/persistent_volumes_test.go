@@ -29,12 +29,14 @@ import (
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -1058,34 +1060,6 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	// Watch all events in the namespace, and save them to artifacts for debugging.
-	// TODO: This is a temporary solution to debug flaky tests `panic: test timed out after 10m0s`.
-	// We should remove this once https://github.com/kubernetes/kubernetes/issues/124136 is fixed.
-	go func() {
-		w, err := testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
-		if err != nil {
-			return
-		}
-		for {
-			select {
-			case event, ok := <-w.ResultChan():
-				if !ok {
-					klog.Info("Event watch channel closed")
-					w, err = testClient.EventsV1().Events(ns.Name).Watch(tCtx, metav1.ListOptions{})
-					if err != nil {
-						klog.ErrorS(err, "Failed to restart event watch")
-						return
-					}
-					continue
-				}
-				reportToArtifacts(t.Name()+"-events.text", event.Object)
-			case <-tCtx.Done():
-				w.Stop()
-				return
-			}
-		}
-	}()
-
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -1117,9 +1091,24 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	}()
 
 	// Wait until the controller provisions and binds all of them
-	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhaseAndReportIt(t, watchPVC, v1.ClaimBound)
-		klog.V(1).Infof("%d claims bound", i+1)
+	err := wait.ExponentialBackoffWithContext(tCtx, retry.DefaultBackoff, func(ctx context.Context) (bool, error) {
+		for i := 0; i < objCount; i++ {
+			waitErr := waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
+			if waitErr != nil {
+				newWatchPVC, err := testClient.CoreV1().PersistentVolumeClaims(namespaceName).Watch(ctx, metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				watchPVC.Stop()
+				watchPVC = newWatchPVC
+				return false, waitErr
+			}
+			klog.V(1).Infof("%d claims bound", i+1)
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for all claims to be bound: %v", err)
 	}
 	klog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
 
@@ -1488,31 +1477,19 @@ func waitForAnyPersistentVolumePhase(w watch.Interface, phase v1.PersistentVolum
 	}
 }
 
-func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
+func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) error {
 	for {
-		event := <-w.ResultChan()
+		event, ok := <-w.ResultChan()
+		if !ok {
+			return fmt.Errorf("watch closed")
+		}
 		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
 		}
 		if claim.Status.Phase == phase {
 			klog.V(2).Infof("claim %q is %s", claim.Name, phase)
-			break
-		}
-	}
-}
-
-func waitForAnyPersistentVolumeClaimPhaseAndReportIt(t *testing.T, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
-	for {
-		event := <-w.ResultChan()
-		reportToArtifacts(t.Name()+"-watched-pvcs.text", event)
-		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
-		if !ok {
-			continue
-		}
-		if claim.Status.Phase == phase {
-			klog.V(2).Infof("claim %q is %s", claim.Name, phase)
-			break
+			return nil
 		}
 	}
 }
