@@ -191,6 +191,19 @@ var StrictCostOpt = VersionedOptions{
 	},
 }
 
+// cacheBaseEnvs controls whether calls to MustBaseEnvSet are cached.
+// Defaults to true, may be disabled by calling DisableBaseEnvSetCachingForTests.
+var cacheBaseEnvs = true
+
+// DisableBaseEnvSetCachingForTests clears and disables base env caching.
+// This is only intended for unit tests exercising MustBaseEnvSet directly with different enablement options.
+// It does not clear other initialization paths that may cache results of calling MustBaseEnvSet.
+func DisableBaseEnvSetCachingForTests() {
+	cacheBaseEnvs = false
+	baseEnvs.Clear()
+	baseEnvsWithOption.Clear()
+}
+
 // MustBaseEnvSet returns the common CEL base environments for Kubernetes for Version, or panics
 // if the version is nil, or does not have major and minor components.
 //
@@ -216,7 +229,9 @@ func MustBaseEnvSet(ver *version.Version, strictCost bool) *EnvSet {
 		}
 		entry, _, _ = baseEnvsSingleflight.Do(key, func() (interface{}, error) {
 			entry := mustNewEnvSet(ver, baseOpts)
-			baseEnvs.Store(key, entry)
+			if cacheBaseEnvs {
+				baseEnvs.Store(key, entry)
+			}
 			return entry, nil
 		})
 	} else {
@@ -225,7 +240,9 @@ func MustBaseEnvSet(ver *version.Version, strictCost bool) *EnvSet {
 		}
 		entry, _, _ = baseEnvsWithOptionSingleflight.Do(key, func() (interface{}, error) {
 			entry := mustNewEnvSet(ver, baseOptsWithoutStrictCost)
-			baseEnvsWithOption.Store(key, entry)
+			if cacheBaseEnvs {
+				baseEnvsWithOption.Store(key, entry)
+			}
 			return entry, nil
 		})
 	}
