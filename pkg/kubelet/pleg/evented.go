@@ -267,7 +267,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			}
 			shouldSendPLEGEvent = true
 		} else {
-			if e.cache.Set(podID, status, err, time.Unix(event.GetCreatedAt(), 0)) {
+			if e.cache.Set(podID, status, err, time.Unix(0, event.GetCreatedAt())) {
 				shouldSendPLEGEvent = true
 			}
 		}
