@@ -64,6 +64,12 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 	}
 }
 
+func getObjectFromJSON(b []byte) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	_ = obj.UnmarshalJSON(b) // can ignore parse error because the comparison will fail
+	return obj
+}
+
 func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewForConfig(&restclient.Config{
@@ -358,6 +364,15 @@ func TestGet(t *testing.T) {
 			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get/srtest",
 			resp:        getJSON("vTest", "srTest", "namespaced_subresource_get"),
 			want:        getObject("vTest", "srTest", "namespaced_subresource_get"),
+		},
+		{
+			resource:    "rtest",
+			subresource: []string{"srtest"},
+			namespace:   "nstest",
+			name:        "namespaced_subresource_get_list",
+			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get_list/srtest",
+			resp:        getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1")),
+			want:        getObjectFromJSON(getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1"))),
 		},
 	}
 	for _, tc := range tcs {
