@@ -2,7 +2,7 @@
 
 module k8s.io/apiserver
 
-go 1.22.0
+go 1.23.0
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a

@@ -2,7 +2,7 @@
 
 module k8s.io/dynamic-resource-allocation
 
-go 1.22.0
+go 1.23.0
 
 require (
 	github.com/blang/semver/v4 v4.0.0
