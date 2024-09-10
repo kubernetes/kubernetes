@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apply implements phases of 'kubeadm upgrade apply'.
-package apply
+// Package upgrade holds the common phases for 'kubeadm upgrade'.
+package upgrade
 
 import (
 	"fmt"
@@ -28,7 +28,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -39,7 +38,6 @@ func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
 		Short: "Upgrade the default kubeadm addons",
-		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
@@ -98,7 +96,6 @@ func runCoreDNSAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	// Upgrade CoreDNS
 	if err := dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, dryRun); err != nil {
 		return err
 	}
@@ -121,7 +118,6 @@ func runKubeProxyAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	// Upgrade kube-proxy
 	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, dryRun); err != nil {
 		return err
 	}

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package node implements phases of 'kubeadm upgrade node'.
 package node
 
 import (
@@ -28,13 +29,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-// NewControlPlane creates a kubeadm workflow phase that implements handling of control-plane upgrade.
+// NewControlPlane returns a new control-plane phase.
 func NewControlPlane() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "control-plane",
 		Short: "Upgrade the control plane instance deployed on this node, if any",
 		Run:   runControlPlane(),
 		InheritFlags: []string{
+			options.CfgPath,
 			options.DryRun,
 			options.KubeconfigPath,
 			options.CertificateRenewal,
@@ -54,7 +56,7 @@ func runControlPlane() func(c workflow.RunData) error {
 
 		// if this is not a control-plane node, this phase should not be executed
 		if !data.IsControlPlaneNode() {
-			fmt.Println("[upgrade] Skipping phase. Not a control plane node.")
+			fmt.Println("[upgrade/control-plane] Skipping phase. Not a control plane node.")
 			return nil
 		}
 
@@ -67,8 +69,9 @@ func runControlPlane() func(c workflow.RunData) error {
 		patchesDir := data.PatchesDir()
 
 		// Upgrade the control plane and etcd if installed on this node
-		fmt.Printf("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
+		fmt.Printf("[upgrade/control-plane] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
 		if dryRun {
+			fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q", cfg.KubernetesVersion)
 			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg)
 		}
 
@@ -78,11 +81,7 @@ func runControlPlane() func(c workflow.RunData) error {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 
-		if err := upgrade.PerformAddonsUpgrade(client, cfg, data.PatchesDir(), data.OutputWriter()); err != nil {
-			return errors.Wrap(err, "failed to perform addons upgrade")
-		}
-
-		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")
+		fmt.Println("[upgrade/control-plane] The control plane instance for this node was successfully upgraded!")
 
 		return nil
 	}
