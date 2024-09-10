@@ -4,6 +4,8 @@ module k8s.io/controller-manager
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0

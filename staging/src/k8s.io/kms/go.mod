@@ -4,6 +4,8 @@ module k8s.io/kms
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/gogo/protobuf v1.3.2
 	google.golang.org/grpc v1.65.0
