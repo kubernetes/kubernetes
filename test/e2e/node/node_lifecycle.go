@@ -40,7 +40,15 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 	f := framework.NewDefaultFramework("fake-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should run through the lifecycle of a node", func(ctx context.Context) {
+	/*
+		Release: v1.32
+		Testname: Node, resource lifecycle
+		Description: Creating and Reading a Node MUST succeed with required name retrieved.
+		Patching a Node MUST succeed with its new label found. Listing Nodes with a labelSelector
+		MUST succeed with only a single node found. Updating a Node MUST succeed with
+		its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
+	*/
+	framework.ConformanceIt("should run through the lifecycle of a node", func(ctx context.Context) {
 		// the scope of this test only covers the api-server
 
 		nodeClient := f.ClientSet.CoreV1().Nodes()
