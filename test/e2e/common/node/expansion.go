@@ -293,9 +293,9 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath test writes
 		Description: Verify that a subpath expansion can be used to write files into subpaths.
-		1.	valid subpathexpr starts a container running
-		2.	test for valid subpath writes
-		3.	successful expansion of the subpathexpr isn't required for volume cleanup
+		1. valid subpathexpr starts a container running
+		2. test for valid subpath writes
+		3. successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
 	framework.ConformanceIt("should succeed in writing subpaths in container", func(ctx context.Context) {

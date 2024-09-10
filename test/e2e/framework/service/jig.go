@@ -357,7 +357,7 @@ func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) er
 func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
+	// Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
 	endpointAvailable := false
 	endpointSliceAvailable := false

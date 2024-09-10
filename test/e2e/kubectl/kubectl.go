@@ -508,7 +508,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectNoError(err)
 			defer framework.TryKill(proxyCmd)
 
-			//proxyLogs.Reset()
+			// proxyLogs.Reset()
 			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := e2ekubectl.NewKubectlCommand(
@@ -2483,7 +2483,7 @@ func validateController(ctx context.Context, c clientset.Interface, containerIma
 
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
-	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) // testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < framework.PodStartTimeout && ctx.Err() == nil; time.Sleep(5 * time.Second) {
 		getPodsOutput := e2ekubectl.RunKubectlOrDie(ns, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname)

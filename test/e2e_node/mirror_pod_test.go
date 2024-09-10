@@ -338,7 +338,7 @@ func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir stri
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever, //don't restart pod
+			RestartPolicy: v1.RestartPolicyNever, // don't restart pod
 			Volumes: []v1.Volume{
 				{
 					Name: "nfs-vol",

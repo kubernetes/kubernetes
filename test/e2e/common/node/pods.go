@@ -152,7 +152,7 @@ func getRestartDelay(ctx context.Context, podClient *e2epod.PodClient, podName s
 		}
 
 		// when the RestartCount is changed, the Containers will be in one of the following states:
-		//Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
+		// Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
 		if status.RestartCount > previousRestartCount {
 			var startedAt time.Time
 			if status.State.Running != nil {

@@ -314,7 +314,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 						continue
 					}
 					if cd.Topology != nil {
-						//we expect nil topology
+						// we expect nil topology
 						return fmt.Errorf("Nil topology is expected")
 					}
 				}
@@ -758,7 +758,7 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 }
 
 func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sidecarContainersEnabled bool) {
-	//var err error
+	// var err error
 	ginkgo.By("checking the output when no pods are present")
 	expected := []podDesc{}
 	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
