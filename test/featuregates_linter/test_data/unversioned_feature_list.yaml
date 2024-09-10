@@ -178,12 +178,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: RetryGenerateName
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: SeparateCacheWatchRPC
   versionedSpecs:
   - default: true
