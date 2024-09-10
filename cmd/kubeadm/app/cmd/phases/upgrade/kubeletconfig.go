@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+// Package upgrade holds the common phases for 'kubeadm upgrade'.
+package upgrade
 
 import (
 	"fmt"
@@ -39,7 +40,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 		Name:  "kubelet-config",
 		Short: "Upgrade the kubelet configuration for this node",
 		Long:  kubeletConfigLongDesc,
-		Run:   runKubeletConfigPhase(),
+		Run:   runKubeletConfigPhase,
 		InheritFlags: []string{
 			options.CfgPath,
 			options.DryRun,
@@ -50,22 +51,20 @@ func NewKubeletConfigPhase() workflow.Phase {
 	return phase
 }
 
-func runKubeletConfigPhase() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
-		data, ok := c.(Data)
-		if !ok {
-			return errors.New("kubelet-config phase invoked with an invalid data struct")
-		}
-
-		// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
-		// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
-		// recovered if there is anything goes wrong.
-		err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), data.PatchesDir(), data.DryRun(), data.OutputWriter())
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("[upgrade/kubelet-config] The configuration for this node was successfully upgraded!")
-		return nil
+func runKubeletConfigPhase(c workflow.RunData) error {
+	data, ok := c.(Data)
+	if !ok {
+		return errors.New("kubelet-config phase invoked with an invalid data struct")
 	}
+
+	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
+	// If not dry-running, the kubelet config file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
+	// recovered if anything goes wrong.
+	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), data.PatchesDir(), data.DryRun(), data.OutputWriter())
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully upgraded!")
+	return nil
 }

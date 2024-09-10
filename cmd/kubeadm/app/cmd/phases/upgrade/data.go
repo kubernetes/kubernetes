@@ -14,20 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apply implements phases of 'kubeadm upgrade apply'.
-package apply
+// Package upgrade holds the common phases for 'kubeadm upgrade'.
+package upgrade
 
 import (
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade"
+	"io"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// Data is the interface to use for kubeadm upgrade apply phases.
-// The "applyData" type from "cmd/upgrade/apply.go" must satisfy this interface.
+// Data is the common interface to use for kubeadm upgrade phases.
 type Data interface {
-	upgrade.Data
-
-	SessionIsInteractive() bool
-	AllowExperimentalUpgrades() bool
-	AllowRCUpgrades() bool
-	ForceUpgrade() bool
+	EtcdUpgrade() bool
+	RenewCerts() bool
+	DryRun() bool
+	Cfg() *kubeadmapi.UpgradeConfiguration
+	InitCfg() *kubeadmapi.InitConfiguration
+	Client() clientset.Interface
+	IgnorePreflightErrors() sets.Set[string]
+	PatchesDir() string
+	OutputWriter() io.Writer
 }

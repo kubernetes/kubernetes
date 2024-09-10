@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package node implements phases of 'kubeadm upgrade node'.
-package node
+// Package upgrade holds the common phases for 'kubeadm upgrade'.
+package upgrade
 
 import (
 	"github.com/pkg/errors"

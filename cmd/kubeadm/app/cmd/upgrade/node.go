@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	commonphases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -98,9 +99,9 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	nodeRunner.AppendPhase(phases.NewPreflightPhase())
 	nodeRunner.AppendPhase(phases.NewControlPlane())
 	nodeRunner.AppendPhase(phases.NewKubeconfigPhase())
-	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
-	nodeRunner.AppendPhase(phases.NewAddonPhase())
-	nodeRunner.AppendPhase(phases.NewPostUpgradePhase())
+	nodeRunner.AppendPhase(commonphases.NewKubeletConfigPhase())
+	nodeRunner.AppendPhase(commonphases.NewAddonPhase())
+	nodeRunner.AppendPhase(commonphases.NewPostUpgradePhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
