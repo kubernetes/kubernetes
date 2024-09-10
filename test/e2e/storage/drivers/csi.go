@@ -885,7 +885,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapSnapshotDataSource:             true,
 				storageframework.CapReadWriteOncePod:               true,
 				storageframework.CapMultiplePVsSameID:              true,
-				storageframework.CapFSResizeFromSourceNotSupported: true, //TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
+				storageframework.CapFSResizeFromSourceNotSupported: true, // TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
