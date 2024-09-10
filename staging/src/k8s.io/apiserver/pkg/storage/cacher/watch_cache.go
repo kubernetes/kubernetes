@@ -696,6 +696,7 @@ func (w *watchCache) isIndexValidLocked(index int) bool {
 // be called under the watchCache lock.
 func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
 	_, matchesSingle := opts.Predicate.MatchesSingle()
+	matchesSingle = matchesSingle && !opts.Recursive
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		return w.getIntervalFromStoreLocked(key, matchesSingle)
 	}

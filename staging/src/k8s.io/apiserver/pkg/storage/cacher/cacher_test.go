@@ -390,6 +390,12 @@ func TestWatchSemanticInitialEventsExtended(t *testing.T) {
 	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
 }
 
+func TestWatchListMatchSingle(t *testing.T) {
+	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+	t.Cleanup(terminate)
+	storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
+}
+
 // ===================================================
 // Test-setup related function are following.
 // ===================================================
