@@ -44,16 +44,8 @@ KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 
 kube::test::find_integration_test_dirs() {
-  (
-    cd "${KUBE_ROOT}"
-    # The "./" syntax here produces Go-compatible package names.
-    find ./test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
-      | LC_ALL=C sort -u
-    find ./staging/src/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
-      | LC_ALL=C sort -u
-  )
+    echo ./test/integration/...
+    echo ./staging/src/k8s.io/apiextensions-apiserver/test/integration/...
 }
 
 CLEANUP_REQUIRED=
@@ -83,6 +75,7 @@ runTests() {
   KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
+      KUBE_SPECIAL_TESTS="run_integration_tests" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE="" \
       MAKEFLAGS="" \
@@ -94,9 +87,11 @@ runTests() {
 checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
+  . hack/install-etcd.sh
+  which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
   kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions."
-  kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
+  kube::log::usage "You can use '. hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
 

@@ -33,28 +33,7 @@ KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
 kube::test::find_dirs() {
-  (
-    cd "${KUBE_ROOT}"
-    find -L . -not \( \
-        \( \
-          -path './_artifacts/*' \
-          -o -path './_output/*' \
-          -o -path './cmd/kubeadm/test/*' \
-          -o -path './contrib/podex/*' \
-          -o -path './release/*' \
-          -o -path './target/*' \
-          -o -path './test/e2e/e2e_test.go' \
-          -o -path './test/e2e_node/*' \
-          -o -path './test/e2e_kubeadm/*' \
-          -o -path './test/integration/*' \
-          -o -path './third_party/*' \
-          -o -path './staging/*' \
-          -o -path './vendor/*' \
-        \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
-
-    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
-  )
+  go work edit -json | jq -r '.Use[].DiskPath + "/..."'
 }
 
 # TODO: This timeout should really be lower, this is a *long* time to test one
@@ -161,6 +140,25 @@ set -- "${testcases[@]+${testcases[@]}}"
 
 if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
+fi
+
+# comma separate for passing to shellcheck
+join() {
+  local IFS=,
+  echo "$*" # note: not $@
+}
+
+gotags=()
+kube::util::read-array gotags < <(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^- ]*\).*|\1|p' | sed -e 's|"||g' -e 's|,|\n|g')
+if [[ -z "${KUBE_SPECIAL_TESTS:-}" ]]; then
+  gotags+=("skip_special_tests")
+else
+  for tag in ${KUBE_SPECIAL_TESTS}; do
+    gotags+=("${tag}")
+  done
+fi
+if [[ "${#gotags[@]}" != 0 ]]; then
+    goflags+=("-tags=$(join "${gotags[@]}")")
 fi
 
 junitFilenamePrefix() {

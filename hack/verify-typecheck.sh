@@ -40,7 +40,12 @@ fi
 
 ret=0
 TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
-go run ./test/typecheck "$@" "--serial=$TYPECHECK_SERIAL" || ret=$?
+go run \
+    ./test/typecheck \
+    --serial="$TYPECHECK_SERIAL" \
+    --tags=run_integration_tests,run_kubeadm_cmd_tests \
+    "$@" `# has to go last because of Go flag parsing` \
+    || ret=$?
 
 if [[ $ret -ne 0 ]]; then
   echo "!!! Typecheck has failed. This may cause cross platform build failures." >&2

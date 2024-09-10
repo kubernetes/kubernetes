@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build run_integration_tests && !windows
+// +build run_integration_tests,!windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
