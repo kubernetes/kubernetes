@@ -4,6 +4,8 @@ module k8s.io/metrics
 
 go 1.23.0
 
+godebug default=go1.23
+
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.9.0
