@@ -1686,7 +1686,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodePort := -1
-		retry.OnError(retry.DefaultRetry, func(e error) bool {
+		err := retry.OnError(retry.DefaultRetry, func(e error) bool {
 			return e != nil
 		}, func() error {
 			v := jig.GetUnusedStaticNodePortAndReserve()
@@ -1696,11 +1696,17 @@ var _ = common.SIGDescribe("Services", func() {
 			nodePort = v
 			return nil
 		})
-		if nodePort == -1 {
-			framework.Failf("No available static nodeport found")
+
+		if err != nil {
+			framework.Failf("error occured while acquiring a free nodeport %v", err)
 		}
+
+		if nodePort == -1 {
+			framework.Failf("no available static nodeport found")
+		}
+
 		service.Spec.Ports[0].NodePort = int32(nodePort)
-		service, err := t.CreateService(service)
+		service, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {

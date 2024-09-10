@@ -118,7 +118,7 @@ func (j *TestJig) ReleaseStaticNodePort(port int) bool {
 	staticPortLock.Lock()
 	defer staticPortLock.Unlock()
 	if port-staticPortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-staticPortRange.Base] == 1 {
-		staticPorts[port-staticPortRange.Base] = 0 //Release
+		staticPorts[port-staticPortRange.Base] = 0 // Release
 		return true
 	} else {
 		return false
