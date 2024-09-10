@@ -1691,14 +1691,14 @@ var _ = common.SIGDescribe("Services", func() {
 		}, func() error {
 			v := jig.GetUnusedStaticNodePortAndReserve()
 			if v == -1 {
-				return errors.New("No available nodeport found")
+				return errors.New("no available nodeport found")
 			}
 			nodePort = v
 			return nil
 		})
 
 		if err != nil {
-			framework.Failf("error occured while acquiring a free nodeport %v", err)
+			framework.Failf("error occurred while acquiring a free nodeport %v", err)
 		}
 
 		if nodePort == -1 {
