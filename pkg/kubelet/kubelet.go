@@ -184,9 +184,6 @@ const (
 	eventedPlegRelistPeriod     = time.Second * 300
 	eventedPlegRelistThreshold  = time.Minute * 10
 	eventedPlegMaxStreamRetries = 5
-	// Evented PLEG needs to update the global timestamp of the cache as frequently as Generic PLEG relisting
-	// in order to wake up pod workers that get stuck in cache.GetNewerThan().
-	eventedPlegCacheUpdatePeriod = genericPlegRelistPeriod
 
 	// backOffPeriod is the period to back off when pod syncing results in an
 	// error. It is also used as the base period for the exponential backoff
@@ -739,7 +736,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			RelistThreshold: genericPlegRelistThreshold,
 		}
 		klet.eventedPleg, err = pleg.NewEventedPLEG(klet.containerRuntime, klet.runtimeService, eventChannel,
-			klet.podCache, klet.pleg, eventedPlegMaxStreamRetries, eventedRelistDuration, clock.RealClock{}, eventedPlegCacheUpdatePeriod)
+			klet.podCache, klet.pleg, eventedPlegMaxStreamRetries, eventedRelistDuration, clock.RealClock{})
 		if err != nil {
 			return nil, err
 		}
