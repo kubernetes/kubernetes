@@ -112,23 +112,23 @@ func NewKVFromKVClient(remote pb.KVClient, c *Client) KV {
 
 func (kv *kv) Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error) {
 	r, err := kv.Do(ctx, OpPut(key, val, opts...))
-	return r.put, toErr(ctx, err)
+	return r.put, ContextError(ctx, err)
 }
 
 func (kv *kv) Get(ctx context.Context, key string, opts ...OpOption) (*GetResponse, error) {
 	r, err := kv.Do(ctx, OpGet(key, opts...))
-	return r.get, toErr(ctx, err)
+	return r.get, ContextError(ctx, err)
 }
 
 func (kv *kv) Delete(ctx context.Context, key string, opts ...OpOption) (*DeleteResponse, error) {
 	r, err := kv.Do(ctx, OpDelete(key, opts...))
-	return r.del, toErr(ctx, err)
+	return r.del, ContextError(ctx, err)
 }
 
 func (kv *kv) Compact(ctx context.Context, rev int64, opts ...CompactOption) (*CompactResponse, error) {
 	resp, err := kv.remote.Compact(ctx, OpCompact(rev, opts...).toRequest(), kv.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 	return (*CompactResponse)(resp), err
 }
@@ -173,5 +173,5 @@ func (kv *kv) Do(ctx context.Context, op Op) (OpResponse, error) {
 	default:
 		panic("Unknown op")
 	}
-	return OpResponse{}, toErr(ctx, err)
+	return OpResponse{}, ContextError(ctx, err)
 }

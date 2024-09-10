@@ -334,9 +334,11 @@ type Config struct {
 	// Requires experimental-enable-lease-checkpoint to be enabled.
 	// Deprecated in v3.6.
 	// TODO: Delete in v3.7
-	ExperimentalEnableLeaseCheckpointPersist bool          `json:"experimental-enable-lease-checkpoint-persist"`
-	ExperimentalCompactionBatchLimit         int           `json:"experimental-compaction-batch-limit"`
-	ExperimentalWatchProgressNotifyInterval  time.Duration `json:"experimental-watch-progress-notify-interval"`
+	ExperimentalEnableLeaseCheckpointPersist bool `json:"experimental-enable-lease-checkpoint-persist"`
+	ExperimentalCompactionBatchLimit         int  `json:"experimental-compaction-batch-limit"`
+	// ExperimentalCompactionSleepInterval is the sleep interval between every etcd compaction loop.
+	ExperimentalCompactionSleepInterval     time.Duration `json:"experimental-compaction-sleep-interval"`
+	ExperimentalWatchProgressNotifyInterval time.Duration `json:"experimental-watch-progress-notify-interval"`
 	// ExperimentalWarningApplyDuration is the time duration after which a warning is generated if applying request
 	// takes more time than this value.
 	ExperimentalWarningApplyDuration time.Duration `json:"experimental-warning-apply-duration"`

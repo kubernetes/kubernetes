@@ -39,8 +39,11 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 	binary.BigEndian.PutUint64(end, uint64(compactMainRev+1))
 
 	batchNum := s.cfg.CompactionBatchLimit
+	batchTicker := time.NewTicker(s.cfg.CompactionSleepInterval)
+	defer batchTicker.Stop()
 	h := newKVHasher(prevCompactRev, compactMainRev, keep)
 	last := make([]byte, 8+1+8)
+
 	for {
 		var rev revision
 
@@ -58,7 +61,7 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 			h.WriteKeyValue(keys[i], values[i])
 		}
 
-		if len(keys) < s.cfg.CompactionBatchLimit {
+		if len(keys) < batchNum {
 			// gofail: var compactBeforeSetFinishedCompact struct{}
 			rbytes := make([]byte, 8+1+8)
 			revToBytes(revision{main: compactMainRev}, rbytes)
@@ -87,7 +90,7 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 		dbCompactionPauseMs.Observe(float64(time.Since(start) / time.Millisecond))
 
 		select {
-		case <-time.After(10 * time.Millisecond):
+		case <-batchTicker.C:
 		case <-s.stopc:
 			return KeyValueHash{}, fmt.Errorf("interrupted due to stop signal")
 		}

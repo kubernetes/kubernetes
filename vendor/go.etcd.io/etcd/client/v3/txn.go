@@ -144,7 +144,7 @@ func (txn *txn) Commit() (*TxnResponse, error) {
 	var err error
 	resp, err = txn.kv.remote.Txn(txn.ctx, r, txn.callOpts...)
 	if err != nil {
-		return nil, toErr(txn.ctx, err)
+		return nil, ContextError(txn.ctx, err)
 	}
 	return (*TxnResponse)(resp), nil
 }

@@ -615,10 +615,16 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		cfg.Logger.Warn("failed to create token provider", zap.Error(err))
 		return nil, err
 	}
-	srv.kv = mvcc.New(srv.Logger(), srv.be, srv.lessor, mvcc.StoreConfig{CompactionBatchLimit: cfg.CompactionBatchLimit})
+
+	mvccStoreConfig := mvcc.StoreConfig{
+		CompactionBatchLimit:    cfg.CompactionBatchLimit,
+		CompactionSleepInterval: cfg.CompactionSleepInterval,
+	}
+	srv.kv = mvcc.New(srv.Logger(), srv.be, srv.lessor, mvccStoreConfig)
 
 	kvindex := ci.ConsistentIndex()
 	srv.lg.Debug("restore consistentIndex", zap.Uint64("index", kvindex))
+
 	if beExist {
 		// TODO: remove kvindex != 0 checking when we do not expect users to upgrade
 		// etcd from pre-3.0 release.
@@ -1205,9 +1211,25 @@ func (s *EtcdServer) revokeExpiredLeases(leases []*lease.Lease) {
 	})
 }
 
+// isActive checks if the etcd instance is still actively processing the
+// heartbeat message (ticks). It returns false if no heartbeat has been
+// received within 3 * tickMs.
+func (s *EtcdServer) isActive() bool {
+	latestTickTs := s.r.getLatestTickTs()
+	threshold := 3 * time.Duration(s.Cfg.TickMs) * time.Millisecond
+	return latestTickTs.Add(threshold).After(time.Now())
+}
+
 // ensureLeadership checks whether current member is still the leader.
 func (s *EtcdServer) ensureLeadership() bool {
 	lg := s.Logger()
+
+	if s.isActive() {
+		lg.Debug("The member is active, skip checking leadership",
+			zap.Time("latestTickTs", s.r.getLatestTickTs()),
+			zap.Time("now", time.Now()))
+		return true
+	}
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.Cfg.ReqTimeout())
 	defer cancel()

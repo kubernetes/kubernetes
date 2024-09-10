@@ -223,7 +223,7 @@ func (l *lessor) Grant(ctx context.Context, ttl int64) (*LeaseGrantResponse, err
 		}
 		return gresp, nil
 	}
-	return nil, toErr(ctx, err)
+	return nil, ContextError(ctx, err)
 }
 
 func (l *lessor) Revoke(ctx context.Context, id LeaseID) (*LeaseRevokeResponse, error) {
@@ -232,14 +232,14 @@ func (l *lessor) Revoke(ctx context.Context, id LeaseID) (*LeaseRevokeResponse, 
 	if err == nil {
 		return (*LeaseRevokeResponse)(resp), nil
 	}
-	return nil, toErr(ctx, err)
+	return nil, ContextError(ctx, err)
 }
 
 func (l *lessor) TimeToLive(ctx context.Context, id LeaseID, opts ...LeaseOption) (*LeaseTimeToLiveResponse, error) {
 	r := toLeaseTimeToLiveRequest(id, opts...)
 	resp, err := l.remote.LeaseTimeToLive(ctx, r, l.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 	gresp := &LeaseTimeToLiveResponse{
 		ResponseHeader: resp.GetHeader(),
@@ -260,7 +260,7 @@ func (l *lessor) Leases(ctx context.Context) (*LeaseLeasesResponse, error) {
 		}
 		return &LeaseLeasesResponse{ResponseHeader: resp.GetHeader(), Leases: leases}, nil
 	}
-	return nil, toErr(ctx, err)
+	return nil, ContextError(ctx, err)
 }
 
 func (l *lessor) KeepAlive(ctx context.Context, id LeaseID) (<-chan *LeaseKeepAliveResponse, error) {
@@ -315,7 +315,7 @@ func (l *lessor) KeepAliveOnce(ctx context.Context, id LeaseID) (*LeaseKeepAlive
 			return resp, err
 		}
 		if isHaltErr(ctx, err) {
-			return nil, toErr(ctx, err)
+			return nil, ContextError(ctx, err)
 		}
 	}
 }
@@ -405,13 +405,13 @@ func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (karesp *LeaseKe
 
 	stream, err := l.remote.LeaseKeepAlive(cctx, l.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
 			if ferr == nil {
-				ferr = toErr(ctx, err)
+				ferr = ContextError(ctx, err)
 			}
 			return
 		}
@@ -419,12 +419,12 @@ func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (karesp *LeaseKe
 
 	err = stream.Send(&pb.LeaseKeepAliveRequest{ID: int64(id)})
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 
 	resp, rerr := stream.Recv()
 	if rerr != nil {
-		return nil, toErr(ctx, rerr)
+		return nil, ContextError(ctx, rerr)
 	}
 
 	karesp = &LeaseKeepAliveResponse{
@@ -461,7 +461,7 @@ func (l *lessor) recvKeepAliveLoop() (gerr error) {
 						return err
 					}
 
-					if toErr(l.stopCtx, err) == rpctypes.ErrNoLeader {
+					if ContextError(l.stopCtx, err) == rpctypes.ErrNoLeader {
 						l.closeRequireLeader()
 					}
 					break

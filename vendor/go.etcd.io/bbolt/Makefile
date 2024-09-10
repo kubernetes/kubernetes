@@ -41,6 +41,15 @@ coverage:
 	TEST_FREELIST_TYPE=array go test -v -timeout 30m \
 		-coverprofile cover-freelist-array.out -covermode atomic
 
+BOLT_CMD=bbolt
+
+build:
+	go build -o bin/${BOLT_CMD} ./cmd/${BOLT_CMD}
+
+.PHONY: clean
+clean: # Clean binaries
+	rm -f ./bin/${BOLT_CMD}
+
 .PHONY: gofail-enable
 gofail-enable: install-gofail
 	gofail enable .
@@ -61,3 +70,7 @@ test-failpoint:
 	@echo "[failpoint] array freelist test"
 	TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} -timeout 30m ./tests/failpoint
 
+.PHONY: test-robustness # Running robustness tests requires root permission
+test-robustness:
+	go test -v ${TESTFLAGS} ./tests/dmflakey -test.root
+	go test -v ${TESTFLAGS} ./tests/robustness -test.root
