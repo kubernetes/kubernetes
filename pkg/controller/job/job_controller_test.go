@@ -2756,6 +2756,8 @@ func getCondition(job *batch.Job, condition batch.JobConditionType, status v1.Co
 // reaching the active deadline, at which point it is marked as Failed.
 func TestPastDeadlineJobFinished(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
 	clientset := fake.NewClientset()
 	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
 	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
@@ -2765,8 +2767,6 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 		controller.NewControllerExpectations(), true, func() {
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	sharedInformerFactory.Start(ctx.Done())
 	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 
@@ -6549,6 +6549,8 @@ func TestWatchPods(t *testing.T) {
 
 func TestWatchOrphanPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
@@ -6594,19 +6596,19 @@ func TestWatchOrphanPods(t *testing.T) {
 					sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Delete(tc.job)
 				})
 			}
-
+			_, ctx := ktesting.NewTestContext(t)
 			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
 			if tc.job != nil {
 				podBuilder = podBuilder.job(tc.job)
 			}
 			orphanPod := podBuilder.Pod
-			orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
+			orphanPod, err := clientset.CoreV1().Pods("default").Create(ctx, orphanPod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Creating orphan pod: %v", err)
 			}
 
 			if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
+				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(ctx, orphanPod.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -7610,7 +7612,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 func TestFinalizerCleanup(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	t.Cleanup(cancel)
 
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
