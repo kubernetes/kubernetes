@@ -101,6 +101,22 @@ var (
 	CSIStorageCapacityAdd = ClusterEvent{Resource: CSIStorageCapacity, ActionType: Add, Label: "CSIStorageCapacityAdd"}
 	// CSIStorageCapacityUpdate is the event when a CSI storage capacity is updated in the cluster.
 	CSIStorageCapacityUpdate = ClusterEvent{Resource: CSIStorageCapacity, ActionType: Update, Label: "CSIStorageCapacityUpdate"}
+	// PodSchedulingContextAdd is the event when a pod scheduling context is added.
+	PodSchedulingContextAdd = ClusterEvent{Resource: PodSchedulingContext, ActionType: Add, Label: "PodSchedulingContextAdd"}
+	// PodSchedulingContextUpdate is the event when a pod scheduling context is updated.
+	PodSchedulingContextUpdate = ClusterEvent{Resource: PodSchedulingContext, ActionType: Update, Label: "PodSchedulingContextUpdate"}
+	// ResourceClaimAdd is the event when a resource claim is added.
+	ResourceClaimAdd = ClusterEvent{Resource: ResourceClaim, ActionType: Add, Label: "ResourceClaimAdd"}
+	// ResourceClaimUpdate is the event when a resource claim is updated.
+	ResourceClaimUpdate = ClusterEvent{Resource: ResourceClaim, ActionType: Update, Label: "ResourceClaimUpdate"}
+	// ResourceSliceAdd is the event when a resource slice is added.
+	ResourceSliceAdd = ClusterEvent{Resource: ResourceSlice, ActionType: Add, Label: "ResourceSliceAdd"}
+	// ResourceSliceUpdate is the event when a resource slice is updated.
+	ResourceSliceUpdate = ClusterEvent{Resource: ResourceSlice, ActionType: Update, Label: "ResourceSliceUpdate"}
+	// DeviceClassAdd is the event when a device class is added.
+	DeviceClassAdd = ClusterEvent{Resource: DeviceClass, ActionType: Add, Label: "DeviceClassAdd"}
+	// DeviceClassUpdate is the event when a device class is updated.
+	DeviceClassUpdate = ClusterEvent{Resource: DeviceClass, ActionType: Update, Label: "DeviceClassUpdate"}
 	// WildCardEvent semantically matches all resources on all actions.
 	WildCardEvent = ClusterEvent{Resource: WildCard, ActionType: All, Label: "WildCardEvent"}
 	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
@@ -138,6 +154,14 @@ var (
 		CSIDriverUpdate,
 		CSIStorageCapacityAdd,
 		CSIStorageCapacityUpdate,
+		PodSchedulingContextAdd,
+		PodSchedulingContextUpdate,
+		ResourceClaimAdd,
+		ResourceClaimUpdate,
+		ResourceSliceAdd,
+		ResourceSliceUpdate,
+		DeviceClassAdd,
+		DeviceClassUpdate,
 		WildCardEvent,
 		UnschedulableTimeout,
 	}
