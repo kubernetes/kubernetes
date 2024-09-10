@@ -162,7 +162,7 @@ func createPodUsingNfs(ctx context.Context, f *framework.Framework, c clientset.
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever, //don't restart pod
+			RestartPolicy: v1.RestartPolicyNever, // don't restart pod
 			Volumes: []v1.Volume{
 				{
 					Name: "nfs-vol",

@@ -62,7 +62,7 @@ var _ = SIGDescribe("Lease", func() {
 		Testname: lease API should be available
 		Description: Create Lease object, and get it; create and get MUST be successful and Spec of the
 		read Lease MUST match Spec of original Lease. Update the Lease and get it; update and get MUST
-		be successful	and Spec of the read Lease MUST match Spec of updated Lease. Patch the Lease and
+		be successful and Spec of the read Lease MUST match Spec of updated Lease. Patch the Lease and
 		get it; patch and get MUST be successful and Spec of the read Lease MUST match Spec of patched
 		Lease. Create a second Lease with labels and list Leases; create and list MUST be successful and
 		list MUST return both leases. Delete the labels lease via delete collection; the delete MUST be
