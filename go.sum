@@ -656,8 +656,8 @@ github.com/openshift/apiserver-library-go v0.0.0-20240828192036-4d55b6dd978f/go.
 github.com/openshift/build-machinery-go v0.0.0-20240419090851-af9c868bcf52/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
 github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87 h1:JtLhaGpSEconE+1IKmIgCOof/Len5ceG6H1pk43yv5U=
 github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87/go.mod h1:3IPD4U0qyovZS4EFady2kqY32m8lGcbs/Wx+yprg9z8=
-github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-1 h1:Hmw0IOL6YHveXb2OgRn7bxTFzc9tQy28O66+FFuwdw8=
-github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-1/go.mod h1:s6Fqwb2KiWG6leCegVhw4KW40tf9f7m+SF1aXiE8Wsk=
+github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2 h1:ls1C5cvJbA5CbOwbA4Nx/W+tRvXgKDc9XT81bg3sxCA=
+github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2/go.mod h1:s6Fqwb2KiWG6leCegVhw4KW40tf9f7m+SF1aXiE8Wsk=
 github.com/openshift/library-go v0.0.0-20240528102242-9c194599a149 h1:7mdQKqnSJMoIl6gkxpu5LXwmRN9IWYWpzgusOn5pC6E=
 github.com/openshift/library-go v0.0.0-20240528102242-9c194599a149/go.mod h1:PdASVamWinll2BPxiUpXajTwZxV8A1pQbWEsCN1od7I=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240314173009-2cd07f4ca53d h1:GDn4rF5hmB+d0tnFcPQhPy1YTooJH6U+HeYYdyjktmI=

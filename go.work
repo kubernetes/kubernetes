@@ -35,3 +35,5 @@ use (
 	./staging/src/k8s.io/sample-cli-plugin
 	./staging/src/k8s.io/sample-controller
 )
+
+replace github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-1 => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2
