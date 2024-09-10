@@ -23,11 +23,13 @@ import (
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -247,8 +249,18 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
-				Name:  fmt.Sprintf("instance-%d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("instance-%d", i),
+				Basic: &resourceapi.BasicDevice{
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model":                {StringValue: ptr.To("A100")},
+						"family":               {StringValue: ptr.To("GPU")},
+						"driverVersion":        {VersionValue: ptr.To("1.2.3")},
+						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
+					},
+					Capacity: map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("1Gi"),
+					},
+				},
 			},
 		)
 	}
