@@ -24,11 +24,9 @@ import (
 	"sync"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 
@@ -152,9 +150,6 @@ type priorityInfo struct {
 func NewResourceManager(path string) ResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	// Register conversion for apidiscovery
-	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
 
 	codecs := serializer.NewCodecFactory(scheme)
 	rdm := &resourceDiscoveryManager{
@@ -532,8 +527,7 @@ func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *ht
 	}
 	var targetGV schema.GroupVersion
 	if mediaType.Convert == nil ||
-		(mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
-			mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion) {
+		(mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion) {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
 		resp.WriteHeader(http.StatusInternalServerError)
 		return

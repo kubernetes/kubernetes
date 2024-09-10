@@ -34,14 +34,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 )
 
@@ -52,9 +49,6 @@ const discoveryPath = "/apis"
 
 func init() {
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	// Register conversion for apidiscovery
-	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
 	codecs = runtimeserializer.NewCodecFactory(scheme)
 }
 
@@ -97,25 +91,9 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 	}
 }
 
-func fetchPathV2Beta1(handler http.Handler, acceptPrefix string, path string, etag string) (*http.Response, []byte, *apidiscoveryv2beta1.APIGroupDiscoveryList) {
-	acceptSuffix := ";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
-	r, bytes := fetchPathHelper(handler, acceptPrefix+acceptSuffix, path, etag)
-	var decoded *apidiscoveryv2beta1.APIGroupDiscoveryList
-	if len(bytes) > 0 {
-		decoded = &apidiscoveryv2beta1.APIGroupDiscoveryList{}
-		err := runtime.DecodeInto(codecs.UniversalDecoder(), bytes, decoded)
-		if err != nil {
-			panic(fmt.Sprintf("failed to decode response: %v", err))
-		}
-
-	}
-	return r, bytes, decoded
-}
-
 func fetchPath(handler http.Handler, acceptPrefix string, path string, etag string) (*http.Response, []byte, *apidiscoveryv2.APIGroupDiscoveryList) {
 	acceptSuffix := ";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList,"
-	acceptSuffixV2Beta1 := ";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList,"
-	r, bytes := fetchPathHelper(handler, acceptPrefix+acceptSuffix+","+acceptPrefix+acceptSuffixV2Beta1, path, etag)
+	r, bytes := fetchPathHelper(handler, acceptPrefix+acceptSuffix, path, etag)
 	var decoded *apidiscoveryv2.APIGroupDiscoveryList
 	if len(bytes) > 0 {
 		decoded = &apidiscoveryv2.APIGroupDiscoveryList{}
@@ -183,34 +161,6 @@ func TestBasicResponseProtobuf(t *testing.T) {
 	assert.Equal(t, "application/vnd.kubernetes.protobuf;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
 	assert.NotEmpty(t, response.Header.Get("ETag"), "E-Tag should be set")
 	assert.EqualValues(t, &apis, decoded, "decoded value should equal input")
-}
-
-// V2Beta1 should still be served
-func TestV2Beta1SkewSupport(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager("apis")
-
-	apis := fuzzAPIGroups(1, 3, 10)
-	manager.SetGroups(apis.Items)
-
-	converted, err := scheme.ConvertToVersion(&apis, &schema.GroupVersion{Group: "apidiscovery.k8s.io", Version: "v2beta1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	v2beta1apis := converted.(*apidiscoveryv2beta1.APIGroupDiscoveryList)
-
-	response, body, decoded := fetchPathV2Beta1(manager, "application/json", discoveryPath, "")
-
-	jsonFormatted, err := json.Marshal(v2beta1apis)
-	require.NoError(t, err, "json marshal should always succeed")
-
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
-	assert.NotEmpty(t, response.Header.Get("ETag"), "E-Tag should be set")
-
-	assert.NoError(t, err, "decode should always succeed")
-	assert.EqualValues(t, v2beta1apis, decoded, "decoded value should equal input")
-	assert.Equal(t, string(jsonFormatted)+"\n", string(body), "response should be the api group list")
 }
 
 // Test that an etag associated with the service only depends on the apiresources
