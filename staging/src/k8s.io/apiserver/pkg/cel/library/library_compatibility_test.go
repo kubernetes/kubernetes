@@ -49,7 +49,7 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes <1.30>:
 		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "cidr", "containsIP", "containsCIDR", "masked", "prefixLength", "isCIDR", "string",
 		// Kubernetes <1.31>:
-		"fieldSelector", "labelSelector", "validate", "format.named",
+		"fieldSelector", "labelSelector", "validate", "format.named", "isSemver", "major", "minor", "patch", "semver",
 		// Kubernetes <1.??>:
 	)
 
@@ -101,5 +101,4 @@ func TestTypeRegistration(t *testing.T) {
 			t.Errorf("Expected types to be registered with the %s library Type() functions, but they were not: %v", lib.LibraryName(), unregistered)
 		}
 	}
-
 }

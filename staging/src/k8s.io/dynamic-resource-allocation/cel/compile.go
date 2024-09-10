@@ -37,6 +37,7 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 const (
@@ -151,7 +152,7 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse semantic version: %w", err)
 		}
-		return Semver{Version: v}, nil
+		return apiservercel.Semver{Version: v}, nil
 	default:
 		return nil, errors.New("unsupported attribute value")
 	}
@@ -236,7 +237,7 @@ func mustBuildEnv() *environment.EnvSet {
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
-				SemverLib(),
+				library.SemverLib(),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//

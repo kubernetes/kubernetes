@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@ limitations under the License.
 
 package library
 
-import "github.com/google/cel-go/cel"
+import (
+	"github.com/google/cel-go/cel"
+)
 
 // Library represents a CEL library used by kubernetes.
 type Library interface {
@@ -42,5 +44,17 @@ func KnownLibraries() []Library {
 		ipLib,
 		cidrsLib,
 		formatLib,
+		semverLib,
 	}
+}
+
+func isRegisteredType(typeName string) bool {
+	for _, lib := range KnownLibraries() {
+		for _, rt := range lib.Types() {
+			if rt.TypeName() == typeName {
+				return true
+			}
+		}
+	}
+	return false
 }

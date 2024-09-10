@@ -133,7 +133,7 @@ func (*format) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }
 
-var ConstantFormats map[string]*apiservercel.Format = map[string]*apiservercel.Format{
+var ConstantFormats = map[string]apiservercel.Format{
 	"dns1123Label": {
 		Name:         "DNS1123Label",
 		ValidateFunc: func(s string) []string { return apimachineryvalidation.NameIsDNSLabel(s, false) },
@@ -261,7 +261,7 @@ var formatLibraryDecls = map[string][]cel.FunctionOpt{
 }
 
 func formatValidate(arg1, arg2 ref.Val) ref.Val {
-	f, ok := arg1.Value().(*apiservercel.Format)
+	f, ok := arg1.Value().(apiservercel.Format)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg1)
 	}

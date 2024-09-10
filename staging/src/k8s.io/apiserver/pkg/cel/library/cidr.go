@@ -109,7 +109,7 @@ var cidrsLib = &cidrs{}
 type cidrs struct{}
 
 func (*cidrs) LibraryName() string {
-	return "net.cidr"
+	return "kubernetes.net.cidr"
 }
 
 func (*cidrs) declarations() map[string][]cel.FunctionOpt {

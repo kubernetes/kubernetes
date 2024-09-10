@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cel
+package library
 
 import (
 	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 // Semver provides a CEL function library extension for [semver.Version].
@@ -91,38 +93,45 @@ var semverLib = &semverLibType{}
 type semverLibType struct{}
 
 func (*semverLibType) LibraryName() string {
-	return "k8s.semver"
+	return "kubernetes.Semver"
 }
 
-func (*semverLibType) CompileOptions() []cel.EnvOption {
-	// Defined in this function to avoid an initialization order problem.
-	semverLibraryDecls := map[string][]cel.FunctionOpt{
+func (*semverLibType) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.SemverType}
+}
+
+func (*semverLibType) declarations() map[string][]cel.FunctionOpt {
+	return map[string][]cel.FunctionOpt{
 		"semver": {
-			cel.Overload("string_to_semver", []*cel.Type{cel.StringType}, SemverType, cel.UnaryBinding((stringToSemver))),
+			cel.Overload("string_to_semver", []*cel.Type{cel.StringType}, apiservercel.SemverType, cel.UnaryBinding((stringToSemver))),
 		},
 		"isSemver": {
 			cel.Overload("is_semver_string", []*cel.Type{cel.StringType}, cel.BoolType, cel.UnaryBinding(isSemver)),
 		},
 		"isGreaterThan": {
-			cel.MemberOverload("semver_is_greater_than", []*cel.Type{SemverType, SemverType}, cel.BoolType, cel.BinaryBinding(semverIsGreaterThan)),
+			cel.MemberOverload("semver_is_greater_than", []*cel.Type{apiservercel.SemverType, apiservercel.SemverType}, cel.BoolType, cel.BinaryBinding(semverIsGreaterThan)),
 		},
 		"isLessThan": {
-			cel.MemberOverload("semver_is_less_than", []*cel.Type{SemverType, SemverType}, cel.BoolType, cel.BinaryBinding(semverIsLessThan)),
+			cel.MemberOverload("semver_is_less_than", []*cel.Type{apiservercel.SemverType, apiservercel.SemverType}, cel.BoolType, cel.BinaryBinding(semverIsLessThan)),
 		},
 		"compareTo": {
-			cel.MemberOverload("semver_compare_to", []*cel.Type{SemverType, SemverType}, cel.IntType, cel.BinaryBinding(semverCompareTo)),
+			cel.MemberOverload("semver_compare_to", []*cel.Type{apiservercel.SemverType, apiservercel.SemverType}, cel.IntType, cel.BinaryBinding(semverCompareTo)),
 		},
 		"major": {
-			cel.MemberOverload("semver_major", []*cel.Type{SemverType}, cel.IntType, cel.UnaryBinding(semverMajor)),
+			cel.MemberOverload("semver_major", []*cel.Type{apiservercel.SemverType}, cel.IntType, cel.UnaryBinding(semverMajor)),
 		},
 		"minor": {
-			cel.MemberOverload("semver_minor", []*cel.Type{SemverType}, cel.IntType, cel.UnaryBinding(semverMinor)),
+			cel.MemberOverload("semver_minor", []*cel.Type{apiservercel.SemverType}, cel.IntType, cel.UnaryBinding(semverMinor)),
 		},
 		"patch": {
-			cel.MemberOverload("semver_patch", []*cel.Type{SemverType}, cel.IntType, cel.UnaryBinding(semverPatch)),
+			cel.MemberOverload("semver_patch", []*cel.Type{apiservercel.SemverType}, cel.IntType, cel.UnaryBinding(semverPatch)),
 		},
 	}
+}
 
+func (s *semverLibType) CompileOptions() []cel.EnvOption {
+	// Defined in this function to avoid an initialization order problem.
+	semverLibraryDecls := s.declarations()
 	options := make([]cel.EnvOption, 0, len(semverLibraryDecls))
 	for name, overloads := range semverLibraryDecls {
 		options = append(options, cel.Function(name, overloads...))
@@ -168,7 +177,7 @@ func stringToSemver(arg ref.Val) ref.Val {
 		return types.WrapErr(err)
 	}
 
-	return Semver{Version: v}
+	return apiservercel.Semver{Version: v}
 }
 
 func semverMajor(arg ref.Val) ref.Val {

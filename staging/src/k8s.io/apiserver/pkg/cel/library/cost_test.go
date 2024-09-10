@@ -1262,7 +1262,8 @@ func TestTypeEquality(t *testing.T) {
 		"kubernetes.Quantity":                    apiservercel.Quantity{},
 		"net.IP":                                 apiservercel.IP{},
 		"net.CIDR":                               apiservercel.CIDR{},
-		"kubernetes.NamedFormat":                 &apiservercel.Format{},
+		"kubernetes.NamedFormat":                 apiservercel.Format{},
+		"kubernetes.Semver":                      apiservercel.Semver{},
 	}
 
 	originalPanicOnUnknown := panicOnUnknown

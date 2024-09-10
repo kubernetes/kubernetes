@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cel_test
+package library_test
 
 import (
 	"regexp"
@@ -27,7 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	library "k8s.io/dynamic-resource-allocation/cel"
+	apiservercel "k8s.io/apiserver/pkg/cel"
+	library "k8s.io/apiserver/pkg/cel/library"
 )
 
 func testSemver(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
@@ -117,7 +118,7 @@ func TestSemver(t *testing.T) {
 		{
 			name:        "parse",
 			expr:        `semver("1.2.3")`,
-			expectValue: library.Semver{Version: semver.MustParse("1.2.3")},
+			expectValue: apiservercel.Semver{Version: semver.MustParse("1.2.3")},
 		},
 		{
 			name:               "parseInvalidVersion",
