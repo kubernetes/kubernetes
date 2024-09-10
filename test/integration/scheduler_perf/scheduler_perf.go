@@ -812,8 +812,6 @@ func initTestOutput(tb testing.TB) io.Writer {
 	return output
 }
 
-var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
-
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
 func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
@@ -898,8 +896,10 @@ func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePlugin
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
 //
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
-// Also, you may want to put your plugins in PluginNames variable in this package.
-func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry) {
+// Also, you may want to put your plugins in PluginNames variable in this package
+// to collect metrics for them.
+// testcaseLabelSelectors is available to select specific test cases to run with labels on them.
+func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry, testcaseLabelSelectors []string) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		b.Fatal(err)
@@ -923,8 +923,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 		b.Run(tc.Name, func(b *testing.B) {
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
-					if !enabled(*perfSchedulingLabelFilter, append(tc.Labels, w.Labels...)...) {
-						b.Skipf("disabled by label filter %q", *perfSchedulingLabelFilter)
+					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
+						b.Skipf("disabled by label filter %v", testcaseLabelSelectors)
 					}
 
 					informerFactory, tCtx := setupTestCase(b, tc, output, outOfTreePluginRegistry)
@@ -973,8 +973,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
 }
-
-var testSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := os.ReadFile(file)

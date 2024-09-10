@@ -1,18 +1,18 @@
-# The following labels are used in this file:
-# - fast: short execution time, ideally less than 30 seconds
-# - integration-test: used to select workloads that
-#   run in ci-kubernetes-integration-master. Choosing those tests
-#   is a tradeoff between code coverage and overall runtime.
-# - short: used to select workloads that
-#   run in pull-kubernetes-integration.
-#   We should make each test case with short label very small,
-#   so that all tests with the label should take less than 5 min to complete.
-#   They can be run using --short=true flag.
-# - performance: used to select workloads that run
-#   in ci-benchmark-scheduler-perf. Such workloads
-#   must run long enough (ideally, longer than 10 seconds)
-#   to provide meaningful samples for the pod scheduling
-#   rate.
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
 #
 # Combining "performance" and "fast" selects suitable workloads for a local
 # before/after comparisons with benchstat.
@@ -29,19 +29,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 1000
@@ -71,19 +71,19 @@
     namespace: sched-1
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 1
       measurePods: 4
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 100
       measurePods: 400
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 1000
@@ -108,19 +108,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -148,13 +148,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -197,13 +197,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -244,13 +244,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -290,19 +290,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -332,13 +332,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -374,19 +374,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -421,12 +421,12 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       measurePods: 10
   - name: 15000Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 390
     params:
       initNodes: 15000
@@ -448,19 +448,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -490,19 +490,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 1000
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -532,13 +532,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 1000
@@ -593,13 +593,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5
       initPods: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 200
@@ -631,13 +631,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 18
     params:
       initNodes: 500
@@ -667,13 +667,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 18
     params:
       initNodes: 500
@@ -702,19 +702,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes/2InitPods
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 5
       initPods: 2
       measurePods: 10
   - name: 500Nodes/200InitPods
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 200
       measurePods: 1000
   - name: 5000Nodes/200InitPods
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 200
@@ -750,17 +750,17 @@
     collectMetrics: true
   workloads:
   - name: 10Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 10
       measurePods: 100
   - name: 1000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 1000
       measurePods: 1000
   - name: 5000Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 5000
       measurePods: 2000
@@ -796,14 +796,14 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
       initNamespaces: 2
       measurePods: 6
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -850,14 +850,14 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -907,14 +907,14 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -961,14 +961,14 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -1005,19 +1005,19 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       taintNodes: 1
       normalNodes: 4
       measurePods: 4
   - name: 500Nodes
-    labels: [fast]
+    labels: [performance, short]
     params:
       taintNodes: 100
       normalNodes: 400
       measurePods: 400
   - name: 5000Nodes
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 68
     params:
       taintNodes: 1000
@@ -1060,7 +1060,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -1137,7 +1137,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -1203,7 +1203,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast, short]
+    labels: [integration-test, performance, short]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -1275,7 +1275,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -1339,13 +1339,13 @@
     collectMetrics: true
   workloads:
   - name: 1Node_10GatedPods
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       gatedPods: 10
       deletingPods: 10
       measurePods: 10
   - name: 1Node_10000GatedPods
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 130
     params:
       gatedPods: 10000
@@ -1373,12 +1373,12 @@
     collectMetrics: true
   workloads:
   - name: 1Node_10GatedPods
-    labels: [fast]
+    labels: [performance, short]
     params:
       gatedPods: 10
       measurePods: 10
   - name: 1Node_10000GatedPods
-    labels: [performance, fast]
+    labels: [performance, short]
     threshold: 110
     params:
       gatedPods: 10000
@@ -1408,13 +1408,13 @@
     collectMetrics: true
   workloads:
   - name: 10Node_100DeletingPods
-    labels: [integration-test, fast]
+    labels: [integration-test, performance, short]
     params:
       initNodes: 10
       deletingPods: 10
       measurePods: 10
   - name: 1000Node_1000DeletingPods
-    labels: [performance, fast]
+    labels: [performance, short]
     params:
       initNodes: 1000
       deletingPods: 1000

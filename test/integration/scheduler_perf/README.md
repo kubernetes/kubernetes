@@ -44,9 +44,9 @@ be used to select workloads. It works like GitHub label filtering: the flag acce
 a comma-separated list of label names. Each label may have a `+` or `-` as prefix. Labels with
 `+` or no prefix must be set for a workload for it to be run. `-` means that the label must not
 be set. For example, this runs all performance benchmarks except those that are labeled
-as "fast":
+as "integration-test":
 ```shell
-make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-fast"
+make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test"
 ```
 
 Once the benchmark is finished, JSON file with metrics is available in the current directory (test/integration/scheduler_perf). Look for `BenchmarkPerfScheduling_benchmark_YYYY-MM-DDTHH:MM:SSZ.json`.
@@ -138,6 +138,8 @@ The test cases labeled as `short` are executed in pull-kubernetes-integration jo
 | ci-kubernetes-integration-master | integration-test       |
 | pull-kubernetes-integration      | integration-test,short |
 | ci-benchmark-scheduler-perf      | performance            |
+
+See the comment on [./config/performance-config.yaml](./config/performance-config.yaml) for the details.
 
 ## Scheduling throughput thresholds
 
