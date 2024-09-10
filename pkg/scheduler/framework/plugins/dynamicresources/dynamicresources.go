@@ -903,15 +903,15 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	if !pl.enabled {
 		return nil
 	}
+	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
 	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
+		return statusError(logger, err)
 	}
 	if len(state.claims) == 0 {
 		return nil
 	}
 
-	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	var unavailableClaims []int
@@ -1075,8 +1075,9 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		return nil
 	}
 	state, err := getStateData(cs)
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
+		return statusError(logger, err)
 	}
 	defer func() {
 		state.preScored = true
@@ -1085,7 +1086,6 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		return nil
 	}
 
-	logger := klog.FromContext(ctx)
 	pending := false
 	for index, claim := range state.claims {
 		if claim.Status.Allocation == nil &&
@@ -1157,15 +1157,14 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	if !pl.enabled {
 		return nil
 	}
+	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
 	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
+		return statusError(logger, err)
 	}
 	if len(state.claims) == 0 {
 		return nil
 	}
-
-	logger := klog.FromContext(ctx)
 
 	numDelayedAllocationPending := 0
 	numClaimsWithStatusInfo := 0
@@ -1369,14 +1368,13 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 		return nil
 	}
 	state, err := getStateData(cs)
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
+		return statusError(logger, err)
 	}
 	if len(state.claims) == 0 {
 		return nil
 	}
-
-	logger := klog.FromContext(ctx)
 
 	// Was publishing delayed? If yes, do it now and then cause binding to stop.
 	// This will not happen if all claims get handled by builtin controllers.
