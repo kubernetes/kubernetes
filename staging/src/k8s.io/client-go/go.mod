@@ -4,6 +4,8 @@ module k8s.io/client-go
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/gogo/protobuf v1.3.2

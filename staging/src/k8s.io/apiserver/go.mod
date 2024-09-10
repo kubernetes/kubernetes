@@ -4,6 +4,8 @@ module k8s.io/apiserver
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0

@@ -8,6 +8,8 @@ module k8s.io/kubernetes
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b

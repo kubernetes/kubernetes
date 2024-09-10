@@ -4,6 +4,8 @@ module k8s.io/cli-runtime
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/google/gnostic-models v0.6.8

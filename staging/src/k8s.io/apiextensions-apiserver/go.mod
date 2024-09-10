@@ -4,6 +4,8 @@ module k8s.io/apiextensions-apiserver
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/evanphx/json-patch v4.12.0+incompatible

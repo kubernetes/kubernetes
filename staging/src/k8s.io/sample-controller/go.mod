@@ -4,6 +4,8 @@ module k8s.io/sample-controller
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	golang.org/x/time v0.3.0
 	k8s.io/api v0.0.0
