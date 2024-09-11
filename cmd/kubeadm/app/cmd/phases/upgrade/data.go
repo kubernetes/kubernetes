@@ -33,6 +33,7 @@ type Data interface {
 	DryRun() bool
 	Cfg() *kubeadmapi.UpgradeConfiguration
 	InitCfg() *kubeadmapi.InitConfiguration
+	IsControlPlaneNode() bool
 	Client() clientset.Interface
 	IgnorePreflightErrors() sets.Set[string]
 	PatchesDir() string

@@ -26,6 +26,5 @@ import (
 type Data interface {
 	upgrade.Data
 
-	IsControlPlaneNode() bool
 	KubeConfigPath() string
 }

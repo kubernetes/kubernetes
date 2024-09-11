@@ -36,6 +36,7 @@ func (t *testData) RenewCerts() bool                        { return false }
 func (t *testData) DryRun() bool                            { return false }
 func (t *testData) Cfg() *kubeadmapi.UpgradeConfiguration   { return nil }
 func (t *testData) InitCfg() *kubeadmapi.InitConfiguration  { return nil }
+func (t *testData) IsControlPlaneNode() bool                { return false }
 func (t *testData) Client() clientset.Interface             { return nil }
 func (t *testData) IgnorePreflightErrors() sets.Set[string] { return nil }
 func (t *testData) PatchesDir() string                      { return "" }

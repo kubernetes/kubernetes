@@ -351,3 +351,9 @@ func (d *applyData) AllowRCUpgrades() bool {
 func (d *applyData) ForceUpgrade() bool {
 	return d.force
 }
+
+// IsControlPlaneNode returns if the node is a control-plane node.
+func (d *applyData) IsControlPlaneNode() bool {
+	// `kubeadm upgrade apply` should always be executed on a control-plane node
+	return true
+}

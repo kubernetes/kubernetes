@@ -73,19 +73,24 @@ func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfigu
 	return true, nil
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, bool, error) {
+func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, bool, bool, error) {
 	data, ok := c.(Data)
 	if !ok {
-		return nil, nil, "", nil, false, errors.New("addon phase invoked with an invalid data struct")
+		return nil, nil, "", nil, false, false, errors.New("addon phase invoked with an invalid data struct")
 	}
-	return data.InitCfg(), data.Client(), data.PatchesDir(), data.OutputWriter(), data.DryRun(), nil
+	return data.InitCfg(), data.Client(), data.PatchesDir(), data.OutputWriter(), data.DryRun(), data.IsControlPlaneNode(), nil
 }
 
 // runCoreDNSAddon upgrades the CoreDNS addon.
 func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, patchesDir, out, dryRun, err := getInitData(c)
+	cfg, client, patchesDir, out, dryRun, isControlPlaneNode, err := getInitData(c)
 	if err != nil {
 		return err
+	}
+
+	if !isControlPlaneNode {
+		fmt.Println("[upgrade/addon] Skipping addon/coredns phase. Not a control plane node.")
+		return nil
 	}
 
 	shouldUpgradeAddons, err := shouldUpgradeAddons(client, cfg, out)
@@ -105,9 +110,14 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon upgrades the kube-proxy addon.
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, _, out, dryRun, err := getInitData(c)
+	cfg, client, _, out, dryRun, isControlPlaneNode, err := getInitData(c)
 	if err != nil {
 		return err
+	}
+
+	if !isControlPlaneNode {
+		fmt.Println("[upgrade/addon] Skipping addon/kube-proxy phase. Not a control plane node.")
+		return nil
 	}
 
 	shouldUpgradeAddons, err := shouldUpgradeAddons(client, cfg, out)
