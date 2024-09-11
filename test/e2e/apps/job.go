@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
@@ -149,12 +150,13 @@ var _ = SIGDescribe("Job", func() {
 		marked as failed, if not for the ignore rule matching on exit codes.
 	*/
 	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on exit code", func(ctx context.Context) {
-		// We set the backoffLimit = completions so that we can tolerate random
-		// failues (like OutOfPods from Kubelet). Yet, the Job would fail if the
-		// pod failures would not be ignored.
-		parallelism := int32(1)
-		completions := int32(2)
-		backoffLimit := int32(completions)
+		// We set the backoffLimit = numPods-1  so that we can tolerate random
+		// failures (like OutOfPods from kubelet). Yet, the Job would fail if the
+		// pod failures were not be ignored.
+		numPods := 3
+		parallelism := int32(numPods)
+		completions := int32(numPods)
+		backoffLimit := int32(numPods) - 1
 
 		ginkgo.By("Looking for a node to schedule job pods")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -179,16 +181,20 @@ var _ = SIGDescribe("Job", func() {
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		for index := 0; index < int(completions); index++ {
-			ginkgo.By(fmt.Sprintf("Awaiting for all the pod at index %v to be ready", index))
-			err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](1))
-			framework.ExpectNoError(err, "failed to await for the pod to be ready for job: %s/%s", job.Name, job.Namespace)
+		ginkgo.By("Waiting for all the pods to be ready")
+		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(int32(numPods)))
+		framework.ExpectNoError(err, "failed to await for the pod to be ready for job: %s/%s", job.Name, job.Namespace)
 
-			ginkgo.By("Fetch the only running pod")
-			pods, err := e2ejob.GetAllRunningJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-			framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
-			gomega.Expect(pods).To(gomega.HaveLen(1), "Exactly one running pod is expected")
-			pod := pods[0]
+		ginkgo.By("Fetch all the only running pods")
+		pods, err := e2ejob.GetAllRunningJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
+		gomega.Expect(pods).To(gomega.HaveLen(numPods), "Number of running pods doesn't match parallelism")
+
+		ginkgo.By("Evict the all the Pods")
+		workqueue.ParallelizeUntil(ctx, numPods, numPods, func(index int) {
+			defer ginkgo.GinkgoRecover()
+
+			pod := pods[index]
 			ginkgo.By(fmt.Sprintf("Evicting the running pod: %s/%s", pod.Name, pod.Namespace))
 			evictTarget := &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -202,16 +208,7 @@ var _ = SIGDescribe("Job", func() {
 			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
 			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
-
-			ginkgo.By("Wait for the number of succeeded pods to be incremented")
-			err = e2ejob.WaitForJobState(ctx, f.ClientSet, f.Namespace.Name, job.Name, f.Timeouts.PodStart, func(job *batchv1.Job) string {
-				if int32(index) != job.Status.Succeeded {
-					return fmt.Sprintf("expected %v succeeded pods, but found %v", int32(index), job.Status.Succeeded)
-				}
-				return ""
-			})
-			framework.ExpectNoError(err, "failed to ensure all potential pod failures are counted for Job: %s/%s", job.Name, job.Namespace)
-		}
+		})
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
@@ -228,12 +225,13 @@ var _ = SIGDescribe("Job", func() {
 		if not for the ignore rule matching on exit codes.
 	*/
 	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on DisruptionTarget condition", func(ctx context.Context) {
-		// We set the backoffLimit = completions so that we can tolerate random
-		// failues (like OutOfPods from Kubelet). Yet, the Job would fail if the
-		// pod failures would not be ignored.
-		parallelism := int32(1)
-		completions := int32(2)
-		backoffLimit := int32(completions)
+		// We set the backoffLimit = numPods-1 so that we can tolerate random
+		// failures (like OutOfPods from kubelet). Yet, the Job would fail if the
+		// pod failures were not be ignored.
+		numPods := 3
+		parallelism := int32(numPods)
+		completions := int32(numPods)
+		backoffLimit := int32(numPods) - 1
 
 		ginkgo.By("Looking for a node to schedule job pods")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -267,16 +265,20 @@ var _ = SIGDescribe("Job", func() {
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		for index := 0; index < int(completions); index++ {
-			ginkgo.By(fmt.Sprintf("Awaiting for all the pod at index %v to be ready", index))
-			err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](1))
-			framework.ExpectNoError(err, "failed to await for the pod to be ready for job: %s/%s", job.Name, job.Namespace)
+		ginkgo.By("Waiting for all the pods to be ready")
+		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(int32(numPods)))
+		framework.ExpectNoError(err, "failed to await for the pod to be ready for job: %s/%s", job.Name, job.Namespace)
 
-			ginkgo.By("Fetch the only running pod")
-			pods, err := e2ejob.GetAllRunningJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-			framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
-			gomega.Expect(pods).To(gomega.HaveLen(1), "Exactly one running pod is expected")
-			pod := pods[0]
+		ginkgo.By("Fetch all the only running pods")
+		pods, err := e2ejob.GetAllRunningJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
+		gomega.Expect(pods).To(gomega.HaveLen(numPods), "Number of running pods doesn't match parallelism")
+
+		ginkgo.By("Evict the all the Pods")
+		workqueue.ParallelizeUntil(ctx, numPods, numPods, func(index int) {
+			defer ginkgo.GinkgoRecover()
+
+			pod := pods[index]
 			ginkgo.By(fmt.Sprintf("Evicting the running pod: %s/%s", pod.Name, pod.Namespace))
 			evictTarget := &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -290,16 +292,7 @@ var _ = SIGDescribe("Job", func() {
 			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
 			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
-
-			ginkgo.By("Wait for the number of succeeded pods to be incremented")
-			err = e2ejob.WaitForJobState(ctx, f.ClientSet, f.Namespace.Name, job.Name, f.Timeouts.PodStart, func(job *batchv1.Job) string {
-				if int32(index) != job.Status.Succeeded {
-					return fmt.Sprintf("expected %v succeeded pods, but found %v", int32(index), job.Status.Succeeded)
-				}
-				return ""
-			})
-			framework.ExpectNoError(err, "failed to ensure all potential pod failures are counted for Job: %s/%s", job.Name, job.Namespace)
-		}
+		})
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
