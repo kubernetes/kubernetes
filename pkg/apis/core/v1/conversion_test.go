@@ -52,8 +52,8 @@ func TestPodLogOptions(t *testing.T) {
 	sinceTime := metav1.NewTime(time.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC).Local())
 	tailLines := int64(2)
 	limitBytes := int64(3)
-	v1StreamStderr := v1.LogStreamTypeStderr
-	coreStreamStderr := core.LogStreamTypeStderr
+	v1StreamStderr := v1.LogStreamStderr
+	coreStreamStderr := core.LogStreamStderr
 
 	versionedLogOptions := &v1.PodLogOptions{
 		Container:    "mycontainer",
