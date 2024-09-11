@@ -6528,6 +6528,18 @@ type Preconditions struct {
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
+// LogStreamType represents the desired log stream type.
+type LogStreamType string
+
+const (
+	// LogStreamTypeStdout is the stream type for stdout.
+	LogStreamTypeStdout LogStreamType = "stdout"
+	// LogStreamTypeStderr is the stream type for stderr.
+	LogStreamTypeStderr LogStreamType = "stderr"
+	// LogStreamTypeAll represents the combined stdout and stderr.
+	LogStreamTypeAll LogStreamType = "All"
+)
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
@@ -6562,7 +6574,8 @@ type PodLogOptions struct {
 	// +optional
 	Timestamps bool `json:"timestamps,omitempty" protobuf:"varint,6,opt,name=timestamps"`
 	// If set, the number of lines from the end of the logs to show. If not specified,
-	// logs are shown from the creation of the container or sinceSeconds or sinceTime
+	// logs are shown from the creation of the container or sinceSeconds or sinceTime.
+	// Note that when "TailLines" is specified, "Stream" can only be set to "All".
 	// +optional
 	TailLines *int64 `json:"tailLines,omitempty" protobuf:"varint,7,opt,name=tailLines"`
 	// If set, the number of bytes to read from the server before terminating the
@@ -6579,6 +6592,14 @@ type PodLogOptions struct {
 	// the actual log data coming from the real kubelet).
 	// +optional
 	InsecureSkipTLSVerifyBackend bool `json:"insecureSkipTLSVerifyBackend,omitempty" protobuf:"varint,9,opt,name=insecureSkipTLSVerifyBackend"`
+
+	// Specify which container log stream to return to the client.
+	// Acceptable values are "All", "stdout" and "stderr". If not specified, "All" is used, and both stdout and stderr
+	// are returned interleaved.
+	// Note that when "TailLines" is specified, "Stream" can only be set to "All".
+	// +featureGate=SplitStdoutAndStderr
+	// +optional
+	Stream *LogStreamType `json:"stream,omitempty" protobuf:"varint,10,opt,name=stream"`
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values
