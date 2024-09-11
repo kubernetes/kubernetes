@@ -55,7 +55,10 @@ type DRAPlugin interface {
 	// to the API server.
 	//
 	// The caller must not modify the content after the call.
-	PublishResources(ctx context.Context, resources Resources)
+	//
+	// Returns an error if KubeClient or NodeName options were not
+	// set in Start() to create the DRAPlugin instance.
+	PublishResources(ctx context.Context, resources Resources) error
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
@@ -254,6 +257,9 @@ type draPlugin struct {
 // The context and/or DRAPlugin.Stop can be used to stop all background activity.
 // Stop also blocks. A logger can be stored in the context to add values or
 // a name to all log entries.
+//
+// If the plugin will be used to publish resources, [KubeClient] and [NodeName]
+// options are mandatory.
 func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
@@ -365,8 +371,16 @@ func (d *draPlugin) Stop() {
 	d.wg.Wait()
 }
 
-// PublishResources implements [DRAPlugin.PublishResources].
-func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) {
+// PublishResources implements [DRAPlugin.PublishResources]. Returns en error if
+// kubeClient or nodeName are unset.
+func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) error {
+	if d.kubeClient == nil {
+		return errors.New("no KubeClient found to publish resources")
+	}
+	if d.nodeName == "" {
+		return errors.New("no NodeName was set to publish resources")
+	}
+
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -393,11 +407,13 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) {
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")
 		controllerCtx = klog.NewContext(controllerCtx, controllerLogger)
 		d.resourceSliceController = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, driverResources)
-		return
+		return nil
 	}
 
 	// Inform running controller about new information.
 	d.resourceSliceController.Update(driverResources)
+
+	return nil
 }
 
 // RegistrationStatus implements [DRAPlugin.RegistrationStatus].
