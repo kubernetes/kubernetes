@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -56,11 +57,20 @@ import (
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
-var staticPortRange = utilnet.PortRange{Base: 30000, Size: 87}
+// Initialize only once per test
+var (
+	staticPortAllocator = &staticPortRange{
+		nodeports: [87]bool{false},
+		baseport:  30000,
+		mu:        &sync.Mutex{},
+	}
+)
 
-var staticPorts = makeStaticPorts()
-
-var staticPortLock = sync.Mutex{}
+type staticPortRange struct {
+	mu        *sync.Mutex
+	baseport  int
+	nodeports [87]bool // this is the static port range based on current NodePortRange KEP-3668
+}
 
 // It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
@@ -77,15 +87,6 @@ type TestJig struct {
 	ExternalIPs bool
 }
 
-// Initialize just once during the package init
-func makeStaticPorts() []int {
-	ports := make([]int, staticPortRange.Size)
-	for i := staticPortRange.Base; i < staticPortRange.Base+staticPortRange.Size; i++ {
-		ports[i-staticPortRange.Base] = 0
-	}
-	return ports
-}
-
 // NewTestJig allocates and inits a new TestJig.
 func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	j := &TestJig{}
@@ -98,31 +99,64 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	return j
 }
 
-// GetUnusedStaticNodePortAndReserve reserves first free port in static range and returns it
-// If no port in static range is available it returns -1
-func (j *TestJig) GetUnusedStaticNodePortAndReserve() int {
-	staticPortLock.Lock()
-	defer staticPortLock.Unlock()
-	for idx, v := range staticPorts {
-		if v == 0 {
-			staticPorts[idx] = 1 // Reserve
-			return idx + staticPortRange.Base
+// allocate tries to allocate the passed node port and
+// return true if succeeds or false if can not be allocated.
+// Should not be used directly as it does not have lock protection and hence avoids deadlock.
+// Should only be called from a function that has acquired lock on nodeports
+func (s *staticPortRange) allocate(port int) bool {
+	// port is out of range, it can not be allocated
+	if port < 0 || port > len(s.nodeports) {
+		return false
+	}
+	// port already allocated
+	if s.nodeports[port] {
+		return false
+	}
+	s.nodeports[port] = true
+	return true
+}
+
+// allocateNext allocates a free port from the range and returns its number and true
+// if none is available then it returns -1 and false
+func (s *staticPortRange) allocateNext() (int, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// start in a random offset
+	start := rand.Intn(len(s.nodeports))
+	for i := 0; i < len(s.nodeports); i++ {
+		port := (start + i) % len(s.nodeports)
+		if s.allocate(port) {
+			return NodePortRange.Base + port, true
 		}
 	}
-	return -1
+	return -1, false
+}
+
+// release the port passed as an argument and returns true. If
+// an invalid port or unreserved port was provided, it returns false
+func (s *staticPortRange) release(port int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	port = port - NodePortRange.Base
+	// port is out of range, it can not be allocated
+	if port < 0 || port > len(s.nodeports) {
+		return false
+	}
+	s.nodeports[port] = false
+	return true
+}
+
+// GetUnusedStaticNodePortAndReserve reserves first free port in static range
+// and returns it and a boolean True value
+// If no port in static range is available it returns -1 and a boolean value False
+func (j *TestJig) GetUnusedStaticNodePortAndReserve() (int, bool) {
+	return staticPortAllocator.allocateNext()
 }
 
 // ReleaseStaticNodePort releases a previously reserved static port and returns true
 // If the port was not previously reserved it returns false
 func (j *TestJig) ReleaseStaticNodePort(port int) bool {
-	staticPortLock.Lock()
-	defer staticPortLock.Unlock()
-	if port-staticPortRange.Base >= 0 && port-staticPortRange.Base < len(staticPorts) && staticPorts[port-staticPortRange.Base] == 1 {
-		staticPorts[port-staticPortRange.Base] = 0 // Release
-		return true
-	} else {
-		return false
-	}
+	return staticPortAllocator.release(port)
 }
 
 // newServiceTemplate returns the default v1.Service template for this j, but
@@ -601,20 +635,14 @@ func (j *TestJig) WaitForNewIngressIP(ctx context.Context, existingIP string, ti
 func (j *TestJig) ChangeServiceNodePort(ctx context.Context, initial int) (*v1.Service, error) {
 	var err error
 	var service *v1.Service
-	for i := 1; i < NodePortRange.Size; i++ {
-		offs1 := initial - NodePortRange.Base
-		offs2 := (offs1 + i) % NodePortRange.Size
-		newPort := NodePortRange.Base + offs2
-		service, err = j.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Ports[0].NodePort = int32(newPort)
-		})
-		if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
-			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
-			continue
-		}
-		// Otherwise err was nil or err was a real error
-		break
+	newport, ok := j.GetUnusedStaticNodePortAndReserve()
+	if !ok {
+		err = errors.New("could not find any unused nodeport")
+		return service, err
 	}
+	service, err = j.UpdateService(ctx, func(s *v1.Service) {
+		s.Spec.Ports[0].NodePort = int32(newport)
+	})
 	return service, err
 }
 

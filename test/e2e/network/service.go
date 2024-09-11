@@ -1689,8 +1689,8 @@ var _ = common.SIGDescribe("Services", func() {
 		err := retry.OnError(retry.DefaultRetry, func(e error) bool {
 			return e != nil
 		}, func() error {
-			v := jig.GetUnusedStaticNodePortAndReserve()
-			if v == -1 {
+			v, ok := jig.GetUnusedStaticNodePortAndReserve()
+			if !ok {
 				return errors.New("no available nodeport found")
 			}
 			nodePort = v
