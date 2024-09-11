@@ -98,6 +98,7 @@ const (
 	extensionPointsLabelName = "extension_point"
 	resultLabelName          = "result"
 	pluginLabelName          = "plugin"
+	eventLabelName           = "event"
 )
 
 // Run with -v=2, this is the default log level in production.
@@ -149,6 +150,22 @@ var (
 					values: metrics.ExtentionPoints,
 				},
 			},
+			"scheduler_queueing_hint_execution_duration_seconds": {
+				{
+					label:  pluginLabelName,
+					values: PluginNames,
+				},
+				{
+					label:  eventLabelName,
+					values: clusterEventsToLabels(schedframework.AllEvents),
+				},
+			},
+			"scheduler_event_handling_duration_seconds": {
+				{
+					label:  eventLabelName,
+					values: clusterEventsToLabels(schedframework.AllEvents),
+				},
+			},
 		},
 	}
 
@@ -176,6 +193,14 @@ var (
 		names.VolumeZone,
 	}
 )
+
+func clusterEventsToLabels(events []schedframework.ClusterEvent) []string {
+	labels := make([]string, 0, len(events))
+	for _, event := range events {
+		labels = append(labels, event.Label)
+	}
+	return labels
+}
 
 // testCase defines a set of test cases that intends to test the performance of
 // similar workloads of varying sizes with shared overall settings such as
@@ -1038,10 +1063,7 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 }
 
 func checkEmptyInFlightEvents() error {
-	labels := []string{metrics.PodPoppedInFlightEvent}
-	for _, event := range schedframework.AllEvents {
-		labels = append(labels, event.Label)
-	}
+	labels := append(clusterEventsToLabels(schedframework.AllEvents), metrics.PodPoppedInFlightEvent)
 	for _, label := range labels {
 		value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
 		if err != nil {
