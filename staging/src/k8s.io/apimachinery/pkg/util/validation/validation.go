@@ -175,7 +175,7 @@ func IsValidLabelValue(value string) []string {
 }
 
 const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-const dns1123LabelFmtWithUnderscore string = "[_a-z0-9]([-_a-z0-9]*[a-z0-9])?"
+const dns1123LabelFmtWithUnderscore string = "_?[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
 
 const dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
 
