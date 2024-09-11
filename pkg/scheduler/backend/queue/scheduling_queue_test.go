@@ -1425,9 +1425,8 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
-			logger := klog.FromContext(ctx)
 			defer cancel()
 
 			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
