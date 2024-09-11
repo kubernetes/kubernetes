@@ -1255,6 +1255,11 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 }
 
 func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
+	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
+		// Update is invalid: ignore changes and let validation handle it
+		return
+	}
+
 	for i, c := range newPod.Spec.Containers {
 		if c.Resources.Requests == nil {
 			continue
