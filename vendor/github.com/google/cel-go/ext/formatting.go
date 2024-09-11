@@ -484,7 +484,7 @@ func matchConstantFormatStringWithListLiteralArgs(a *ast.AST) ast.ExprMatcher {
 			}
 		}
 		formatString := call.Target()
-		if formatString.Kind() != ast.LiteralKind && formatString.AsLiteral().Type() != cel.StringType {
+		if formatString.Kind() != ast.LiteralKind || formatString.AsLiteral().Type() != cel.StringType {
 			return false
 		}
 		args := call.Args()
