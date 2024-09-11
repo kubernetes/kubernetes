@@ -982,11 +982,12 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, cache.NewEmptySnapshot(), nil)
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
+	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterInterPodAffinity" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
@@ -1244,7 +1245,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				return p.(*InterPodAffinity), cycleState, state, snapshot
 			}
 
-			ctx := context.Background()
+			_, ctx := ktesting.NewTestContext(t)
 			// allPodsState is the state produced when all pods, including test.addedPod are given to prefilter.
 			_, _, allPodsState, _ := getState(append(test.existingPods, test.addedPod))
 
@@ -1277,7 +1278,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			}
 
 			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
+			if err := ipa.RemovePod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}
 			if !reflect.DeepEqual(originalState, state) {
@@ -1429,7 +1430,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			l, _ := snapshot.NodeInfos().List()
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, nil)
 			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, mustNewPodInfo(t, tt.pod), l)

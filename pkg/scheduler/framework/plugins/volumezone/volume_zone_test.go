@@ -803,7 +803,8 @@ func BenchmarkVolumeZone(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run(tt.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			nodes := makeNodesWithTopologyZone(tt.NumNodes)
 			pl := newPluginWithListers(ctx, b, []*v1.Pod{tt.Pod}, nodes, makePVCsWithPV(tt.NumPVC), makePVsWithZoneLabel(tt.NumPV))

@@ -188,7 +188,7 @@ func TestDryRunPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -202,7 +202,6 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
-			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := tf.NewFramework(
@@ -239,7 +238,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Interface:  fakePostPlugin,
 					State:      state,
 				}
-				got, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(ctx, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -290,7 +289,7 @@ func TestSelectCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
@@ -306,7 +305,6 @@ func TestSelectCandidate(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			snapshot := internalcache.NewSnapshot(tt.testPods, nodes)
-			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := tf.NewFramework(
@@ -341,7 +339,7 @@ func TestSelectCandidate(t *testing.T) {
 					Interface:  fakePreemptionScorePostFilterPlugin,
 					State:      state,
 				}
-				candidates, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				candidates, _, _ := pe.DryRunPreemption(ctx, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
 				if s == nil || len(s.Name()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
