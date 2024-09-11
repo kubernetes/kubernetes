@@ -554,3 +554,13 @@ func Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.Persi
 func Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.PersistentVolumeSpec, out *core.PersistentVolumeSpec, s conversion.Scope) error {
 	return autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in, out, s)
 }
+
+// Convert_Slice_string_To_Pointer_v1_LogStreamType is needed because decoding URL parameters requires manual assistance.
+func Convert_Slice_string_To_Pointer_v1_LogStreamType(in *[]string, out **v1.LogStreamType, s conversion.Scope) error {
+	if len(*in) == 0 {
+		return nil
+	}
+	temp := v1.LogStreamType((*in)[0])
+	*out = &temp
+	return nil
+}
