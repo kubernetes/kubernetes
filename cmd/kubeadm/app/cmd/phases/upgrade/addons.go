@@ -18,16 +18,21 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -62,6 +67,21 @@ func NewAddonPhase() workflow.Phase {
 }
 
 func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) (bool, error) {
+	nodeSelector := labels.SelectorFromSet(labels.Set(map[string]string{
+		constants.LabelNodeRoleControlPlane: "",
+		v1.LabelHostname:                    cfg.NodeRegistration.Name,
+	}))
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: nodeSelector.String(),
+	})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get Node %v from cluster", cfg.NodeRegistration.Name)
+	}
+	if len(nodes.Items) == 0 {
+		fmt.Println("[upgrade/control-plane] Skipping phase. Not a control plane node.")
+		return false, nil
+	}
+
 	unupgradedControlPlanes, err := upgrade.UnupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
