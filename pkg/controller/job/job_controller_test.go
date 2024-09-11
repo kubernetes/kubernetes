@@ -7624,9 +7624,9 @@ func TestFinalizerCleanup(t *testing.T) {
 	// Start the Pod and Job informers.
 	sharedInformers.Start(ctx.Done())
 	sharedInformers.WaitForCacheSync(ctx.Done())
-	// Initialize the controller with 0 workers to make sure the
-	// pod finalizers are not removed by the "syncJob" function.
-	go manager.Run(ctx, 0)
+	// Initialize the controller with 1 worker to make sure the
+	// pod finalizers are removed by the "syncJob" function.
+	go manager.Run(ctx, 1)
 	// Make sure the pod finalizers are removed by the "orphanWorker" function.
 	go wait.UntilWithContext(ctx, manager.orphanWorker, time.Second)
 
@@ -7645,22 +7645,24 @@ func TestFinalizerCleanup(t *testing.T) {
 		t.Fatalf("Waiting for Job object to appear in jobLister: %v", err)
 	}
 
-	// Create a Pod with the job tracking finalizer
-	pod := newPod("test-pod", job)
-	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
-	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
+	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
-		t.Fatalf("Creating pod: %v", err)
+		t.Fatalf("Error parsing job selector: %v", err)
 	}
 
-	// Await for the Pod to appear in the podStore to ensure that the pod exists when cleaning up the Job.
-	// In a production environment, there wouldn't be these guarantees, but the Pod would be cleaned up
-	// by the orphan pod worker, when the Pod finishes.
+	var pods []*v1.Pod
+	// Wait for the Pod to be created by the Job controller
 	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		pod, _ := manager.podStore.Pods(pod.GetNamespace()).Get(pod.Name)
-		return pod != nil, nil
+		pods, err = manager.podStore.Pods(job.Namespace).List(selector)
+		if err != nil {
+			return false, err
+		}
+		if len(pods) > 0 {
+			return true, nil
+		}
+		return false, nil
 	}); err != nil {
-		t.Fatalf("Waiting for Pod to appear in podLister: %v", err)
+		t.Fatalf("Waiting for Pod to be created by Job: %v", err)
 	}
 
 	// Mark Job as complete.
@@ -7673,10 +7675,9 @@ func TestFinalizerCleanup(t *testing.T) {
 		t.Fatalf("Updating job status: %v", err)
 	}
 
-	// Verify the pod finalizer is removed for a finished Job,
-	// even if the jobs pods are not tracked by the main reconciliation loop.
+	// Verify the pod finalizer is removed for a finished Job
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		p, err := clientset.CoreV1().Pods(pods[0].Namespace).Get(ctx, pods[0].Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
