@@ -838,6 +838,13 @@ const (
 	// Allows kube-proxy to create DSR loadbalancers for Windows
 	WinDSR featuregate.Feature = "WinDSR"
 
+	// owner: @zylxjtu
+	// kep: https://kep.k8s.io/4802
+	// alpha: v1.32
+	//
+	// Enables support for graceful shutdown windows node.
+	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
+
 	// owner: @ksubrmnn
 	// alpha: v1.14
 	// beta: v1.20
