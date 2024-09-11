@@ -18,7 +18,6 @@ package wait
 
 import (
 	"context"
-	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -37,12 +36,8 @@ import (
 func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding bool, condition ConditionWithContextFunc) error {
 	defer t.Stop()
 
-	var timeCh <-chan time.Time
+	timeCh := t.C()
 	doneCh := ctx.Done()
-
-	if !sliding {
-		timeCh = t.C()
-	}
 
 	// if immediate is true the condition is
 	// guaranteed to be executed at least once,
@@ -54,10 +49,6 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 		}(); err != nil || ok {
 			return err
 		}
-	}
-
-	if sliding {
-		timeCh = t.C()
 	}
 
 	for {
