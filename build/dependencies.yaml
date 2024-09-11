@@ -136,6 +136,8 @@ dependencies:
     - path: build/build-image/cross/VERSION
     - path: hack/lib/golang.sh
       match: minimum_go_version=go([0-9]+\.[0-9]+)
+    - path: staging/src/k8s.io/kms/internal/plugins/_mock/Dockerfile
+      match: golang:([0-9]+\.[0-9]+).0-bullseye
 
   - name: "registry.k8s.io/kube-cross: dependents"
     version: v1.32.0-go1.23.0-bullseye.0
