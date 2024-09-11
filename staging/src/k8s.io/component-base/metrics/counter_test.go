@@ -302,8 +302,9 @@ func TestCounterWithExemplar(t *testing.T) {
 	traceID := trace.TraceID(fn(1))
 	spanID := trace.SpanID(fn(2))
 	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID: traceID,
-		SpanID:  spanID,
+		SpanID:     spanID,
+		TraceID:    traceID,
+		TraceFlags: trace.FlagsSampled,
 	}))
 	toAdd := float64(40)
 

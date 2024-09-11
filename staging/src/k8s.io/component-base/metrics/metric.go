@@ -226,7 +226,7 @@ type exemplarMetric struct {
 func (e *exemplarMetric) withExemplar(v float64) {
 	if m, ok := e.CounterMetric.(prometheus.ExemplarAdder); ok {
 		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
-		if maybeSpanCtx.IsValid() {
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
 			exemplarLabels := prometheus.Labels{
 				"trace_id": maybeSpanCtx.TraceID().String(),
 				"span_id":  maybeSpanCtx.SpanID().String(),
