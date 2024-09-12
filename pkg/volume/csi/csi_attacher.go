@@ -262,7 +262,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 }
 
 func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) error {
-	klog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
+	klog.V(4).Info(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	if deviceMountPath == "" {
 		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
@@ -356,7 +356,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		// finished, we should remove the directory.
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// clean up metadata
-			klog.Errorf(log("attacher.MountDevice failed: %v", err))
+			klog.Error(log("attacher.MountDevice failed: %v", err))
 			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
 				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
 			}
@@ -370,7 +370,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	if !stageUnstageSet {
-		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
+		klog.Info(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
 		return nil
 	}
@@ -408,7 +408,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return err
 	}
 
-	klog.V(4).Infof(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
+	klog.V(4).Info(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
 	return err
 }
 
@@ -541,7 +541,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 			return nil
 		}
 
-		klog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
+		klog.Error(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
 		return err
 	}
 
@@ -564,7 +564,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		return errors.New(log("attacher.UnmountDevice failed to check whether STAGE_UNSTAGE_VOLUME set: %v", err))
 	}
 	if !stageUnstageSet {
-		klog.Infof(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
+		klog.Info(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
 		// Just	delete the global directory + json file
 		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
 			return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
@@ -587,7 +587,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
 	}
 
-	klog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeUnStageVolume [%s]", deviceMountPath))
+	klog.V(4).Info(log("attacher.UnmountDevice successfully requested NodeUnStageVolume [%s]", deviceMountPath))
 	return nil
 }
 
