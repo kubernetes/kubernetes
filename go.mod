@@ -6,7 +6,9 @@
 
 module k8s.io/kubernetes
 
-go 1.22.0
+go 1.23.0
+
+godebug default=go1.23
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
@@ -216,7 +218,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240903080316-fb7743ff00a0 // indirect
+	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect

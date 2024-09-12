@@ -2,7 +2,9 @@
 
 module k8s.io/code-generator
 
-go 1.22.0
+go 1.23.0
+
+godebug default=go1.23
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -14,7 +16,7 @@ require (
 	golang.org/x/text v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/gengo/v2 v2.0.0-20240903080316-fb7743ff00a0
+	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2
 )

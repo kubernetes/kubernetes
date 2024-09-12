@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/packages"
+
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -640,6 +641,12 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 	name := goNameToName(in.String())
 	if useName != nil {
 		name = *useName
+	}
+
+	// Handle alias types conditionally on go1.22+.
+	// Inline this once the minimum supported version is go1.22
+	if out := p.walkAliasType(u, in); out != nil {
+		return out
 	}
 
 	switch t := in.(type) {
