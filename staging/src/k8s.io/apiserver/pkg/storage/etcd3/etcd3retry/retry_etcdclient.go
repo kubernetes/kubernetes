@@ -15,7 +15,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var defaultRetry = wait.Backoff{
+var DefaultRetry = wait.Backoff{
 	Duration: 300 * time.Millisecond,
 	Factor:   2, // double the timeout for every failure
 	Jitter:   0.1,
@@ -36,7 +36,7 @@ func NewRetryingEtcdStorage(delegate storage.Interface) storage.Interface {
 // in seconds (0 means forever). If no error is returned and out is not nil, out will be
 // set to the read value from database.
 func (c *retryClient) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	return onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		return c.Interface.Create(ctx, key, obj, out, ttl)
 	})
 }
@@ -44,7 +44,7 @@ func (c *retryClient) Create(ctx context.Context, key string, obj, out runtime.O
 // Delete removes the specified key and returns the value that existed at that spot.
 // If key didn't exist, it will return NotFound storage error.
 func (c *retryClient) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
-	return onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		return c.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject)
 	})
 }
@@ -58,7 +58,7 @@ func (c *retryClient) Delete(ctx context.Context, key string, out runtime.Object
 // and send it in an "ADDED" event, before watch starts.
 func (c *retryClient) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	var ret watch.Interface
-	err := onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	err := OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		var innerErr error
 		ret, innerErr = c.Interface.Watch(ctx, key, opts)
 		return innerErr
@@ -72,7 +72,7 @@ func (c *retryClient) Watch(ctx context.Context, key string, opts storage.ListOp
 // The returned contents may be delayed, but it is guaranteed that they will
 // match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 func (c *retryClient) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
-	return onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		return c.Interface.Get(ctx, key, opts, objPtr)
 	})
 }
@@ -84,7 +84,7 @@ func (c *retryClient) Get(ctx context.Context, key string, opts storage.GetOptio
 // The returned contents may be delayed, but it is guaranteed that they will
 // match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 func (c *retryClient) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		return c.Interface.GetList(ctx, key, opts, listObj)
 	})
 }
@@ -125,14 +125,14 @@ func (c *retryClient) GetList(ctx context.Context, key string, opts storage.List
 // )
 func (c *retryClient) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	return onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 		return c.Interface.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 	})
 }
 
-// isRetriableEtcdError returns true if a retry should be attempted, otherwise false.
+// IsRetriableEtcdError returns true if a retry should be attempted, otherwise false.
 // errorLabel is set to a non-empty value that reflects the type of error encountered.
-func isRetriableEtcdError(err error) (errorLabel string, retry bool) {
+func IsRetriableEtcdError(err error) (errorLabel string, retry bool) {
 	if err != nil {
 		if etcdError, ok := etcdrpc.Error(err).(etcdrpc.EtcdError); ok {
 			if etcdError.Code() == codes.Unavailable {
@@ -144,10 +144,10 @@ func isRetriableEtcdError(err error) (errorLabel string, retry bool) {
 	return
 }
 
-// onError allows the caller to retry fn in case the error returned by fn is retriable
+// OnError allows the caller to retry fn in case the error returned by fn is retriable
 // according to the provided function. backoff defines the maximum retries and the wait
 // interval between two retries.
-func onError(ctx context.Context, backoff wait.Backoff, retriable func(error) (string, bool), fn func() error) error {
+func OnError(ctx context.Context, backoff wait.Backoff, retriable func(error) (string, bool), fn func() error) error {
 	var lastErr error
 	var lastErrLabel string
 	var retry bool

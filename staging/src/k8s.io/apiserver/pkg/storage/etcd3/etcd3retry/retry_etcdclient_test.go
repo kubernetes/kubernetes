@@ -53,7 +53,7 @@ func TestOnError(t *testing.T) {
 			// we set it to -1 to indicate that the first
 			// execution is not a retry
 			actualRetries := -1
-			err := onError(ctx, defaultRetry, isRetriableEtcdError, func() error {
+			err := OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
 				actualRetries++
 				return scenario.returnedFnError(actualRetries)
 			})
@@ -111,7 +111,7 @@ func TestIsRetriableEtcdError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errorCodeGot, retryGot := isRetriableEtcdError(test.etcdErr)
+			errorCodeGot, retryGot := IsRetriableEtcdError(test.etcdErr)
 
 			if test.errorLabelExpected != errorCodeGot {
 				t.Errorf("expected error code: %s  but got: %s", test.errorLabelExpected, errorCodeGot)
