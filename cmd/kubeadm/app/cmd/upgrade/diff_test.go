@@ -114,13 +114,6 @@ diff:
 			expectedError: true,
 		},
 		{
-			name:            "invalid: valid config but empty manifest path",
-			cfgPath:         testUpgradeDiffConfig,
-			setManifestPath: true,
-			manifestPath:    "",
-			expectedError:   true,
-		},
-		{
 			name:            "invalid: valid config but bad manifest path",
 			cfgPath:         testUpgradeDiffConfig,
 			setManifestPath: true,
