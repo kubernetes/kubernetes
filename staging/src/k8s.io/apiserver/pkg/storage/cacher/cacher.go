@@ -693,9 +693,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 // Get implements storage.Interface.
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	ctx, span := tracing.Start(ctx, "cacher.Get",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("resource-version", opts.ResourceVersion))
+	defer span.End(500 * time.Millisecond)
 	if opts.ResourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
+		span.AddEvent("About to Get from underlying storage")
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
@@ -703,6 +709,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		if !c.ready.check() {
 			// If Cache is not initialized, delegate Get requests to storage
 			// as described in https://kep.k8s.io/4568
+			span.AddEvent("About to Get from underlying storage - cache not initialized")
 			return c.storage.Get(ctx, key, opts, objPtr)
 		}
 	}
@@ -722,6 +729,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		if getRV == 0 && !c.ready.check() {
 			// If Cacher is not yet initialized and we don't require any specific
 			// minimal resource version, simply forward the request to storage.
+			span.AddEvent("About to Get from underlying storage - cache not initialized and no resourceVersion set")
 			return c.storage.Get(ctx, key, opts, objPtr)
 		}
 		if err := c.ready.wait(ctx); err != nil {
@@ -734,6 +742,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
+	span.AddEvent("About to fetch object from cache")
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
 	if err != nil {
 		return err
@@ -856,7 +865,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		}
 	}
 
-	ctx, span := tracing.Start(ctx, "cacher list",
+	ctx, span := tracing.Start(ctx, "cacher.GetList",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
