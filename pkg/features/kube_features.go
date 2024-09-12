@@ -466,6 +466,13 @@ const (
 	// Set pod completion index as a pod label for Indexed Jobs.
 	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 
+	// owner: @knight42
+	// kep: https://kep.k8s.io/3288
+	// alpha: v1.32
+	//
+	// Enables only stdout or stderr of the container to be retrievd.
+	PodLogsQuerySplitStreams featuregate.Feature = "PodLogsQuerySplitStreams"
+
 	// owner: @ddebroy, @kannon92
 	//
 	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
