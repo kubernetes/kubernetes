@@ -584,7 +584,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 			if op != nil {
 				ret = fmt.Sprintf("%s: %v", ret, op.Error)
 			}
-			return "", fmt.Errorf(ret)
+			return "", errors.New(ret)
 		} else if op.Error != nil {
 			var errs []string
 			for _, insertErr := range op.Error.Errors {

@@ -272,7 +272,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 			sets.NewString(authzmodes.AuthorizationModeChoices...),
 			sets.NewString(repeatableAuthorizerTypes...),
 		); len(errors) != 0 {
-			return nil, fmt.Errorf(errors.ToAggregate().Error())
+			return nil, errors.ToAggregate()
 		}
 	} else {
 		authorizationConfiguration, err = o.buildAuthorizationConfiguration()

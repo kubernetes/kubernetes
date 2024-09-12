@@ -322,7 +322,7 @@ func (step stepName) getName() string { return step.name }
 func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected string) {
 	data, err := ioutil.ReadFile(filepath.Join(volumePath, filename))
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	actualStr := string(data)
@@ -358,7 +358,7 @@ type verifyMode struct {
 func (step verifyMode) run(test *downwardAPITest) {
 	fileInfo, err := os.Stat(filepath.Join(test.volumePath, step.name))
 	if err != nil {
-		test.t.Errorf(err.Error())
+		test.t.Error(err.Error())
 		return
 	}
 

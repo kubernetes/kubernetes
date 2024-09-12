@@ -18,6 +18,7 @@ package gce
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -96,7 +97,7 @@ func WaitForNodeBootIdsToChange(ctx context.Context, c clientset.Interface, node
 		}
 	}
 	if len(errMsg) > 0 {
-		return fmt.Errorf(strings.Join(errMsg, ","))
+		return errors.New(strings.Join(errMsg, ","))
 	}
 	return nil
 }

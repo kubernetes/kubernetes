@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -741,7 +742,7 @@ func (cont *IngressController) Cleanup(del bool) error {
 	if errMsg == "" {
 		return nil
 	}
-	return fmt.Errorf(errMsg)
+	return errors.New(errMsg)
 }
 
 // Init initializes the IngressController with an UID
