@@ -439,6 +439,15 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+
+	// InitialEventsListBlueprintAnnotationKey is the name of the key
+	// where an empty, base64-encoded, versioned list is stored as a string.
+	//
+	// Used by clients that want to reconstruct a list object from
+	// the retrieved stream, ensuring it is equivalent to a standard LIST call.
+	//
+	// The annotation is added to a "Bookmark" event.
+	InitialEventsListBlueprintAnnotationKey = "kubernetes.io/initial-events-list-blueprint"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
