@@ -167,6 +167,9 @@ func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Inte
 }
 
 func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) http.Handler {
+	if atomicReadOnlyExecuting != 0 {
+		t.Errorf("Expected %d requests executing when constructing filter, got %d", 0, atomicReadOnlyExecuting)
+	}
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
@@ -189,7 +192,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 			// TODO: all test(s) using this filter must run
 			// serially to each other
 			if atomicReadOnlyExecuting != 0 {
-				t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
+				t.Errorf("Expected %d requests executing after handling, got %d", 0, atomicReadOnlyExecuting)
 			}
 		})
 	}), requestInfoFactory)
@@ -556,16 +559,19 @@ func TestApfWatchHandlePanic(t *testing.T) {
 	postExecutePanicingFilter.postExecutePanic = true
 
 	testCases := []struct {
-		name   string
-		filter *fakeWatchApfFilter
+		name               string
+		filter             *fakeWatchApfFilter
+		expectedHTTPStatus int
 	}{
 		{
-			name:   "pre-execute panic",
-			filter: preExecutePanicingFilter,
+			name:               "pre-execute panic",
+			filter:             preExecutePanicingFilter,
+			expectedHTTPStatus: http.StatusTooManyRequests,
 		},
 		{
-			name:   "post-execute panic",
-			filter: postExecutePanicingFilter,
+			name:               "post-execute panic",
+			filter:             postExecutePanicingFilter,
+			expectedHTTPStatus: http.StatusOK,
 		},
 	}
 
@@ -577,18 +583,10 @@ func TestApfWatchHandlePanic(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
-			handler := func(w http.ResponseWriter, r *http.Request) {
-				defer func() {
-					if err := recover(); err == nil {
-						t.Errorf("expected panic, got %v", err)
-					}
-				}()
-				apfHandler.ServeHTTP(w, r)
-			}
-			server := httptest.NewServer(http.HandlerFunc(handler))
+			server := httptest.NewServer(apfHandler)
 			defer server.Close()
 
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), test.expectedHTTPStatus); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
