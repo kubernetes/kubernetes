@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	apiadmissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/admissionregistration/v1alpha1"
+	admissionregistrationv1alpha1 "k8s.io/client-go/listers/admissionregistration/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // MutatingAdmissionPolicyBindings.
 type MutatingAdmissionPolicyBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.MutatingAdmissionPolicyBindingLister
+	Lister() admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingLister
 }
 
 type mutatingAdmissionPolicyBindingInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredMutatingAdmissionPolicyBindingInformer(client kubernetes.Interfa
 				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(context.TODO(), options)
 			},
 		},
-		&admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{},
+		&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *mutatingAdmissionPolicyBindingInformer) defaultInformer(client kubernet
 }
 
 func (f *mutatingAdmissionPolicyBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{}, f.defaultInformer)
 }
 
-func (f *mutatingAdmissionPolicyBindingInformer) Lister() v1alpha1.MutatingAdmissionPolicyBindingLister {
-	return v1alpha1.NewMutatingAdmissionPolicyBindingLister(f.Informer().GetIndexer())
+func (f *mutatingAdmissionPolicyBindingInformer) Lister() admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingLister {
+	return admissionregistrationv1alpha1.NewMutatingAdmissionPolicyBindingLister(f.Informer().GetIndexer())
 }

@@ -178,10 +178,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1.WebhookClientConfigApplyConfiguration{}
 
 		// Group=admissionregistration.k8s.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithKind("ApplyConfiguration"):
+		return &admissionregistrationv1alpha1.ApplyConfigurationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AuditAnnotation"):
 		return &admissionregistrationv1alpha1.AuditAnnotationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ExpressionWarning"):
 		return &admissionregistrationv1alpha1.ExpressionWarningApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JSONPatch"):
+		return &admissionregistrationv1alpha1.JSONPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MatchCondition"):
 		return &admissionregistrationv1alpha1.MatchConditionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MatchResources"):

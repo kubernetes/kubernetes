@@ -119,14 +119,21 @@
       ],
       "matchPolicy": "matchPolicyValue"
     },
+    "variables": [
+      {
+        "name": "nameValue",
+        "expression": "expressionValue"
+      }
+    ],
     "mutations": [
       {
-        "expression": "expressionValue",
-        "message": "messageValue",
-        "reason": "reasonValue",
-        "messageExpression": "messageExpressionValue",
-        "reinvocationPolicy": "reinvocationPolicyValue",
-        "patchType": "patchTypeValue"
+        "patchType": "patchTypeValue",
+        "applyConfiguration": {
+          "expression": "expressionValue"
+        },
+        "jsonPatch": {
+          "expression": "expressionValue"
+        }
       }
     ],
     "failurePolicy": "failurePolicyValue",
@@ -135,6 +142,7 @@
         "name": "nameValue",
         "expression": "expressionValue"
       }
-    ]
+    ],
+    "reinvocationPolicy": "reinvocationPolicyValue"
   }
 }

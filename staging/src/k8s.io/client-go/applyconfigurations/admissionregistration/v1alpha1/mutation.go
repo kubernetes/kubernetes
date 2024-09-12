@@ -19,20 +19,15 @@ limitations under the License.
 package v1alpha1
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 )
 
 // MutationApplyConfiguration represents a declarative configuration of the Mutation type for use
 // with apply.
 type MutationApplyConfiguration struct {
-	Expression         *string                                         `json:"expression,omitempty"`
-	Message            *string                                         `json:"message,omitempty"`
-	Reason             *v1.StatusReason                                `json:"reason,omitempty"`
-	MessageExpression  *string                                         `json:"messageExpression,omitempty"`
-	ReinvocationPolicy *admissionregistrationv1.ReinvocationPolicyType `json:"reinvocationPolicy,omitempty"`
-	PatchType          *v1alpha1.PatchType                             `json:"patchType,omitempty"`
+	PatchType          *admissionregistrationv1alpha1.PatchType `json:"patchType,omitempty"`
+	ApplyConfiguration *ApplyConfigurationApplyConfiguration    `json:"applyConfiguration,omitempty"`
+	JSONPatch          *JSONPatchApplyConfiguration             `json:"jsonPatch,omitempty"`
 }
 
 // MutationApplyConfiguration constructs a declarative configuration of the Mutation type for use with
@@ -41,50 +36,26 @@ func Mutation() *MutationApplyConfiguration {
 	return &MutationApplyConfiguration{}
 }
 
-// WithExpression sets the Expression field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Expression field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithExpression(value string) *MutationApplyConfiguration {
-	b.Expression = &value
-	return b
-}
-
-// WithMessage sets the Message field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Message field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithMessage(value string) *MutationApplyConfiguration {
-	b.Message = &value
-	return b
-}
-
-// WithReason sets the Reason field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Reason field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithReason(value v1.StatusReason) *MutationApplyConfiguration {
-	b.Reason = &value
-	return b
-}
-
-// WithMessageExpression sets the MessageExpression field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MessageExpression field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithMessageExpression(value string) *MutationApplyConfiguration {
-	b.MessageExpression = &value
-	return b
-}
-
-// WithReinvocationPolicy sets the ReinvocationPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ReinvocationPolicy field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithReinvocationPolicy(value admissionregistrationv1.ReinvocationPolicyType) *MutationApplyConfiguration {
-	b.ReinvocationPolicy = &value
-	return b
-}
-
 // WithPatchType sets the PatchType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PatchType field is set to the value of the last call.
-func (b *MutationApplyConfiguration) WithPatchType(value v1alpha1.PatchType) *MutationApplyConfiguration {
+func (b *MutationApplyConfiguration) WithPatchType(value admissionregistrationv1alpha1.PatchType) *MutationApplyConfiguration {
 	b.PatchType = &value
+	return b
+}
+
+// WithApplyConfiguration sets the ApplyConfiguration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ApplyConfiguration field is set to the value of the last call.
+func (b *MutationApplyConfiguration) WithApplyConfiguration(value *ApplyConfigurationApplyConfiguration) *MutationApplyConfiguration {
+	b.ApplyConfiguration = value
+	return b
+}
+
+// WithJSONPatch sets the JSONPatch field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the JSONPatch field is set to the value of the last call.
+func (b *MutationApplyConfiguration) WithJSONPatch(value *JSONPatchApplyConfiguration) *MutationApplyConfiguration {
+	b.JSONPatch = value
 	return b
 }

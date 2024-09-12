@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // MutatingAdmissionPolicyBindingLister helps list MutatingAdmissionPolicyBindings.
@@ -30,19 +30,19 @@ import (
 type MutatingAdmissionPolicyBindingLister interface {
 	// List lists all MutatingAdmissionPolicyBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.MutatingAdmissionPolicyBinding, err error)
+	List(selector labels.Selector) (ret []*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, err error)
 	// Get retrieves the MutatingAdmissionPolicyBinding from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.MutatingAdmissionPolicyBinding, error)
+	Get(name string) (*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, error)
 	MutatingAdmissionPolicyBindingListerExpansion
 }
 
 // mutatingAdmissionPolicyBindingLister implements the MutatingAdmissionPolicyBindingLister interface.
 type mutatingAdmissionPolicyBindingLister struct {
-	listers.ResourceIndexer[*v1alpha1.MutatingAdmissionPolicyBinding]
+	listers.ResourceIndexer[*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
 }
 
 // NewMutatingAdmissionPolicyBindingLister returns a new MutatingAdmissionPolicyBindingLister.
 func NewMutatingAdmissionPolicyBindingLister(indexer cache.Indexer) MutatingAdmissionPolicyBindingLister {
-	return &mutatingAdmissionPolicyBindingLister{listers.New[*v1alpha1.MutatingAdmissionPolicyBinding](indexer, v1alpha1.Resource("mutatingadmissionpolicybinding"))}
+	return &mutatingAdmissionPolicyBindingLister{listers.New[*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](indexer, admissionregistrationv1alpha1.Resource("mutatingadmissionpolicybinding"))}
 }

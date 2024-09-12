@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
+	applyconfigurationsadmissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,36 @@ type MutatingAdmissionPoliciesGetter interface {
 
 // MutatingAdmissionPolicyInterface has methods to work with MutatingAdmissionPolicy resources.
 type MutatingAdmissionPolicyInterface interface {
-	Create(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.CreateOptions) (*v1alpha1.MutatingAdmissionPolicy, error)
-	Update(ctx context.Context, mutatingAdmissionPolicy *v1alpha1.MutatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.MutatingAdmissionPolicy, error)
+	Create(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1alpha1.MutatingAdmissionPolicy, opts v1.CreateOptions) (*admissionregistrationv1alpha1.MutatingAdmissionPolicy, error)
+	Update(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1alpha1.MutatingAdmissionPolicy, opts v1.UpdateOptions) (*admissionregistrationv1alpha1.MutatingAdmissionPolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.MutatingAdmissionPolicy, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.MutatingAdmissionPolicyList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1alpha1.MutatingAdmissionPolicy, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1alpha1.MutatingAdmissionPolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.MutatingAdmissionPolicy, err error)
-	Apply(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.MutatingAdmissionPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1alpha1.MutatingAdmissionPolicy, err error)
+	Apply(ctx context.Context, mutatingAdmissionPolicy *applyconfigurationsadmissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1alpha1.MutatingAdmissionPolicy, err error)
 	MutatingAdmissionPolicyExpansion
 }
 
 // mutatingAdmissionPolicies implements MutatingAdmissionPolicyInterface
 type mutatingAdmissionPolicies struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicy, *v1alpha1.MutatingAdmissionPolicyList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*admissionregistrationv1alpha1.MutatingAdmissionPolicy, *admissionregistrationv1alpha1.MutatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration]
 }
 
 // newMutatingAdmissionPolicies returns a MutatingAdmissionPolicies
 func newMutatingAdmissionPolicies(c *AdmissionregistrationV1alpha1Client) *mutatingAdmissionPolicies {
 	return &mutatingAdmissionPolicies{
-		gentype.NewClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicy, *v1alpha1.MutatingAdmissionPolicyList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*admissionregistrationv1alpha1.MutatingAdmissionPolicy, *admissionregistrationv1alpha1.MutatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration](
 			"mutatingadmissionpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.MutatingAdmissionPolicy { return &v1alpha1.MutatingAdmissionPolicy{} },
-			func() *v1alpha1.MutatingAdmissionPolicyList { return &v1alpha1.MutatingAdmissionPolicyList{} }),
+			func() *admissionregistrationv1alpha1.MutatingAdmissionPolicy {
+				return &admissionregistrationv1alpha1.MutatingAdmissionPolicy{}
+			},
+			func() *admissionregistrationv1alpha1.MutatingAdmissionPolicyList {
+				return &admissionregistrationv1alpha1.MutatingAdmissionPolicyList{}
+			}),
 	}
 }
