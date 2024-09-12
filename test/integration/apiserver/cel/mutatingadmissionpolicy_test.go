@@ -19,15 +19,21 @@ package cel
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,53 +43,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/restmapper"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	coreinstall "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/ptr"
 )
 
-func policy(name string, matchResources v1alpha1.MatchResources, paramKind *v1alpha1.ParamKind, mutations ...v1alpha1.Mutation) *v1alpha1.MutatingAdmissionPolicy {
-	return &v1alpha1.MutatingAdmissionPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1alpha1.MutatingAdmissionPolicySpec{
-			MatchConstraints: &matchResources,
-			ParamKind:        paramKind,
-			Mutations:        mutations,
-		},
-	}
-}
-
-func binding(policyName string, paramRef *v1alpha1.ParamRef, matchResources *v1alpha1.MatchResources) *v1alpha1.MutatingAdmissionPolicyBinding {
-	return &v1alpha1.MutatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: policyName + "-binding-" + string(uuid.NewUUID()),
-		},
-		Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
-			PolicyName:     policyName,
-			ParamRef:       paramRef,
-			MatchResources: matchResources,
-		},
-	}
-}
-
-func TestMAP(t *testing.T) {
-	matchAllResources := v1alpha1.MatchResources{
+// TestMutatingAdmissionPolicy tests MutatingAdmissionPolicy using a shared apiserver for all tests
+// and waiting for bindings to become ready by dry-running marker requests until the binding successfully
+// mutates a marker, and then verifies the policy exactly once.
+func TestMutatingAdmissionPolicy(t *testing.T) {
+	matchEndpointResources := v1alpha1.MatchResources{
 		ResourceRules: []v1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: v1alpha1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{"*"},
 					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{"*"},
-						APIVersions: []string{"*"},
-						Resources:   []string{"*"},
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"endpoints"},
 					},
 				},
 			},
@@ -94,21 +75,21 @@ func TestMAP(t *testing.T) {
 		name     string
 		policies []*v1alpha1.MutatingAdmissionPolicy
 		bindings []*v1alpha1.MutatingAdmissionPolicyBinding
-		params   []runtime.Object
+		params   []*corev1.ConfigMap
 
 		requestOperation admissionregistrationv1.OperationType
 		requestResource  schema.GroupVersionResource
+		subresources     []string // Only supported for requestOperation=Update since subresources can not be created
 		requestObject    runtime.Object
-
-		expected runtime.Object
+		expected         runtime.Object
 	}{
 		{
 			name: "basic",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("basic-policy", matchAllResources, nil, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression: `
+				mutatingPolicy("basic-policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `
 						Object{
 							metadata: Object.metadata{
 								annotations: {
@@ -116,22 +97,23 @@ func TestMAP(t *testing.T) {
 								}
 							}
 						}`,
+					},
 				}),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("basic-policy", nil, nil),
+				mutatingBinding("basic-policy", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "basic-policy-object",
 					Namespace: "default",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "basic-policy-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"my-foo-annotation": "myAnnotationValue",
@@ -142,10 +124,10 @@ func TestMAP(t *testing.T) {
 		{
 			name: "multiple policies",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-1", matchAllResources, nil, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression: `
+				mutatingPolicy("multi-policy-1", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `
 						Object{
 							metadata: Object.metadata{
 								annotations: {
@@ -153,11 +135,12 @@ func TestMAP(t *testing.T) {
 								}
 							}
 						}`,
+					},
 				}),
-				policy("policy-2", matchAllResources, nil, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression: `
+				mutatingPolicy("multi-policy-2", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `
 						Object{
 							metadata: Object.metadata{
 								annotations: {
@@ -165,23 +148,24 @@ func TestMAP(t *testing.T) {
 								}
 							}
 						}`,
+					},
 				}),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-1", nil, nil),
-				binding("policy-2", nil, nil),
+				mutatingBinding("multi-policy-1", nil, nil),
+				mutatingBinding("multi-policy-2", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "multi-policy-object",
 					Namespace: "default",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "multi-policy-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"foo1": "foo1Value",
@@ -193,13 +177,13 @@ func TestMAP(t *testing.T) {
 		{
 			name: "policy with native param",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-with-param", matchAllResources, &v1alpha1.ParamKind{
+				mutatingPolicy("policy-with-native", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
 					APIVersion: "v1",
 					Kind:       "ConfigMap",
 				}, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression: `
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `
 						Object{
 							metadata: Object.metadata{
 								annotations: {
@@ -207,17 +191,18 @@ func TestMAP(t *testing.T) {
 								}
 							}
 						}`,
+					},
 				}),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-param", &v1alpha1.ParamRef{
-					Name: "test-param",
+				mutatingBinding("policy-with-native", &v1alpha1.ParamRef{
+					Name: "policy-with-native-param",
 				}, nil),
 			},
-			params: []runtime.Object{
-				&corev1.ConfigMap{
+			params: []*corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param",
+						Name:      "policy-with-native-param",
 						Namespace: "default",
 					},
 					Data: map[string]string{
@@ -227,16 +212,16 @@ func TestMAP(t *testing.T) {
 				},
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "policy-with-native-object",
 					Namespace: "default",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "policy-with-native-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"myFooKey": "myFooValue",
@@ -244,176 +229,112 @@ func TestMAP(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// Can't be reliably tested due to large possibly 30s delay in picking up
-		// CRDs in discovery
-		// 	name: "policy with crd param",
-		// },
-		{
-			name: "multiple bindings with different params",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-with-param", matchAllResources, &v1alpha1.ParamKind{
-					APIVersion: "v1",
-					Kind:       "ConfigMap",
-				}, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression:         `Object{metadata: Object.metadata{annotations: params.data}}`,
-				}),
-			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-param", &v1alpha1.ParamRef{
-					Name:      "test-param-1",
-					Namespace: "default",
-				}, nil),
-				binding("policy-with-param", &v1alpha1.ParamRef{
-					Name:      "test-param-2",
-					Namespace: "default",
-				}, nil),
-			},
-			params: []runtime.Object{
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-1",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"key1": "value1",
-					},
-				},
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-2",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"key2": "value2",
-						"key3": "value3",
-					},
-				},
-			},
-			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-						"key3": "value3",
-					},
-				},
-			},
-		},
 		{
 			name: "policy with multiple params quantified by single binding",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-with-param", matchAllResources, &v1alpha1.ParamKind{
+				mutatingPolicy("multi-param-binding", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
 					APIVersion: "v1",
 					Kind:       "ConfigMap",
 				}, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression:         `Object{metadata: Object.metadata{annotations: params.data}}`,
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
+					},
 				}),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-param", &v1alpha1.ParamRef{
+				mutatingBinding("multi-param-binding", &v1alpha1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"param": "true",
+							"multi-param-binding-param": "true",
 						},
 					},
+					Namespace: "default",
 				}, nil),
 			},
-			params: []runtime.Object{
-				&corev1.ConfigMap{
+			params: []*corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-1",
+						Name:      "multi-param-binding-param-1",
 						Namespace: "default",
 						Labels: map[string]string{
-							"param": "true",
+							"multi-param-binding-param": "true",
 						},
 					},
 					Data: map[string]string{
-						"key1": "value1",
+						"multi-param-binding-key1": "value1",
 					},
 				},
-				&corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-2",
+						Name:      "multi-param-binding-param-2",
 						Namespace: "default",
 						Labels: map[string]string{
-							"param": "true",
+							"multi-param-binding-param": "true",
 						},
 					},
 					Data: map[string]string{
-						"key2": "value2",
-						"key3": "value3",
+						"multi-param-binding-key2": "value2",
+						"multi-param-binding-key3": "value3",
 					},
 				},
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "multi-param-binding-object",
 					Namespace: "default",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "multi-param-binding-object",
 					Namespace: "default",
 					Annotations: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-						"key3": "value3",
+						"multi-param-binding-key1": "value1",
+						"multi-param-binding-key2": "value2",
+						"multi-param-binding-key3": "value3",
 					},
 				},
 			},
 		},
 		{
-			name: "policy with multiple mutations",
+			name: "policy with variables",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-with-multiple-mutations", matchAllResources, nil,
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
+				withMutatingVariables([]v1alpha1.Variable{
+					{Name: "foo1", Expression: `"foo1" + "Value"`},
+					{Name: "foo2", Expression: `variables.foo1.replace("1", "2")`},
+				},
+					mutatingPolicy("policy-with-multiple-mutations", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil,
+						v1alpha1.Mutation{
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
-										"foo1": "foo1Value"
+										"foo1": variables.foo1
 									}
 								}
 							}`,
-					},
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
-							Object{
-								metadata: Object.metadata{
-									annotations: {
-										"foo2": "foo2Value"
-									}
-								}
-							}`,
-					},
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
+							},
+						},
+						v1alpha1.Mutation{
+							PatchType: v1alpha1.PatchTypeJSONPatch,
+							JSONPatch: &v1alpha1.JSONPatch{
+								Expression: `[
+									JSONPatch{op: "test", path: "/metadata/annotations", value: {"foo1": variables.foo1}},
+									JSONPatch{op: "add", path: "/metadata/annotations/foo2", value: variables.foo2},
+								]`,
+							},
+						},
+						v1alpha1.Mutation{
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -421,23 +342,24 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
-					},
-				),
+							},
+						},
+					)),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-multiple-mutations", nil, nil),
+				mutatingBinding("policy-with-multiple-mutations", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "policy-with-multiple-mutations-object",
 					Namespace: "default",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
+					Name:      "policy-with-multiple-mutations-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"foo1": "foo1Value",
@@ -448,13 +370,46 @@ func TestMAP(t *testing.T) {
 			},
 		},
 		{
-			name: "policy with multiple mutations requiring reinvocation",
+			name: "match condition matches",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-with-multiple-mutations-requiring-reinvocation", matchAllResources, nil,
+				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-match-condition", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
+						},
+					})),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("policy-match-condition", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "test"},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "test", "applied": "updated"},
+				},
+			},
+		},
+		{
+			// same as the multiple mutations test, but the mutations are split
+			// across multiple policies
+			name: "multiple policies requiring reinvocation",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				mutatingPolicy("policy-1", v1alpha1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression: `
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -463,11 +418,14 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
+						},
 					},
+				),
+				mutatingPolicy("policy-2", v1alpha1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression: `
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -476,11 +434,14 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
+						},
 					},
+				),
+				mutatingPolicy("policy-3", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil,
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -489,14 +450,18 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
-					}),
+						},
+					},
+				),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-multiple-mutations-requiring-reinvocation", nil, nil),
+				mutatingBinding("policy-1", nil, nil),
+				mutatingBinding("policy-2", nil, nil),
+				mutatingBinding("policy-3", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-configmap",
 					Namespace: "default",
@@ -505,7 +470,7 @@ func TestMAP(t *testing.T) {
 					},
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-configmap",
 					Namespace: "default",
@@ -525,89 +490,379 @@ func TestMAP(t *testing.T) {
 				},
 			},
 		},
-		{
-			// same as the multiple mutations test, but the mutations are split
-			// across multiple policies
-			name: "multiple policies requiring reinvocation",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("policy-1", matchAllResources, nil,
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression: `
-							Object{
-								metadata: Object.metadata{
-									annotations: {
-										?"foo": optional.of(string(int(object.metadata.annotations["foo"]) + 1)),
-										"firstApplied": "true"
-									}
-								}
-							}`,
-					},
-				),
-				policy("policy-2", matchAllResources, nil,
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression: `
-							Object{
-								metadata: Object.metadata{
-									annotations: {
-										?"foo": optional.of(string(int(object.metadata.annotations["foo"]) + 1)),
-										"secondApplied": "true"
-									}
-								}
-							}`,
-					},
-				),
-				policy("policy-3", matchAllResources, nil,
-					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
-							Object{
-								metadata: Object.metadata{
-									annotations: {
-										?"foo": optional.of(string(int(object.metadata.annotations["foo"]) + 1)),
-										"thirdApplied": "true"
-									}
-								}
-							}`,
-					},
-				),
-			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-1", nil, nil),
-				binding("policy-2", nil, nil),
-				binding("policy-3", nil, nil),
-			},
-			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"foo": "0",
+	}
+
+	// Run all tests in a shared apiserver
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "MutatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	require.NoError(t, err)
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	require.NoError(t, err)
+
+	dynClient, err := dynamic.NewForConfig(server.ClientConfig)
+	require.NoError(t, err)
+
+	sch := runtime.NewScheme()
+	coreinstall.Install(sch)
+
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			// Create the policies, bindings and params.
+			for _, param := range tc.params {
+				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(context.TODO(), param, metav1.CreateOptions{FieldManager: "integration-test"})
+				require.NoError(t, err)
+			}
+
+			for _, p := range tc.policies {
+				// Modify each policy to also mutate marker requests.
+				p = withMutatingWaitReadyConstraintAndExpression(p, fmt.Sprintf("%d-%s", i, p.Name))
+				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(context.TODO(), p, metav1.CreateOptions{FieldManager: "integration-test"})
+				require.NoError(t, err)
+			}
+
+			for _, b := range tc.bindings {
+				// After creating each binding, wait until a marker request is successfully mutated.
+				err = createAndWaitReadyMutating(t, client, b, fmt.Sprintf("%d-%s", i, b.Spec.PolicyName))
+				require.NoError(t, err)
+			}
+
+			unstructuredRequestObj := toUnstructured(t, tc.requestObject)
+			unstructuredExpectedObj := toUnstructured(t, tc.expected)
+			wipeUncheckedFields(t, unstructuredExpectedObj)
+
+			defer func() {
+				if cleanupErr := cleanupMutatingPolicy(t, client, tc.policies, tc.bindings, tc.params); cleanupErr != nil {
+					t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
+				}
+			}()
+
+			// Verify that the policy is working as expected.
+			// Note that we do NOT retry requests here. Once the bindings are verified as working via marker
+			// requests, we expect the policy to work consistently for all subsequent requests.
+			var resultObj runtime.Object
+			rsrcClient := clientForType(t, unstructuredRequestObj, tc.requestResource, dynClient)
+			switch tc.requestOperation {
+			case admissionregistrationv1.Create:
+				resultObj, err = rsrcClient.Create(context.TODO(), unstructuredRequestObj, metav1.CreateOptions{
+					DryRun:       []string{metav1.DryRunAll},
+					FieldManager: "integration-test",
+				}, tc.subresources...)
+			case admissionregistrationv1.Update:
+				resultObj, err = rsrcClient.Update(context.TODO(), unstructuredRequestObj, metav1.UpdateOptions{
+					DryRun:       []string{metav1.DryRunAll},
+					FieldManager: "integration-test",
+				}, tc.subresources...)
+				require.NoError(t, err)
+			default:
+				t.Fatalf("unsupported operation: %v", tc.requestOperation)
+			}
+			wipeUncheckedFields(t, resultObj)
+			if !cmp.Equal(unstructuredExpectedObj, resultObj, cmpopts.EquateEmpty()) {
+				t.Errorf("unexpected diff:\n%s\n", cmp.Diff(unstructuredRequestObj, resultObj, cmpopts.EquateEmpty()))
+			}
+		})
+	}
+}
+
+// TestMutatingAdmissionPolicy_Slow tests policies by waiting until a request is successfully mutated.
+// This is slower because it creates an apiserver for each whereas TestMutatingAdmissionPolicy creates
+// a single apiserver and then uses marker requests to check that a binding is ready before testing it exactly once.
+// Only test cases that cannot be run in TestMutatingAdmissionPolicy should be added here.
+func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
+	matchEndpointResources := v1alpha1.MatchResources{
+		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1alpha1.RuleWithOperations{
+					Operations: []admissionregistrationv1.OperationType{"*"},
+					Rule: admissionregistrationv1.Rule{
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"endpoints"},
 					},
 				},
 			},
-			expected: &corev1.ConfigMap{
+		},
+	}
+
+	cases := []struct {
+		name     string
+		policies []*v1alpha1.MutatingAdmissionPolicy
+		bindings []*v1alpha1.MutatingAdmissionPolicyBinding
+		params   []*corev1.ConfigMap
+
+		requestOperation admissionregistrationv1.OperationType
+		requestResource  schema.GroupVersionResource
+		subresources     []string       // Only supported for requestOperation=Update since subresources can not be created
+		initialObject    runtime.Object // For requestOperation=Update, this may be used to create the initial object state
+		requestObject    runtime.Object
+		expected         runtime.Object
+	}{
+		{
+			name: "unbound policy is no-op",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				mutatingPolicy("unbound-policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `
+						Object{
+							metadata: Object.metadata{
+								annotations: {
+									"foo": "fooValue"
+								}
+							}
+						}`,
+					},
+				}),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-configmap",
 					Namespace: "default",
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+				},
+			},
+		},
+		{
+			name: "failure policy ignore",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				withMutatingFailurePolicy(v1alpha1.Ignore,
+					mutatingPolicy("policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{spec: Object.spec{invalidField: "invalid apply configuration"}}`,
+						},
+					})),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("policy", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+				},
+			},
+		},
+		{
+			name: "match condition does not match",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-no-match-condition", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
+						},
+					})),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("policy-no-match-condition", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+		},
+		{
+			name: "some policy conditions match",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("production")`}},
+					mutatingPolicy("policy-1", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{labels: {"applied": "wrong"}}}`,
+						},
+					})),
+				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-2", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
+						},
+					})),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("policy-1", nil, nil),
+				mutatingBinding("policy-2", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "test"},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-configmap",
+					Namespace: "default",
+					Labels:    map[string]string{"environment": "test", "applied": "updated"},
+				},
+			},
+		},
+		{
+			name: "mutate status subresource",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				mutatingPolicy("subresource-status", v1alpha1.NeverReinvocationPolicy, v1alpha1.MatchResources{
+					ResourceRules: []v1alpha1.NamedRuleWithOperations{
+						{
+							RuleWithOperations: v1alpha1.RuleWithOperations{
+								Operations: []admissionregistrationv1.OperationType{"*"},
+								Rule: admissionregistrationv1.Rule{
+									APIGroups:   []string{""},
+									APIVersions: []string{"v1"},
+									Resources:   []string{"namespaces/status"},
+								},
+							},
+						},
+					},
+				}, nil, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `Object{
+							status: Object.status{
+								conditions: [Object.status.conditions{
+									type: "NamespaceDeletionContentFailure", 
+									message: "mutated"
+								}]
+							}
+						}`,
+					},
+				}),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("subresource-status", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Update,
+			subresources:     []string{"status"},
+			requestResource:  corev1.SchemeGroupVersion.WithResource("namespaces"),
+			initialObject: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-namespace",
+				},
+			},
+			requestObject: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-namespace",
+				},
+				Status: corev1.NamespaceStatus{
+					Conditions: []corev1.NamespaceCondition{{
+						Type:   corev1.NamespaceDeletionContentFailure,
+						Status: corev1.ConditionUnknown,
+					}},
+				},
+			},
+			expected: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-namespace",
+					Labels: map[string]string{"kubernetes.io/metadata.name": "test-namespace"},
+				},
+				Spec: corev1.NamespaceSpec{
+					Finalizers: []corev1.FinalizerName{"kubernetes"},
+				},
+				Status: corev1.NamespaceStatus{
+					Conditions: []corev1.NamespaceCondition{{
+						Type:    corev1.NamespaceDeletionContentFailure,
+						Status:  corev1.ConditionUnknown,
+						Message: "mutated",
+					}},
+					Phase: corev1.NamespaceActive,
+				},
+			},
+		},
+		{
+			name: "multiple bindings with different params",
+			policies: []*v1alpha1.MutatingAdmissionPolicy{
+				mutatingPolicy("multi-binding", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+				}, v1alpha1.Mutation{
+					PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
+					},
+				}),
+			},
+			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("multi-binding", &v1alpha1.ParamRef{
+					Name:      "multi-binding-param-1",
+					Namespace: "default",
+				}, nil),
+				mutatingBinding("multi-binding", &v1alpha1.ParamRef{
+					Name:      "multi-binding-param-2",
+					Namespace: "default",
+				}, nil),
+			},
+			params: []*corev1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "multi-binding-param-1",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"multi-binding-key1": "value1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "multi-binding-param-2",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"multi-binding-key2": "value2",
+						"multi-binding-key3": "value3",
+					},
+				},
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "multi-binding-object",
+					Namespace: "default",
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "multi-binding-object",
+					Namespace: "default",
 					Annotations: map[string]string{
-						// First mutation 0->1
-						// Second mutation 1->2
-						// Third Mutation 2->3
-						// First Mutation Reinvocation 3->4
-						// Second Mutation Reinvocation 4->5
-						// (Third Mutation is set to never reinvocation, so it's not reinvoked)
-						// No future reinvocation passes (we only do a single reinvocation)
-						"foo":           "5",
-						"firstApplied":  "true",
-						"secondApplied": "true",
-						"thirdApplied":  "true",
+						"multi-binding-key1": "value1",
+						"multi-binding-key2": "value2",
+						"multi-binding-key3": "value3",
 					},
 				},
 			},
@@ -617,22 +872,24 @@ func TestMAP(t *testing.T) {
 			// multiple params bound
 			name: "multiple params causing reinvocation",
 			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy(
-					"policy-with-param",
-					matchAllResources,
+				mutatingPolicy(
+					"multi-param-reinvocation",
+					v1alpha1.IfNeededReinvocationPolicy,
+					matchEndpointResources,
 					&v1alpha1.ParamKind{
 						APIVersion: "v1",
 						Kind:       "ConfigMap",
 					},
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression:         `Object{metadata: Object.metadata{annotations: params.data}}`,
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
+						},
 					},
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.IfNeededReinvocationPolicy),
-						Expression: `
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -640,24 +897,27 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
+						},
 					},
 				),
-				policy(
+				mutatingPolicy(
 					"policy-with-param-no-reinvoke",
-					matchAllResources,
+					v1alpha1.NeverReinvocationPolicy,
+					matchEndpointResources,
 					&v1alpha1.ParamKind{
 						APIVersion: "v1",
 						Kind:       "ConfigMap",
 					},
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression:         `Object{metadata: Object.metadata{annotations: params.data}}`,
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
+						},
 					},
 					v1alpha1.Mutation{
-						PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-						ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-						Expression: `
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: `
 							Object{
 								metadata: Object.metadata{
 									annotations: {
@@ -665,53 +925,54 @@ func TestMAP(t *testing.T) {
 									}
 								}
 							}`,
+						},
 					},
 				),
 			},
 			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				binding("policy-with-param", &v1alpha1.ParamRef{
+				mutatingBinding("multi-param-reinvocation", &v1alpha1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"param": "true",
+							"multi-param-reinvocation": "true",
 						},
 					},
 				}, nil),
-				binding("policy-with-param-no-reinvoke", &v1alpha1.ParamRef{
+				mutatingBinding("policy-with-param-no-reinvoke", &v1alpha1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
-					Name: "test-param-3",
+					Name: "multi-param-reinvocation-param-3",
 				}, nil),
 			},
-			params: []runtime.Object{
-				&corev1.ConfigMap{
+			params: []*corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-1",
+						Name:      "multi-param-reinvocation-param-1",
 						Namespace: "default",
 						Labels: map[string]string{
-							"param": "true",
+							"multi-param-reinvocation": "true",
 						},
 					},
 					Data: map[string]string{
 						"firstApplied": "true",
 					},
 				},
-				&corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-2",
+						Name:      "multi-param-reinvocation-param-2",
 						Namespace: "default",
 						Labels: map[string]string{
-							"param": "true",
+							"multi-param-reinvocation": "true",
 						},
 					},
 					Data: map[string]string{
 						"secondApplied": "true",
 					},
 				},
-				&corev1.ConfigMap{
+				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-param-3",
+						Name:      "multi-param-reinvocation-param-3",
 						Namespace: "default",
 					},
 					Data: map[string]string{
@@ -720,19 +981,19 @@ func TestMAP(t *testing.T) {
 				},
 			},
 			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "multi-param-reinvocation-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"foo": "0",
 					},
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "request-configmap",
+					Name:      "multi-param-reinvocation-object",
 					Namespace: "default",
 					Annotations: map[string]string{
 						"firstApplied":  "true",
@@ -743,47 +1004,10 @@ func TestMAP(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "unbound policy is no-op",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				policy("unbound-policy", matchAllResources, nil, v1alpha1.Mutation{
-					PatchType:          ptr.To(v1alpha1.ApplyConfigurationPatchType),
-					ReinvocationPolicy: ptr.To(v1alpha1.NeverReinvocationPolicy),
-					Expression: `
-						Object{
-							metadata: Object.metadata{
-								annotations: {
-									"foo": "fooValue"
-								}
-							}
-						}`,
-				}),
-			},
-			requestOperation: admissionregistrationv1.Create,
-			requestResource:  corev1.SchemeGroupVersion.WithResource("configmaps"),
-			requestObject: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
-		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.requestObject == nil {
-				t.Fatalf("requestObject must be set")
-			} else if tc.expected == nil {
-				t.Fatalf("expected must be set")
-			}
-
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "MutatingAdmissionPolicy",
@@ -797,22 +1021,12 @@ func TestMAP(t *testing.T) {
 			dynClient, err := dynamic.NewForConfig(server.ClientConfig)
 			require.NoError(t, err)
 
-			restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(client.DiscoveryClient))
-
 			sch := runtime.NewScheme()
 			coreinstall.Install(sch)
 
-			guessGVK := func(obj runtime.Object) schema.GroupVersionKind {
-				gvk := obj.GetObjectKind().GroupVersionKind()
-				if gvk.Empty() {
-					// Try to read gvk off of the schema
-					gvks, _, err := sch.ObjectKinds(obj)
-					require.NoError(t, err)
-					require.NotEmpty(t, gvks)
-
-					gvk = gvks[0]
-				}
-				return gvk
+			for _, param := range tc.params {
+				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(context.TODO(), param, metav1.CreateOptions{FieldManager: "integration-test"})
+				require.NoError(t, err)
 			}
 
 			for _, p := range tc.policies {
@@ -825,89 +1039,42 @@ func TestMAP(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			for _, obj := range tc.params {
-				gvk := guessGVK(obj)
-
-				mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-				require.NoError(t, err)
-
-				unstructuredParamMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-				require.NoError(t, err)
-
-				unstructuredParamObj := &unstructured.Unstructured{
-					Object: unstructuredParamMap,
-				}
-
-				var rsrcClient dynamic.ResourceInterface = dynClient.Resource(mapping.Resource)
-				if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-					rsrcClient = rsrcClient.(dynamic.NamespaceableResourceInterface).Namespace(unstructuredParamObj.GetNamespace())
-				}
-				_, err = rsrcClient.Create(context.TODO(), unstructuredParamObj, metav1.CreateOptions{FieldManager: "integration-test"})
+			if tc.initialObject != nil {
+				initClient := clientForType(t, tc.initialObject, tc.requestResource, dynClient)
+				_, err = initClient.Create(context.TODO(), toUnstructured(t, tc.initialObject), metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
-			// Convert request object to unstructured
-			unstructuredRequestMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.requestObject)
-			require.NoError(t, err)
+			unstructuredRequestObj := toUnstructured(t, tc.requestObject)
+			unstructuredExpectedObj := toUnstructured(t, tc.expected)
+			wipeUncheckedFields(t, unstructuredExpectedObj)
 
-			unstructuredRequestObj := &unstructured.Unstructured{
-				Object: unstructuredRequestMap,
-			}
-
-			unstructuredExpectedMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.expected)
-			require.NoError(t, err)
-
-			unstructuredExpectedObj := &unstructured.Unstructured{
-				Object: unstructuredExpectedMap,
-			}
-
-			wipeUncheckedFields := func(obj runtime.Object) {
-				acc, err := meta.Accessor(obj)
-				require.NoError(t, err)
-
-				// GVK can't be patched, and not always on our test objects, so
-				// clear for convenience
-				obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-
-				// Will be set by server, should be wiped
-				acc.SetResourceVersion("")
-				acc.SetUID("")
-				acc.SetCreationTimestamp(metav1.Time{})
-				acc.SetManagedFields(nil)
-			}
-			wipeUncheckedFields(unstructuredExpectedObj)
-
-			// Dry Run the request until we get the expected/mutated response
+			// Dry Run the request until we get the expected mutated response
 			var resultObj runtime.Object
 			err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (done bool, err error) {
-				acc, err := meta.Accessor(tc.requestObject)
-				require.NoError(t, err)
-
-				var rsrcClient dynamic.ResourceInterface = dynClient.Resource(tc.requestResource)
-				if len(acc.GetNamespace()) > 0 {
-					rsrcClient = rsrcClient.(dynamic.NamespaceableResourceInterface).Namespace(acc.GetNamespace())
-				}
-
+				rsrcClient := clientForType(t, unstructuredRequestObj, tc.requestResource, dynClient)
 				switch tc.requestOperation {
 				case admissionregistrationv1.Create:
 					resultObj, err = rsrcClient.Create(context.TODO(), unstructuredRequestObj, metav1.CreateOptions{
 						DryRun:       []string{metav1.DryRunAll},
 						FieldManager: "integration-test",
-					})
+					}, tc.subresources...)
 					if err != nil {
-						return false, err
+						t.Logf("error while waiting: %v", err)
+						return false, nil
 					}
-					wipeUncheckedFields(resultObj)
+					wipeUncheckedFields(t, resultObj)
 					return reflect.DeepEqual(unstructuredExpectedObj, resultObj), nil
 				case admissionregistrationv1.Update:
 					resultObj, err = rsrcClient.Update(context.TODO(), unstructuredRequestObj, metav1.UpdateOptions{
 						DryRun:       []string{metav1.DryRunAll},
 						FieldManager: "integration-test",
-					})
+					}, tc.subresources...)
 					if err != nil {
-						return false, err
+						t.Logf("error while waiting: %v", err)
+						return false, nil
 					}
-					wipeUncheckedFields(resultObj)
+					wipeUncheckedFields(t, resultObj)
 					return reflect.DeepEqual(unstructuredExpectedObj, resultObj), nil
 				default:
 					t.Fatalf("unsupported operation: %v", tc.requestOperation)
@@ -922,4 +1089,330 @@ func TestMAP(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test_MutatingAdmissionPolicy_CustomResources tests a custom resource mutation.
+// CRDs are also ideal for testing version conversion since old version are not removed, so version conversion is also
+// tested.
+func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "MutatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withMutatingFailurePolicy(v1alpha1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1alpha1.IfNeededReinvocationPolicy, v1alpha1.MatchResources{
+		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1alpha1.RuleWithOperations{
+					Operations: []v1alpha1.OperationType{
+						"*",
+					},
+					Rule: v1alpha1.Rule{
+						APIGroups: []string{
+							"awesome.bears.com",
+						},
+						APIVersions: []string{
+							"v1",
+						},
+						Resources: []string{
+							"pandas",
+						},
+					},
+				},
+			},
+		}},
+		nil,
+		v1alpha1.Mutation{
+			PatchType: v1alpha1.PatchTypeApplyConfiguration,
+			ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				Expression: `Object{ metadata: Object.metadata{ labels: {"mutated-panda": "true"} } }`,
+			},
+		},
+	))
+	testID := "policy-equivalent"
+	policy = withMutatingWaitReadyConstraintAndExpression(policy, testID)
+	if _, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := mutatingBinding("match-by-match-policy-equivalent", nil, nil)
+	if err := createAndWaitReadyMutating(t, client, policyBinding, testID); err != nil {
+		t.Fatal(err)
+	}
+
+	v1Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v1",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v1-bears",
+			},
+		},
+	}
+
+	v2Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v2",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v2-bears",
+			},
+		},
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for CRDs to register
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		createdv1, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
+				return false, nil
+			}
+			return false, nil
+		}
+		if createdv1.GetLabels()["mutated-panda"] != "true" {
+			t.Errorf("expected mutated-panda to be true, got %s", createdv1.GetLabels())
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		createdv2, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v2, Kind=Panda not found") {
+				return false, nil
+			}
+			return false, nil
+		}
+		if createdv2.GetLabels()["mutated-panda"] != "true" {
+			t.Errorf("expected mutated-panda to be true, got %s", createdv2.GetLabels())
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+func mutatingPolicy(name string, reinvocationPolicy v1alpha1.ReinvocationPolicyType, matchResources v1alpha1.MatchResources, paramKind *v1alpha1.ParamKind, mutations ...v1alpha1.Mutation) *v1alpha1.MutatingAdmissionPolicy {
+	return &v1alpha1.MutatingAdmissionPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1alpha1.MutatingAdmissionPolicySpec{
+			MatchConstraints:   &matchResources,
+			ParamKind:          paramKind,
+			Mutations:          mutations,
+			ReinvocationPolicy: reinvocationPolicy,
+		},
+	}
+}
+
+func withMutatingVariables(variables []v1alpha1.Variable, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+	policy.Spec.Variables = variables
+	return policy
+}
+
+func withMutatingFailurePolicy(failure v1alpha1.FailurePolicyType, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+	policy.Spec.FailurePolicy = &failure
+	return policy
+}
+
+func withMutatingMatchConditions(matchConditions []v1alpha1.MatchCondition, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+	policy.Spec.MatchConditions = matchConditions
+	return policy
+}
+
+func withMutatingWaitReadyConstraintAndExpression(policy *v1alpha1.MutatingAdmissionPolicy, testID string) *v1alpha1.MutatingAdmissionPolicy {
+	policy = policy.DeepCopy()
+	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, v1alpha1.NamedRuleWithOperations{
+		ResourceNames: []string{"test-marker"},
+		RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+			Operations: []admissionregistrationv1.OperationType{
+				"CREATE",
+			},
+			Rule: admissionregistrationv1.Rule{
+				APIGroups: []string{
+					"",
+				},
+				APIVersions: []string{
+					"v1",
+				},
+				Resources: []string{
+					"endpoints",
+				},
+			},
+		},
+	})
+	for i, mc := range policy.Spec.MatchConditions {
+		mc.Expression = `object.metadata.?labels["mutation-marker"].hasValue() || ` + mc.Expression
+		policy.Spec.MatchConditions[i] = mc
+	}
+	for _, m := range policy.Spec.Mutations {
+		if m.ApplyConfiguration != nil {
+			bypass := `object.metadata.?labels["mutation-marker"].hasValue() ? Object{} : `
+			m.ApplyConfiguration.Expression = bypass + m.ApplyConfiguration.Expression
+		}
+	}
+	policy.Spec.Mutations = append([]v1alpha1.Mutation{{
+		PatchType: v1alpha1.PatchTypeApplyConfiguration,
+		ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			// Only mutate mutation-markers.
+			Expression: fmt.Sprintf(`object.metadata.?labels["mutation-marker"] == optional.of("%v") ? Object{ metadata: Object.metadata{ labels: {"mutated":"%v"}}}: Object{}`, testID, testID),
+		},
+	}}, policy.Spec.Mutations...)
+	return policy
+}
+
+func mutatingBinding(policyName string, paramRef *v1alpha1.ParamRef, matchResources *v1alpha1.MatchResources) *v1alpha1.MutatingAdmissionPolicyBinding {
+	return &v1alpha1.MutatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: policyName + "-binding-" + string(uuid.NewUUID()),
+		},
+		Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+			PolicyName:     policyName,
+			ParamRef:       paramRef,
+			MatchResources: matchResources,
+		},
+	}
+}
+
+func createAndWaitReadyMutating(t *testing.T, client clientset.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, testID string) error {
+	return createAndWaitReadyNamespacedWithWarnHandlerMutating(t, client, binding, "default", testID)
+}
+
+func createAndWaitReadyNamespacedWithWarnHandlerMutating(t *testing.T, client clientset.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, ns string, testID string) error {
+	_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(context.TODO(), binding, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := &corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "test-marker", Namespace: ns, Labels: map[string]string{"mutation-marker": testID}}}
+	if waitErr := wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		result, err := client.CoreV1().Endpoints(ns).Create(context.TODO(), marker, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}, FieldManager: "mutation-marker-sender"})
+		if err != nil {
+			if strings.Contains(err.Error(), "no params found for policy binding") { // wait for params to register
+				return false, nil
+			} else {
+				return false, err
+			}
+		}
+		if result.Labels["mutated"] == testID {
+			return true, nil
+		}
+		return false, nil
+	}); waitErr != nil {
+		return waitErr
+	}
+	t.Logf("Marker ready: %v", marker)
+	return nil
+}
+
+func cleanupMutatingPolicy(t *testing.T, client clientset.Interface, policies []*v1alpha1.MutatingAdmissionPolicy, bindings []*v1alpha1.MutatingAdmissionPolicyBinding, params []*corev1.ConfigMap) error {
+	for _, policy := range policies {
+		if err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Delete(context.TODO(), policy.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatal(err)
+		}
+
+		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Get(context.TODO(), policy.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}); waitErr != nil {
+			t.Fatalf("timed out waiting for policy to be cleaned up: %v", waitErr)
+		}
+	}
+
+	for _, binding := range bindings {
+		err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Delete(context.TODO(), binding.Name, metav1.DeleteOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Get(context.TODO(), binding.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}); waitErr != nil {
+			t.Fatalf("timed out waiting for policy binding to be cleaned up: %v", err)
+		}
+	}
+
+	for _, param := range params {
+		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			if err := client.CoreV1().ConfigMaps(param.GetNamespace()).Delete(context.TODO(), param.Name, metav1.DeleteOptions{}); err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, nil
+			}
+			_, err := client.CoreV1().ConfigMaps(param.GetNamespace()).Get(context.TODO(), param.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}); waitErr != nil {
+			t.Fatalf("timed out waiting for policy to be cleaned up: %v", waitErr)
+		}
+	}
+
+	return nil
+}
+
+func clientForType(t *testing.T, obj runtime.Object, resource schema.GroupVersionResource, dynClient *dynamic.DynamicClient) dynamic.ResourceInterface {
+	acc, err := meta.Accessor(obj)
+	require.NoError(t, err)
+	var rsrcClient dynamic.ResourceInterface = dynClient.Resource(resource)
+	if len(acc.GetNamespace()) > 0 {
+		rsrcClient = rsrcClient.(dynamic.NamespaceableResourceInterface).Namespace(acc.GetNamespace())
+	}
+	return rsrcClient
+}
+
+func toUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
+	unstructuredRequestMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	require.NoError(t, err)
+
+	unstructuredRequestObj := &unstructured.Unstructured{
+		Object: unstructuredRequestMap,
+	}
+	return unstructuredRequestObj
+}
+
+func wipeUncheckedFields(t *testing.T, obj runtime.Object) {
+	acc, err := meta.Accessor(obj)
+	require.NoError(t, err)
+
+	// GVK can't be patched, and not always on our test objects, so
+	// clear for convenience
+	obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+
+	// Will be set by server, should be wiped
+	acc.SetResourceVersion("")
+	acc.SetUID("")
+	acc.SetCreationTimestamp(metav1.Time{})
+	acc.SetManagedFields(nil)
 }
