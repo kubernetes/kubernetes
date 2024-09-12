@@ -54,7 +54,7 @@ func TestTypeProvider(t *testing.T) {
 			},
 		},
 		{
-			// list literal does not require new path code of the type provider
+			// list literal does not require new Path code of the type provider
 			// comparing to the object literal.
 			// This test case serves as a note of "supported syntax"
 			name: "Object.spec.template.containers",

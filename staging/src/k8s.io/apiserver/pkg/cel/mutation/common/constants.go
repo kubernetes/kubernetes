@@ -16,12 +16,5 @@ limitations under the License.
 
 package common
 
-import (
-	"github.com/google/cel-go/common/types/traits"
-)
-
 // RootTypeReferenceName is the root reference that all type names should start with.
 const RootTypeReferenceName = "Object"
-
-// ObjectTraits is the bitmask that represents traits that an object should have.
-const ObjectTraits = traits.ContainerType

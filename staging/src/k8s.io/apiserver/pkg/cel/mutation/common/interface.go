@@ -33,8 +33,11 @@ type TypeResolver interface {
 type TypeRef interface {
 	ref.Type
 
-	// CELType wraps the TypeRef to be a type that is understood by CEL.
-	CELType() *types.Type
+	Type() *types.Type
+
+	// TypeType wraps the TypeRef to be a type of this type. That is, if this type is 'example',
+	// this returns a type of 'type(example)'.
+	TypeType() *types.Type
 
 	// Field finds the field by the field name, or false if the field is not known.
 	// This function directly return a FieldType that is known to CEL to be more customizable.

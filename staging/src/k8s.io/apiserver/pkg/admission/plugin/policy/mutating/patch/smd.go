@@ -17,32 +17,109 @@ limitations under the License.
 package patch
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/schema"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
+	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/cel/mutation/common"
 )
 
-func ApplySMD(
+// NewApplyConfigurationPatcher creates a patcher that performs an applyConfiguration mutation.
+func NewApplyConfigurationPatcher(expressionEvaluator plugincel.Evaluator) Patcher {
+	return &applyConfigPatcher{expressionEvaluator: expressionEvaluator}
+}
+
+type applyConfigPatcher struct {
+	expressionEvaluator plugincel.Evaluator
+}
+
+func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget int64) (runtime.Object, error) {
+	admissionRequest := plugincel.CreateAdmissionRequest(
+		r.VersionedAttributes.Attributes,
+		metav1.GroupVersionResource(r.MatchedResource),
+		metav1.GroupVersionKind(r.VersionedAttributes.VersionedKind))
+
+	compileErrors := e.expressionEvaluator.CompilationErrors()
+	if len(compileErrors) > 0 {
+		return nil, errors.Join(compileErrors...)
+	}
+	eval, _, err := e.expressionEvaluator.ForInput(ctx, r.VersionedAttributes, admissionRequest, r.OptionalVariables, r.Namespace, runtimeCELCostBudget)
+	if err != nil {
+		return nil, err
+	}
+	if eval.Error != nil {
+		return nil, eval.Error
+	}
+	v := eval.EvalResult
+
+	// The compiler ensures that the return type is an ObjectVal with type name of "Object".
+	objVal, ok := v.(*common.ObjectVal)
+	if !ok {
+		// Should not happen since the compiler type checks the return type.
+		return nil, fmt.Errorf("unsupported return type from ApplyConfiguration expression: %v", v.Type())
+	}
+	// TODO: Object initializers are insufficiently type checked.
+	// In the interim, we use this sanity check to detect type mismatches
+	// between field names and Object initializers. For example,
+	// "Object.spec{ selector: Object.spec.wrong{}}" is detected as a mismatch.
+	// Before beta, attaching full type information both to Object initializers and
+	// the "object" and "oldObject" variables is needed. This will allow CEL to
+	// perform comprehensive runtime type checking.
+	err = objVal.CheckTypeNamesMatchFieldPathNames()
+	if err != nil {
+		return nil, fmt.Errorf("type mismatch: %w", err)
+	}
+
+	value, ok := objVal.Value().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid return type: %T", v)
+	}
+
+	patchObject := unstructured.Unstructured{Object: value}
+	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.GetObjectKind().GroupVersionKind())
+	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject, &patchObject)
+	if err != nil {
+		return nil, fmt.Errorf("error applying patch: %w", err)
+	}
+	return patched, nil
+}
+
+// ApplyStructuredMergeDiff applies a structured merge diff to an object and returns a copy of the object
+// with the patch applied.
+func ApplyStructuredMergeDiff(
 	typeConverter managedfields.TypeConverter,
 	originalObject runtime.Object,
 	patch *unstructured.Unstructured,
 ) (runtime.Object, error) {
 	if patch.GroupVersionKind() != originalObject.GetObjectKind().GroupVersionKind() {
-		return nil, fmt.Errorf("patch and original object are not of the same gvk")
+		return nil, fmt.Errorf("patch (%v) and original object (%v) are not of the same gvk", patch.GroupVersionKind().String(), originalObject.GetObjectKind().GroupVersionKind().String())
 	} else if typeConverter == nil {
 		return nil, fmt.Errorf("type converter must not be nil")
-	}
-
-	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert original object to typed object: %w", err)
 	}
 
 	patchObjTyped, err := typeConverter.ObjectToTyped(patch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert patch object to typed object: %w", err)
+	}
+
+	err = validatePatch(patchObjTyped)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ApplyConfiguration: %w", err)
+	}
+
+	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert original object to typed object: %w", err)
 	}
 
 	newObjTyped, err := liveObjTyped.Merge(patchObjTyped)
@@ -65,4 +142,52 @@ func ApplySMD(
 	}
 
 	return newObj, nil
+}
+
+// validatePatch searches an apply configuration for any arrays, maps or structs elements that are atomic and returns
+// an error if any are found.
+func validatePatch(v *typed.TypedValue) error {
+	atomics := findAtomics(nil, v.Schema(), v.TypeRef(), v.AsValue())
+	if len(atomics) > 0 {
+		return fmt.Errorf("may not mutate atomic arrays, maps or structs: %v", strings.Join(atomics, ", "))
+	}
+	return nil
+}
+
+// findAtomics returns field paths for any atomic arrays, maps or structs found when traversing the given value.
+func findAtomics(path []fieldpath.PathElement, s *schema.Schema, tr schema.TypeRef, v value.Value) (atomics []string) {
+	if a, ok := s.Resolve(tr); ok { // Validation pass happens before this and checks that all schemas can be resolved
+		if v.IsMap() && a.Map != nil {
+			if a.Map.ElementRelationship == schema.Atomic {
+				atomics = append(atomics, pathString(path))
+			}
+			v.AsMap().Iterate(func(key string, val value.Value) bool {
+				pe := fieldpath.PathElement{FieldName: &key}
+				if sf, ok := a.Map.FindField(key); ok {
+					tr = sf.Type
+					atomics = append(atomics, findAtomics(append(path, pe), s, tr, val)...)
+				}
+				return true
+			})
+		}
+		if v.IsList() && a.List != nil {
+			if a.List.ElementRelationship == schema.Atomic {
+				atomics = append(atomics, pathString(path))
+			}
+			list := v.AsList()
+			for i := 0; i < list.Length(); i++ {
+				pe := fieldpath.PathElement{Index: &i}
+				atomics = append(atomics, findAtomics(append(path, pe), s, a.List.ElementType, list.At(i))...)
+			}
+		}
+	}
+	return atomics
+}
+
+func pathString(path []fieldpath.PathElement) string {
+	sb := strings.Builder{}
+	for _, p := range path {
+		sb.WriteString(p.String())
+	}
+	return sb.String()
 }

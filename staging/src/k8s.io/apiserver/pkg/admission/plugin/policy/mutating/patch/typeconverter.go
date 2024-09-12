@@ -75,9 +75,9 @@ type typeConverterManager struct {
 }
 
 func (t *typeConverterManager) Run(ctx context.Context) {
-	// Loop every 30s refershing the OpenAPI schema list to know which
+	// Loop every 5s refershing the OpenAPI schema list to know which
 	// schemas have been invalidated. This should use e-tags under the hood
-	_ = wait.PollUntilContextCancel(ctx, 30*time.Second, true, func(_ context.Context) (done bool, err error) {
+	_ = wait.PollUntilContextCancel(ctx, 5*time.Second, true, func(_ context.Context) (done bool, err error) {
 		paths, err := t.openapiClient.Paths()
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to fetch openapi paths: %w", err))

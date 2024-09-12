@@ -24,16 +24,18 @@ import (
 
 const object = common.RootTypeReferenceName
 
-type TypeResolver struct {
-}
+type TypeResolver struct{}
 
-// Resolve resolves the TypeRef for the given type name
+// Resolve resolves the ObjectType for the given type name
 // that starts with "Object".
 // This is the unstructured version, which means the
-// returned TypeRef does not refer to the schema.
+// returned ObjectType does not refer to the schema.
 func (r *TypeResolver) Resolve(name string) (common.TypeRef, bool) {
-	if !strings.HasPrefix(name, object) {
-		return nil, false
+	if name == "JSONPatch" {
+		return &JSONPatchType{}, true
 	}
-	return NewTypeRef(name), true
+	if strings.HasPrefix(name, object) {
+		return NewTypeRef(name), true
+	}
+	return nil, false
 }

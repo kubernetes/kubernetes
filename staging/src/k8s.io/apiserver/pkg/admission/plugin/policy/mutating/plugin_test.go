@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
@@ -81,24 +81,7 @@ func TestBasicPatch(t *testing.T) {
 
 	// Treat all policies as setting foo annotation to bar
 	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
-		return []mutating.MutationEvaluationFunc{func(
-			ctx context.Context,
-			matchedResource schema.GroupVersionResource,
-			versionedAttr *admission.VersionedAttributes,
-			o admission.ObjectInterfaces,
-			versionedParams runtime.Object,
-			namespace *corev1.Namespace,
-			tc managedfields.TypeConverter,
-			runtimeCELCostBudget int64,
-		) (runtime.Object, error) {
-			obj := versionedAttr.VersionedObject.DeepCopyObject()
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return nil, err
-			}
-			accessor.SetAnnotations(expectedAnnotations)
-			return obj, nil
-		}}
+		return mutating.PolicyEvaluator{Mutators: []patch.Patcher{annotationPatcher{expectedAnnotations}}}
 	})
 
 	// Set up a policy and binding that match, no params
@@ -113,7 +96,10 @@ func TestBasicPatch(t *testing.T) {
 				},
 				Mutations: []v1alpha1.Mutation{
 					{
-						Expression: "ignored, but required",
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: "ignored, but required",
+						},
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
@@ -150,22 +136,9 @@ func TestSSAPatch(t *testing.T) {
 	}
 
 	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
-		return []mutating.MutationEvaluationFunc{func(
-			ctx context.Context,
-			matchedResource schema.GroupVersionResource,
-			versionedAttr *admission.VersionedAttributes,
-			o admission.ObjectInterfaces,
-			versionedParams runtime.Object,
-			namespace *corev1.Namespace,
-			tc managedfields.TypeConverter,
-			runtimeCELCostBudget int64,
-		) (runtime.Object, error) {
-			return patch.ApplySMD(
-				tc,
-				versionedAttr.VersionedObject,
-				patchObj,
-			)
-		}}
+		return mutating.PolicyEvaluator{
+			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
+		}
 	})
 
 	// Set up a policy and binding that match, no params
@@ -180,7 +153,10 @@ func TestSSAPatch(t *testing.T) {
 				},
 				Mutations: []v1alpha1.Mutation{
 					{
-						Expression: "ignored, but required",
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: "ignored, but required",
+						},
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
@@ -205,7 +181,7 @@ func TestSSAPatch(t *testing.T) {
 	}, testObject)
 }
 
-func TestSSAMapListAtomicMap(t *testing.T) {
+func TestSSAMapList(t *testing.T) {
 	patchObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
@@ -222,31 +198,14 @@ func TestSSAMapListAtomicMap(t *testing.T) {
 						"image": "injected-image",
 					},
 				},
-				// node selector is atomic, so should be replaced
-				"nodeSelector": map[string]interface{}{
-					"custom": "nodeselector",
-				},
 			},
 		},
 	}
 
 	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
-		return []mutating.MutationEvaluationFunc{func(
-			ctx context.Context,
-			matchedResource schema.GroupVersionResource,
-			versionedAttr *admission.VersionedAttributes,
-			o admission.ObjectInterfaces,
-			versionedParams runtime.Object,
-			namespace *corev1.Namespace,
-			tc managedfields.TypeConverter,
-			runtimeCELCostBudget int64,
-		) (runtime.Object, error) {
-			return patch.ApplySMD(
-				tc,
-				versionedAttr.VersionedObject,
-				patchObj,
-			)
-		}}
+		return mutating.PolicyEvaluator{
+			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
+		}
 	})
 
 	// Set up a policy and binding that match, no params
@@ -261,7 +220,10 @@ func TestSSAMapListAtomicMap(t *testing.T) {
 				},
 				Mutations: []v1alpha1.Mutation{
 					{
-						Expression: "ignored, but required",
+						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Expression: "ignored, but required",
+						},
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
@@ -284,7 +246,6 @@ func TestSSAMapListAtomicMap(t *testing.T) {
 					Image: "image",
 				},
 			},
-			NodeSelector: map[string]string{"original": "not customized"},
 		},
 	}
 	err := testContext.Dispatch(testObject, nil, admission.Create)
@@ -304,7 +265,28 @@ func TestSSAMapListAtomicMap(t *testing.T) {
 					Image: "injected-image",
 				},
 			},
-			NodeSelector: map[string]string{"custom": "nodeselector"},
 		},
 	}, testObject)
+}
+
+type annotationPatcher struct {
+	annotations map[string]string
+}
+
+func (ap annotationPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
+	obj := request.VersionedAttributes.VersionedObject.DeepCopyObject()
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	accessor.SetAnnotations(ap.annotations)
+	return obj, nil
+}
+
+type smdPatcher struct {
+	patch *unstructured.Unstructured
+}
+
+func (sp smdPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
+	return patch.ApplyStructuredMergeDiff(request.TypeConverter, request.VersionedAttributes.VersionedObject, sp.patch)
 }

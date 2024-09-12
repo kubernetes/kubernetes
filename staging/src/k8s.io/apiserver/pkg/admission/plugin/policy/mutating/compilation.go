@@ -17,173 +17,65 @@ limitations under the License.
 package mutating
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/interpreter"
-
 	"k8s.io/api/admissionregistration/v1alpha1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
-	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apiserver/pkg/admission"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/cel/mutation"
-	mutationunstructured "k8s.io/apiserver/pkg/cel/mutation/unstructured"
 )
 
 // compilePolicy compiles the policy into a PolicyEvaluator
 // any error is stored and delayed until invocation.
 //
 // Each individual mutation is compiled into MutationEvaluationFunc and
-// returned as a slice in the same order as the mutations appeared in the policy.
+// returned is a PolicyEvaluator in the same order as the mutations appeared in the policy.
 func compilePolicy(policy *Policy) PolicyEvaluator {
-	hasParams := policy.Spec.ParamKind != nil
-	var res []MutationEvaluationFunc
+	opts := plugincel.OptionalVariableDeclarations{HasParams: policy.Spec.ParamKind != nil, StrictCost: true, HasAuthorizer: true}
+	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	if err != nil {
+		return PolicyEvaluator{Error: &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInternal,
+			Detail: fmt.Sprintf("failed to initialize CEL compiler: %v", err),
+		}}
+	}
+
+	// Compile and store variables
+	compiler.CompileAndStoreVariables(convertv1alpha1Variables(policy.Spec.Variables), opts, environment.StoredExpressions)
+
+	// Compile matchers
+	var matcher matchconditions.Matcher = nil
+	matchConditions := policy.Spec.MatchConditions
+	if len(matchConditions) > 0 {
+		matchExpressionAccessors := make([]plugincel.ExpressionAccessor, len(matchConditions))
+		for i := range matchConditions {
+			matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
+		}
+		matcher = matchconditions.NewMatcher(compiler.Compile(matchExpressionAccessors, opts, environment.StoredExpressions), toV1FailurePolicy(policy.Spec.FailurePolicy), "policy", "validate", policy.Name)
+	}
+
+	// Compiler patchers
+	var patchers []patch.Patcher
+	patchOptions := opts
+	patchOptions.HasPatchTypes = true
 	for _, m := range policy.Spec.Mutations {
-		e := &evaluator{}
-		e.program, e.err = CompileMutation(m, plugincel.OptionalVariableDeclarations{HasParams: hasParams})
-		res = append(res, e.Invoke)
-	}
-	return res
-}
-
-type evaluator struct {
-	program cel.Program
-	// err holds the error during the creation of compiledEvaluator
-	err error
-}
-
-func CompileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariableDeclarations) (cel.Program, error) {
-	// TODO: edit when JSONPatch is supported
-	if mutation.PatchType != v1alpha1.ApplyConfigurationPatchType {
-		return nil, fmt.Errorf("unsupported mutation type %q", mutation.PatchType)
+		switch m.PatchType {
+		case v1alpha1.PatchTypeJSONPatch:
+			if m.JSONPatch != nil {
+				accessor := &JSONPatchCondition{Expression: m.JSONPatch.Expression}
+				compileResult := compiler.CompileEvaluator(accessor, patchOptions, environment.StoredExpressions)
+				patchers = append(patchers, patch.NewJSONPatcher(compileResult))
+			}
+		case v1alpha1.PatchTypeApplyConfiguration:
+			if m.ApplyConfiguration != nil {
+				accessor := &ApplyConfigurationCondition{Expression: m.ApplyConfiguration.Expression}
+				compileResult := compiler.CompileEvaluator(accessor, patchOptions, environment.StoredExpressions)
+				patchers = append(patchers, patch.NewApplyConfigurationPatcher(compileResult))
+			}
+		}
 	}
 
-	envSet, err := createEnvSet(vars)
-	if err != nil {
-		return nil, err
-	}
-	env, err := envSet.Env(environment.StoredExpressions)
-	if err != nil {
-		return nil, err
-	}
-	ast, issues := env.Compile(mutation.Expression)
-	if issues != nil {
-		return nil, fmt.Errorf("cannot compile CEL expression: %v", issues)
-	}
-	if ast.OutputType().Kind() != cel.StructKind {
-		return nil, fmt.Errorf("must evaluate to struct type")
-	}
-	program, err := env.Program(ast)
-	if err != nil {
-		return nil, fmt.Errorf("cannot initiate program: %w", err)
-	}
-	return program, nil
-}
-
-func (e *evaluator) Invoke(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, o admission.ObjectInterfaces, versionedParams runtime.Object, namespace *v1.Namespace, typeConverter managedfields.TypeConverter, runtimeCELCostBudget int64) (runtime.Object, error) {
-	if err := e.err; err != nil {
-		return nil, err
-	}
-	a := new(activation)
-	if err := a.SetObject(versionedAttr.GetObject()); err != nil {
-		return nil, err
-	} else if err := a.SetOldObject(versionedAttr.GetOldObject()); err != nil {
-		return nil, err
-	} else if err := a.SetParams(versionedParams); err != nil {
-		return nil, err
-	}
-	v, _, err := e.program.ContextEval(ctx, a)
-	if err != nil {
-		return nil, err
-	}
-	value, ok := v.Value().(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected evaluation result type: %t", v.Value())
-	}
-
-	liveObject := unstructured.Unstructured{Object: a.object}
-	patchObject := unstructured.Unstructured{Object: value}
-	patchObject.SetGroupVersionKind(versionedAttr.GetKind())
-	return patch.ApplySMD(typeConverter, &liveObject, &patchObject)
-}
-
-func createEnvSet(vars plugincel.OptionalVariableDeclarations) (*environment.EnvSet, error) {
-	_, option := mutation.NewTypeProviderAndEnvOption(&mutationunstructured.TypeResolver{})
-	options := []cel.EnvOption{option, cel.Variable("object", cel.DynType), cel.Variable("oldObject", cel.DynType)}
-	if vars.HasParams {
-		options = append(options, cel.Variable("params", cel.DynType))
-	}
-	return environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(environment.VersionedOptions{
-		// Feature epoch was actually 1.32, but we artificially set it to 1.0 because these
-		// options should always be present.
-		IntroducedVersion: version.MajorMinor(1, 0),
-		EnvOptions:        options,
-	})
-}
-
-type activation struct {
-	// object is the current version of the incoming request object.
-	// For the first mutation, this is the original object in the request.
-	// For the second mutation and afterward, this is the object after previous mutations.
-	object map[string]any
-
-	// oldObject is the oldObject of the incoming request, or null if oldObject is not present
-	// in the incoming request, i.e. for CREATE requests.
-	// This is NOT the object before any mutation.
-	oldObject map[string]any
-
-	// params is the resolved params that is referred by the policy.
-	// It is null if the policy does not refer to any params.
-	params map[string]any
-}
-
-func (a *activation) ResolveName(name string) (any, bool) {
-	switch name {
-	case "object":
-		return a.object, true
-	case "oldObject":
-		return a.oldObject, true
-	case "params":
-		return a.params, true
-	}
-	return nil, false
-}
-
-func (a *activation) Parent() interpreter.Activation {
-	return nil
-}
-
-func (a *activation) SetObject(object runtime.Object) error {
-	var err error
-	if object == nil {
-		return nil
-	}
-	a.object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(object)
-	return err
-}
-
-func (a *activation) SetOldObject(oldObject runtime.Object) error {
-	var err error
-	if oldObject == nil {
-		return nil
-	}
-	a.oldObject, err = runtime.DefaultUnstructuredConverter.ToUnstructured(oldObject)
-	return err
-}
-
-func (a *activation) SetParams(params runtime.Object) error {
-	var err error
-	if params == nil {
-		return nil
-	}
-	a.params, err = runtime.DefaultUnstructuredConverter.ToUnstructured(params)
-	return err
+	return PolicyEvaluator{Matcher: matcher, Mutators: patchers, CompositionEnv: compiler.CompositionEnv}
 }

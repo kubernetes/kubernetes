@@ -18,6 +18,7 @@ package mutating
 
 import (
 	"context"
+	celgo "github.com/google/cel-go/cel"
 	"io"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -27,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/client-go/dynamic"
@@ -55,6 +58,9 @@ type Policy = v1alpha1.MutatingAdmissionPolicy
 type PolicyBinding = v1alpha1.MutatingAdmissionPolicyBinding
 type PolicyMutation = v1alpha1.Mutation
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
+
+type Mutator struct {
+}
 type MutationEvaluationFunc func(
 	ctx context.Context,
 	matchedResource schema.GroupVersionResource,
@@ -64,8 +70,15 @@ type MutationEvaluationFunc func(
 	namespace *corev1.Namespace,
 	typeConverter managedfields.TypeConverter,
 	runtimeCELCostBudget int64,
+	authorizer authorizer.Authorizer,
 ) (runtime.Object, error)
-type PolicyEvaluator = []MutationEvaluationFunc
+
+type PolicyEvaluator struct {
+	Matcher        matchconditions.Matcher
+	Mutators       []patch.Patcher
+	CompositionEnv *cel.CompositionEnv
+	Error          error
+}
 
 type Plugin struct {
 	*generic.Plugin[PolicyHook]
@@ -74,9 +87,10 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.MutationInterface = &Plugin{}
 
-// NewMutatingWebhook returns a generic admission webhook plugin.
+// NewPlugin returns a generic admission webhook plugin.
 func NewPlugin(_ io.Reader) *Plugin {
-	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
+	// There is no request body to mutate for DELETE and CONNECT, so this plugin never handles those operations.
+	handler := admission.NewHandler(admission.Create, admission.Update, admission.Connect)
 	res := &Plugin{}
 	res.Plugin = generic.NewPlugin(
 		handler,
@@ -108,4 +122,30 @@ func (a *Plugin) Admit(ctx context.Context, attr admission.Attributes, o admissi
 
 func (a *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	a.Plugin.SetEnabled(featureGates.Enabled(features.MutatingAdmissionPolicy))
+}
+
+// Variable is a named expression for composition.
+type Variable struct {
+	Name       string
+	Expression string
+}
+
+func (v *Variable) GetExpression() string {
+	return v.Expression
+}
+
+func (v *Variable) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.AnyType, celgo.DynType}
+}
+
+func (v *Variable) GetName() string {
+	return v.Name
+}
+
+func convertv1alpha1Variables(variables []v1alpha1.Variable) []cel.NamedExpressionAccessor {
+	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
+	for i, variable := range variables {
+		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
+	}
+	return namedExpressions
 }

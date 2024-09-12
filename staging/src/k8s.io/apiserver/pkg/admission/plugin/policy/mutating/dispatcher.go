@@ -27,10 +27,11 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
@@ -42,6 +43,7 @@ import (
 func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
 	res := &dispatcher{
 		matcher: m,
+		authz:   a,
 		//!TODO: pass in static type converter to reduce network calls
 		typeConverterManager: tcm,
 	}
@@ -56,6 +58,7 @@ func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeC
 
 type dispatcher struct {
 	matcher              *matching.Matcher
+	authz                authorizer.Authorizer
 	typeConverterManager patch.TypeConverterManager
 	generic.Dispatcher[PolicyHook]
 }
@@ -123,37 +126,63 @@ func (d *dispatcher) dispatchInvocations(
 		}
 	}
 
+	authz := admissionauthorizer.NewCachingAuthorizer(d.authz)
+
 	// Should loop through invocations, handling possible error and invoking
 	// evaluator to apply patch, also should handle re-invocations
 	for _, invocation := range invocations {
-		if len(invocation.Evaluator) != len(invocation.Policy.Spec.Mutations) {
+		if invocation.Evaluator.CompositionEnv != nil {
+			ctx = invocation.Evaluator.CompositionEnv.CreateContext(ctx)
+		}
+		if len(invocation.Evaluator.Mutators) != len(invocation.Policy.Spec.Mutations) {
 			// This would be a bug. The compiler should always return exactly as
 			// many evaluators as there are mutations
 			return nil, k8serrors.NewInternalError(fmt.Errorf("expected %v compiled evaluators for policy %v, got %v",
-				invocation.Policy.Name, len(invocation.Policy.Spec.Mutations), len(invocation.Evaluator)))
+				invocation.Policy.Name, len(invocation.Policy.Spec.Mutations), len(invocation.Evaluator.Mutators)))
 		}
 
-		for mutationIndex, mutation := range invocation.Policy.Spec.Mutations {
-			invocationKey, err := keyFor(invocation, mutationIndex)
+		versionedAttr, err := versionedAttributes.VersionedAttribute(invocation.Kind)
+		if err != nil {
+			// This should never happen, we pre-warm versoined attribute
+			// accessors before starting the dispatcher
+			return nil, k8serrors.NewInternalError(err)
+		}
+
+		if invocation.Evaluator.Matcher != nil {
+			matchResults := invocation.Evaluator.Matcher.Match(ctx, versionedAttr, invocation.Param, authz)
+			if matchResults.Error != nil {
+				addConfigError(matchResults.Error, invocation, metav1.StatusReasonInvalid)
+			}
+
+			// if preconditions are not met, then skip mutations
+			if !matchResults.Matches {
+				continue
+			}
+		}
+
+		invocationKey, err := keyFor(invocation)
+		if reinvokeCtx.IsReinvoke() && !policyReinvokeCtx.ShouldReinvoke(invocationKey) {
+			continue
+		}
+
+		objectBeforeMutations := versionedAttr.VersionedObject
+		// Mutations for a single invocation of a MutatingAdmissionPolicy are evaluated
+		// in order.
+		for mutationIndex := range invocation.Policy.Spec.Mutations {
 			if err != nil {
 				// This should never happen. It occurs if there is a programming
 				// error causing the Param not to be a valid object.
 				return nil, k8serrors.NewInternalError(err)
 			}
 
-			if reinvokeCtx.IsReinvoke() && !policyReinvokeCtx.ShouldReinvoke(invocationKey) {
+			lastVersionedAttr = versionedAttr
+			if versionedAttr.VersionedObject == nil { // Do not call patchers if there is no object to patch.
 				continue
 			}
 
-			versionedAttr, err := versionedAttributes.VersionedAttribute(invocation.Kind)
-			if err != nil {
-				// This should never happen, we pre-warm versoined attribute
-				// accessors before starting the dispatcher
-				return nil, k8serrors.NewInternalError(err)
-			}
-			lastVersionedAttr = versionedAttr
-
-			changed, err := d.dispatchOne(ctx, a, o, versionedAttr, namespace, invocation.Resource, invocation.Param, invocation.Evaluator[mutationIndex])
+			patcher := invocation.Evaluator.Mutators[mutationIndex]
+			optionalVariables := cel.OptionalVariableBindings{VersionedParams: invocation.Param, Authorizer: authz}
+			err = d.dispatchOne(ctx, patcher, o, versionedAttr, namespace, invocation.Resource, optionalVariables)
 			if err != nil {
 				var statusError *k8serrors.StatusError
 				if errors.As(err, &statusError) {
@@ -163,19 +192,20 @@ func (d *dispatcher) dispatchInvocations(
 				addConfigError(err, invocation, metav1.StatusReasonInvalid)
 				continue
 			}
-
-			if changed {
-				// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
-				policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
-				reinvokeCtx.SetShouldReinvoke()
-			}
-			if mutation.ReinvocationPolicy != nil && *mutation.ReinvocationPolicy == v1alpha1.IfNeededReinvocationPolicy {
-				policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
-			}
+		}
+		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject) {
+			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
+			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
+			reinvokeCtx.SetShouldReinvoke()
+		}
+		if invocation.Policy.Spec.ReinvocationPolicy == v1alpha1.IfNeededReinvocationPolicy {
+			policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
 		}
 	}
 
 	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject != nil && lastVersionedAttr.Dirty {
+		policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
+		reinvokeCtx.SetShouldReinvoke()
 		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject, lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
 			return nil, k8serrors.NewInternalError(fmt.Errorf("failed to convert object: %w", err))
 		}
@@ -186,17 +216,16 @@ func (d *dispatcher) dispatchInvocations(
 
 func (d *dispatcher) dispatchOne(
 	ctx context.Context,
-	a admission.Attributes,
+	patcher patch.Patcher,
 	o admission.ObjectInterfaces,
 	versionedAttributes *admission.VersionedAttributes,
 	namespace *v1.Namespace,
 	resource schema.GroupVersionResource,
-	param runtime.Object,
-	evaluator MutationEvaluationFunc,
-) (changed bool, err error) {
-	if evaluator == nil {
+	optionalVariables cel.OptionalVariableBindings,
+) (err error) {
+	if patcher == nil {
 		// internal error. this should not happen
-		return false, k8serrors.NewInternalError(fmt.Errorf("policy evaluator is nil"))
+		return k8serrors.NewInternalError(fmt.Errorf("policy evaluator is nil"))
 	}
 
 	// Find type converter for the invoked Group-Version.
@@ -204,31 +233,29 @@ func (d *dispatcher) dispatchOne(
 	if typeConverter == nil {
 		// This can happen if the request is for a resource whose schema
 		// has not been registered with the type converter manager.
-		return false, k8serrors.NewServiceUnavailable(fmt.Sprintf("failed to get type converter for %s", versionedAttributes.VersionedKind))
+		return k8serrors.NewServiceUnavailable(fmt.Sprintf("Resource kind %s not found. There can be a delay between when CustomResourceDefinitions are created and when they are available.", versionedAttributes.VersionedKind))
 	}
 
-	newVersionedObject, err := evaluator(
-		ctx,
-		resource,
-		versionedAttributes,
-		o,
-		param,
-		namespace,
-		typeConverter,
-		celconfig.RuntimeCELCostBudget,
-	)
+	patchRequest := patch.Request{
+		MatchedResource:     resource,
+		VersionedAttributes: versionedAttributes,
+		ObjectInterfaces:    o,
+		OptionalVariables:   optionalVariables,
+		Namespace:           namespace,
+		TypeConverter:       typeConverter,
+	}
+	newVersionedObject, err := patcher.Patch(ctx, patchRequest, celconfig.RuntimeCELCostBudget)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	changed = !apiequality.Semantic.DeepEqual(versionedAttributes.VersionedObject, newVersionedObject)
 	versionedAttributes.Dirty = true
 	versionedAttributes.VersionedObject = newVersionedObject
 	o.GetObjectDefaulter().Default(newVersionedObject)
-	return changed, nil
+	return nil
 }
 
-func keyFor(invocation generic.PolicyInvocation[*Policy, *PolicyBinding, PolicyEvaluator], mutatingIndex int) (key, error) {
+func keyFor(invocation generic.PolicyInvocation[*Policy, *PolicyBinding, PolicyEvaluator]) (key, error) {
 	var paramUID types.NamespacedName
 	if invocation.Param != nil {
 		paramAccessor, err := meta.Accessor(invocation.Param)
@@ -252,7 +279,6 @@ func keyFor(invocation generic.PolicyInvocation[*Policy, *PolicyBinding, PolicyE
 			Name:      invocation.Binding.GetName(),
 			Namespace: invocation.Binding.GetNamespace(),
 		},
-		ParamUID:      paramUID,
-		MutationIndex: mutatingIndex,
+		ParamUID: paramUID,
 	}, nil
 }

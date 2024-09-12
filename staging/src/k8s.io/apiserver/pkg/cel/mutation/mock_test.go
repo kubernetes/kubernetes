@@ -38,7 +38,7 @@ type mockTypeRef struct {
 }
 
 func newMockTypeRef(resolver common.TypeResolver, name string) *mockTypeRef {
-	objectType := types.NewObjectType(name, common.ObjectTraits)
+	objectType := types.NewObjectType(name)
 	return &mockTypeRef{
 		objectType: objectType,
 		resolver:   resolver,
@@ -46,14 +46,18 @@ func newMockTypeRef(resolver common.TypeResolver, name string) *mockTypeRef {
 }
 
 func (m *mockTypeRef) HasTrait(trait int) bool {
-	return common.ObjectTraits|trait != 0
+	return m.objectType.HasTrait(trait)
 }
 
 func (m *mockTypeRef) TypeName() string {
 	return m.objectType.TypeName()
 }
 
-func (m *mockTypeRef) CELType() *types.Type {
+func (m *mockTypeRef) Type() *types.Type {
+	return m.objectType
+}
+
+func (m *mockTypeRef) TypeType() *types.Type {
 	return types.NewTypeTypeWithParam(m.objectType)
 }
 

@@ -63,10 +63,14 @@ func (v *mutatingAdmissionPolicyAccessor) GetMatchConstraints() *v1.MatchResourc
 }
 
 func (v *mutatingAdmissionPolicyAccessor) GetFailurePolicy() *v1.FailurePolicyType {
-	if v.Spec.FailurePolicy == nil {
+	return toV1FailurePolicy(v.Spec.FailurePolicy)
+}
+
+func toV1FailurePolicy(failurePolicy *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+	if failurePolicy == nil {
 		return nil
 	}
-	fp := v1.FailurePolicyType(*v.Spec.FailurePolicy)
+	fp := v1.FailurePolicyType(*failurePolicy)
 	return &fp
 }
 

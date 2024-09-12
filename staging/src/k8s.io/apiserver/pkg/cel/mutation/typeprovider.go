@@ -55,7 +55,7 @@ func (p *TypeProvider) FindIdent(identName string) (ref.Val, bool) {
 func (p *TypeProvider) FindStructType(structType string) (*types.Type, bool) {
 	t, ok := p.typeResolver.Resolve(structType)
 	if ok {
-		return t.CELType(), true
+		return t.TypeType(), true
 	}
 	return p.underlyingTypeProvider.FindStructType(structType)
 }
@@ -83,6 +83,13 @@ func (p *TypeProvider) NewValue(structType string, fields map[string]ref.Val) re
 		return t.Val(fields)
 	}
 	return p.underlyingTypeProvider.NewValue(structType, fields)
+}
+
+// EnvOption creates the TypeProvider with a given TypeResolver,
+// and also returns the CEL EnvOption to apply it to the env.
+func EnvOption(resolver common.TypeResolver) cel.EnvOption {
+	_, envOpt := NewTypeProviderAndEnvOption(resolver)
+	return envOpt
 }
 
 // NewTypeProviderAndEnvOption creates the TypeProvider with a given TypeResolver,
