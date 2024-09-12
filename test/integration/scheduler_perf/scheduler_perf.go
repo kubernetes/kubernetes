@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -404,36 +405,43 @@ type op struct {
 // UnmarshalJSON is a custom unmarshaler for the op struct since we don't know
 // which op we're decoding at runtime.
 func (op *op) UnmarshalJSON(b []byte) error {
-	possibleOps := []realOp{
-		&createAny{},
-		&createNodesOp{},
-		&createNamespacesOp{},
-		&createPodsOp{},
-		&createPodSetsOp{},
-		&deletePodsOp{},
-		&createResourceClaimsOp{},
-		&createResourceDriverOp{},
-		&churnOp{},
-		&barrierOp{},
-		&sleepOp{},
-		&startCollectingMetricsOp{},
-		&stopCollectingMetricsOp{},
+	possibleOps := map[operationCode]realOp{
+		createAnyOpcode:              &createAny{},
+		createNodesOpcode:            &createNodesOp{},
+		createNamespacesOpcode:       &createNamespacesOp{},
+		createPodsOpcode:             &createPodsOp{},
+		createPodSetsOpcode:          &createPodSetsOp{},
+		deletePodsOpcode:             &deletePodsOp{},
+		createResourceClaimsOpcode:   &createResourceClaimsOp{},
+		createResourceDriverOpcode:   &createResourceDriverOp{},
+		churnOpcode:                  &churnOp{},
+		barrierOpcode:                &barrierOp{},
+		sleepOpcode:                  &sleepOp{},
+		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
+		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
-	var firstError error
-	for _, possibleOp := range possibleOps {
-		if err := json.Unmarshal(b, possibleOp); err == nil {
-			if err2 := possibleOp.isValid(true); err2 == nil {
-				op.realOp = possibleOp
-				return nil
-			} else if firstError == nil {
-				// Don't return an error yet. Even though this op is invalid, it may
-				// still match other possible ops.
-				firstError = err2
-			}
-		}
+	// First determine the opcode using lenient decoding (= ignore extra fields).
+	var possibleOp struct {
+		Opcode operationCode
 	}
-	return fmt.Errorf("cannot unmarshal %s into any known op type: %w", string(b), firstError)
+	if err := json.Unmarshal(b, &possibleOp); err != nil {
+		return fmt.Errorf("decoding opcode from %s: %w", string(b), err)
+	}
+	realOp, ok := possibleOps[possibleOp.Opcode]
+	if !ok {
+		return fmt.Errorf("unknown opcode %q in %s", possibleOp.Opcode, string(b))
+	}
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(realOp); err != nil {
+		return fmt.Errorf("decoding %s into %T: %w", string(b), realOp, err)
+	}
+	if err := realOp.isValid(true); err != nil {
+		return fmt.Errorf("%s not valid for %T: %w", string(b), realOp, err)
+	}
+	op.realOp = realOp
+	return nil
 }
 
 // realOp is an interface that is implemented by different structs. To evaluate
@@ -441,6 +449,8 @@ func (op *op) UnmarshalJSON(b []byte) error {
 type realOp interface {
 	// isValid verifies the validity of the op args such as node/pod count. Note
 	// that we don't catch undefined parameters at this stage.
+	//
+	// This returns errInvalidOp if the configured operation does not match.
 	isValid(allowParameterization bool) error
 	// collectsMetrics checks if the op collects metrics.
 	collectsMetrics() bool
@@ -497,9 +507,6 @@ type createNodesOp struct {
 }
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
-	if cno.Opcode != createNodesOpcode {
-		return fmt.Errorf("invalid opcode %q", cno.Opcode)
-	}
 	if !isValidCount(allowParameterization, cno.Count, cno.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cno.Count, cno.CountParam)
 	}
@@ -538,9 +545,6 @@ type createNamespacesOp struct {
 }
 
 func (cmo *createNamespacesOp) isValid(allowParameterization bool) error {
-	if cmo.Opcode != createNamespacesOpcode {
-		return fmt.Errorf("invalid opcode %q", cmo.Opcode)
-	}
 	if !isValidCount(allowParameterization, cmo.Count, cmo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cmo.Count, cmo.CountParam)
 	}
@@ -595,9 +599,6 @@ type createPodsOp struct {
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
-	if cpo.Opcode != createPodsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", cpo.Opcode, createPodsOpcode)
-	}
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
 	}
@@ -641,9 +642,6 @@ type createPodSetsOp struct {
 }
 
 func (cpso *createPodSetsOp) isValid(allowParameterization bool) error {
-	if cpso.Opcode != createPodSetsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", cpso.Opcode, createPodSetsOpcode)
-	}
 	if !isValidCount(allowParameterization, cpso.Count, cpso.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpso.Count, cpso.CountParam)
 	}
@@ -729,9 +727,6 @@ type churnOp struct {
 }
 
 func (co *churnOp) isValid(_ bool) error {
-	if co.Opcode != churnOpcode {
-		return fmt.Errorf("invalid opcode %q", co.Opcode)
-	}
 	if co.Mode != Recreate && co.Mode != Create {
 		return fmt.Errorf("invalid mode: %v. must be one of %v", co.Mode, []string{Recreate, Create})
 	}
@@ -767,9 +762,6 @@ type barrierOp struct {
 }
 
 func (bo *barrierOp) isValid(allowParameterization bool) error {
-	if bo.Opcode != barrierOpcode {
-		return fmt.Errorf("invalid opcode %q", bo.Opcode)
-	}
 	return nil
 }
 
@@ -805,9 +797,6 @@ func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
 }
 
 func (so *sleepOp) isValid(_ bool) error {
-	if so.Opcode != sleepOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", so.Opcode, sleepOpcode)
-	}
 	return nil
 }
 
@@ -831,9 +820,6 @@ type startCollectingMetricsOp struct {
 }
 
 func (scm *startCollectingMetricsOp) isValid(_ bool) error {
-	if scm.Opcode != startCollectingMetricsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", scm.Opcode, startCollectingMetricsOpcode)
-	}
 	if len(scm.Namespaces) == 0 {
 		return fmt.Errorf("namespaces cannot be empty")
 	}
@@ -857,9 +843,6 @@ type stopCollectingMetricsOp struct {
 }
 
 func (scm *stopCollectingMetricsOp) isValid(_ bool) error {
-	if scm.Opcode != stopCollectingMetricsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", scm.Opcode, stopCollectingMetricsOpcode)
-	}
 	return nil
 }
 

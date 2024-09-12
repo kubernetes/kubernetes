@@ -50,9 +50,6 @@ var _ realOp = &createResourceClaimsOp{}
 var _ runnableOp = &createResourceClaimsOp{}
 
 func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
-	if op.Opcode != createResourceClaimsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", op.Opcode, createResourceClaimsOpcode)
-	}
 	if !isValidCount(allowParameterization, op.Count, op.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", op.Count, op.CountParam)
 	}
@@ -139,9 +136,6 @@ var _ realOp = &createResourceDriverOp{}
 var _ runnableOp = &createResourceDriverOp{}
 
 func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
-	if op.Opcode != createResourceDriverOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", op.Opcode, createResourceDriverOpcode)
-	}
 	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
 		return fmt.Errorf("invalid MaxClaimsPerNode=%d / MaxClaimsPerNodeParam=%q", op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam)
 	}
