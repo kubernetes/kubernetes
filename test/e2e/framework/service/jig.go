@@ -96,23 +96,6 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	return j
 }
 
-// allocate tries to allocate the passed node port and
-// return true if succeeds or false if can not be allocated.
-// Should not be used directly as it does not have lock protection and hence avoids deadlock.
-// Should only be called from a function that has acquired lock on nodeports
-func (s *staticPortRange) allocate(port int) bool {
-	// port is out of range, it can not be allocated
-	if port < 0 || port > len(s.nodeports) {
-		return false
-	}
-	// port already allocated
-	if s.nodeports[port] {
-		return false
-	}
-	s.nodeports[port] = true
-	return true
-}
-
 // allocateNext allocates a free port from the range and returns its number and true
 // if none is available then it returns -1 and false
 func (s *staticPortRange) allocateNext() (int, bool) {
@@ -122,8 +105,8 @@ func (s *staticPortRange) allocateNext() (int, bool) {
 	start := rand.Intn(len(s.nodeports))
 	for i := 0; i < len(s.nodeports); i++ {
 		port := (start + i) % len(s.nodeports)
-		if s.allocate(port) {
-			return NodePortRange.Base + port, true
+		if port < len(s.nodeports) && port >= 0 && s.nodeports[port] {
+			return s.baseport + port, true
 		}
 	}
 	return -1, false
