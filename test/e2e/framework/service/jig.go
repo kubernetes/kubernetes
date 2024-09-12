@@ -105,7 +105,8 @@ func (s *staticPortRange) allocateNext() (int, bool) {
 	start := rand.Intn(len(s.nodeports))
 	for i := 0; i < len(s.nodeports); i++ {
 		port := (start + i) % len(s.nodeports)
-		if port < len(s.nodeports) && port >= 0 && s.nodeports[port] {
+		if port < len(s.nodeports) && port >= 0 && !s.nodeports[port] {
+			s.nodeports[port] = true
 			return s.baseport + port, true
 		}
 	}
