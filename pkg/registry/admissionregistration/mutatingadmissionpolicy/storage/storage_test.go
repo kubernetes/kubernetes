@@ -118,7 +118,6 @@ func TestWatch(t *testing.T) {
 }
 
 func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPolicy {
-	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
 	return &admissionregistration.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -132,14 +131,17 @@ func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPoli
 				APIVersion: "rules.example.com/v1",
 				Kind:       "ReplicaLimit",
 			},
+			ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
 			Mutations: []admissionregistration.Mutation{
 				{
-					Expression: `Object{
+					PatchType: admissionregistration.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: `Object{
 							spec: Object.spec{
 								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
 							}
 						}`,
-					PatchType: applyConfigurationPatchType,
+					},
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{
@@ -182,13 +184,17 @@ func newMutatingAdmissionPolicy(name string) *admissionregistration.MutatingAdmi
 				APIVersion: "rules.example.com/v1",
 				Kind:       "ReplicaLimit",
 			},
+			ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
 			Mutations: []admissionregistration.Mutation{
 				{
-					Expression: `Object{
+					PatchType: admissionregistration.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: `Object{
 							spec: Object.spec{
 								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
 							}
 						}`,
+					},
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{

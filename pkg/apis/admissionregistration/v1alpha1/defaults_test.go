@@ -108,10 +108,14 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 			name: "MutatingAdmissionPolicy",
 			original: &v1alpha1.MutatingAdmissionPolicy{
 				Spec: v1alpha1.MutatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{},
+					MatchConstraints:   &v1alpha1.MatchResources{},
+					ReinvocationPolicy: never,
 					Mutations: []v1alpha1.Mutation{
 						{
-							Expression: "fake string",
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: "fake string",
+							},
 						},
 					},
 				},
@@ -123,11 +127,14 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
 					},
-					FailurePolicy: &fail,
+					FailurePolicy:      &fail,
+					ReinvocationPolicy: never,
 					Mutations: []v1alpha1.Mutation{
 						{
-							Expression:         "fake string",
-							ReinvocationPolicy: &never,
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: "fake string",
+							},
 						},
 					},
 				},
