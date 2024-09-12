@@ -72,9 +72,6 @@ type staticPortRange struct {
 	nodeports [87]bool // this is the static port range based on current NodePortRange KEP-3668
 }
 
-// It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-var errAllocated = errors.New("provided port is already allocated")
-
 // TestJig is a test jig to help service testing.
 type TestJig struct {
 	Client    clientset.Interface
@@ -137,7 +134,7 @@ func (s *staticPortRange) allocateNext() (int, bool) {
 func (s *staticPortRange) release(port int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	port = port - NodePortRange.Base
+	port -= NodePortRange.Base
 	// port is out of range, it can not be allocated
 	if port < 0 || port > len(s.nodeports) {
 		return false
