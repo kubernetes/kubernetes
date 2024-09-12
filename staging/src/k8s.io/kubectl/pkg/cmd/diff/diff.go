@@ -161,7 +161,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	// command it means changes were found.
 	// Thus, it should return status code greater than 1.
 	cmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
-		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, err.Error()))
+		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, "%s", err.Error()))
 		return nil
 	})
 

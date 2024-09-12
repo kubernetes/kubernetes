@@ -18,6 +18,7 @@ package printers
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -61,7 +62,7 @@ func (p *GoTemplatePrinter) AllowMissingKeys(allow bool) {
 // PrintObj formats the obj with the Go Template.
 func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
-		return fmt.Errorf(InternalObjectPrinterErr)
+		return errors.New(InternalObjectPrinterErr)
 	}
 
 	var data []byte

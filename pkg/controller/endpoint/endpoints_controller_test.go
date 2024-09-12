@@ -2782,7 +2782,7 @@ func waitForChanReceive(t *testing.T, timeout time.Duration, receivingChan chan 
 	timer := time.NewTimer(timeout)
 	select {
 	case <-timer.C:
-		t.Errorf(errorMsg)
+		t.Error(errorMsg)
 	case <-receivingChan:
 	}
 }

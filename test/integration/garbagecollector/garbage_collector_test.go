@@ -697,7 +697,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	wg.Wait()
 	close(errs)
 	for errString := range errs {
-		t.Fatalf(errString)
+		t.Fatal(errString)
 	}
 	t.Logf("all pods are created, all replications controllers are created then deleted")
 	// wait for the RCs and Pods to reach the expected numbers.

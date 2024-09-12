@@ -115,5 +115,5 @@ func (d *errorDecoderV4) decode(message []byte) error {
 		return errors.New("error stream protocol error: unknown error")
 	}
 
-	return fmt.Errorf(status.Message)
+	return errors.New(status.Message)
 }
