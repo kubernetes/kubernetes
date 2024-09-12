@@ -299,7 +299,7 @@ func TestHTTPProxy(t *testing.T) {
 	}))
 	defer testProxyServer.Close()
 
-	t.Logf(testProxyServer.URL)
+	t.Log(testProxyServer.URL)
 
 	u, err := url.Parse(testProxyServer.URL)
 	if err != nil {
