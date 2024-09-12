@@ -693,27 +693,45 @@ type MutatingAdmissionPolicyList struct {
 	Items []MutatingAdmissionPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// MutatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
+// MutatingAdmissionPolicySpec is the specification of the desired behavior of the admission policy.
 type MutatingAdmissionPolicySpec struct {
-	// ParamKind specifies the kind of resources used to parameterize this policy.
+	// paramKind specifies the kind of resources used to parameterize this policy.
 	// If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions.
-	// If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
+	// If paramKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
 	// If paramKind is specified but paramRef is unset in MutatingAdmissionPolicyBinding, the params variable will be null.
 	// +optional
 	ParamKind *ParamKind `json:"paramKind,omitempty" protobuf:"bytes,1,rep,name=paramKind"`
 
-	// MatchConstraints specifies what resources this policy is designed to validate.
+	// matchConstraints specifies what resources this policy is designed to validate.
 	// The AdmissionPolicy cares about a request if it matches _all_ Constraints.
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding.
+	// Only the CREATE and UPDATE operations are allowed.  DELETE and CONNECT operations may not be matched.
+	// '*' matches only CREATE and UPDATE.
 	// Required.
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
-	// Mutations contain CEL expressions which are used to apply the mutation.
-	// Mutations may not be empty; a minimum of one mutation is required.
+	// variables contain definitions of variables that can be used in composition of other expressions.
+	// Each variable is defined as a named CEL expression.
+	// The variables defined here will be available under `variables` in other expressions of the policy
+	// except matchConditions because matchConditions are evaluated before the rest of the policy.
+	//
+	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
+	// Thus, variables must be sorted by the order of first appearance and acyclic.
 	// +listType=atomic
 	// +optional
-	Mutations []Mutation `json:"mutations,omitempty" protobuf:"bytes,3,rep,name=mutations"`
+	Variables []Variable `json:"variables,omitempty" protobuf:"bytes,3,rep,name=variables"`
+
+	// mutations contain operations which are used to perform mutations.
+	// mutations may not be empty; a minimum of one mutation is required.
+	// mutations are evaluated in order, and are reinvoked according to
+	// the reinvocationPolicy.
+	// The mutations of a policy are invoked for each binding of this policy
+	// and reinvocation of mutations occurs on a per binding basis.
+	//
+	// +listType=atomic
+	// +optional
+	Mutations []Mutation `json:"mutations,omitempty" protobuf:"bytes,4,rep,name=mutations"`
 
 	// failurePolicy defines how to handle failures for the admission policy. Failures can
 	// occur from CEL expression parse errors, type check errors, runtime errors and invalid
@@ -726,9 +744,9 @@ type MutatingAdmissionPolicySpec struct {
 	//
 	// Allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
-	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
+	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,5,opt,name=failurePolicy,casttype=FailurePolicyType"`
 
-	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// matchConditions is a list of conditions that must be met for a request to be validated.
 	// Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
@@ -748,13 +766,72 @@ type MutatingAdmissionPolicySpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,5,rep,name=matchConditions"`
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
+
+	// reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding
+	// as part of a single admission evaluation.
+	// Allowed values are "Never" and "IfNeeded".
+	//
+	// Never: These mutations will not be called more than once per binding in a single admission evaluation.
+	//
+	// IfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of
+	// order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only
+	// reinvoked when mutations change the object after this mutation is invoked.
+	// Required.
+	ReinvocationPolicy ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,7,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 }
 
 // Mutation specifies the CEL expression which is used to apply the Mutation.
 type Mutation struct {
-	// Expression represents the expression which will be evaluated by CEL.
+	// patchType indicates the patch strategy used.
+	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// Required.
+	//
+	// +unionDiscriminator
+	PatchType PatchType `json:"patchType" protobuf:"bytes,2,opt,name=patchType,casttype=PatchType"`
+
+	// applyConfiguration defines the desired configuration values of an object.
+	// The configuration is applied to the admission object using
+	// [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
+	// A CEL expression is used to create apply configuration.
+	ApplyConfiguration *ApplyConfiguration `json:"applyConfiguration,omitempty" protobuf:"bytes,3,opt,name=applyConfiguration"`
+
+	// jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
+	// A CEL expression is used to create the JSON patch.
+	JSONPatch *JSONPatch `json:"jsonPatch,omitempty" protobuf:"bytes,4,opt,name=jsonPatch"`
+}
+
+// PatchType specifies the type of patch operation for a mutation.
+// +enum
+type PatchType string
+
+const (
+	// ApplyConfiguration indicates that the mutation is using apply configuration to mutate the object.
+	PatchTypeApplyConfiguration PatchType = "ApplyConfiguration"
+	// JSONPatch indicates that the object is mutated through JSON Patch.
+	PatchTypeJSONPatch PatchType = "JSONPatch"
+)
+
+// ApplyConfiguration defines the desired configuration values of an object.
+type ApplyConfiguration struct {
+	// expression will be evaluated by CEL to create an apply configuration.
 	// ref: https://github.com/google/cel-spec
+	//
+	// Apply configurations are declared in CEL using object initialization.  For example, this CEL expression
+	// returns an apply configuration to set a single field:
+	//
+	//	Object{
+	//	  spec: Object.spec{
+	//	    serviceAccountName: "example"
+	//	  }
+	//	}
+	//
+	// CEL expressions have access to the object types needed to create apply configurations:
+	//
+	// - 'Object' - CEL type of the resource object.
+	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
+	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
+	//
 	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
 	//
 	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
@@ -764,78 +841,88 @@ type Mutation struct {
 	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
 	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
 	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
+	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
 	//
 	// The `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the
 	// object. No other metadata properties are accessible.
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
-	Expression string `json:"expression" protobuf:"bytes,1,opt,name=Expression"`
-	// Message represents the message displayed when validation fails. The message is required if the Expression contains
-	// line breaks. The message must not contain line breaks.
-	// If unset, the message is "failed rule: {Rule}".
-	// e.g. "must be a URL with the host matching spec.host"
-	// If the Expression contains line breaks. Message is required.
-	// The message must not contain line breaks.
-	// If unset, the message is "failed Expression: {Expression}".
-	// +optional
-	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
-	// reason represents a machine-readable description of why this validation failed.
-	// If this is the first validation in the list to fail, this reason, as well as the
-	// corresponding HTTP response code, are used in the
-	// HTTP response to the client.
-	// The currently supported reasons are: "Unauthorized", "Forbidden", "Invalid", "RequestEntityTooLarge".
-	// If not set, StatusReasonInvalid is used in the response to the client.
-	// +optional
-	Reason *metav1.StatusReason `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
-	// messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
-	// Since messageExpression is used as a failure message, it must evaluate to a string.
-	// If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails.
-	// If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced
-	// as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
-	// that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and
-	// the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged.
-	// messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'.
-	// Example:
-	// "object.x must be less than max ("+string(params.max)+")"
-	// +optional
-	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,4,opt,name=messageExpression"`
-	// reinvocationPolicy indicates whether this mutation should be called multiple times as part of a single admission evaluation.
-	// Allowed values are "Never" and "IfNeeded".
-	//
-	// Never: the mutation will not be called more than once in a single admission evaluation.
-	//
-	// IfNeeded: the mutation will be called at least one additional time as part of the admission evaluation
-	// if the object being admitted is modified by other admission plugins after the initial mutation call.
-	// mutations that specify this option *must* be idempotent, able to process objects they previously admitted.
-	// Note:
-	// * the number of additional invocations is not guaranteed to be exactly one.
-	// * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again.
-	// * mutations that use this option may be reordered to minimize the number of additional invocations.
-	// * to validate an object after all mutations are guaranteed complete, use a validating admission policy instead.
-	//
-	// Defaults to "Never".
-	// +optional
-	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,5,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
-	// patchType indicates the patch strategy used.
-	// Allowed values are "ApplyConfiguration" and "JSONPatch".
-	// "ApplyConfiguration" is to use structured merge algorithm stated [here](https://github.com/kubernetes-sigs/structured-merge-diff)
-	// to mutate the incoming object.
-	// "JSONPatch" is to use [JSON patch](https://jsonpatch.com/) to perform the mutation of the object.
-	// +required
-	PatchType PatchType `json:"patchType,omitempty" protobuf:"bytes,6,opt,name=patchType,casttype=PatchType"`
+	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
 }
 
-// PatchType specifies what type of strategy the admission mutation uses.
-// +enum
-type PatchType string
-
-const (
-	// ApplyConfigurationPatchType indicates that the mutation is using apply configuration to mutate the object.
-	ApplyConfigurationPatchType PatchType = "PatchTypeApplyConfiguration"
-	// JSONPatchPatchType indicates that the object is mutated through JSONPatch.
-	JSONPatchPatchType PatchType = "PatchTypeJSONPatch"
-)
+// JSONPatch defines a JSON Patch.
+type JSONPatch struct {
+	// expression will be evaluated by CEL to create a [JSON patch](https://jsonpatch.com/).
+	// ref: https://github.com/google/cel-spec
+	//
+	// expression must return an array of JSONPatch values.
+	//
+	// For example, this CEL expression returns a JSON patch to conditionally modify a value:
+	//
+	//	  [
+	//      JSONPatch{op: "test", path: "/spec/example", value: "Red"},
+	//	    JSONPatch{op: "replace", path: "/spec/example", value: "Green"}
+	//	  ]
+	//
+	// To define an object for the patch value, use Object types. For example:
+	//
+	//	  [
+	//	    JSONPatch{
+	//	      op: "add",
+	//	      path: "/spec/selector",
+	//	      value: Object.spec.selector{matchLabels: {"environment": "test"}}
+	//	    }
+	//	  ]
+	//
+	// To use strings containing '/' and '~' as JSONPatch path keys, use "jsonpatch.escapeKey". For example:
+	//
+	//	  [
+	//      JSONPatch{
+	//        op: "add",
+	//        path: "/metadata/labels/" + jsonpatch.escapeKey("example.com/environment"),
+	//        value: "test"
+	//      },
+	//	  ]
+	//
+	// CEL expressions have access to the types needed to create JSON patches and objects:
+	//
+	// - 'JSONPatch' - CEL type of JSON Patch operations. JSONPatch has the fields 'op', 'from', 'path' and 'value'.
+	//   See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to strings,
+	//   integers, arrays, maps and Object types.
+	// - 'Object' - CEL type of the resource object.
+	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
+	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
+	//
+	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
+	//
+	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// - 'oldObject' - The existing object. The value is null for CREATE requests.
+	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
+	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
+	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
+	//
+	// CEL expressions have access to [Kubernetes CEL function libraries](https://kubernetes.io/docs/reference/using-api/cel/#cel-options-language-features-and-libraries)
+	// as well as:
+	//
+	// - 'jsonpatch.escapeKey' - Performs JSONPatch key escaping. '~' and  '/' are escaped as '~0' and `~1' respectively).
+	//
+	// The `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the
+	// object. No other metadata properties are accessible.
+	//
+	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
+	// Required.
+	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
+}
 
 // ReinvocationPolicyType specifies what type of policy the admission mutation uses.
 // +enum
@@ -909,6 +996,8 @@ type MutatingAdmissionPolicyBindingSpec struct {
 	// If this is unset, all resources matched by the policy are validated by this binding
 	// When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
 	// Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required.
+	// Only the CREATE, UPDATE and CONNECT operations are allowed.  DELETE operations may not be matched.
+	// '*' matches CREATE, UPDATE and CONNECT.
 	// +optional
 	MatchResources *MatchResources `json:"matchResources,omitempty" protobuf:"bytes,3,rep,name=matchResources"`
 }
