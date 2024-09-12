@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -597,7 +598,39 @@ var _ = common.SIGDescribe("DNS", func() {
 		}
 		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
+})
 
+// TODO replace WithLabel by framework.WithFeatureGate(features.RelaxedDNSSearchValidation) once https://github.com/kubernetes/kubernetes/pull/126977 is solved
+var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.WithLabel("Feature:Alpha"), func() {
+	f := framework.NewDefaultFramework("dns")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.It("should work with a search path containing an underscore and a search path with a single dot", func(ctx context.Context) {
+		// All the names we need to be able to resolve.
+		namesToResolve := []string{
+			"kubernetes.default",
+			"kubernetes.default.svc",
+		}
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostEntries := []string{hostFQDN, dnsTestPodHostName}
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		ginkgo.By("Creating a pod with expanded DNS configuration to probe DNS")
+		testSearchPaths := []string{
+			".",
+			"_sip._tcp.abc_d.example.com",
+		}
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
+		pod.Spec.DNSPolicy = v1.DNSClusterFirst
+		pod.Spec.DNSConfig = &v1.PodDNSConfig{
+			Searches: testSearchPaths,
+		}
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
 })
 
 var _ = common.SIGDescribe("DNS HostNetwork", func() {

@@ -145,6 +145,15 @@ func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateDNS1123SubdomainWithUnderScore validates that a name is a proper DNS subdomain but allows for an underscore in the string
+func ValidateDNS1123SubdomainWithUnderScore(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123SubdomainWithUnderscore(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 // ValidateDNS1123Subdomain validates that a name is a proper DNS subdomain.
 func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -3779,10 +3788,18 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 		if len(strings.Join(dnsConfig.Searches, " ")) > MaxDNSSearchListChars {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v characters (including spaces) in the search list", MaxDNSSearchListChars)))
 		}
+
 		for i, search := range dnsConfig.Searches {
-			// it is fine to have a trailing dot
-			search = strings.TrimSuffix(search, ".")
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			if opts.AllowRelaxedDNSSearchValidation {
+				if search != "." {
+					search = strings.TrimSuffix(search, ".")
+					allErrs = append(allErrs, ValidateDNS1123SubdomainWithUnderScore(search, fldPath.Child("searches").Index(i))...)
+				}
+			} else {
+				search = strings.TrimSuffix(search, ".")
+				allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			}
+
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -4034,6 +4051,8 @@ type PodValidationOptions struct {
 	AllowRelaxedEnvironmentVariableValidation bool
 	// Allow the use of the ImageVolumeSource API.
 	AllowImageVolumeSource bool
+	// Allow the use of a relaxed DNS search
+	AllowRelaxedDNSSearchValidation bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

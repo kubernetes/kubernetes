@@ -24193,6 +24193,172 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		dnsConfig      *core.PodDNSConfig
+	}{
+		{
+			name:           "beginswith underscore, contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+		{
+			name:           "begins with underscore, contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 // TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
 func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 	fldPath := field.NewPath("spec")
