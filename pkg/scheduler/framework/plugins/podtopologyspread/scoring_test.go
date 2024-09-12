@@ -227,11 +227,12 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.New("node-x"),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{key: "zone"}:                 ptr.To[int64](0),
 					{key: "zone", value: "zone1"}: ptr.To[int64](0),
 				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
 		},
 		{

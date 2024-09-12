@@ -78,14 +78,14 @@ func (pl *PodTopologySpread) buildDefaultConstraints(p *v1.Pod, action v1.Unsati
 	return constraints, nil
 }
 
-// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread Constraints are present in node labels.
+// nodeLabelsMatchSpreadConstraints checks if at least one topology key in spread Constraints is present in node labels.
 func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []topologySpreadConstraint) bool {
 	for _, c := range constraints {
-		if _, ok := nodeLabels[c.TopologyKey]; !ok {
-			return false
+		if _, ok := nodeLabels[c.TopologyKey]; ok {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, podLabels map[string]string, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {

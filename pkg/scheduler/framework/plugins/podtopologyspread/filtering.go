@@ -267,7 +267,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			}
 		}
 
-		// Ensure current node's labels contains all topologyKeys in 'Constraints'.
+		// Ensure current node's labels contains at least one topologyKey in 'Constraints'.
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			return
 		}
