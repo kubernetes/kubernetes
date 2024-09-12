@@ -19,6 +19,7 @@ package dualstack
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1409,7 +1410,7 @@ func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.
 
 	if len(errstrings) > 0 {
 		errstrings = append(errstrings, fmt.Sprintf("Error validating Service: %s, ClusterIPs: %v Expected IPFamilies %v", svc.Name, svc.Spec.ClusterIPs, expectedIPFamilies))
-		return fmt.Errorf(strings.Join(errstrings, "\n"))
+		return errors.New(strings.Join(errstrings, "\n"))
 	}
 
 	return nil

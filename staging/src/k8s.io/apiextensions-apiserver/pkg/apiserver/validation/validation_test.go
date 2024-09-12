@@ -620,7 +620,7 @@ func TestValidateCustomResource(t *testing.T) {
 				}
 				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, celconfig.RuntimeCELCostBudget)
 				if len(errs) > 0 {
-					t.Errorf(errs.ToAggregate().Error())
+					t.Error(errs.ToAggregate().Error())
 				}
 			}
 			for i, failingObject := range tt.failingObjects {

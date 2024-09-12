@@ -2409,7 +2409,7 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	node2.Status = healthyNodeNewStatus
 	_, err = fakeNodeHandler.UpdateStatus(ctx, node2, metav1.UpdateOptions{})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
@@ -2559,7 +2559,7 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 	node0.Status = healthyNodeNewStatus
 	_, err = fakeNodeHandler.UpdateStatus(ctx, node0, metav1.UpdateOptions{})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 
@@ -2791,12 +2791,12 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	node1.Status = healthyNodeNewStatus
 	_, err = fakeNodeHandler.UpdateStatus(ctx, node0, metav1.UpdateOptions{})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	_, err = fakeNodeHandler.UpdateStatus(ctx, node1, metav1.UpdateOptions{})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 

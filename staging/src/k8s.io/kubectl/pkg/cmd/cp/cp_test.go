@@ -988,6 +988,6 @@ func cmpFileData(t *testing.T, filePath, data string) {
 type testWriter testing.T
 
 func (t *testWriter) Write(p []byte) (n int, err error) {
-	t.Logf(string(p))
+	t.Log(string(p))
 	return len(p), nil
 }

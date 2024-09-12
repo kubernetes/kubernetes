@@ -60,7 +60,7 @@ func TestLazyMapType(t *testing.T) {
 		evalCounter++
 		v, err := compileAndRun(env, activation, `{"a": "a"}`)
 		if err != nil {
-			return types.NewErr(err.Error())
+			return types.NewErr("%s", err.Error())
 		}
 		return v
 	})

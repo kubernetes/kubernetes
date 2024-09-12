@@ -345,7 +345,7 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 			var err error
 			s, err := c.decodeString(kv.Value)
 			if err != nil {
-				return m, newDecodeErrorf(expr, err.Error())
+				return m, newDecodeErrorf(expr, "%s", err.Error())
 			}
 			value = *s
 			switch key {
@@ -771,7 +771,7 @@ func (c *metricDecoder) decodeBuildFQNameArguments(fc *ast.CallExpr) (string, st
 	for i, elt := range fc.Args {
 		s, err := c.decodeString(elt)
 		if err != nil || s == nil {
-			return "", "", "", newDecodeErrorf(fc, err.Error())
+			return "", "", "", newDecodeErrorf(fc, "%s", err.Error())
 		}
 		strArgs[i] = *s
 	}
