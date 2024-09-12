@@ -54,11 +54,11 @@ func (fake *FakeInterface) Reset() {
 }
 
 // ClearEntries is part of Interface
-func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) error {
+func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
 	for _, anyFilter := range filters {
 		filter := anyFilter.(*conntrackFilter)
 		if filter.protocol != protocolMap[v1.ProtocolUDP] {
-			return fmt.Errorf("FakeInterface currently only supports UDP")
+			return 0, fmt.Errorf("FakeInterface currently only supports UDP")
 		}
 
 		// record IP and Port entries
@@ -77,7 +77,7 @@ func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntr
 				origin := filter.original.dstIP.String()
 				dest := filter.reply.srcIP.String()
 				if previous, exists := fake.ClearedNATs[origin]; exists && previous != dest {
-					return fmt.Errorf("filter for NAT passed with same origin (%s), different destination (%s / %s)", origin, previous, dest)
+					return 0, fmt.Errorf("filter for NAT passed with same origin (%s), different destination (%s / %s)", origin, previous, dest)
 				}
 				fake.ClearedNATs[filter.original.dstIP.String()] = filter.reply.srcIP.String()
 			}
@@ -86,11 +86,11 @@ func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntr
 				dest := filter.reply.srcIP.String()
 				port := int(filter.original.dstPort)
 				if previous, exists := fake.ClearedPortNATs[port]; exists && previous != dest {
-					return fmt.Errorf("filter for PortNAT passed with same port (%d), different destination (%s / %s)", port, previous, dest)
+					return 0, fmt.Errorf("filter for PortNAT passed with same port (%d), different destination (%s / %s)", port, previous, dest)
 				}
 				fake.ClearedPortNATs[port] = dest
 			}
 		}
 	}
-	return nil
+	return 0, nil
 }

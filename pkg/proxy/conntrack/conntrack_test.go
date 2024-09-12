@@ -91,7 +91,8 @@ func TestConntracker_ClearEntries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := &fakeHandler{}
 			ct := newConntracker(handler)
-			require.NoError(t, ct.ClearEntries(tc.ipFamily, tc.filters...))
+			_, err := ct.ClearEntries(tc.ipFamily, tc.filters...)
+			require.NoError(t, err)
 			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
 			require.Equal(t, netlink.InetFamily(tc.ipFamily), handler.ipFamily)
 			require.Equal(t, len(tc.filters), len(handler.filters))
