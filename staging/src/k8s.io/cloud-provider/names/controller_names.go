@@ -51,6 +51,7 @@ const (
 	ServiceLBController          = "service-lb-controller"
 	NodeRouteController          = "node-route-controller"
 	CloudNodeLifecycleController = "cloud-node-lifecycle-controller"
+	CloudNodeCSRApprover         = "cloud-node-csr-approver"
 )
 
 // CCMControllerAliases returns a mapping of aliases to canonical controller names

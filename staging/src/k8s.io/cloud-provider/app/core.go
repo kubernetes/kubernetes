@@ -28,6 +28,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app/config"
 	cloudnodecontroller "k8s.io/cloud-provider/controllers/node"
+	"k8s.io/cloud-provider/controllers/nodecsrapprover"
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
@@ -74,6 +75,23 @@ func startCloudNodeLifecycleController(ctx context.Context, initContext Controll
 	}
 
 	go cloudNodeLifecycleController.Run(ctx, controlexContext.ControllerManagerMetrics)
+
+	return nil, true, nil
+}
+
+func startCloudNodeCSRApprover(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+	cloudNodeCSRApprover, err := nodecsrapprover.NewController(
+		completedConfig.SharedInformers.Certificates().V1().CertificateSigningRequests(),
+		completedConfig.SharedInformers.Core().V1().Nodes(),
+		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		cloud,
+	)
+	if err != nil {
+		klog.Warningf("failed to start cloud node lifecycle controller: %s", err)
+		return nil, false, nil
+	}
+
+	go cloudNodeCSRApprover.Run(ctx, 5)
 
 	return nil, true, nil
 }
