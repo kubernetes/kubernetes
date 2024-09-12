@@ -75,8 +75,10 @@ func deleteStaleServiceConntrackEntries(ct Interface, ipFamily v1.IPFamily, svcP
 		filters = append(filters, filterForPort(nodePort, v1.ProtocolUDP))
 	}
 
-	if err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
+	if n, err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
 		klog.ErrorS(err, "Failed to delete stale service connections")
+	} else {
+		klog.V(4).InfoS("Deleted conntrack stale entries for services", "count", n)
 	}
 }
 
@@ -103,8 +105,10 @@ func deleteStaleEndpointConntrackEntries(ct Interface, ipFamily v1.IPFamily, svc
 		}
 	}
 
-	if err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
+	if n, err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
 		klog.ErrorS(err, "Failed to delete stale endpoint connections")
+	} else {
+		klog.V(4).InfoS("Deleted conntrack stale entries for endpoints", "count", n)
 	}
 }
 

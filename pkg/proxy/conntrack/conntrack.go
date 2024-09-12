@@ -31,7 +31,7 @@ import (
 type Interface interface {
 	// ClearEntries deletes conntrack entries for connections of the given IP family,
 	// filtered by the given filters.
-	ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) error
+	ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) (int, error)
 }
 
 // netlinkHandler allows consuming real and mockable implementation for testing.
@@ -56,16 +56,16 @@ func newConntracker(handler netlinkHandler) Interface {
 
 // ClearEntries deletes conntrack entries for connections of the given IP family,
 // filtered by the given filters.
-func (ct *conntracker) ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) error {
+func (ct *conntracker) ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
 	if len(filters) == 0 {
 		klog.V(7).InfoS("no conntrack filters provided")
-		return nil
+		return 0, nil
 	}
 
 	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filters...)
 	if err != nil {
-		return fmt.Errorf("error deleting conntrack entries, error: %w", err)
+		return 0, fmt.Errorf("error deleting conntrack entries, error: %w", err)
 	}
 	klog.V(4).InfoS("Cleared conntrack entries", "count", n)
-	return nil
+	return int(n), nil
 }
