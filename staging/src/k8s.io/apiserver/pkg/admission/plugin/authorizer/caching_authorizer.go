@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package authorizer
 
 import (
 	"context"
@@ -39,7 +39,10 @@ type cachingAuthorizer struct {
 	decisions  map[string]authzResult
 }
 
-func newCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
+// NewCachingAuthorizer returns and author that caches decisions for the duration
+// of the authorizers use.  Intended to be used for short-lived operations such as
+// the handling of a request in the admission chain, and then discarded.
+func NewCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
 	return &cachingAuthorizer{
 		authorizer: in,
 		decisions:  make(map[string]authzResult),

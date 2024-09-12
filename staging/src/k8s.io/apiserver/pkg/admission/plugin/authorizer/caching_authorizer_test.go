@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package authorizer
 
 import (
 	"context"
@@ -491,7 +491,7 @@ func TestCachingAuthorizer(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var misses int
-			frontend := newCachingAuthorizer(func() authorizer.Authorizer {
+			frontend := NewCachingAuthorizer(func() authorizer.Authorizer {
 				return authorizer.AuthorizerFunc(func(_ context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 					if misses >= len(tc.backend) {
 						t.Fatalf("got more than expected %d backend invocations", len(tc.backend))
