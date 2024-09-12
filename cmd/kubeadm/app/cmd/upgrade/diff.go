@@ -57,8 +57,11 @@ type diffFlags struct {
 // newCmdDiff returns the cobra command for `kubeadm upgrade diff`
 func newCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
-		kubeConfigPath: constants.GetAdminKubeConfigPath(),
-		out:            out,
+		kubeConfigPath:                constants.GetAdminKubeConfigPath(),
+		out:                           out,
+		apiServerManifestPath:         constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory()),
+		controllerManagerManifestPath: constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory()),
+		schedulerManifestPath:         constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory()),
 	}
 
 	cmd := &cobra.Command{
@@ -88,9 +91,6 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 
 func validateManifestsPath(manifests ...string) (err error) {
 	for _, manifestPath := range manifests {
-		if len(manifestPath) == 0 {
-			return errors.New("empty manifest path")
-		}
 		s, err := os.Stat(manifestPath)
 		if err != nil {
 			if os.IsNotExist(err) {
