@@ -110,8 +110,12 @@ func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
 	procSwapsLines := strings.Split(procSwapsStr, "\n")
 
 	// If there is more than one line (table headers) in /proc/swaps then swap is enabled
-	klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
-	return len(procSwapsLines) > 1
+	isSwapOn := len(procSwapsLines) > 1
+	if isSwapOn {
+		klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
+	}
+
+	return isSwapOn
 }
 
 // IsSwapOn detects whether swap in enabled on the system by inspecting
