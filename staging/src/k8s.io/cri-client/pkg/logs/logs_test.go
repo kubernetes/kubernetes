@@ -198,7 +198,7 @@ func TestReadLogs(t *testing.T) {
 			err = ReadLogs(context.TODO(), nil, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 			if stderrBuf.Len() > 0 {
 				t.Fatalf("Stderr: %v", stderrBuf.String())

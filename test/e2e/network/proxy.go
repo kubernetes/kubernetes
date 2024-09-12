@@ -271,7 +271,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				framework.Fail(strings.Join(errs, "\n"))
 			}
 		})
 

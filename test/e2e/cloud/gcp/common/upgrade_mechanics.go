@@ -110,7 +110,7 @@ func traceRouteToControlPlane() {
 	cmd := exec.Command(traceroute, "-I", framework.APIAddress())
 	out, err := cmd.Output()
 	if len(out) != 0 {
-		framework.Logf(string(out))
+		framework.Logf("%s", string(out))
 	}
 	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
 		framework.Logf("Error while running traceroute: %s", exiterr.Stderr)
