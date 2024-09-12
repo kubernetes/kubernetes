@@ -439,6 +439,20 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+
+	// InitialEventsListBlueprintAnnotationKey is the name of the key
+	// where an empty, versioned list is encoded in the requested format
+	// (e.g., protobuf, JSON, CBOR), then base64-encoded and stored as a string.
+	//
+	// This encoding matches the request encoding format, which may be
+	// protobuf, JSON, CBOR, or others, depending on what the client requested.
+	// This ensures that the reconstructed list can be processed through the
+	// same decoder chain that would handle a standard LIST call response.
+	//
+	// The annotation is added to a "Bookmark" event and is used by clients
+	// to guarantee the format consistency when reconstructing
+	// the list during WatchList processing.
+	InitialEventsListBlueprintAnnotationKey = "kubernetes.io/initial-events-list-blueprint"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
