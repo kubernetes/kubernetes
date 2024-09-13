@@ -18,17 +18,10 @@ limitations under the License.
 
 package certreload
 
-import "testing"
-
-// NOTE: this intentionally fails to compile.
-`
-
-
-  !!!!!
-  This directory contains tests which require special handling.
-  If you intended to run these tests, use "-tags=run_integration_tests", otherwise use
-  "-tags=skip_special_tests".
-  !!!!!
-
-
-`
+var _ = ____
+var _ = ____This_directory_contains_tests_which_require_special_handling
+var _ = ____If_you_intended_to_run_these_tests_use_the_tag
+var _ = ________run_integration_tests
+var _ = ____otherwise_use_the_tag
+var _ = ________skip_special_tests
+var _ = ____
