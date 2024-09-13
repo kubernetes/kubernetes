@@ -83,6 +83,7 @@ const (
 	createPodSetsOpcode        operationCode = "createPodSets"
 	createResourceClaimsOpcode operationCode = "createResourceClaims"
 	createResourceDriverOpcode operationCode = "createResourceDriver"
+	allocResourceClaimsOpcode  operationCode = "allocResourceClaims"
 	churnOpcode                operationCode = "churn"
 	barrierOpcode              operationCode = "barrier"
 	sleepOpcode                operationCode = "sleep"
@@ -430,6 +431,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		createPodSetsOpcode:        &createPodSetsOp{},
 		createResourceClaimsOpcode: &createResourceClaimsOp{},
 		createResourceDriverOpcode: &createResourceDriverOp{},
+		allocResourceClaimsOpcode:  &allocResourceClaimsOp{},
 		churnOpcode:                &churnOp{},
 		barrierOpcode:              &barrierOp{},
 		sleepOpcode:                &sleepOp{},
