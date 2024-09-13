@@ -829,6 +829,7 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"} \
       -gcflags="${gogcflags}" \
       -ldflags="${goldflags}" \
+      -tags="run_e2e_tests" \
       -o "${outfile}" \
       "${testpkg}"
   done
