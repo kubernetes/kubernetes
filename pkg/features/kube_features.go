@@ -895,6 +895,7 @@ const (
 	// kep: http://kep.k8s.io/1860
 	// alpha: v1.29
 	// beta: v1.30
+	// GA: v1.32
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
 	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
 
