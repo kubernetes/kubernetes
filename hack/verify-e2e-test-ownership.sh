@@ -60,7 +60,7 @@ function ensure_dependencies() {
     make ginkgo
   fi
   if ! { [ -f "${e2e_test}" ] && [[ "${REUSE_BUILD_OUTPUT}" =~ ^[yY]$ ]]; }; then
-    hack/make-rules/build.sh -tags=run_e2e_tests test/e2e/e2e.test
+    make WHAT=test/e2e/e2e.test GOFLAGS=-tags=run_e2e_tests
   fi
   if ! { [ -f "${spec_summaries}" ] && [[ "${REUSE_BUILD_OUTPUT}" =~ ^[yY]$ ]]; }; then
     "${ginkgo}" --dry-run=true "${e2e_test}" -- --spec-dump "${spec_summaries}" > /dev/null

@@ -36,7 +36,7 @@ for suite in $(git grep -l framework.AfterReadingAllFlags | grep -v -e ^test/e2e
     # Build a binary and run it in the root directory to get paths that are
     # relative to that instead of the package directory.
     out=""
-    if (cd "$suite" && go test -c -o "${KUBE_TEMP}/e2e.bin" .) && out=$("${KUBE_TEMP}/e2e.bin" --list-tests); then
+    if (cd "$suite" && go test -c -tags=run_e2e_tests -o "${KUBE_TEMP}/e2e.bin" .) && out=$("${KUBE_TEMP}/e2e.bin" --list-tests); then
         echo "E2E suite $suite passed."
     else
         echo >&2 "ERROR: E2E test suite invocation failed for $suite."

@@ -51,7 +51,7 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 # - `dlv exec` if set to "delve"
 # - `gdb` if set to "gdb"
 # NOTE: for this to work the e2e.test binary has to be compiled with
-# make DBG=1 WHAT=test/e2e/e2e.test
+# make DBG=1 WHAT=test/e2e/e2e.test GOFLAGS=-tags=run_e2e_tests
 E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL:-}
 
 : "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"

@@ -32,7 +32,8 @@ kube::util::read-array PERMITTED_IMAGES < <(sed '/^#/d' ./test/images/.permitted
 
 # get current list of images, ignoring tags
 echo "Getting e2e image list ..."
-make WHAT=test/e2e/e2e.test
+make WHAT=test/e2e/e2e.test GOFLAGS=-tags=run_e2e_tests
+
 e2e_test="$(kube::util::find-binary e2e.test)"
 kube::util::read-array IMAGES < <("${e2e_test}" --list-images | sed -E 's/^(.+):[^:]+$/\1/' | LC_ALL=C sort -u)
 

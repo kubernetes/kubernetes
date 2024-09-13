@@ -28,7 +28,11 @@ cd "${KUBE_ROOT}"
 # module-relative names (e.g. /src/kube/foo/bar.go vs.
 # k8s.io/kubernetes/foo/bar.go).  These names are used by gingko in
 # `--spec-dump` which is consumed later in conformance verification. 
-DBG=1 hack/make-rules/build.sh github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test
+DBG=1 \
+    hack/make-rules/build.sh \
+    -tags=run_e2e_tests \
+    github.com/onsi/ginkgo/v2/ginkgo \
+    test/e2e/e2e.test
 
 # dump spec
 ./_output/bin/ginkgo --dry-run=true --focus='[Conformance]' ./_output/bin/e2e.test -- --spec-dump "${KUBE_ROOT}/_output/specsummaries.json" > /dev/null

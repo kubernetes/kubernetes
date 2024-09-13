@@ -144,7 +144,9 @@ main(){
 
     # The build e2e.test, ginkgo and kubectl binaries + copy to dockerized dir is
     # because of https://github.com/kubernetes-sigs/kubetest2/issues/184
-    make all WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl";
+    make all \
+        WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl" \
+        GOFLAGS=-tags=run_e2e_tests;
     mkdir -p _output/dockerized/bin/linux/amd64;
     for binary in kubectl e2e.test ginkgo; do
         cp -f _output/local/go/bin/${binary} _output/dockerized/bin/linux/amd64/${binary};
