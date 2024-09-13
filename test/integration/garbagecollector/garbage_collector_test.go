@@ -301,7 +301,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
 		}, syncPeriod, tCtx.Done())
-		go gc.Run(tCtx, workers)
+		go gc.Run(tCtx, workers, syncPeriod)
 		go gc.Sync(tCtx, clientSet.Discovery(), syncPeriod)
 	}
 
@@ -1371,6 +1371,8 @@ func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
 	}
 
 	ctx.startGC(5)
+	// make sure gc.Sync finds the new CRD and starts monitoring it
+	time.Sleep(ctx.syncPeriod + 1*time.Second)
 
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	podClient := clientSet.CoreV1().Pods(ns.Name)

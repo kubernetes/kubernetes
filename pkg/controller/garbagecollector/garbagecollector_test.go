@@ -124,7 +124,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	assert.Len(t, gc.dependencyGraphBuilder.monitors, 1)
 
-	go gc.Run(tCtx, 1)
+	go gc.Run(tCtx, 1, 5*time.Second)
 
 	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
@@ -914,7 +914,8 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go gc.Run(tCtx, 1)
+	syncPeriod := 200 * time.Millisecond
+	go gc.Run(tCtx, 1, syncPeriod)
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -929,7 +930,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, 200*time.Millisecond)
+	go gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)

@@ -129,7 +129,7 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 }
 
 // Run starts garbage collector workers.
-func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
+func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
@@ -146,7 +146,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 
 	go gc.dependencyGraphBuilder.Run(ctx)
 
-	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), 30*time.Second), func() bool {
+	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)
 	}) {
 		logger.Info("Garbage collector: all resource monitors could not be synced, proceeding anyways")
