@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -113,6 +114,7 @@ func (pl *FakePreemptionScorePostFilterPlugin) OrderedScoreFuncs(ctx context.Con
 }
 
 func TestDryRunPreemption(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name               string
 		nodes              []*v1.Node

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
 )
@@ -68,6 +69,7 @@ func (p *criticalPaths) sort() {
 }
 
 func TestPreFilterState(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name                      string
 		pod                       *v1.Pod
@@ -2388,6 +2390,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 }
 
 func BenchmarkFilter(b *testing.B) {
+	metrics.Register()
 	tests := []struct {
 		name             string
 		pod              *v1.Pod

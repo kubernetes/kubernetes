@@ -108,6 +108,7 @@ func TestClear(t *testing.T) {
 }
 
 func TestInFlightEventAsync(t *testing.T) {
+	Register()
 	r := &MetricAsyncRecorder{
 		aggregatedInflightEventMetric:              map[gaugeVecMetricKey]int{},
 		aggregatedInflightEventMetricLastFlushTime: time.Now(),
