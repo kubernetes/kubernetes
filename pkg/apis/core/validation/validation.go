@@ -741,7 +741,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			}
 		}
 	}
-	if opts.AllowImageVolumeSource && source.Image != nil {
+	if source.Image != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("image"), "may not specify more than 1 volume type"))
 		} else {
@@ -2940,14 +2940,12 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		}
 
 		// Disallow subPath/subPathExpr for image volumes
-		if opts.AllowImageVolumeSource {
-			if v, ok := volumes[mnt.Name]; ok && v.Image != nil {
-				if len(mnt.SubPath) != 0 {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPath"), mnt.SubPath, "not allowed in image volume sources"))
-				}
-				if len(mnt.SubPathExpr) != 0 {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "not allowed in image volume sources"))
-				}
+		if v, ok := volumes[mnt.Name]; ok && v.Image != nil {
+			if len(mnt.SubPath) != 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPath"), mnt.SubPath, "not allowed in image volume sources"))
+			}
+			if len(mnt.SubPathExpr) != 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "not allowed in image volume sources"))
 			}
 		}
 
@@ -4049,8 +4047,6 @@ type PodValidationOptions struct {
 	ResourceIsPod bool
 	// Allow relaxed validation of environment variable names
 	AllowRelaxedEnvironmentVariableValidation bool
-	// Allow the use of the ImageVolumeSource API.
-	AllowImageVolumeSource bool
 	// Allow the use of a relaxed DNS search
 	AllowRelaxedDNSSearchValidation bool
 }

@@ -385,7 +385,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
-		AllowImageVolumeSource:                            utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -416,9 +415,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
-
-		// if old spec has used image volume source, we must allow it
-		opts.AllowImageVolumeSource = opts.AllowImageVolumeSource || hasUsedImageVolumeSourceWithPodSpec(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -578,19 +574,6 @@ func hasUsedDownwardAPIFieldPathWithContainer(container *api.Container, fieldPat
 		if env.ValueFrom != nil &&
 			env.ValueFrom.FieldRef != nil &&
 			env.ValueFrom.FieldRef.FieldPath == fieldPath {
-			return true
-		}
-	}
-	return false
-}
-
-func hasUsedImageVolumeSourceWithPodSpec(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	for _, vol := range podSpec.Volumes {
-		if vol.Image != nil {
 			return true
 		}
 	}
