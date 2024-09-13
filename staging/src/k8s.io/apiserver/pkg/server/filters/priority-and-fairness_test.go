@@ -166,6 +166,9 @@ func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Inte
 }
 
 func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) http.Handler {
+	if atomicReadOnlyExecuting != 0 {
+		t.Errorf("Expected %d requests executing while constructing filter, got %d", 0, atomicReadOnlyExecuting)
+	}
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
@@ -180,7 +183,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 		apfHandler.ServeHTTP(w, r)
 		postExecute()
 		if atomicReadOnlyExecuting != 0 {
-			t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
+			t.Errorf("Wanted %d requests executing after postExecute(), got %d", 0, atomicReadOnlyExecuting)
 		}
 	}), requestInfoFactory)
 
