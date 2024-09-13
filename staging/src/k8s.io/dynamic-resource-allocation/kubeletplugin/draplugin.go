@@ -406,7 +406,10 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 		controllerLogger := klog.FromContext(controllerCtx)
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")
 		controllerCtx = klog.NewContext(controllerCtx, controllerLogger)
-		d.resourceSliceController = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, driverResources)
+		var err error
+		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, driverResources); err != nil {
+			return fmt.Errorf("start ResourceSlice controller: %w", err)
+		}
 		return nil
 	}
 
