@@ -20,10 +20,15 @@ package pvc
 
 import "testing"
 
-func TestFailRequireTags(t *testing.T) {
-	t.Fatalf(`
-This directory contains tests which require special handling.
-If you intended to run these tests, use "-tags=run_integration_tests", otherwise use
-"-tags=skip_special_tests".
-`)
-}
+// NOTE: this intentionally fails to compile.
+`
+
+
+  !!!!!
+  This directory contains tests which require special handling.
+  If you intended to run these tests, use "-tags=run_integration_tests", otherwise use
+  "-tags=skip_special_tests".
+  !!!!!
+
+
+`
