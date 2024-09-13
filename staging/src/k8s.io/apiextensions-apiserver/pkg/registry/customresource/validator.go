@@ -86,7 +86,11 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) []string
 	}
 	if len(strings.Split(stringValue, "/")) == 1 {
 		if !standardFinalizers.Has(stringValue) {
-			allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers", fldPath.String(), stringValue))
+			if strings.Contains(stringValue, ".") {
+				allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: prefer a domain-qualified finalizer name including a path (/) to avoid accidental conflicts with other finalizer writers", fldPath.String(), stringValue))
+			} else {
+				allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers", fldPath.String(), stringValue))
+			}
 		}
 	}
 	return allWarnings
