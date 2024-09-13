@@ -149,7 +149,7 @@ join() {
 }
 
 gotags=()
-kube::util::read-array gotags < <(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^- ]*\).*|\1|p' | sed -e 's|"||g' -e 's|,|\n|g')
+kube::util::read-array gotags < <(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^- ]*\).*|\1|p' | sed 's|,|\n|g')
 if [[ -z "${KUBE_SPECIAL_TESTS:-}" ]]; then
   gotags+=("skip_special_tests")
 else

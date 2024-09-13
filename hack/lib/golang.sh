@@ -806,7 +806,6 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
       -ldflags="${goldflags}"
-      -tags="${gotags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
@@ -816,7 +815,6 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
       -ldflags="${goldflags}"
-      -tags="${gotags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -831,7 +829,6 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"} \
       -gcflags="${gogcflags}" \
       -ldflags="${goldflags}" \
-      -tags="${gotags:-}" \
       -o "${outfile}" \
       "${testpkg}"
   done
@@ -882,7 +879,7 @@ kube::golang::build_binaries() {
   # These are "local" but are visible to and relied on by functions this
   # function calls.  They are effectively part of the calling API to
   # build_binaries_for_platform.
-  local goflags goldflags gogcflags gotags
+  local goflags goldflags gogcflags
 
   goflags=()
   gogcflags="${GOGCFLAGS:-}"
@@ -898,19 +895,28 @@ kube::golang::build_binaries() {
   fi
 
   # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  local tags
+  tags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^- ]*\).*|\1|p')"
 
   local -a targets=()
   local arg
+  local did_tags=0
 
   for arg; do
     if [[ "${arg}" == -* ]]; then
       # Assume arguments starting with a dash are flags to pass to go.
+      if [[ "${arg}" == -tags=* ]]; then
+          did_tags=1
+          arg="${arg},${tags}"
+      fi
       goflags+=("${arg}")
     else
       targets+=("${arg}")
     fi
   done
+  if [[ "${did_tags}" == 0 ]]; then
+    goflags+=("-tags=${tags}")
+  fi
 
   local -a platforms
   IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
