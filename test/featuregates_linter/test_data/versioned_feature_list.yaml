@@ -616,6 +616,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.32"
 - name: LocalStorageCapacityIsolationFSQuotaMonitoring
   versionedSpecs:
   - default: false
