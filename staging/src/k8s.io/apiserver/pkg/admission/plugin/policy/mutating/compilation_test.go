@@ -461,6 +461,24 @@ func TestCompilation(t *testing.T) {
 			}}},
 		},
 		{
+			name: "JSONPatch key escaping",
+			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+				Expression: `[
+					JSONPatch{
+						op: "add", path: "/metadata/labels", value: {}
+					},
+					JSONPatch{
+						op: "add", path: "/metadata/labels/" + jsonpatch.escapeKey("k8s.io/x~y"), value: "true"
+					}
+				]`,
+			}),
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				"k8s.io/x~y": "true",
+			}}},
+		},
+		{
 			name: "applyConfiguration then jsonPatch",
 			policy: mutations(policy("d1"), v1alpha1.Mutation{
 				PatchType: v1alpha1.PatchTypeApplyConfiguration,

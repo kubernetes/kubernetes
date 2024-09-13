@@ -86,7 +86,7 @@ func NewTypeRef(name string) *ObjectType {
 	}
 }
 
-var jsonPatchType = types.NewObjectType("JSONPatch")
+var JSONPatchCELType = types.NewObjectType("JSONPatch")
 
 // JSONPatchType and JSONPatchVal are defined entirely from scratch here because it
 // has a dynamic value field.  If this could be defined with an OpenAPI schema,
@@ -96,12 +96,12 @@ var jsonPatchType = types.NewObjectType("JSONPatch")
 type JSONPatchType struct{}
 
 func (r *JSONPatchType) HasTrait(trait int) bool {
-	return jsonPatchType.HasTrait(trait)
+	return JSONPatchCELType.HasTrait(trait)
 }
 
 // TypeName returns the name of this ObjectType.
 func (r *JSONPatchType) TypeName() string {
-	return jsonPatchType.TypeName()
+	return JSONPatchCELType.TypeName()
 }
 
 // Val returns an instance given the fields.
@@ -137,11 +137,11 @@ func (r *JSONPatchType) Val(fields map[string]ref.Val) ref.Val {
 }
 
 func (r *JSONPatchType) Type() *types.Type {
-	return jsonPatchType
+	return JSONPatchCELType
 }
 
 func (r *JSONPatchType) TypeType() *types.Type {
-	return types.NewTypeTypeWithParam(jsonPatchType)
+	return types.NewTypeTypeWithParam(JSONPatchCELType)
 }
 
 func (r *JSONPatchType) Field(name string) (*types.FieldType, bool) {
@@ -171,10 +171,10 @@ func (p *JSONPatchVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 }
 
 func (p *JSONPatchVal) ConvertToType(typeValue ref.Type) ref.Val {
-	if typeValue == jsonPatchType {
+	if typeValue == JSONPatchCELType {
 		return p
 	} else if typeValue == types.TypeType {
-		return types.NewTypeTypeWithParam(jsonPatchType)
+		return types.NewTypeTypeWithParam(JSONPatchCELType)
 	}
 	return types.NewErr("Unsupported type: %s", typeValue.TypeName())
 }
@@ -235,7 +235,7 @@ func (p *JSONPatchVal) IsSet(field ref.Val) ref.Val {
 }
 
 func (p *JSONPatchVal) Type() ref.Type {
-	return jsonPatchType
+	return JSONPatchCELType
 }
 
 func (p *JSONPatchVal) Value() any {

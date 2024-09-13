@@ -291,5 +291,8 @@ var hasPatchTypes = environment.VersionedOptions{
 	// Feature epoch was actually 1.32, but we artificially set it to 1.0 because these
 	// options should always be present.
 	IntroducedVersion: version.MajorMinor(1, 0),
-	EnvOptions:        []cel.EnvOption{mutation.EnvOption(&mutationunstructured.TypeResolver{})},
+	EnvOptions: []cel.EnvOption{
+		mutation.EnvOption(&mutationunstructured.TypeResolver{}),
+		library.JSONPatch(), // for jsonPatch.escape() function
+	},
 }
