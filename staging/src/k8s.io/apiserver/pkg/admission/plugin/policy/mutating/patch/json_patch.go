@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/cel/mutation/common"
-	mutationunstructured "k8s.io/apiserver/pkg/cel/mutation/unstructured"
+	"k8s.io/apiserver/pkg/cel/mutation"
+	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -120,12 +120,12 @@ func (e *jsonPatcher) evaluatePatchExpression(patchEvaluator plugincel.Evaluator
 	result := jsonpatch.Patch{}
 	for it := iter.Iterator(); it.HasNext() == types.True; {
 		v := it.Next()
-		patchObj, err := v.ConvertToNative(reflect.TypeOf(&mutationunstructured.JSONPatchVal{}))
+		patchObj, err := v.ConvertToNative(reflect.TypeOf(&mutation.JSONPatchVal{}))
 		if err != nil {
 			// Should never happen since return type is checked by compiler.
 			return nil, -1, fmt.Errorf("type mismatch: JSONPatchType.expression should evaluate to array of JSONPatch: %w", err)
 		}
-		op, ok := patchObj.(*mutationunstructured.JSONPatchVal)
+		op, ok := patchObj.(*mutation.JSONPatchVal)
 		if !ok {
 			// Should never happen since return type is checked by compiler.
 			return nil, -1, fmt.Errorf("type mismatch: JSONPatchType.expression should evaluate to array of JSONPatch, got element of %T", patchObj)
@@ -139,7 +139,7 @@ func (e *jsonPatcher) evaluatePatchExpression(patchEvaluator plugincel.Evaluator
 			resultOp["from"] = pointer.To(json2.RawMessage(strconv.Quote(op.From)))
 		}
 		if op.Val != nil {
-			if objVal, ok := op.Val.(*common.ObjectVal); ok {
+			if objVal, ok := op.Val.(*dynamic.ObjectVal); ok {
 				// TODO: Object initializers are insufficiently type checked.
 				// In the interim, we use this sanity check to detect type mismatches
 				// between field names and Object initializers. For example,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package mutation
 
 import (
 	"fmt"
@@ -22,86 +22,24 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"reflect"
-
-	"k8s.io/apiserver/pkg/cel/mutation/common"
 )
 
-// ObjectType is the implementation of the Object type for an unstructured object.
-// This is used to compile CEL expressions that can construct Object{} types
-// when the schema is not known or available.
-type ObjectType struct {
-	objectType *types.Type
-}
+var jsonPatchType = types.NewObjectType("JSONPatch")
 
-func (r *ObjectType) HasTrait(trait int) bool {
-	return r.objectType.HasTrait(trait)
-}
-
-// TypeName returns the name of this ObjectType.
-func (r *ObjectType) TypeName() string {
-	return r.objectType.TypeName()
-}
-
-// Val returns an instance given the fields.
-func (r *ObjectType) Val(fields map[string]ref.Val) ref.Val {
-	return common.NewObjectVal(r, fields)
-}
-
-func (r *ObjectType) Type() *types.Type {
-	return r.objectType
-}
-
-func (r *ObjectType) TypeType() *types.Type {
-	return types.NewTypeTypeWithParam(r.objectType)
-}
-
-// Field looks up the field by name.
-// This is the unstructured version that allows any name as the field name.
-// The returned field is of DynType type.
-func (r *ObjectType) Field(name string) (*types.FieldType, bool) {
-	return &types.FieldType{
-		// for unstructured, we do not check for its type,
-		// use DynType for all fields.
-		Type: types.DynType,
-		IsSet: func(target any) bool {
-			if m, ok := target.(map[string]any); ok {
-				_, isSet := m[name]
-				return isSet
-			}
-			return false
-		},
-		GetFrom: func(target any) (any, error) {
-			if m, ok := target.(map[string]any); ok {
-				return m[name], nil
-			}
-			return nil, fmt.Errorf("cannot get field %q", name)
-		},
-	}, true
-}
-
-// NewTypeRef creates a ObjectType by the given field name.
-func NewTypeRef(name string) *ObjectType {
-	return &ObjectType{
-		objectType: types.NewObjectType(name),
-	}
-}
-
-var JSONPatchCELType = types.NewObjectType("JSONPatch")
-
-// JSONPatchType and JSONPatchVal are defined entirely from scratch here because it
-// has a dynamic value field.  If this could be defined with an OpenAPI schema,
-// we could have used DeclType and UnstructuredToVal here instead.
+// JSONPatchType and JSONPatchVal are defined entirely from scratch here because JSONPatchVal
+// has a dynamic 'value' field which can not be defined with an OpenAPI schema,
+// preventing us from using DeclType and UnstructuredToVal.
 
 // JSONPatchType provides a CEL type for "JSONPatch" operations.
 type JSONPatchType struct{}
 
 func (r *JSONPatchType) HasTrait(trait int) bool {
-	return JSONPatchCELType.HasTrait(trait)
+	return jsonPatchType.HasTrait(trait)
 }
 
 // TypeName returns the name of this ObjectType.
 func (r *JSONPatchType) TypeName() string {
-	return JSONPatchCELType.TypeName()
+	return jsonPatchType.TypeName()
 }
 
 // Val returns an instance given the fields.
@@ -137,11 +75,7 @@ func (r *JSONPatchType) Val(fields map[string]ref.Val) ref.Val {
 }
 
 func (r *JSONPatchType) Type() *types.Type {
-	return JSONPatchCELType
-}
-
-func (r *JSONPatchType) TypeType() *types.Type {
-	return types.NewTypeTypeWithParam(JSONPatchCELType)
+	return jsonPatchType
 }
 
 func (r *JSONPatchType) Field(name string) (*types.FieldType, bool) {
@@ -155,6 +89,10 @@ func (r *JSONPatchType) Field(name string) (*types.FieldType, bool) {
 	return &types.FieldType{
 		Type: fieldType,
 	}, true
+}
+
+func (r *JSONPatchType) FieldNames() ([]string, bool) {
+	return []string{"op", "from", "patch", "value"}, true
 }
 
 // JSONPatchVal is the ref.Val for a JSONPatch.
@@ -171,10 +109,10 @@ func (p *JSONPatchVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 }
 
 func (p *JSONPatchVal) ConvertToType(typeValue ref.Type) ref.Val {
-	if typeValue == JSONPatchCELType {
+	if typeValue == jsonPatchType {
 		return p
 	} else if typeValue == types.TypeType {
-		return types.NewTypeTypeWithParam(JSONPatchCELType)
+		return types.NewTypeTypeWithParam(jsonPatchType)
 	}
 	return types.NewErr("Unsupported type: %s", typeValue.TypeName())
 }
@@ -235,7 +173,7 @@ func (p *JSONPatchVal) IsSet(field ref.Val) ref.Val {
 }
 
 func (p *JSONPatchVal) Type() ref.Type {
-	return JSONPatchCELType
+	return jsonPatchType
 }
 
 func (p *JSONPatchVal) Value() any {

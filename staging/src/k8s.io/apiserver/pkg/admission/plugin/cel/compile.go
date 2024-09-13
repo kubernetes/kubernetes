@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/mutation"
-	mutationunstructured "k8s.io/apiserver/pkg/cel/mutation/unstructured"
 )
 
 const (
@@ -292,7 +292,7 @@ var hasPatchTypes = environment.VersionedOptions{
 	// options should always be present.
 	IntroducedVersion: version.MajorMinor(1, 0),
 	EnvOptions: []cel.EnvOption{
-		mutation.EnvOption(&mutationunstructured.TypeResolver{}),
+		common.ResolverEnvOption(&mutation.DynamicTypeResolver{}),
 		library.JSONPatch(), // for jsonPatch.escape() function
 	},
 }

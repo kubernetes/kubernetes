@@ -14,32 +14,91 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package dynamic
 
 import (
 	"errors"
 	"fmt"
-	"google.golang.org/protobuf/types/known/structpb"
-	"reflect"
-	"strings"
-
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"google.golang.org/protobuf/types/known/structpb"
+	"reflect"
+	"strings"
 )
 
-// ObjectVal is the CEL Val for an object that is constructed via the object
-// construction syntax.
-type ObjectVal struct {
-	typeRef TypeRef
-	fields  map[string]ref.Val
+// ObjectType is the implementation of the Object type for use when compiling
+// CEL expressions without schema information about the object.
+// This is to provide CEL expressions with access to Object{} types constructors.
+type ObjectType struct {
+	objectType *types.Type
 }
 
-// NewObjectVal creates an ObjectVal by its TypeRef and its fields.
-func NewObjectVal(typeRef TypeRef, fields map[string]ref.Val) *ObjectVal {
+func (r *ObjectType) HasTrait(trait int) bool {
+	return r.objectType.HasTrait(trait)
+}
+
+// TypeName returns the name of this ObjectType.
+func (r *ObjectType) TypeName() string {
+	return r.objectType.TypeName()
+}
+
+// Val returns an instance given the fields.
+func (r *ObjectType) Val(fields map[string]ref.Val) ref.Val {
+	return NewObjectVal(r.objectType, fields)
+}
+
+func (r *ObjectType) Type() *types.Type {
+	return r.objectType
+}
+
+// Field looks up the field by name.
+// This is the unstructured version that allows any name as the field name.
+// The returned field is of DynType type.
+func (r *ObjectType) Field(name string) (*types.FieldType, bool) {
+	return &types.FieldType{
+		// for unstructured, we do not check for its type,
+		// use DynType for all fields.
+		Type: types.DynType,
+		IsSet: func(target any) bool {
+			if m, ok := target.(map[string]any); ok {
+				_, isSet := m[name]
+				return isSet
+			}
+			return false
+		},
+		GetFrom: func(target any) (any, error) {
+			if m, ok := target.(map[string]any); ok {
+				return m[name], nil
+			}
+			return nil, fmt.Errorf("cannot get field %q", name)
+		},
+	}, true
+}
+
+func (r *ObjectType) FieldNames() ([]string, bool) {
+	return nil, true // Field names are not known for dynamic types. All field names are allowed.
+}
+
+// NewObjectType creates a ObjectType by the given field name.
+func NewObjectType(name string) *ObjectType {
+	return &ObjectType{
+		objectType: types.NewObjectType(name),
+	}
+}
+
+// ObjectVal is the CEL Val for an object that is constructed via the Object{} in
+// CEL expressions without schema information about the object.
+type ObjectVal struct {
+	objectType *types.Type
+	fields     map[string]ref.Val
+}
+
+// NewObjectVal creates an ObjectVal by its ResolvedType and its fields.
+func NewObjectVal(objectType *types.Type, fields map[string]ref.Val) *ObjectVal {
 	return &ObjectVal{
-		typeRef: typeRef,
-		fields:  fields,
+		objectType: objectType,
+		fields:     fields,
 	}
 }
 
@@ -52,8 +111,7 @@ var _ traits.Zeroer = (*ObjectVal)(nil)
 // It returns an error if the target type is not map[string]any,
 // or any recursive conversion fails.
 func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
-	var result map[string]any
-	result = make(map[string]any, len(v.fields))
+	result := make(map[string]any, len(v.fields))
 	for k, v := range v.fields {
 		converted, err := convertField(v)
 		if err != nil {
@@ -76,11 +134,11 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 
 // ConvertToType supports type conversions between CEL value types supported by the expression language.
 func (v *ObjectVal) ConvertToType(typeValue ref.Type) ref.Val {
-	switch typeValue {
-	case v.typeRef:
+	if v.objectType.TypeName() == typeValue.TypeName() {
 		return v
-	case types.TypeType:
-		return v.typeRef.TypeType()
+	}
+	if typeValue == types.TypeType {
+		return types.NewTypeTypeWithParam(v.objectType)
 	}
 	return types.NewErr("unsupported conversion into %v", typeValue)
 }
@@ -95,7 +153,7 @@ func (v *ObjectVal) Equal(other ref.Val) ref.Val {
 
 // Type returns the TypeValue of the value.
 func (v *ObjectVal) Type() ref.Type {
-	return v.typeRef.Type()
+	return types.NewObjectType(v.objectType.TypeName())
 }
 
 // Value returns its value as a map[string]any.
@@ -123,7 +181,7 @@ func (v *ObjectVal) CheckTypeNamesMatchFieldPathNames() error {
 func typeCheck(v ref.Val, typeNamePath []string) []error {
 	var errs []error
 	if ov, ok := v.(*ObjectVal); ok {
-		tn := ov.typeRef.TypeName()
+		tn := ov.objectType.TypeName()
 		if strings.Join(typeNamePath, ".") != tn {
 			errs = append(errs, fmt.Errorf("unexpected type name %q, expected %q, which matches field name path from root Object type", tn, strings.Join(typeNamePath, ".")))
 		}

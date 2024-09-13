@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/cel/mutation/common"
+	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
 )
 
 // NewApplyConfigurationPatcher creates a patcher that performs an applyConfiguration mutation.
@@ -63,7 +63,7 @@ func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCos
 	v := eval.EvalResult
 
 	// The compiler ensures that the return type is an ObjectVal with type name of "Object".
-	objVal, ok := v.(*common.ObjectVal)
+	objVal, ok := v.(*dynamic.ObjectVal)
 	if !ok {
 		// Should not happen since the compiler type checks the return type.
 		return nil, fmt.Errorf("unsupported return type from ApplyConfiguration expression: %v", v.Type())
