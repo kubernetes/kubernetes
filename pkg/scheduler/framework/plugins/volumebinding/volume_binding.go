@@ -112,7 +112,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
 
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
@@ -126,7 +126,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
+		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
 		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
 	}
 	return events, nil
