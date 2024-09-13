@@ -76,6 +76,7 @@ import (
 type operationCode string
 
 const (
+	allocResourceClaimsOpcode    operationCode = "allocResourceClaims"
 	createAnyOpcode              operationCode = "createAny"
 	createNodesOpcode            operationCode = "createNodes"
 	createNamespacesOpcode       operationCode = "createNamespaces"
@@ -426,6 +427,7 @@ type op struct {
 // which op we're decoding at runtime.
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := map[operationCode]realOp{
+		allocResourceClaimsOpcode:    &allocResourceClaimsOp{},
 		createAnyOpcode:              &createAny{},
 		createNodesOpcode:            &createNodesOp{},
 		createNamespacesOpcode:       &createNamespacesOp{},
