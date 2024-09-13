@@ -1,5 +1,4 @@
 //go:build !run_integration_tests && !skip_special_tests
-// +build !run_integration_tests,!skip_special_tests
 
 /*
 Copyright 2024 The Kubernetes Authors.

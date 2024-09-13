@@ -1,5 +1,4 @@
 //go:build !run_kubeadm_cmd_tests && !skip_special_tests
-// +build !run_kubeadm_cmd_tests,!skip_special_tests
 
 /*
 Copyright 2024 The Kubernetes Authors.

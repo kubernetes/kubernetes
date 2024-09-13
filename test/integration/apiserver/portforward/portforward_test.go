@@ -1,5 +1,4 @@
 //go:build run_integration_tests
-// +build run_integration_tests
 
 /*
 Copyright 2024 The Kubernetes Authors.

@@ -1,5 +1,4 @@
 //go:build run_kubeadm_cmd_tests
-// +build run_kubeadm_cmd_tests
 
 /*
 Copyright 2016 The Kubernetes Authors.
