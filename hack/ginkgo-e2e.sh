@@ -173,6 +173,8 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--no-color")
 fi
 
+ginkgo_args+=("--tags=run_e2e_tests")
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.

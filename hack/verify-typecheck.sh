@@ -43,7 +43,7 @@ TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
 go run \
     ./test/typecheck \
     --serial="$TYPECHECK_SERIAL" \
-    --tags=run_integration_tests,run_kubeadm_cmd_tests \
+    --tags=run_integration_tests,run_e2e_tests,run_kubeadm_cmd_tests \
     "$@" `# has to go last because of Go flag parsing` \
     || ret=$?
 

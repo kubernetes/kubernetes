@@ -1,4 +1,4 @@
-//go:build linux
+//go:build run_e2e_tests && linux
 
 /*
 Copyright 2023 The Kubernetes Authors.

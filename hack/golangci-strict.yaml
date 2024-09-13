@@ -19,6 +19,7 @@ run:
     - "^zz_generated.*"
   build-tags:
     - run_integration_tests
+    - run_e2e_tests
     - run_kubeadm_cmd_tests
 
 output:

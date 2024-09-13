@@ -1,3 +1,5 @@
+//go:build run_e2e_tests
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
