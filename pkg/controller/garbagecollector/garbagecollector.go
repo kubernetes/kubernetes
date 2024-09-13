@@ -149,7 +149,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)
 	}) {
-		logger.Info("Garbage collector: all resource monitors could not be synced, proceeding anyways")
+		logger.Info("Garbage collector: not all resource monitors could be synced, proceeding anyways")
 	} else {
 		logger.Info("Garbage collector: all resource monitors have synced")
 	}
@@ -227,14 +227,13 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		}
 		logger.V(4).Info("resynced monitors")
 
-		// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
-		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
-		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
-		// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
-		// note that workers stay paused until we successfully resync.
-		if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), period), func() bool {
+		// gc worker no longer waits for cache to be synced, but we will keep the periodical check to provide logs & metrics
+		cacheSynced := cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), period), func() bool {
 			return gc.dependencyGraphBuilder.IsSynced(logger)
-		}) {
+		})
+		if cacheSynced {
+			logger.V(2).Info("synced garbage collector")
+		} else {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
 			metrics.GarbageCollectorResourcesSyncError.Inc()
 		}
@@ -243,7 +242,6 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		// Monitors where the cache sync times out are still tracked here as
 		// subsequent runs should stop them if their resources were removed.
 		oldResources = newResources
-		logger.V(2).Info("synced garbage collector")
 	}, period)
 }
 
