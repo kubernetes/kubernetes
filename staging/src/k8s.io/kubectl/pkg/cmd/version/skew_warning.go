@@ -18,10 +18,10 @@ package version
 
 import (
 	"fmt"
-	"io"
+	"math"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"math"
 )
 
 // supportedMinorVersionSkew is the maximum supported difference between the client and server minor versions.
@@ -29,26 +29,26 @@ import (
 // and server versions 1.18, 1.19, and 1.20 would be within the supported version skew for client version 1.19.
 const supportedMinorVersionSkew = 1
 
-// printVersionSkewWarning prints a warning message if the difference between the client and version is greater than
+// getVersionSkewWarning returns a warning message if the difference between the client and version is greater than
 // the supported version skew.
-func printVersionSkewWarning(w io.Writer, clientVersion, serverVersion apimachineryversion.Info) error {
+func getVersionSkewWarning(clientVersion, serverVersion apimachineryversion.Info) (string, error) {
 	parsedClientVersion, err := version.ParseSemantic(clientVersion.GitVersion)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("client version error: %w", err)
 	}
 
 	parsedServerVersion, err := version.ParseSemantic(serverVersion.GitVersion)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("server version error: %w", err)
 	}
 
 	majorVersionDifference := math.Abs(float64(parsedClientVersion.Major()) - float64(parsedServerVersion.Major()))
 	minorVersionDifference := math.Abs(float64(parsedClientVersion.Minor()) - float64(parsedServerVersion.Minor()))
 
 	if majorVersionDifference > 0 || minorVersionDifference > supportedMinorVersionSkew {
-		fmt.Fprintf(w, "WARNING: version difference between client (%d.%d) and server (%d.%d) exceeds the supported minor version skew of +/-%d\n",
+		warningMessage := fmt.Sprintf("version difference between client (%d.%d) and server (%d.%d) exceeds the supported minor version skew of +/-%d",
 			parsedClientVersion.Major(), parsedClientVersion.Minor(), parsedServerVersion.Major(), parsedServerVersion.Minor(), supportedMinorVersionSkew)
+		return warningMessage, nil
 	}
-
-	return nil
+	return "", nil
 }

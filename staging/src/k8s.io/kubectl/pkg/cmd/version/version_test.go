@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -32,13 +30,18 @@ func TestNewCmdVersionClientVersion(t *testing.T) {
 	defer tf.Cleanup()
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	o := NewOptions(streams)
-	if err := o.Complete(tf, &cobra.Command{}, nil); err != nil {
+
+	cmd := NewCmdVersion(tf, streams)
+	cmd.Flags().Bool("warnings-as-errors", false, "")
+
+	if err := o.Complete(tf, cmd, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := o.Validate(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := o.Complete(tf, &cobra.Command{}, []string{"extraParameter0"}); err != nil {
+
+	if err := o.Complete(tf, cmd, []string{"extraParameter0"}); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := o.Validate(); !strings.Contains(err.Error(), "extra arguments") {
