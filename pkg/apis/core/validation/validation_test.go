@@ -5378,19 +5378,14 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 		}, {
-			name: "feature disabled",
+			name: "no volume source",
 			vol: core.Volume{
-				Name: "image-volume",
-				VolumeSource: core.VolumeSource{
-					Image: &core.ImageVolumeSource{
-						Reference:  "quay.io/my/artifact:v1",
-						PullPolicy: "IfNotPresent",
-					},
-				},
+				Name:         "volume",
+				VolumeSource: core.VolumeSource{},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: false},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype:  field.ErrorTypeRequired,
 				field:  "field[0]",
@@ -5407,7 +5402,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "name",
@@ -5423,7 +5418,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: true},
+			opts: PodValidationOptions{ResourceIsPod: true},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "image.reference",
@@ -5439,7 +5434,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: false},
+			opts: PodValidationOptions{ResourceIsPod: false},
 		}, {
 			name: "image volume with wrong pullPolicy",
 			vol: core.Volume{
@@ -5451,7 +5446,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeNotSupported,
 				field: "image.pullPolicy",
@@ -7066,7 +7061,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		}}}},
 		{Name: "image-volume", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
-	opts := PodValidationOptions{AllowImageVolumeSource: true}
+	opts := PodValidationOptions{}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), opts)
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)

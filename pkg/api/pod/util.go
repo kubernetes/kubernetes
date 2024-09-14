@@ -385,7 +385,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
-		AllowImageVolumeSource:                            utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
