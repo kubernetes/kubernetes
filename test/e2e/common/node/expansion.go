@@ -187,7 +187,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path", f.WithSlow(), func(ctx context.Context) {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path", func(ctx context.Context) {
 		absolutePath := "/tmp"
 		if framework.NodeOSDistroIs("windows") {
 			// Windows does not typically have a C:\tmp folder.
