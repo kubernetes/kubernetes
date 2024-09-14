@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	math "math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -459,10 +460,32 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	}
 }
 
-// AsApproximateFloat64 returns a float64 representation of the quantity which may
-// lose precision. If the value of the quantity is outside the range of a float64
-// +Inf/-Inf will be returned.
+// AsApproximateFloat64 returns a float64 representation of the quantity which
+// may lose precision. If precision matter more than performance, see
+// AsFloat64Slow. If the value of the quantity is outside the range of a
+// float64 +Inf/-Inf will be returned.
 func (q *Quantity) AsApproximateFloat64() float64 {
+	var base float64
+	var exponent int
+	if q.d.Dec != nil {
+		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
+		exponent = int(-q.d.Dec.Scale())
+	} else {
+		base = float64(q.i.value)
+		exponent = int(q.i.scale)
+	}
+	if exponent == 0 {
+		return base
+	}
+
+	return base * math.Pow10(exponent)
+}
+
+// AsFloat64Slow returns a float64 representation of the quantity.  This is
+// more precise than AsApproximateFloat64 but significantly slower.  If the
+// value of the quantity is outside the range of a float64 +Inf/-Inf will be
+// returned.
+func (q *Quantity) AsFloat64Slow() float64 {
 	infDec := q.AsDec()
 
 	var absScale int64
