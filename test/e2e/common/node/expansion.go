@@ -298,7 +298,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	framework.ConformanceIt("should succeed in writing subpaths in container", f.WithSlow(), func(ctx context.Context) {
+	framework.ConformanceIt("should succeed in writing subpaths in container", func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
