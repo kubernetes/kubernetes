@@ -295,7 +295,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods: sets.New("pod1"),
 		},
 		{
-			name:         "Pod got resource scaled down requeued to activeQ",
+			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when the Pod is updated to scale down",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
@@ -306,6 +306,65 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				// It makes Pod1 schedulable.
 				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Pod is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - Pod2 request will be rejected because there are not enough free resources on the Node
+				st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an assigned Pod1 delete event.
+				// It makes Pod2 schedulable.
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+					return fmt.Errorf("failed to delete pod1: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod2"),
+		},
+		{
+			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			pods: []*v1.Pod{
+				// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
+				// - Pod2 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
+				st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeCreated event.
+				// It makes Pod1 schedulable. Pod2 is not requeued because of having too high requests.
+				node := st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create a new node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			pods: []*v1.Pod{
+				// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
+				// - Pod2 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
+				st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeUpdate event that increases the CPU capacity of fake-node.
+				// It makes Pod1 schedulable. Pod2 is not requeued because of having too high requests.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update fake-node: %w", err)
 				}
 				return nil
 			},
