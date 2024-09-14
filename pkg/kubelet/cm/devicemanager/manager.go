@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,7 +158,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
-		update:                make(chan resourceupdates.Update),
+		update:                make(chan resourceupdates.Update, 100),
 	}
 
 	server, err := plugin.NewServer(socketPath, manager, manager)
@@ -309,8 +310,10 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 		if len(podsToUpdate) > 0 {
-			m.update <- resourceupdates.Update{
-				PodUIDs: podsToUpdate.UnsortedList(),
+			select {
+			case m.update <- resourceupdates.Update{PodUIDs: podsToUpdate.UnsortedList()}:
+			default:
+				klog.ErrorS(goerrors.New("device update channel is full"), "discard pods info", "podsToUpdate", podsToUpdate.UnsortedList())
 			}
 		}
 	}
