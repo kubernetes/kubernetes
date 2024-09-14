@@ -3935,6 +3935,11 @@ func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.Stream != nil {
+		in, out := &in.Stream, &out.Stream
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
