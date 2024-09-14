@@ -46,7 +46,7 @@ func kubeProxyDaemonSetExtraEnvs(enableKubeProxyDaemonSet bool) []string {
 	return []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)}
 }
 
-var _ = SIGDescribe("kube-proxy migration", feature.KubeProxyDaemonSetMigration, func() {
+var _ = SIGDescribe("kube-proxy migration", framework.WithSerial(), framework.WithDisruptive(), feature.KubeProxyDaemonSetMigration, func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	upgradeTestFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
