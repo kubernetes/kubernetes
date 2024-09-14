@@ -907,6 +907,23 @@ func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *Per
 	return p
 }
 
+// Labels sets all {k,v} pair provided by `labels` to the pv.
+func (p *PersistentVolumeWrapper) Labels(labels map[string]string) *PersistentVolumeWrapper {
+	for k, v := range labels {
+		p.Label(k, v)
+	}
+	return p
+}
+
+// Label sets a {k,v} pair to the pv.
+func (p *PersistentVolumeWrapper) Label(k, v string) *PersistentVolumeWrapper {
+	if p.PersistentVolume.ObjectMeta.Labels == nil {
+		p.PersistentVolume.ObjectMeta.Labels = make(map[string]string)
+	}
+	p.PersistentVolume.ObjectMeta.Labels[k] = v
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
 type ResourceClaimWrapper struct{ resourceapi.ResourceClaim }
 
