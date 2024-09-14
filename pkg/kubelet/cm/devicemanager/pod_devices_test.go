@@ -251,3 +251,27 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPodAndContainerForDevice(t *testing.T) {
+	podDevices := newPodDevices()
+	resourceName1 := "domain1.com/resource1"
+	podID := "pod1"
+	contID := "con1"
+	devices := checkpoint.DevicesPerNUMA{0: []string{"dev1"}, 1: []string{"dev1"}}
+
+	podDevices.insert(podID, contID, resourceName1,
+		devices,
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
+
+	// dev2 is a new device
+	podUID, _ := podDevices.getPodAndContainerForDevice("dev2")
+	assert.Equal(t, "", podUID)
+
+	// dev1 is a exist device
+	podUID, _ = podDevices.getPodAndContainerForDevice("dev1")
+	assert.Equal(t, "pod1", podUID)
+}

@@ -280,16 +280,20 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 			// compare with old device's health and send update to the channel if needed
+			updatePodUIDFn := func(deviceID string) {
+				podUID, _ := m.podDevices.getPodAndContainerForDevice(deviceID)
+				if podUID != "" {
+					podsToUpdate.Insert(podUID)
+				}
+			}
 			if oldDev, ok := oldDevices[dev.ID]; ok {
 				if oldDev.Health != dev.Health {
-					podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-					podsToUpdate.Insert(podUID)
+					updatePodUIDFn(dev.ID)
 				}
 			} else {
 				// if this is a new device, it might have existed before and disappeared for a while
 				// but still be assigned to a Pod. In this case, we need to send an update to the channel
-				podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-				podsToUpdate.Insert(podUID)
+				updatePodUIDFn(dev.ID)
 			}
 		}
 
