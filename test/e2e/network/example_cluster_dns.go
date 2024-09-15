@@ -59,7 +59,7 @@ try:
 except:
 	print('err')`
 
-var _ = common.SIGDescribe("ClusterDns", feature.Example, func() {
+var _ = common.SIGDescribe("ClusterDns", feature.Example, feature.NetworkingIPv4, func() {
 	f := framework.NewDefaultFramework("cluster-dns")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
