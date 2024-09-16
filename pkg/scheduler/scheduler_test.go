@@ -779,6 +779,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
 func Test_UnionedGVKs(t *testing.T) {
+	
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
