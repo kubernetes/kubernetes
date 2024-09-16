@@ -779,6 +779,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
 func Test_UnionedGVKs(t *testing.T) {
+
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
@@ -894,6 +895,22 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.StorageClass:          framework.All - framework.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
+		},
+		{
+			name:    "plugins with default profile (queueingHint: enabled)",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[framework.GVK]framework.ActionType{
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
+				framework.Node:                  framework.All,
+				framework.CSINode:               framework.All - framework.Delete,
+				framework.CSIDriver:             framework.All - framework.Delete,
+				framework.CSIStorageCapacity:    framework.All - framework.Delete,
+				framework.PersistentVolume:      framework.All - framework.Delete,
+				framework.PersistentVolumeClaim: framework.All - framework.Delete,
+				framework.StorageClass:          framework.All - framework.Delete,
+			},
+			enableInPlacePodVerticalScaling: true,
+			enableSchedulerQueueingHints:    true,
 		},
 		{
 			name:    "plugins with default profile (queueingHint: enabled)",
