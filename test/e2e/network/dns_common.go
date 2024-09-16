@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	dnsclient "k8s.io/kubernetes/third_party/forked/golang/net"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -351,7 +352,7 @@ func (t *dnsTestCommon) deleteDNSServerPod(ctx context.Context) {
 	}
 }
 
-func createDNSPod(namespace, probeCmd, podHostName, serviceName string) *v1.Pod {
+func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, serviceName string) *v1.Pod {
 	podName := "dns-test-" + string(uuid.NewUUID())
 	volumes := []v1.Volume{
 		{
@@ -372,10 +373,17 @@ func createDNSPod(namespace, probeCmd, podHostName, serviceName string) *v1.Pod 
 	dnsPod := e2epod.NewAgnhostPod(namespace, podName, volumes, mounts, nil, "test-webserver")
 	dnsPod.Spec.Containers[0].Name = "webserver"
 
-	querier := e2epod.NewAgnhostContainer("querier", mounts, nil, probeCmd)
+	querier := e2epod.NewAgnhostContainer("querier", mounts, nil, wheezyProbeCmd)
 	querier.Command = []string{"sh", "-c"}
 
-	dnsPod.Spec.Containers = append(dnsPod.Spec.Containers, querier)
+	jessieQuerier := v1.Container{
+		Name:         "jessie-querier",
+		Image:        imageutils.GetE2EImage(imageutils.JessieDnsutils),
+		Command:      []string{"sh", "-c", jessieProbeCmd},
+		VolumeMounts: mounts,
+	}
+
+	dnsPod.Spec.Containers = append(dnsPod.Spec.Containers, querier, jessieQuerier)
 	dnsPod.Spec.Hostname = podHostName
 	dnsPod.Spec.Subdomain = serviceName
 

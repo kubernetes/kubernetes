@@ -565,7 +565,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
-			ImageID:       e2epod.GetTestImageID(imageutils.Agnhost),
+			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
@@ -687,7 +687,7 @@ func TestConcurrentAccessToRelatedVolumes(ctx context.Context, f *framework.Fram
 			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  false,
-			ImageID:       e2epod.GetTestImageID(imageutils.Agnhost),
+			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
