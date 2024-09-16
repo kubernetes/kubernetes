@@ -66,7 +66,8 @@ var (
 // compact(5):
 // generations:
 //
-//	{empty} -> key SHOULD be removed.
+//	{empty}
+//	{5.0(t)}
 //
 // compact(6):
 // generations:
@@ -203,8 +204,7 @@ func (ki *keyIndex) since(lg *zap.Logger, rev int64) []revision {
 }
 
 // compact compacts a keyIndex by removing the versions with smaller or equal
-// revision than the given atRev except the largest one (If the largest one is
-// a tombstone, it will not be kept).
+// revision than the given atRev except the largest one.
 // If a generation becomes empty during compaction, it will be removed.
 func (ki *keyIndex) compact(lg *zap.Logger, atRev int64, available map[revision]struct{}) {
 	if ki.isEmpty() {
@@ -222,11 +222,6 @@ func (ki *keyIndex) compact(lg *zap.Logger, atRev int64, available map[revision]
 		if revIndex != -1 {
 			g.revs = g.revs[revIndex:]
 		}
-		// remove any tombstone
-		if len(g.revs) == 1 && genIdx != len(ki.generations)-1 {
-			delete(available, g.revs[0])
-			genIdx++
-		}
 	}
 
 	// remove the previous generations.
@@ -242,7 +237,12 @@ func (ki *keyIndex) keep(atRev int64, available map[revision]struct{}) {
 	genIdx, revIndex := ki.doCompact(atRev, available)
 	g := &ki.generations[genIdx]
 	if !g.isEmpty() {
-		// remove any tombstone
+		// If the given `atRev` is a tombstone, we need to skip it.
+		//
+		// Note that this s different from the `compact` function which
+		// keeps tombstone in such case. We need to stay consistent with
+		// existing versions, ensuring they always generate the same hash
+		// values.
 		if revIndex == len(g.revs)-1 && genIdx != len(ki.generations)-1 {
 			delete(available, g.revs[revIndex])
 		}
@@ -263,7 +263,7 @@ func (ki *keyIndex) doCompact(atRev int64, available map[revision]struct{}) (gen
 	genIdx, g := 0, &ki.generations[0]
 	// find first generation includes atRev or created after atRev
 	for genIdx < len(ki.generations)-1 {
-		if tomb := g.revs[len(g.revs)-1].main; tomb > atRev {
+		if tomb := g.revs[len(g.revs)-1].main; tomb >= atRev {
 			break
 		}
 		genIdx++

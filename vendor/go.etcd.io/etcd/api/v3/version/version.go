@@ -26,7 +26,7 @@ import (
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
 	MinClusterVersion = "3.0.0"
-	Version           = "3.5.15"
+	Version           = "3.5.16"
 	APIVersion        = "unknown"
 
 	// Git SHA Value will be set during build
