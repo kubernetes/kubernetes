@@ -253,6 +253,25 @@ func (c *client) list(ctx context.Context, opts metav1.ListOptions) (*metav1.Par
 	return partial, nil
 }
 
+// watchList establishes a watch stream with the server and returns PartialObjectMetadataList.
+func (c *client) watchList(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+
+	result := &metav1.PartialObjectMetadataList{}
+	err := c.client.client.Get().
+		AbsPath(c.makeURLSegments("")...).
+		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Timeout(timeout).
+		WatchList(ctx).
+		Into(result)
+
+	return result, err
+}
+
 // Watch finds all changes to the resources in the specified scope (namespace or cluster).
 func (c *client) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
