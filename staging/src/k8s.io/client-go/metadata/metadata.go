@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/consistencydetector"
+	"k8s.io/client-go/util/watchlist"
 )
 
 var deleteScheme = runtime.NewScheme()
@@ -218,7 +220,21 @@ func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, s
 
 // List returns all resources within the specified scope (namespace or cluster).
 func (c *client) List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
-	return c.list(ctx, opts)
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.FromContext(ctx).Error(watchListOptionsErr, "Failed preparing watchlist options, falling back to the standard LIST semantics", "resource", c.resource)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("watchlist request for %v", c.resource), c.list, opts, result)
+			return result, nil
+		}
+		klog.FromContext(ctx).Error(err, "The watchlist request ended with an error, falling back to the standard LIST semantics", "resource", c.resource)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
+	}
+	return result, err
 }
 
 func (c *client) list(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
