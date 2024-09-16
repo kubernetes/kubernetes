@@ -1239,7 +1239,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				defer ticker.Stop()
 
 				wg.Add(1)
-				go func() {
+				go func(opIndex int) {
 					defer wg.Done()
 					for i := 0; i < len(pods); i++ {
 						select {
@@ -1254,7 +1254,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 							return
 						}
 					}
-				}()
+				}(opIndex)
 			}
 
 		case *churnOp:
