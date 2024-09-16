@@ -20,7 +20,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -38,12 +42,15 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+)
+
+var (
+	// filterCompiler is memory heavy, so we only want to create it once and share it.
+	filterCompilerOnce sync.Once
+	filterCompiler     cel.FilterCompiler
 )
 
 // Webhook is an abstract admission plugin with all the infrastructure to define Admit or Validate on-top.
@@ -57,7 +64,6 @@ type Webhook struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
-	filterCompiler   cel.FilterCompiler
 	authorizer       authorizer.Authorizer
 }
 
@@ -95,6 +101,10 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	cm.SetAuthenticationInfoResolver(authInfoResolver)
 	cm.SetServiceResolver(webhookutil.NewDefaultServiceResolver())
 
+	filterCompilerOnce.Do(func() {
+		filterCompiler = cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks)))
+	})
+
 	return &Webhook{
 		Handler:          handler,
 		sourceFactory:    sourceFactory,
@@ -102,7 +112,6 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		namespaceMatcher: &namespace.Matcher{},
 		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
-		filterCompiler:   cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks))),
 	}, nil
 }
 
@@ -228,7 +237,7 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 			return nil, apierrors.NewInternalError(err)
 		}
 
-		matcher := h.GetCompiledMatcher(a.filterCompiler)
+		matcher := h.GetCompiledMatcher(filterCompiler)
 		matchResult := matcher.Match(ctx, versionedAttr, nil, a.authorizer)
 
 		if matchResult.Error != nil {
