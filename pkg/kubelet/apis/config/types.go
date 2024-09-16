@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	metricsapi "k8s.io/component-base/metrics/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
@@ -429,9 +430,13 @@ type KubeletConfiguration struct {
 	// The format is <major>.<minor>, e.g.: '1.16'.
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
+	// Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead.
 	ShowHiddenMetricsForVersion string
+	// Metrics specifies the options of metrics.
+	// Refer k8s.io/component-base/metrics/api/ for more information.
+	Metrics metricsapi.MetricsConfiguration
 	// Logging specifies the options of logging.
-	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	// Refer k8s.io/component-base/logs/api/ for more information.
 	Logging logsapi.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool

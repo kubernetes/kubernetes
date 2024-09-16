@@ -34,9 +34,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc/codes"
@@ -46,7 +43,10 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/coreos/go-systemd/v22/daemon"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -125,6 +125,8 @@ import (
 	"k8s.io/utils/cpuset"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 )
 
 func init() {
@@ -644,7 +646,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.ErrorS(err, "Failed to register kubelet configuration with configz")
 	}
 
-	if len(s.ShowHiddenMetricsForVersion) > 0 {
+	if len(s.ShowHiddenMetricsForVersion) > 0 || len(s.Metrics.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
 	}
 

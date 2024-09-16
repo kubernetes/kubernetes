@@ -328,7 +328,11 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if err := validateKubeletOSConfiguration(kc); err != nil {
 		allErrors = append(allErrors, err)
 	}
-	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
+	if kc.Metrics.ShowHiddenMetricsForVersion != "" {
+		allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.Metrics.ShowHiddenMetricsForVersion)...)
+	} else if kc.ShowHiddenMetricsForVersion != "" {
+		allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
+	}
 
 	if errs := logsapi.Validate(&kc.Logging, localFeatureGate, field.NewPath("logging")); len(errs) > 0 {
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
