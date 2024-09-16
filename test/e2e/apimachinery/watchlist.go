@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/consistencydetector"
@@ -139,6 +141,35 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 		ginkgo.By("Verifying if expected requests were sent to the server")
 		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientFor(secretList.GetResourceVersion())
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+	})
+	ginkgo.It("should be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		metaClient, err := metadata.NewForConfig(f.ClientConfig())
+		framework.ExpectNoError(err)
+		expectedMetaSecrets := []metav1.PartialObjectMetadata{}
+		for _, addedSecret := range addWellKnownSecrets(ctx, f) {
+			addedSecretMeta, err := metaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Get(ctx, addedSecret.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			expectedMetaSecrets = append(expectedMetaSecrets, *addedSecretMeta)
+		}
+
+		rt, clientConfig := clientConfigWithRoundTripper(f)
+		wrappedMetaClient, err := metadata.NewForConfig(clientConfig)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Streaming secrets metadata from the server")
+		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying if the secret meta list was properly streamed")
+		streamedMetaSecrets := secretMetaList.Items
+		gomega.Expect(cmp.Equal(expectedMetaSecrets, streamedMetaSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+		gomega.Expect(secretMetaList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(schema.GroupVersion{}.WithKind("PartialObjectMetadataList")))
+
+		ginkgo.By("Verifying if expected requests were sent to the server")
+		expectedRequestMadeByMetaClient := getExpectedRequestMadeByClientFor(secretMetaList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByMetaClient))
 	})
 })
 
