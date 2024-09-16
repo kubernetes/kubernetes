@@ -66,13 +66,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 			nil,
 		)
 
-		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []v1.Secret
-		for i := 1; i <= 5; i++ {
-			secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		ginkgo.By("Starting the secret informer")
 		go secretInformer.Run(stopCh)
@@ -99,13 +93,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 	ginkgo.It("should be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
-		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []v1.Secret
-		for i := 1; i <= 5; i++ {
-			secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedKubeClient, err := kubernetes.NewForConfig(clientConfig)
@@ -202,6 +190,17 @@ func getExpectedRequestMadeByClientFor(rv string) []string {
 		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
 	}
 	return expectedRequestMadeByClient
+}
+
+func addWellKnownSecrets(ctx context.Context, f *framework.Framework) []v1.Secret {
+	ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+	var secrets []v1.Secret
+	for i := 1; i <= 5; i++ {
+		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		secrets = append(secrets, *secret)
+	}
+	return secrets
 }
 
 type byName []v1.Secret
