@@ -70,7 +70,7 @@ type ManagerImpl struct {
 func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
 	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create claimInfo cache: %+v", err)
+		return nil, fmt.Errorf("failed to create claimInfo cache: %w", err)
 	}
 
 	// TODO: for now the reconcile period is not configurable.
@@ -158,7 +158,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 		logger.V(3).Info("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
-			return fmt.Errorf("prepare resource claim: %v", err)
+			return fmt.Errorf("prepare resource claim: %w", err)
 		}
 
 		if claimName == nil {
@@ -172,7 +172,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 			*claimName,
 			metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", *claimName, pod.Name, err)
+			return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %w", *claimName, pod.Name, err)
 		}
 
 		if mustCheckOwner {
@@ -489,10 +489,10 @@ func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, 
 
 // PodMightNeedToUnprepareResources returns true if the pod might need to
 // unprepare resources
-func (m *ManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
+func (m *ManagerImpl) PodMightNeedToUnprepareResources(uid types.UID) bool {
 	m.cache.Lock()
 	defer m.cache.Unlock()
-	return m.cache.hasPodReference(UID)
+	return m.cache.hasPodReference(uid)
 }
 
 // GetContainerClaimInfos gets Container's ClaimInfo
