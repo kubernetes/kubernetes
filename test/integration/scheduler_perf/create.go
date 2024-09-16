@@ -155,7 +155,10 @@ func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface
 	fm := template.FuncMap{"div": func(a, b int) int {
 		return a / b
 	}}
-	tmpl, err := template.New("object").Funcs(fm).Parse(string(content))
+	modFn := template.FuncMap{"mod": func(a, b int) int {
+		return a % b
+	}}
+	tmpl, err := template.New("object").Funcs(fm).Funcs(modFn).Parse(string(content))
 	if err != nil {
 		return err
 	}

@@ -1548,3 +1548,118 @@
       initNodes: 1000
       deletingPods: 1000
       measurePods: 1000
+
+# This test case is used to measure the performance of queuing hints when handling the AssignedPodDelete events.
+# First, two groups of blocker pods are created, which will prevents other pods from being scheduled.
+# Then multiple types of pods are created, and each group is filtered by different plugin.
+# Next, blocker pods are gradually deleted and previously unscheduled pods can be scheduled.
+# Plugins covered: InterPodAffinity, NodePorts, NodeResources, NodeVolumeLimits, PodTopologySpread and VolumeRestrictions.
+- name: EventHandlingPodDelete
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/templates/node-default.yaml
+    # Allow max 20 volumes per node.
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "20"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 20
+  # Create pods that will block other pods from being scheduled.
+  # They'll block using NodePorts, NodeResources, NodeVolumeLimits and PodTopologySpread plugins.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: config/event_handling/poddelete-pod-blocker-topology-ports-resources.yaml
+    persistentVolumeTemplatePath: config/templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
+    namespace: blockertopologyportsresources
+  # Create second group of pods that will block another pods from being scheduled.
+  # They'll block using InterPodAffinity and VolumeRestrictions plugins.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: config/event_handling/poddelete-pod-blocker-affinity.yaml
+    persistentVolumeTemplatePath: config/templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: config/templates/pvc-once-pod.yaml
+    namespace: blockeraffinity
+  # Collect metrics from all createPods ops below.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [blockertopologyportsresources, blockeraffinity, nodeports, noderesources, nodevolumelimits, interpodaffinity]
+    labelSelector:
+      type: unsched
+  # Create pods blocked using PodTopologySpread plugin.
+  # Note: for this plugin, namespace has to match the blocker's namespace,
+  # so has to be "blockertopologyportsresources".
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/poddelete-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: blockertopologyportsresources
+  # Create pods blocked using VolumeRestrictions plugin.
+  # Note: these pods uses PVCs and PVs created for second blocker pods,
+  # so the count needs to be equal to $blockerPods
+  # and namespace has to be "blockeraffinity".
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: config/event_handling/poddelete-pod-volumerestrictions.yaml
+    skipWaitToCompletion: true
+    namespace: blockeraffinity
+  # Create pods blocked using NodePorts plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/poddelete-pod-nodeports.yaml
+    skipWaitToCompletion: true
+    namespace: nodeports
+  # Create pods blocked using NodeResources plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/poddelete-pod-noderesources.yaml
+    skipWaitToCompletion: true
+    namespace: noderesources
+  # Create pods blocked using NodeVolumeLimits plugin.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: config/event_handling/poddelete-pod-nodevolumelimits.yaml
+    persistentVolumeTemplatePath: config/templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
+    skipWaitToCompletion: true
+    namespace: nodevolumelimits
+  # Create pods blocked using InterPodAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/poddelete-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    labelSelector:
+      type: unsched
+  # Start deleting blocker pods.
+  - opcode: deletePods
+    deletePodsPerSecond: 100
+    namespace: blockertopologyportsresources
+    labelSelector:
+      type: blocker
+    skipWaitToCompletion: true
+  - opcode: deletePods
+    deletePodsPerSecond: 100
+    namespace: blockeraffinity
+    labelSelector:
+      type: blocker
+    skipWaitToCompletion: true
+  # Wait for previously unschedulable pods to be scheduled.
+  - opcode: barrier
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 50Nodes_500Pods
+    labels: [performance, short]
+    params:
+      initNodes: 50
+      blockerPods: 480 # Must be slightly below initNodes * 10 to be stable
+      measurePods: 500 # Must be initNodes * 10
