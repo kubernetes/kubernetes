@@ -191,19 +191,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:           "find-existing-claim-by-name",
-			pods:           []*v1.Pod{testPodWithResource},
-			key:            podKey(testPodWithResource),
-			claims:         []*resourceapi.ResourceClaim{testClaim},
-			expectedClaims: []resourceapi.ResourceClaim{*testClaim},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithResource.Name: {
-					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &testClaim.Name},
-				},
-			},
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
 			name:          "find-created-claim-in-cache",
 			pods:          []*v1.Pod{testPodWithResource},
 			key:           podKey(testPodWithResource),

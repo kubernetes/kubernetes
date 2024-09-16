@@ -678,23 +678,20 @@ func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceC
 	if err != nil {
 		return nil, err
 	}
-	deterministicName := pod.Name + "-" + podClaim.Name // Kubernetes <= 1.27 behavior.
 	for _, claimObj := range claims {
 		claim, ok := claimObj.(*resourceapi.ResourceClaim)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object of type %T returned by claim cache", claimObj)
 		}
 		podClaimName, ok := claim.Annotations[podResourceClaimAnnotation]
-		if ok && podClaimName != podClaim.Name {
+		// No annotation? Then it cannot be an automatically generated claim
+		// and we need to ignore it.
+		if !ok {
 			continue
 		}
 
-		// No annotation? It might a ResourceClaim created for
-		// the pod with a previous Kubernetes release where the
-		// ResourceClaim name was deterministic, in which case
-		// we have to use it and update the new pod status
-		// field accordingly.
-		if !ok && claim.Name != deterministicName {
+		// Not the claim for this particular pod claim?
+		if podClaimName != podClaim.Name {
 			continue
 		}
 
