@@ -843,11 +843,13 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			retErr = err
 		}
 
-		logger.V(4).Info("Proposing desired replicas",
+		logger.V(2).Info("Proposing desired replicas",
 			"desiredReplicas", metricDesiredReplicas,
+			"currentReplicas", currentReplicas,
 			"metric", metricName,
 			"timestamp", metricTimestamp,
-			"scaleTarget", reference)
+			"scaleTarget", reference,
+			"metrics", metricStatuses)
 
 		rescaleMetric := ""
 		if metricDesiredReplicas > desiredReplicas {
@@ -885,6 +887,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		a.storeScaleEvent(hpa.Spec.Behavior, key, currentReplicas, desiredReplicas)
 		logger.Info("Successfully rescaled",
 			"HPA", klog.KObj(hpa),
+			"scaleTarget", reference,
 			"currentReplicas", currentReplicas,
 			"desiredReplicas", desiredReplicas,
 			"reason", rescaleReason)
@@ -895,7 +898,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			actionLabel = monitor.ActionLabelScaleDown
 		}
 	} else {
-		logger.V(4).Info("Decided not to scale",
+		logger.V(2).Info("Decided not to scale",
 			"scaleTarget", reference,
 			"desiredReplicas", desiredReplicas,
 			"lastScaleTime", hpa.Status.LastScaleTime)
@@ -957,6 +960,9 @@ func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.Horiz
 	} else {
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, condition, reason)
 	}
+	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
+	klog.V(4).Infof("Normalized desired replicas: scaleTarget=%s, currentReplicas=%d, desiredReplicas=%d, minReplicas=%d, stabilizedRecommendation=%d, prenormalizedDesiredReplicas=%d, condition=%s, reason=%s",
+		reference, currentReplicas, desiredReplicas, minReplicas, stabilizedRecommendation, prenormalizedDesiredReplicas, condition, reason)
 
 	return desiredReplicas
 }
@@ -995,12 +1001,20 @@ func (a *HorizontalController) normalizeDesiredReplicasWithBehaviors(hpa *autosc
 	} else {
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "recommended size matches current size")
 	}
+
+	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
+	klog.V(4).Infof("Normalized desired replicas with behaviors - after stabilized recommendation: scaleTarget=%s, currentReplicas=%d, minReplicas=%d, stabilizedRecommendation=%d, prenormalizedDesiredReplicas=%d, reason=%s, message=%s",
+		reference, currentReplicas, minReplicas, stabilizedRecommendation, prenormalizedDesiredReplicas, reason, message)
+
 	desiredReplicas, reason, message := a.convertDesiredReplicasWithBehaviorRate(normalizationArg)
 	if desiredReplicas == stabilizedRecommendation {
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, reason, message)
 	} else {
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, reason, message)
 	}
+
+	klog.V(4).Infof("Normalized desired replicas with behaviors - after rated recommendation: scaleTarget=%s, currentReplicas=%d, minReplicas=%d, stabilizedRecommendation=%d, desiredReplicas=%d, reason=%s, message=%s",
+		reference, currentReplicas, minReplicas, stabilizedRecommendation, desiredReplicas, reason, message)
 
 	return desiredReplicas
 }
@@ -1128,7 +1142,13 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	if recommendation > downRecommendation {
 		recommendation = downRecommendation
 	}
-
+	// Only keep the recommendations and ignore timestamp for logging.
+	var recommendations []int32
+	for _, rec := range a.recommendations[args.Key] {
+		recommendations = append(recommendations, rec.recommendation)
+	}
+	klog.V(4).Infof("Stabilizing recommendation: key=%s, currentReplicas=%d, desiredReplicas=%d, upRecommendation=%d, downRecommendation=%d, recommendations=%v",
+		args.Key, args.CurrentReplicas, args.DesiredReplicas, upRecommendation, downRecommendation, recommendations)
 	// Record the unstabilized recommendation.
 	if foundOldSample {
 		a.recommendations[args.Key][oldSampleIndex] = timestampedRecommendation{args.DesiredReplicas, time.Now()}
@@ -1158,6 +1178,8 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 		defer a.scaleUpEventsLock.RUnlock()
 		a.scaleDownEventsLock.RLock()
 		defer a.scaleDownEventsLock.RUnlock()
+		klog.V(4).Infof("Converting desired replicas with behavior rate - scale up: key=%s, currentReplicas=%d, desiredReplicas=%d, scaleUpEvents=%v, scaleDownEvents=%v",
+			args.Key, args.CurrentReplicas, args.DesiredReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key])
 		scaleUpLimit := calculateScaleUpLimitWithScalingRules(args.CurrentReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key], args.ScaleUpBehavior)
 
 		if scaleUpLimit < args.CurrentReplicas {
@@ -1181,6 +1203,8 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 		defer a.scaleUpEventsLock.RUnlock()
 		a.scaleDownEventsLock.RLock()
 		defer a.scaleDownEventsLock.RUnlock()
+		klog.V(4).Infof("Converting desired replicas with behavior rate - scale down: key=%s, currentReplicas=%d, desiredReplicas=%d, scaleUpEvents=%v, scaleDownEvents=%v",
+			args.Key, args.CurrentReplicas, args.DesiredReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key])
 		scaleDownLimit := calculateScaleDownLimitWithBehaviors(args.CurrentReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key], args.ScaleDownBehavior)
 
 		if scaleDownLimit > args.CurrentReplicas {
