@@ -333,7 +333,7 @@ func StopServeHostnameService(ctx context.Context, clientset clientset.Interface
 // given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(ctx context.Context, c clientset.Interface, ns string, expectedPods []string, serviceIP string, servicePort int) error {
 	// to verify from host network
-	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-up-host-exec-pod")
+	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-up-host-exec-pod", nil)
 
 	// to verify from container's network
 	execPod := e2epod.CreateExecPodOrFail(ctx, c, ns, "verify-service-up-exec-pod-", nil)
@@ -403,7 +403,7 @@ func verifyServeHostnameServiceUp(ctx context.Context, c clientset.Interface, ns
 // verifyServeHostnameServiceDown verifies that the given service isn't served.
 func verifyServeHostnameServiceDown(ctx context.Context, c clientset.Interface, ns string, serviceIP string, servicePort int) error {
 	// verify from host network
-	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-down-host-exec-pod")
+	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-down-host-exec-pod", nil)
 	defer func() {
 		e2epod.DeletePodOrFail(ctx, c, ns, hostExecPod.Name)
 	}()
@@ -1706,7 +1706,7 @@ var _ = common.SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec", nil)
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
@@ -2705,50 +2705,30 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		ginkgo.By("creating the service")
-		svc, err := jig.CreateOnlyLocalNodePortService(ctx, false)
+		svc, err := jig.CreateOnlyLocalNodePortService(ctx, true)
 		framework.ExpectNoError(err, "creating the service")
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
 		nodePortStr := fmt.Sprintf("%d", tcpNodePort)
 		framework.Logf("NodePort is %s", nodePortStr)
 
-		ginkgo.By("creating a HostNetwork exec pod")
-		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec")
-		execPod, err = cs.CoreV1().Pods(namespace).Get(ctx, execPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "getting podIP of execPod")
-		framework.Logf("execPod IP is %q", execPod.Status.PodIP)
-
-		ginkgo.By("creating an endpoint for the service on a different node from the execPod")
-		_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
-			rc.Spec.Template.Spec.Affinity = &v1.Affinity{
-				// We need to ensure the endpoint is on a different node
-				// from the exec pod, to ensure that the source IP of the
-				// traffic is the node's "public" IP. For
-				// node-to-pod-on-same-node traffic, it might end up using
-				// the "docker0" IP or something like that.
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{{
-							MatchFields: []v1.NodeSelectorRequirement{{
-								Key:      "metadata.name",
-								Operator: "NotIn",
-								Values:   []string{execPod.Spec.NodeName},
-							}},
-						}},
-					},
-				},
-			}
-		})
-		framework.ExpectNoError(err, "creating the endpoint pod")
-
-		// Extract the single endpoint node IP from a map of endpoint node IPs
-		var endpointNodeIP string
+		// Get the (single) endpoint's node name and IP
+		var endpointNodeName, endpointNodeIP string
 		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
 		framework.ExpectNoError(err, "fetching endpoint node IPs")
 		for node, nodeIP := range endpointsNodeMap {
 			framework.Logf("endpoint is on node %s (%s)", node, nodeIP)
+			endpointNodeName = node
 			endpointNodeIP = nodeIP
 			break
 		}
+
+		// We need to ensure the endpoint is on a different node from the exec
+		// pod, to ensure that the source IP of the traffic is the node's "public"
+		// IP. For node-to-pod-on-same-node traffic, it might end up using the
+		// "docker0" IP or something like that.
+		ginkgo.By("creating a HostNetwork exec pod on a different node")
+		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec", &endpointNodeName)
+		framework.Logf("execPod IP is %q", execPod.Status.PodIP)
 
 		ginkgo.By("connecting from the execpod to the NodePort on the endpoint's node")
 		cmd := fmt.Sprintf("curl -g -q -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(endpointNodeIP, nodePortStr))
@@ -3934,6 +3914,168 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("The state of the sctp module has changed due to the test case")
 		}
 	})
+
+	ginkgo.It("should implement NodePort and HealthCheckNodePort correctly when ExternalTrafficPolicy changes", func(ctx context.Context) {
+		// This uses a LoadBalancer service but only tests the parts of it that are
+		// managed by the service proxy; there is another test in loadbalancer.go
+		// to test the load balancer parts.
+
+		namespace := f.Namespace.Name
+		serviceName := "external-local-update"
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
+		framework.ExpectNoError(err, "listing nodes")
+		if len(nodes.Items) != 3 {
+			e2eskipper.Skipf("Need at least 3 schedulable nodes for this test")
+		}
+
+		ginkgo.By("creating the service")
+		svc, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+		})
+		framework.ExpectNoError(err, "creating the service")
+		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
+		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
+		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)
+
+		ginkgo.By("creating an endpoint for the service")
+		_, err = jig.Run(ctx, nil)
+		framework.ExpectNoError(err, "creating the endpoint")
+
+		var endpointNode, endpointNodeIP string
+		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
+		framework.ExpectNoError(err, "fetching endpoint node IP")
+		for node, nodeIP := range endpointsNodeMap {
+			framework.Logf("endpoint is on node %s (%s)", node, nodeIP)
+			endpointNode = node
+			endpointNodeIP = nodeIP
+			break
+		}
+
+		ginkgo.By("creating a HostNetwork exec pod on a different node from the endpoint")
+		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec", &endpointNode)
+		hostExecPodNodeIP := execPod.Status.HostIP
+
+		ginkgo.By("finding a third node with neither the endpoint nor the hostexec pod")
+		var thirdNodeIP string
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			ips := e2enode.GetAddresses(node, v1.NodeInternalIP)
+			if len(ips) < 1 {
+				framework.Failf("No internal ip found for node %s", node.Name)
+			}
+			if ips[0] != endpointNodeIP && ips[0] != hostExecPodNodeIP {
+				thirdNodeIP = ips[0]
+				break
+			}
+		}
+		gomega.Expect(thirdNodeIP).NotTo(gomega.Equal(""), "cluster has at least 3 nodes but could not find a third node IP?")
+
+		checkOneNodePort := func(nodeIP string, expectResponse bool, trafficPolicy v1.ServiceExternalTrafficPolicy, deadline time.Time) {
+			cmd := fmt.Sprintf("curl -g -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(nodeIP, nodePortStr))
+			var clientIP string
+			err := wait.PollUntilContextTimeout(ctx, framework.Poll, time.Until(deadline), true, func(ctx context.Context) (bool, error) {
+				out, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
+				if !expectResponse {
+					return err != nil, nil
+				} else if err != nil {
+					return false, nil
+				}
+
+				clientIP, _, err = net.SplitHostPort(out)
+				if err != nil {
+					return false, fmt.Errorf("could not parse clientip response %q: %w", out, err)
+				}
+				return true, nil
+			})
+			framework.ExpectNoError(err, "expected correct response within timeout")
+			if expectResponse && trafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
+				gomega.Expect(clientIP).To(gomega.Equal(hostExecPodNodeIP), "expected client IP to be preserved")
+			}
+		}
+
+		checkOneHealthCheck := func(nodeIP string, expectResponse bool, expectStatus string, deadline time.Time) {
+			// "-i" means to return the HTTP headers in the response
+			cmd := fmt.Sprintf("curl -g -i -s --connect-timeout 3 http://%s/", net.JoinHostPort(nodeIP, hcNodePortStr))
+			err := wait.PollUntilContextTimeout(ctx, framework.Poll, time.Until(deadline), true, func(ctx context.Context) (bool, error) {
+				out, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
+				if !expectResponse {
+					return err != nil, nil
+				} else if err != nil {
+					return false, nil
+				}
+
+				status := strings.Split(out, "\n")[0]
+				gotResponse := strings.Contains(status, expectStatus)
+				return gotResponse, nil
+			})
+			framework.ExpectNoError(err, "expected response containing %s", expectStatus)
+		}
+
+		// (In each round of checks, all nodes must be correct within a single
+		// KubeProxyEndpointLagTimeout; we don't want to allow a full
+		// KubeProxyEndpointLagTimeout interval for each checkOneNodePort call.)
+		deadline := time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
+
+		ginkgo.By("ensuring that the HealthCheckNodePort reports healthy on the endpoint node when ExternalTrafficPolicy is Local")
+		checkOneHealthCheck(endpointNodeIP, true, "200 OK", deadline)
+		ginkgo.By("ensuring that the HealthCheckNodePort reports UN-healthy on the execpod node when ExternalTrafficPolicy is Local")
+		checkOneHealthCheck(hostExecPodNodeIP, true, "503 Service Unavailable", deadline)
+		ginkgo.By("ensuring that the HealthCheckNodePort reports UN-healthy on the third node when ExternalTrafficPolicy is Local")
+		checkOneHealthCheck(thirdNodeIP, true, "503 Service Unavailable", deadline)
+
+		ginkgo.By("ensuring that the NodePort responds on the endpoint node when ExternalTrafficPolicy is Local")
+		checkOneNodePort(endpointNodeIP, true, v1.ServiceExternalTrafficPolicyLocal, deadline)
+		ginkgo.By("ensuring that the NodePort responds (due to short-circuit rule) on the execpod node when ExternalTrafficPolicy is Local")
+		checkOneNodePort(hostExecPodNodeIP, true, v1.ServiceExternalTrafficPolicyLocal, deadline)
+		ginkgo.By("ensuring that the NodePort does not respond on the third node when ExternalTrafficPolicy is Local")
+		checkOneNodePort(thirdNodeIP, false, v1.ServiceExternalTrafficPolicyLocal, deadline)
+
+		ginkgo.By("changing ExternalTrafficPolicy to Cluster")
+		oldHealthCheckNodePort := svc.Spec.HealthCheckNodePort
+		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
+		})
+		framework.ExpectNoError(err, "updating Service")
+		if svc.Spec.HealthCheckNodePort > 0 {
+			framework.Failf("Service HealthCheck NodePort still present")
+		}
+		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
+
+		// FIXME: this is racy; we need to use a reserved HCNP here.
+		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the endpoint node when ExternalTrafficPolicy is Cluster")
+		checkOneHealthCheck(endpointNodeIP, false, "", deadline)
+		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the execpod node when ExternalTrafficPolicy is Cluster")
+		checkOneHealthCheck(hostExecPodNodeIP, false, "", deadline)
+		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the third node when ExternalTrafficPolicy is Cluster")
+		checkOneHealthCheck(thirdNodeIP, false, "", deadline)
+
+		ginkgo.By("ensuring that the NodePort responds on the endpoint node when ExternalTrafficPolicy is Cluster")
+		checkOneNodePort(endpointNodeIP, true, v1.ServiceExternalTrafficPolicyCluster, deadline)
+		ginkgo.By("ensuring that the NodePort responds on the execpod node when ExternalTrafficPolicy is Cluster")
+		checkOneNodePort(hostExecPodNodeIP, true, v1.ServiceExternalTrafficPolicyCluster, deadline)
+		ginkgo.By("ensuring that the NodePort responds on the third node when ExternalTrafficPolicy is Cluster")
+		checkOneNodePort(thirdNodeIP, true, v1.ServiceExternalTrafficPolicyCluster, deadline)
+
+		ginkgo.By("changing ExternalTrafficPolicy back to Local")
+		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
+			// FIXME: we need to use a reserved HCNP here.
+			svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
+		})
+		framework.ExpectNoError(err, "updating ExternalTrafficPolicy and HealthCheckNodePort")
+		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
+
+		ginkgo.By("ensuring that all NodePorts and HealthCheckNodePorts show the correct behavior again after changing ExternalTrafficPolicy back to Local")
+		checkOneHealthCheck(endpointNodeIP, true, "200 OK", deadline)
+		checkOneHealthCheck(hostExecPodNodeIP, true, "503 Service Unavailable", deadline)
+		checkOneHealthCheck(thirdNodeIP, true, "503 Service Unavailable", deadline)
+		checkOneNodePort(endpointNodeIP, true, v1.ServiceExternalTrafficPolicyLocal, deadline)
+		checkOneNodePort(hostExecPodNodeIP, true, v1.ServiceExternalTrafficPolicyLocal, deadline)
+		checkOneNodePort(thirdNodeIP, false, v1.ServiceExternalTrafficPolicyLocal, deadline)
+	})
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
@@ -4184,14 +4326,33 @@ func createPodOrFail(ctx context.Context, f *framework.Framework, ns, name strin
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
-func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name string) *v1.Pod {
+// until it's Running. If avoidNode is non-nil, it will ensure that the pod doesn't
+// land on that node.
+func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name string, avoidNode *string) *v1.Pod {
 	framework.Logf("Creating new host exec pod")
 	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(ctx, hostExecPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	if avoidNode != nil {
+		hostExecPod.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: "NotIn",
+							Values:   []string{*avoidNode},
+						}},
+					}},
+				},
+			},
+		}
+	}
+	_, err := client.CoreV1().Pods(ns).Create(ctx, hostExecPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating host exec pod")
 	err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, client, name, ns, framework.PodStartTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "waiting for host exec pod")
+	// re-fetch to get PodIP, etc
+	pod, err := client.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "getting podIP of host exec pod")
 	return pod
 }
 
