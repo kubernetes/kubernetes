@@ -50,7 +50,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	// Do some initialization to decode the query parameters correctly.
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -802,8 +802,8 @@ func TestContainerLogs(t *testing.T) {
 		podLogOption *v1.PodLogOptions
 	}{
 		"without tail":     {"", &v1.PodLogOptions{}},
-		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
-		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
+		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: ptr.To[int64](5)}},
+		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: ptr.To[int64](5)}},
 		"with tail all":    {"?tail=all", &v1.PodLogOptions{}},
 		"with follow":      {"?follow=1", &v1.PodLogOptions{Follow: true}},
 	}

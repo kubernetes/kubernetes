@@ -106,7 +106,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -3043,7 +3043,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
-		MemoryThrottlingFactor:                    utilpointer.Float64(0),
+		MemoryThrottlingFactor:                    ptr.To[float64](0),
 	}
 	var prober volume.DynamicPluginProber
 	tp := noopoteltrace.NewTracerProvider()
@@ -3166,7 +3166,7 @@ func TestSyncPodSpans(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
-		MemoryThrottlingFactor:                    utilpointer.Float64(0),
+		MemoryThrottlingFactor:                    ptr.To[float64](0),
 	}
 
 	exp := tracetest.NewInMemoryExporter()
@@ -3231,7 +3231,7 @@ func TestSyncPodSpans(t *testing.T) {
 				ImagePullPolicy: v1.PullAlways,
 			},
 		},
-		EnableServiceLinks: utilpointer.Bool(false),
+		EnableServiceLinks: ptr.To(false),
 	})
 
 	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
