@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_VERBOSE=${KUBE_VERBOSE:-1}
+if (( KUBE_VERBOSE > 4 )); then
+  set -x
+fi
 set -o errexit
 set -o nounset
 set -o pipefail
