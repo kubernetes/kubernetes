@@ -157,6 +157,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
 		framework.ExpectNoError(err)
 
+		// Change the services to NodePort.
+
 		ginkgo.By("changing the TCP service to type=NodePort")
 		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
@@ -293,6 +295,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns2, "execpod", nil)
 		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
 		framework.ExpectNoError(err)
+
+		// Change the services to NodePort.
 
 		ginkgo.By("changing the UDP service to type=NodePort")
 		udpService, err = udpJig.UpdateService(ctx, func(s *v1.Service) {

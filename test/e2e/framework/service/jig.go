@@ -657,7 +657,6 @@ func (j *TestJig) ChangeServiceNodePort(ctx context.Context, initial int) (*v1.S
 		// Otherwise err was nil or err was a real error
 		break
 	}
-
 	return service, err
 }
 
