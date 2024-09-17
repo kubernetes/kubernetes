@@ -271,6 +271,7 @@ func statusForClaim(schedulingCtx *resourceapi.PodSchedulingContext, podClaimNam
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
 	enabled                       bool
+	enableSchedulingQueueHint     bool
 	controlPlaneControllerEnabled bool
 
 	fh                         framework.Handle
@@ -345,6 +346,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	pl := &dynamicResources{
 		enabled:                       true,
 		controlPlaneControllerEnabled: fts.EnableDRAControlPlaneController,
+		enableSchedulingQueueHint:     fts.EnableSchedulingQueueHint,
 
 		fh:               fh,
 		clientset:        fh.ClientSet(),
@@ -380,22 +382,23 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 	if !pl.enabled {
 		return nil, nil
 	}
+	// A resource might depend on node labels for topology filtering.
+	// A new or updated node may make pods schedulable.
+	//
+	// A note about UpdateNodeTaint event:
+	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	if pl.enableSchedulingQueueHint {
+		// When QHint is enabled, the problematic preCheck is already removed, and we can remove UpdateNodeTaint.
+		nodeActionType = framework.Add | framework.UpdateNodeLabel
+	}
 
 	events := []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
-		// A resource might depend on node labels for topology filtering.
-		// A new or updated node may make pods schedulable.
-		//
-		// A note about UpdateNodeTaint event:
-		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
-		// As a common problematic scenario,
-		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
-		// In such cases, this plugin may miss some events that actually make pods schedulable.
-		// As a workaround, we add UpdateNodeTaint event to catch the case.
-		// We can remove UpdateNodeTaint when we remove the preCheck feature.
-		// See: https://github.com/kubernetes/kubernetes/issues/110175
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.DeviceClass, ActionType: framework.Add | framework.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.

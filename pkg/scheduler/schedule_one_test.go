@@ -873,7 +873,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	fns := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPluginAsExtensions(nodeports.Name, nodeports.New, "Filter", "PreFilter"),
+		tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(feature.Features{}, nodeports.New), "Filter", "PreFilter"),
 	}
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, pod, &node, fns...)
 
@@ -938,7 +938,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	fns := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPluginAsExtensions(nodeports.Name, nodeports.New, "Filter", "PreFilter"),
+		tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(feature.Features{}, nodeports.New), "Filter", "PreFilter"),
 	}
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, firstPod, &node, fns...)
 

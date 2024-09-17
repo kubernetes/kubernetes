@@ -56,6 +56,7 @@ const (
 	// for better performance in requeueing.
 	UpdateNodeAllocatable
 	UpdateNodeLabel
+	// UpdateNodeTaint is an update for node's taints or node.Spec.Unschedulable.
 	UpdateNodeTaint
 	UpdateNodeCondition
 	UpdateNodeAnnotation

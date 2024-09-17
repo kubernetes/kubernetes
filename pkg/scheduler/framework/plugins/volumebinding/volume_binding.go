@@ -95,6 +95,19 @@ func (pl *VolumeBinding) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// Pods may fail to find available PVs because the node labels do not
+	// match the storage class's allowed topologies or PV's node affinity.
+	// A new or updated node may make pods schedulable.
+	//
+	// A note about UpdateNodeTaint event:
+	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	if pl.fts.EnableSchedulingQueueHint {
+		// When scheduling queue hint is enabled, we don't use the problematic preCheck and don't need to register UpdateNodeTaint event.
+		nodeActionType = framework.Add | framework.UpdateNodeLabel
+	}
 	events := []framework.ClusterEventWithHint{
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
@@ -105,19 +118,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
 
-		// Pods may fail to find available PVs because the node labels do not
-		// match the storage class's allowed topologies or PV's node affinity.
-		// A new or updated node may make pods schedulable.
-		//
-		// A note about UpdateNodeTaint event:
-		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
-		// As a common problematic scenario,
-		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
-		// In such cases, this plugin may miss some events that actually make pods schedulable.
-		// As a workaround, we add UpdateNodeTaint event to catch the case.
-		// We can remove UpdateNodeTaint when we remove the preCheck feature.
-		// See: https://github.com/kubernetes/kubernetes/issues/110175
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 
 		// We rely on CSI node to translate in-tree PV to CSI.
 		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.

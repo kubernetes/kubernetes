@@ -638,7 +638,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-				tf.RegisterPluginAsExtensions(interpodaffinity.Name, interpodaffinity.New, "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{

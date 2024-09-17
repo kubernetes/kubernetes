@@ -24,6 +24,7 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -31,6 +32,7 @@ import (
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
 type NodeUnschedulable struct {
+	enableSchedulingQueueHint bool
 }
 
 var _ framework.FilterPlugin = &NodeUnschedulable{}
@@ -49,8 +51,9 @@ const (
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// preCheck is not used when QHint is enabled.
 	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
@@ -101,6 +104,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &NodeUnschedulable{}, nil
+func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+	return &NodeUnschedulable{enableSchedulingQueueHint: fts.EnableSchedulingQueueHint}, nil
 }
