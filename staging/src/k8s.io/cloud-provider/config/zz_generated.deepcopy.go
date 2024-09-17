@@ -78,6 +78,7 @@ func (in *KubeCloudSharedConfiguration) DeepCopyInto(out *KubeCloudSharedConfigu
 	out.CloudProvider = in.CloudProvider
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.InstanceExistsGracePeriod = in.InstanceExistsGracePeriod
 	out.NodeSyncPeriod = in.NodeSyncPeriod
 	return
 }

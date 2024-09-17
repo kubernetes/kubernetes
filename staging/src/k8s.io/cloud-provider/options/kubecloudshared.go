@@ -60,6 +60,8 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
 	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
 		fmt.Sprintf("The period for syncing NodeStatus in %s.", names.CloudNodeLifecycleController))
+	fs.DurationVar(&o.InstanceExistsGracePeriod.Duration, "instance-exists-grace-period", o.InstanceExistsGracePeriod.Duration,
+		fmt.Sprintf("Period after Node creation during which %s will assume the cloud instance exists.", names.CloudNodeLifecycleController))
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&o.ClusterCIDR, "cluster-cidr", o.ClusterCIDR, "CIDR Range for Pods in cluster. Only used when --allocate-node-cidrs=true; if false, this option will be ignored.")
 	fs.BoolVar(&o.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider. Requires --cluster-cidr.")

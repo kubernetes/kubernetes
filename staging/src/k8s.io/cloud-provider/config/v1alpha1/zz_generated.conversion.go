@@ -154,6 +154,7 @@ func autoConvert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudShared
 	out.AllowUntaggedCloud = in.AllowUntaggedCloud
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.InstanceExistsGracePeriod = in.InstanceExistsGracePeriod
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
@@ -174,6 +175,7 @@ func autoConvert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudShared
 	out.AllowUntaggedCloud = in.AllowUntaggedCloud
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.InstanceExistsGracePeriod = in.InstanceExistsGracePeriod
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs

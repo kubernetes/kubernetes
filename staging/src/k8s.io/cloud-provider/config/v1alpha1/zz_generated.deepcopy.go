@@ -78,6 +78,7 @@ func (in *KubeCloudSharedConfiguration) DeepCopyInto(out *KubeCloudSharedConfigu
 	out.CloudProvider = in.CloudProvider
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.InstanceExistsGracePeriod = in.InstanceExistsGracePeriod
 	if in.ConfigureCloudRoutes != nil {
 		in, out := &in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes
 		*out = new(bool)

@@ -57165,6 +57165,12 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"InstanceExistsGracePeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InstanceExistsGracePeriod is the period after Node creation that CloudNodeLifecycleController will assume the cloud instance exists.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 					"ClusterName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "clusterName is the instance prefix for the cluster.",
@@ -57211,7 +57217,7 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 						},
 					},
 				},
-				Required: []string{"CloudProvider", "ExternalCloudVolumePlugin", "UseServiceAccountCredentials", "AllowUntaggedCloud", "RouteReconciliationPeriod", "NodeMonitorPeriod", "ClusterName", "ClusterCIDR", "AllocateNodeCIDRs", "CIDRAllocatorType", "ConfigureCloudRoutes", "NodeSyncPeriod"},
+				Required: []string{"CloudProvider", "ExternalCloudVolumePlugin", "UseServiceAccountCredentials", "AllowUntaggedCloud", "RouteReconciliationPeriod", "NodeMonitorPeriod", "InstanceExistsGracePeriod", "ClusterName", "ClusterCIDR", "AllocateNodeCIDRs", "CIDRAllocatorType", "ConfigureCloudRoutes", "NodeSyncPeriod"},
 			},
 		},
 		Dependencies: []string{
