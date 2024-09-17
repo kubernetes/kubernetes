@@ -351,6 +351,14 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
+// SubResourceIfNotEmpty is a convenience function to set a subresource if it's not empty
+func (r *Request) SubResourceIfNotEmpty(subresources ...string) *Request {
+	if len(subresources) > 0 && subresources[0] != "" {
+		return r.SubResource(subresources...)
+	}
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {

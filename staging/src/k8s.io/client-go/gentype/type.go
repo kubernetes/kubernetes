@@ -38,6 +38,8 @@ type objectWithMeta interface {
 	metav1.Object
 }
 
+type resource interface{}
+
 // namedObject matches comparable objects implementing GetName(); it is intended for use with apply declarative configurations.
 type namedObject interface {
 	comparable
@@ -46,13 +48,21 @@ type namedObject interface {
 
 // Client represents a client, optionally namespaced, with no support for lists or apply declarative configurations.
 type Client[T objectWithMeta] struct {
-	resource       string
-	client         rest.Interface
-	namespace      string // "" for non-namespaced clients
-	newObject      func() T
-	parameterCodec runtime.ParameterCodec
+	ResourceClient
+	newObject func() T
+}
 
+// Client represents a resource client client, optionally namespaced.
+type ResourceClient struct {
+	resource        string
+	client          rest.Interface
+	namespace       string // "" for non-namespaced clients
+	parameterCodec  runtime.ParameterCodec
 	prefersProtobuf bool
+}
+
+func resourceAsObject(r resource) runtime.Object {
+	return any(&r).(runtime.Object)
 }
 
 // ClientWithList represents a client with support for lists.
@@ -97,11 +107,13 @@ func NewClient[T objectWithMeta](
 	options ...Option[T],
 ) *Client[T] {
 	c := &Client[T]{
-		resource:       resource,
-		client:         client,
-		parameterCodec: parameterCodec,
-		namespace:      namespace,
-		newObject:      emptyObjectCreator,
+		ResourceClient{
+			resource:       resource,
+			client:         client,
+			parameterCodec: parameterCodec,
+			namespace:      namespace,
+		},
+		emptyObjectCreator,
 	}
 	for _, option := range options {
 		option(c)
@@ -158,20 +170,39 @@ func (c *Client[T]) GetNamespace() string {
 
 // Get takes name of the resource, and returns the corresponding object, and an error if there is any.
 func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOptions) (T, error) {
-	result := c.newObject()
+	result, err := Get(ctx, &c.ResourceClient, c.newObject(), name, options)
+	return any(result).(T), err
+}
+
+// Get takes name of the resource, and returns the corresponding object, and an error if there is any.
+// T is the type managed by the client, R is the type returned by the server (usually the same).
+func Get[R resource](ctx context.Context, c *ResourceClient, empty R, name string, options metav1.GetOptions) (*R, error) {
+	return GetSubresource[R](ctx, c, name, "", options)
+}
+
+// Get takes name of the resource and subresource, and returns the corresponding object, and an error if there is any.
+// T is the type managed by the client, R is the type of the subresource.
+func GetSubresource[R resource](ctx context.Context, c *ResourceClient, name, subresource string, options metav1.GetOptions) (*R, error) {
+	result := new(R)
 	err := c.client.Get().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(name).
+		SubResourceIfNotEmpty(subresource).
 		VersionedParams(&options, c.parameterCodec).
 		Do(ctx).
-		Into(result)
+		Into(resourceAsObject(result))
 	return result, err
 }
 
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L, error) {
+	return List(ctx, l, opts)
+}
+
+// List takes label and field selectors, and returns the list of resources that match those selectors.
+func List[T objectWithMeta, L runtime.Object](ctx context.Context, l *alsoLister[T, L], opts metav1.ListOptions) (L, error) {
 	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
 		klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
 	} else if hasWatchListOptionsPrepared {
@@ -190,6 +221,10 @@ func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L
 }
 
 func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L, error) {
+	return list(ctx, l, opts)
+}
+
+func list[T objectWithMeta, L runtime.Object](ctx context.Context, l *alsoLister[T, L], opts metav1.ListOptions) (L, error) {
 	list := l.newList()
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
@@ -242,7 +277,12 @@ func (c *Client[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 
 // Create takes the representation of a resource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error) {
-	result := c.newObject()
+	return Create(ctx, c, obj, c.newObject(), opts)
+}
+
+// Create takes the representation of a resource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
+// T is the type managed by the client, R is the type returned by the server (usually the same).
+func Create[T objectWithMeta, I runtime.Object, R runtime.Object](ctx context.Context, c *Client[T], obj I, empty R, opts metav1.CreateOptions) (R, error) {
 	err := c.client.Post().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
@@ -250,39 +290,60 @@ func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
 		Do(ctx).
-		Into(result)
-	return result, err
+		Into(empty)
+	return empty, err
+}
+
+// CreateSubresource takes the representation of a subresource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
+// T is the type managed by the client, I is the input type of the subresource, R is the subresource type returned by the server.
+func CreateSubresource[T objectWithMeta, I runtime.Object, R runtime.Object](
+	ctx context.Context, c *Client[T], name string, obj I, subresource string, empty R, opts metav1.CreateOptions,
+) (R, error) {
+	err := c.client.Post().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
+		NamespaceIfScoped(c.namespace, c.namespace != "").
+		Resource(c.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&opts, c.parameterCodec).
+		Body(obj).
+		Do(ctx).
+		Into(empty)
+	return empty, err
 }
 
 // Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
-	result := c.newObject()
+	return Update(ctx, c, obj, c.newObject(), opts)
+}
+
+// Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
+// T is the type managed by the client, I is the input type, R is the type returned by the server.
+func Update[T objectWithMeta, I objectWithMeta, R runtime.Object](ctx context.Context, c *Client[T], obj I, empty R, opts metav1.UpdateOptions) (R, error) {
+	return UpdateSubresource(ctx, c, obj.GetName(), obj, "", empty, opts)
+}
+
+// Update takes the representation of a subresource and updates it. Returns the server's representation of the subresource, and an error, if there is any.
+// T is the type managed by the client, I is the input type of the subresource, R is the subresource type returned by the server.
+func UpdateSubresource[T objectWithMeta, I runtime.Object, R runtime.Object](
+	ctx context.Context, c *Client[T], name string, obj I, subresource string, empty R, opts metav1.UpdateOptions,
+) (R, error) {
 	err := c.client.Put().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
-		Name(obj.GetName()).
+		Name(name).
+		SubResourceIfNotEmpty(subresource).
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
 		Do(ctx).
-		Into(result)
-	return result, err
+		Into(empty)
+	return empty, err
 }
 
 // UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
-	result := c.newObject()
-	err := c.client.Put().
-		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
-		NamespaceIfScoped(c.namespace, c.namespace != "").
-		Resource(c.resource).
-		Name(obj.GetName()).
-		SubResource("status").
-		VersionedParams(&opts, c.parameterCodec).
-		Body(obj).
-		Do(ctx).
-		Into(result)
-	return result, err
+	return UpdateSubresource(ctx, c, obj.GetName(), obj, "status", c.newObject(), opts)
 }
 
 // Delete takes name of the resource and deletes it. Returns an error if one occurs.
@@ -316,7 +377,11 @@ func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched resource.
 func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error) {
-	result := c.newObject()
+	return Patch(ctx, c, name, pt, data, c.newObject(), opts, subresources...)
+}
+
+// Patch applies the patch and returns the patched resource.
+func Patch[T objectWithMeta, R runtime.Object](ctx context.Context, c *Client[T], name string, pt types.PatchType, data []byte, empty R, opts metav1.PatchOptions, subresources ...string) (R, error) {
 	err := c.client.Patch(pt).
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
@@ -326,62 +391,55 @@ func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, 
 		VersionedParams(&opts, c.parameterCodec).
 		Body(data).
 		Do(ctx).
-		Into(result)
-	return result, err
+		Into(empty)
+	return empty, err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied resource.
 func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
-	result := a.client.newObject()
+	return Apply(ctx, a.client, obj, a.client.newObject(), opts)
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied resource.
+// T is the type managed by the client, C is the apply configuration type, R is the type returned by the server.
+func Apply[T objectWithMeta, C namedObject, R runtime.Object](ctx context.Context, c *Client[T], obj C, empty R, opts metav1.ApplyOptions) (R, error) {
+	if obj.GetName() == nil {
+		return *new(R), fmt.Errorf("obj.Name must be provided to Apply")
+	}
+	return ApplySubresource(ctx, c, *obj.GetName(), obj, "", empty, opts)
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied subresource.
+// T is the type managed by the client, C is the apply configuration type, R is the subresource type returned by the server.
+func ApplySubresource[T objectWithMeta, C comparable, R runtime.Object](
+	ctx context.Context, c *Client[T], name string, obj C, subresource string, empty R, opts metav1.ApplyOptions,
+) (R, error) {
 	if obj == *new(C) {
-		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
+		return *new(R), fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	if obj.GetName() == nil {
-		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
-	}
 
-	request, err := apply.NewRequest(a.client.client, obj)
+	request, err := apply.NewRequest(c.client, obj)
 	if err != nil {
-		return *new(T), err
+		return *new(R), err
 	}
 
 	err = request.
-		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
-		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
-		Resource(a.client.resource).
-		Name(*obj.GetName()).
-		VersionedParams(&patchOpts, a.client.parameterCodec).
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
+		NamespaceIfScoped(c.namespace, c.namespace != "").
+		Resource(c.resource).
+		Name(name).
+		SubResourceIfNotEmpty(subresource).
+		VersionedParams(&patchOpts, c.parameterCodec).
 		Do(ctx).
-		Into(result)
-	return result, err
+		Into(empty)
+	return empty, err
 }
 
 // Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
-	if obj == *new(C) {
-		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-
 	if obj.GetName() == nil {
-		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
+		return *new(T), fmt.Errorf("obj.Name must be provided to ApplyStatus")
 	}
-
-	request, err := apply.NewRequest(a.client.client, obj)
-	if err != nil {
-		return *new(T), err
-	}
-
-	result := a.client.newObject()
-	err = request.
-		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
-		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
-		Resource(a.client.resource).
-		Name(*obj.GetName()).
-		SubResource("status").
-		VersionedParams(&patchOpts, a.client.parameterCodec).
-		Do(ctx).
-		Into(result)
-	return result, err
+	return ApplySubresource(ctx, a.client, *obj.GetName(), obj, "status", a.client.newObject(), opts)
 }
