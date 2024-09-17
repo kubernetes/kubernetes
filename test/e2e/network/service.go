@@ -1699,9 +1699,9 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 			return nil
 		})
-		nodeport := service.Spec.Ports[0].NodePort
-		e2eservice.ReserveStaticNodePort(int(nodeport))
-		defer e2eservice.ReleaseStaticNodePort(int(nodeport))
+		nodePort := service.Spec.Ports[0].NodePort
+		e2eservice.ReserveStaticNodePort(int(nodePort))
+		defer e2eservice.ReleaseStaticNodePort(int(nodePort))
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
@@ -1729,18 +1729,18 @@ var _ = common.SIGDescribe("Services", func() {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
-				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodeport, stdout)
+				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 				return false, nil
 			}
 			return true, nil
 		}); pollErr != nil {
-			framework.Failf("expected node port (%d) to not be in use in %v, stdout: %v", nodeport, e2eservice.KubeProxyLagTimeout, stdout)
+			framework.Failf("expected node port (%d) to not be in use in %v, stdout: %v", nodePort, e2eservice.KubeProxyLagTimeout, stdout)
 		}
 
-		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodeport))
+		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = int32(nodeport)
+		service.Spec.Ports[0].NodePort = int32(nodePort)
 		_, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
