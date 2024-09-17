@@ -334,7 +334,7 @@ func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]framework.C
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},

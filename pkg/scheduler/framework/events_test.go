@@ -334,64 +334,131 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			},
 		},
 	}
+
+	withNode := func(pod *v1.Pod, node string) *v1.Pod {
+		p := pod.DeepCopy()
+		p.Spec.NodeName = node
+		return p
+	}
+
 	tests := []struct {
 		name   string
 		newPod *v1.Pod
 		oldPod *v1.Pod
+		isSelf bool
 		want   []ClusterEvent
 	}{
 		{
 			name:   "only label is updated",
 			newPod: st.MakePod().Label("foo", "bar").Obj(),
 			oldPod: st.MakePod().Label("foo", "bar2").Obj(),
-			want:   []ClusterEvent{PodLabelChange},
+			want:   []ClusterEvent{UnscheduledPodLabelChange},
+		},
+		{
+			name:   "only self label is updated",
+			newPod: st.MakePod().Label("foo", "bar").Obj(),
+			oldPod: st.MakePod().Label("foo", "bar2").Obj(),
+			isSelf: true,
+			want:   []ClusterEvent{PodItselfLabelChange},
+		},
+		{
+			name:   "assigned pod, only label is updated",
+			newPod: st.MakePod().Node("node1").Label("foo", "bar").Obj(),
+			oldPod: st.MakePod().Node("node1").Label("foo", "bar2").Obj(),
+			want:   []ClusterEvent{AssignedPodLabelChange},
 		},
 		{
 			name:   "pod's resource request is scaled down",
 			oldPod: podWithBigRequest,
 			newPod: podWithSmallRequest,
-			want:   []ClusterEvent{PodRequestScaledDown},
+			want:   []ClusterEvent{UnscheduledPodRequestScaledDown},
+		},
+		{
+			name:   "pod self's resource request is scaled down",
+			oldPod: podWithBigRequest,
+			newPod: podWithSmallRequest,
+			isSelf: true,
+			want:   []ClusterEvent{PodItselfRequestScaledDown},
+		},
+		{
+			name:   "assigned pod, pod's resource request is scaled down",
+			oldPod: withNode(podWithBigRequest, "node1"),
+			newPod: withNode(podWithSmallRequest, "node1"),
+			want:   []ClusterEvent{AssignedPodRequestScaledDown},
 		},
 		{
 			name:   "pod's resource request is scaled up",
-			oldPod: podWithSmallRequest,
-			newPod: podWithBigRequest,
+			oldPod: withNode(podWithSmallRequest, "node1"),
+			newPod: withNode(podWithBigRequest, "node1"),
 			want:   []ClusterEvent{assignedPodOtherUpdate},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
 			oldPod: podWithBigRequest,
 			newPod: podWithSmallRequestAndLabel,
-			want:   []ClusterEvent{PodLabelChange, PodRequestScaledDown},
+			want:   []ClusterEvent{UnscheduledPodLabelChange, UnscheduledPodRequestScaledDown},
+		},
+		{
+			name:   "both pod self's resource request and label are updated",
+			oldPod: podWithBigRequest,
+			newPod: podWithSmallRequestAndLabel,
+			isSelf: true,
+			want:   []ClusterEvent{PodItselfLabelChange, PodItselfRequestScaledDown},
+		},
+		{
+			name:   "assigned pod,,both pod's resource request and label are updated",
+			oldPod: withNode(podWithBigRequest, "node1"),
+			newPod: withNode(podWithSmallRequestAndLabel, "node1"),
+			want:   []ClusterEvent{AssignedPodLabelChange, AssignedPodRequestScaledDown},
 		},
 		{
 			name:   "untracked properties of pod is updated",
 			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
-			want:   []ClusterEvent{assignedPodOtherUpdate},
+			want:   []ClusterEvent{unscheduledPodOtherUpdate},
+		},
+		{
+			name:   "self's scheduling gate is eliminated",
+			newPod: st.MakePod().SchedulingGates([]string{}).Obj(),
+			oldPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
+			isSelf: true,
+			want:   []ClusterEvent{PodItselfSchedulingGateEliminatedChange},
 		},
 		{
 			name:   "scheduling gate is eliminated",
 			newPod: st.MakePod().SchedulingGates([]string{}).Obj(),
 			oldPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
-			want:   []ClusterEvent{PodSchedulingGateEliminatedChange},
+			want:   []ClusterEvent{UnscheduledPodSchedulingGateEliminatedChange},
 		},
 		{
 			name:   "scheduling gate is removed, but not completely eliminated",
 			newPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
 			oldPod: st.MakePod().SchedulingGates([]string{"foo", "bar"}).Obj(),
-			want:   []ClusterEvent{assignedPodOtherUpdate},
+			want:   []ClusterEvent{unscheduledPodOtherUpdate},
+		},
+		{
+			name:   "pod slef's tolerations are updated",
+			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
+			oldPod: st.MakePod().Toleration("key").Obj(),
+			isSelf: true,
+			want:   []ClusterEvent{PodItselfTolerationChange},
 		},
 		{
 			name:   "pod's tolerations are updated",
 			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
 			oldPod: st.MakePod().Toleration("key").Obj(),
-			want:   []ClusterEvent{PodTolerationChange},
+			want:   []ClusterEvent{UnscheduledPodTolerationChange},
+		},
+		{
+			name:   "assigned pod, pod's tolerations are updated",
+			newPod: st.MakePod().Node("node1").Toleration("key").Toleration("key2").Obj(),
+			oldPod: st.MakePod().Node("node1").Toleration("key").Obj(),
+			want:   []ClusterEvent{AssignedPodTolerationChange},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
+			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod, tt.isSelf)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
 			}

@@ -1622,30 +1622,36 @@ func TestCloudEvent_Match(t *testing.T) {
 		{
 			name:        "wildcard event matches with all kinds of coming events",
 			event:       ClusterEvent{Resource: WildCard, ActionType: All},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
-			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
-			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			name:        "event with resource = 'UnscheduledPod' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'AssignedPod' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: AssignedPod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: AssignedPod, ActionType: UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carries same actionType",
 			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carries different actionType",
 			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeAllocatable},
+			comingEvent: ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeAllocatable},
 			wantResult:  false,
 		},
 		{
 			name:        "event matching with coming events carries '*' resources",
-			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			event:       ClusterEvent{Resource: UnscheduledPod, ActionType: UpdateNodeLabel},
 			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
 			wantResult:  false,
 		},
@@ -1673,4 +1679,63 @@ func TestNodeInfoKMetadata(t *testing.T) {
 	if !strings.Contains(output, `Some NodeInfo slice nodes=["","<no node>","","worker"]`) {
 		tCtx.Fatalf("unexpected output:\n%s", output)
 	}
+}
+
+func TestSplitPodEvent(t *testing.T) {
+	testCases := []struct {
+		name         string
+		event        ClusterEvent
+		expectEvents []ClusterEvent
+	}{
+		{
+			name: "not a pod event",
+			event: ClusterEvent{
+				Resource:   Node,
+				ActionType: Update,
+				Label:      "NodeUpdate",
+			},
+			expectEvents: []ClusterEvent{
+				{
+					Resource:   Node,
+					ActionType: Update,
+					Label:      "NodeUpdate",
+				},
+			},
+		},
+		{
+			name: "pod update event",
+			event: ClusterEvent{
+				Resource:   Pod,
+				ActionType: Update,
+				Label:      "PodUpdate",
+			},
+			expectEvents: []ClusterEvent{
+				{
+					Resource:   AssignedPod,
+					ActionType: Update,
+					Label:      "PodUpdate",
+				},
+				{
+					Resource:   UnscheduledPod,
+					ActionType: Update,
+					Label:      "PodUpdate",
+				},
+				{
+					Resource:   PodItself,
+					ActionType: Update,
+					Label:      "PodUpdate",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := UnrollPodEvent(tc.event)
+			if diff := cmp.Diff(got, tc.expectEvents); diff != "" {
+				t.Errorf("events: got=%v, want=%v, diff=%s", got, tc.expectEvents, diff)
+			}
+		})
+	}
+
 }

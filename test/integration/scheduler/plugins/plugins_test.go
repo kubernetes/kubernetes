@@ -2629,7 +2629,7 @@ func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1
 
 func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.Update}},
 	}, nil
 }
 
@@ -2685,9 +2685,11 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 			expectedScheduled: []bool{true, false},
 		},
 		{
-			name:              "preEnqueue plugin with event registered",
-			withEvents:        true,
-			count:             3,
+			name:       "preEnqueue plugin with event registered",
+			withEvents: true,
+			// Update an assigned pod will not trigger the schedulingGate plugin
+			// So we still expect 2 here (gatedPod created and pausePod created)
+			count:             2,
 			queueHintEnabled:  []bool{false, true},
 			expectedScheduled: []bool{true, true},
 		},

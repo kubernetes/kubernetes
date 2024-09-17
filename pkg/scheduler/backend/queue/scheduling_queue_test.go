@@ -1028,7 +1028,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	skipPlugin := "skipPlugin"
 	queueingHintMap := QueueingHintMapPerProfile{
 		"": {
-			framework.UnscheduledPodUpdate: {
+			framework.PodItselfUpdate: {
 				{
 					PluginName:     queuePlugin,
 					QueueingHintFn: queueHintReturnQueue,
@@ -1058,7 +1058,9 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "add highPriorityPodInfo to activeQ",
 			wantQ: activeQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				return nil, highPriorityPodInfo.Pod
+				p := highPriorityPodInfo.Pod.DeepCopy()
+				p.Labels = map[string]string{"foo": "bar"}
+				return highPriorityPodInfo.Pod, p
 			},
 			schedulingHintsEnablement: []bool{false, true},
 		},
@@ -1085,8 +1087,10 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "When updating a pod that is already in activeQ, the pod should remain in activeQ after Update()",
 			wantQ: activeQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.Update(logger, nil, highPriorityPodInfo.Pod)
-				return highPriorityPodInfo.Pod, highPriorityPodInfo.Pod
+				p := highPriorityPodInfo.Pod.DeepCopy()
+				p.Labels = map[string]string{"foo": "bar"}
+				q.Update(logger, highPriorityPodInfo.Pod, p)
+				return highPriorityPodInfo.Pod, p
 			},
 			schedulingHintsEnablement: []bool{false, true},
 		},
@@ -1106,7 +1110,9 @@ func TestPriorityQueue_Update(t *testing.T) {
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
 				q.unschedulablePods.addOrUpdate(attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)))
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
-				updatedPod.Annotations["foo"] = "test"
+				updatedPod.Labels = map[string]string{
+					"foo": "test",
+				}
 				return medPriorityPodInfo.Pod, updatedPod
 			},
 			schedulingHintsEnablement: []bool{false, true},
@@ -1117,7 +1123,9 @@ func TestPriorityQueue_Update(t *testing.T) {
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
 				q.unschedulablePods.addOrUpdate(attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)))
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
-				updatedPod.Annotations["foo"] = "test1"
+				updatedPod.Labels = map[string]string{
+					"foo": "test",
+				}
 				// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
 				// and the pods will be moved into activeQ.
 				c.Step(q.podInitialBackoffDuration)
@@ -1222,7 +1230,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 	m := makeEmptyQueueingHintMapPerProfile()
 	// fakePlugin could change its scheduling result by any updates in Pods.
-	m[""][framework.UnscheduledPodUpdate] = []*QueueingHintFunction{
+	m[""][framework.PodItselfUpdate] = []*QueueingHintFunction{
 		{
 			PluginName:     "fakePlugin",
 			QueueingHintFn: queueHintReturnQueue,

@@ -103,16 +103,25 @@ const (
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
 	//
 	// Note that the Pod event type includes the events for the unscheduled Pod itself.
-	// i.e., when unscheduled Pods are updated, the scheduling queue checks with Pod/Update QueueingHint(s) whether the update may make the pods schedulable,
+	// i.e., when unscheduled Pods are updated,
+	// the scheduling queue checks with
+	// 1. PodItself/Update QueueingHint(s) whether the update may make the updated pod schedulable,
+	// 2. UnscheduledPod/Update QueueingHint(s) whether the update may make other unscheduled pods schedulable,
 	// and requeues them to activeQ/backoffQ when at least one QueueingHint(s) return Queue.
-	// Plugins **have to** implement a QueueingHint for Pod/Update event
+	// Plugins **have to** implement a QueueingHint for PodItself/Update event
 	// if the rejection from them could be resolved by updating unscheduled Pods themselves.
 	// Example: Pods that require excessive resources may be rejected by the noderesources plugin,
 	// if this unscheduled pod is updated to require fewer resources,
 	// the previous rejection from noderesources plugin can be resolved.
-	// this plugin would implement QueueingHint for Pod/Update event
-	// that returns Queue when such label changes are made in unscheduled Pods.
-	Pod GVK = "Pod"
+	// this plugin would implement QueueingHint for PodItself/Update event
+	// that returns Queue when such request changes are made in unscheduled Pods.
+	// When a plugin registers an event using the pod GVK,
+	// it will be treated as if the plugin separately registered the same event using the UnscheduledPod, AssignedPod, and PodItself.
+	// Therefore, developers are advised to use specific pod GVK to improve the scheduler's performance.
+	Pod            GVK = "Pod"
+	UnscheduledPod GVK = "UnscheduledPod"
+	AssignedPod    GVK = "AssignedPod"
+	PodItself      GVK = "PodItself"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
 	// It's definitely not something expected for plugin developers,
@@ -214,9 +223,36 @@ func (ce ClusterEvent) Match(event ClusterEvent) bool {
 	return ce.IsWildCard() || (ce.Resource == WildCard || ce.Resource == event.Resource) && ce.ActionType&event.ActionType != 0
 }
 
+// UnrollPodEvent splits the event with resource as a pod into three separate events:
+// resource as assignedPod, unscheduledPod, and poditself.
+func UnrollPodEvent(event ClusterEvent) []ClusterEvent {
+	if event.Resource != Pod {
+		return []ClusterEvent{event}
+	}
+	return []ClusterEvent{
+		{
+			Resource:   AssignedPod,
+			ActionType: event.ActionType,
+			Label:      event.Label,
+		},
+		{
+			Resource:   UnscheduledPod,
+			ActionType: event.ActionType,
+			Label:      event.Label,
+		},
+		{
+			Resource:   PodItself,
+			ActionType: event.ActionType,
+			Label:      event.Label,
+		},
+	}
+}
+
 func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
-		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
+		{Event: ClusterEvent{Resource: AssignedPod, ActionType: All}},
+		{Event: ClusterEvent{Resource: UnscheduledPod, ActionType: All}},
+		{Event: ClusterEvent{Resource: PodItself, ActionType: All}},
 		{Event: ClusterEvent{Resource: Node, ActionType: All}},
 		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
 		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},

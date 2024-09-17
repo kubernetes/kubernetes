@@ -851,11 +851,11 @@ func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 	return p.activeQ.listInFlightPods()
 }
 
-// isPodUpdated checks if the pod is updated in a way that it may have become
+// IsPodUpdated checks if the pod is updated in a way that it may have become
 // schedulable. It drops status of the pod and compares it with old version,
 // except for pod.status.resourceClaimStatuses: changing that may have an
 // effect on scheduling.
-func isPodUpdated(oldPod, newPod *v1.Pod) bool {
+func IsPodUpdated(oldPod, newPod *v1.Pod) bool {
 	strip := func(pod *v1.Pod) *v1.Pod {
 		p := pod.DeepCopy()
 		p.ResourceVersion = ""
@@ -878,13 +878,19 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	// When unscheduled Pods are updated, we check with QueueingHint
+	// whether the update may make the pods schedulable.
+	// Plugins have to implement a QueueingHint for Pod/Update event
+	// if the rejection from them could be resolved by updating unscheduled Pods itself.
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
+
 	if p.isSchedulingQueueHintEnabled {
 		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
 		// Record this update as Pod/Update because
 		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
 		// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
 		// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
-		if exists := p.activeQ.addEventIfPodInFlight(oldPod, newPod, framework.UnscheduledPodUpdate); exists {
+		if exists := p.activeQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
 			logger.V(6).Info("The pod doesn't be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
 			return
 		}
@@ -913,14 +919,9 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 		gated := pInfo.Gated
 		if p.isSchedulingQueueHintEnabled {
-			// When unscheduled Pods are updated, we check with QueueingHint
-			// whether the update may make the pods schedulable.
-			// Plugins have to implement a QueueingHint for Pod/Update event
-			// if the rejection from them could be resolved by updating unscheduled Pods itself.
-			events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
 			for _, evt := range events {
 				hint := p.isPodWorthRequeuing(logger, pInfo, evt, oldPod, newPod)
-				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, framework.UnscheduledPodUpdate.Label)
+				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, framework.PodItselfUpdate.Label)
 				if queue != unschedulablePods {
 					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", framework.PodUpdate, "queue", queue)
 					p.unschedulablePods.delete(pInfo.Pod, gated)
@@ -932,7 +933,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 			}
 			return
 		}
-		if isPodUpdated(oldPod, newPod) {
+		if IsPodUpdated(oldPod, newPod) {
 			if p.isPodBackingoff(pInfo) {
 				p.podBackoffQ.AddOrUpdate(pInfo)
 				p.unschedulablePods.delete(pInfo.Pod, gated)
@@ -988,7 +989,7 @@ func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 // may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent) {
 	p.lock.Lock()
-	if event.Resource == framework.Pod && event.ActionType&framework.UpdatePodScaleDown != 0 {
+	if event.Resource == framework.AssignedPod && event.ActionType&framework.UpdatePodScaleDown != 0 {
 		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
 		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
 		p.moveAllToActiveOrBackoffQueue(logger, framework.AssignedPodUpdate, oldPod, newPod, nil)

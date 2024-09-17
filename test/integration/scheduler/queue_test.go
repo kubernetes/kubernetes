@@ -43,7 +43,9 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -183,9 +185,79 @@ func TestSchedulingGates(t *testing.T) {
 	}
 }
 
+type UnscheduledPodAdd struct {
+}
+
+func (f *UnscheduledPodAdd) Name() string {
+	return "UnscheduledPodAdd"
+}
+
+func (f *UnscheduledPodAdd) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, "always fail")
+}
+
+func (f *UnscheduledPodAdd) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.UnscheduledPod, ActionType: framework.Add}},
+	}, nil
+}
+
+type UnscheduledPodUpdate struct {
+}
+
+func (f *UnscheduledPodUpdate) Name() string {
+	return "UnscheduledPodUpdate"
+}
+
+func (f *UnscheduledPodUpdate) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, "always fail")
+}
+
+func (f *UnscheduledPodUpdate) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.UnscheduledPod, ActionType: framework.UpdatePodLabel}},
+	}, nil
+}
+
+type UnscheduledPodDelete struct {
+}
+
+func (f *UnscheduledPodDelete) Name() string {
+	return "UnscheduledPodDelete"
+}
+
+func (f *UnscheduledPodDelete) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, "always fail")
+}
+
+func (f *UnscheduledPodDelete) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.UnscheduledPod, ActionType: framework.Delete}},
+	}, nil
+}
+
+var (
+	_ framework.FilterPlugin = &UnscheduledPodAdd{}
+	_ framework.FilterPlugin = &UnscheduledPodUpdate{}
+	_ framework.FilterPlugin = &UnscheduledPodDelete{}
+)
+
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 func TestCoreResourceEnqueue(t *testing.T) {
+	// custom plugins that will be used in this test
+	customeRegistry := frameworkruntime.Registry{
+		"UnscheduledPodAdd": func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return &UnscheduledPodAdd{}, nil
+		},
+		"UnscheduledPodUpdate": func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return &UnscheduledPodUpdate{}, nil
+		},
+		"UnscheduledPodDelete": func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return &UnscheduledPodDelete{}, nil
+		},
+	}
+
 	tests := []struct {
 		name string
 		// initialNodes is the list of Nodes to be created at first.
@@ -197,13 +269,12 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		// pods are the list of Pods to be created.
 		// All of them are expected to be unschedulable at first.
 		pods []*v1.Pod
+		// customPlugins are the custom plugins that will be enabled in the test case
+		customPlugins []string
 		// triggerFn is the function that triggers the event to move Pods.
 		triggerFn func(testCtx *testutils.TestContext) error
-		// wantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
-		wantRequeuedPods sets.Set[string]
-		// enableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
-		// By default, it's {true, false}
-		enableSchedulingQueueHint []bool
+		// wantRequeuedPodsByQHint is the map of Pods that are expected to be requeued after triggerFn, stored by whether SchedulingQueueHint is enabled
+		wantRequeuedPodsByQHint map[bool]sets.Set[string]
 	}{
 		{
 			name:         "Pod without a required toleration to a node isn't requeued to activeQ",
@@ -224,7 +295,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod2"),
+				true:  sets.New("pod2"),
+			},
 		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -255,7 +329,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod2"),
+				true:  sets.New("pod2"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node is updated",
@@ -275,7 +352,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod updated with toleration requeued to activeQ",
@@ -292,7 +372,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when the Pod is updated to scale down",
@@ -309,7 +392,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Pod is deleted",
@@ -329,7 +415,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod2"),
+				true:  sets.New("pod2"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is created",
@@ -349,7 +438,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated",
@@ -368,7 +460,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Updating pod condition doesn't retry scheduling if the Pod was rejected by TaintToleration",
@@ -397,10 +492,11 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				testCtx.Scheduler.SchedulingQueue.Update(klog.FromContext(testCtx.Ctx), oldPod, newPod)
 				return nil
 			},
-			wantRequeuedPods: sets.Set[string]{},
 			// This behaviour is only true when enabling QHint
 			// because QHint of TaintToleration would decide to ignore a Pod update.
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: {},
+			},
 		},
 		{
 			// The test case makes sure that PreFilter plugins returning PreFilterResult are also inserted into pInfo.UnschedulablePlugins
@@ -436,6 +532,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 				return nil
 			},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: {},
+				true:  {},
+			},
 		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label to make it match the podAntiAffinity",
@@ -456,8 +556,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod2"),
+			},
 		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
@@ -478,8 +579,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod2"),
+			},
 		},
 
 		{
@@ -498,8 +600,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod1"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected with hostport by the NodePorts plugin is requeued when pod with common hostport is deleted",
@@ -521,8 +624,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod3"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod3"),
+			},
 		},
 		{
 			name:         "Pod rejected with hostport by the NodePorts plugin is requeued when new node is created",
@@ -542,8 +646,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod2"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod2"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeUnschedulable plugin is requeued when the node is turned to ready",
@@ -559,7 +664,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeUnschedulable plugin is requeued when a new node is created",
@@ -576,7 +684,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod1"),
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("pod1"),
+				true:  sets.New("pod1"),
+			},
 		},
 		{
 			name:         "Pod rejected by the NodeUnschedulable plugin isn't requeued when another unschedulable node is created",
@@ -592,10 +703,11 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.Set[string]{},
 			// This test case is valid only when QHint is enabled
 			// because QHint filters out a node creation made in triggerFn.
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: {},
+			},
 		},
 		{
 			name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
@@ -619,8 +731,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod3"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod3"),
+			},
 		},
 		{
 			name:         "Pods with PodTopologySpread should be requeued when a scheduled Pod label is updated to match the selector",
@@ -643,8 +756,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod3"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod3"),
+			},
 		},
 		{
 			name:         "Pods with PodTopologySpread should be requeued when a scheduled Pod with matching label is deleted",
@@ -666,8 +780,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod3"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod3"),
+			},
 		},
 		{
 			name: "Pods with PodTopologySpread should be requeued when a Node with topology label is created",
@@ -693,8 +808,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod3"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod3"),
+			},
 		},
 		{
 			name: "Pods with PodTopologySpread should be requeued when a Node is updated to have the topology label",
@@ -720,8 +836,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod4"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod4"),
+			},
 		},
 		{
 			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
@@ -800,20 +917,105 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods:          sets.New("pod4"),
-			enableSchedulingQueueHint: []bool{true},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				true: sets.New("pod4"),
+			},
+		},
+		{
+			name:         "Pod rejected by the UnscheduledPodAdd plugin is requeued when a UnscheduledPod is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Obj()},
+			pods: []*v1.Pod{
+				// - target-pod will be rejected by the UnscheduledPodAdd plugin.
+				st.MakePod().Name("target-pod").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a UnscheduledPodAdd event.
+				// It causes target-pod to be requeued.
+				pod := st.MakePod().Name("trigger-pod").Container("image").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create pod: %w", err)
+				}
+				return nil
+			},
+			customPlugins: []string{"UnscheduledPodAdd"},
+			// trigger-pod is not actually requeued, but stayed in the active queue at first
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("target-pod", "trigger-pod"),
+				true:  sets.New("target-pod", "trigger-pod"),
+			},
+		},
+		{
+			name:         "Pod rejected by the UnscheduledPodUpdate plugin is requeued when a UnscheduledPod is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Obj()},
+			pods: []*v1.Pod{
+				// both pod will be rejected by the UnscheduledPodAdd plugin.
+				st.MakePod().Name("target-pod").Container("image").Obj(),
+				st.MakePod().Name("trigger-pod").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a UnscheduledPodAdd event.
+				// It causes target-pod to be requeued.
+				pod := st.MakePod().Name("trigger-pod").Container("image").Labels(map[string]string{
+					"foo": "bar",
+				}).Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update pod: %w", err)
+				}
+				return nil
+			},
+			customPlugins: []string{"UnscheduledPodUpdate"},
+			// trigger-pod is not actually requeued, but stayed in the active queue at first
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				// when Qhint is disabled, any updates on a pod will make the pod requeued
+				false: sets.New("target-pod", "trigger-pod"),
+				true:  sets.New("target-pod"),
+			},
+		},
+		{
+			name:         "Pod rejected by the UnscheduledPodDelete plugin is requeued when a UnscheduledPod is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Obj()},
+			pods: []*v1.Pod{
+				// both pod will be rejected by the UnscheduledPodAdd plugin.
+				st.MakePod().Name("target-pod").Container("image").Obj(),
+				st.MakePod().Name("trigger-pod").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a UnscheduledPodAdd event.
+				// It causes target-pod to be requeued.
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "trigger-pod", metav1.DeleteOptions{}); err != nil {
+					return fmt.Errorf("failed to delete pod: %w", err)
+				}
+				return nil
+			},
+			customPlugins: []string{"UnscheduledPodDelete"},
+			wantRequeuedPodsByQHint: map[bool]sets.Set[string]{
+				false: sets.New("target-pod"),
+				true:  sets.New("target-pod"),
+			},
 		},
 	}
 
 	for _, tt := range tests {
-		if len(tt.enableSchedulingQueueHint) == 0 {
-			tt.enableSchedulingQueueHint = []bool{true, false}
-		}
 
-		for _, featureEnabled := range tt.enableSchedulingQueueHint {
+		for featureEnabled, wantedPods := range tt.wantRequeuedPodsByQHint {
 			t.Run(fmt.Sprintf("%s [SchedulerQueueingHints enabled: %v]", tt.name, featureEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, featureEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+				pls := defaults.PluginsV1.MultiPoint.Enabled
+				for _, pl := range tt.customPlugins {
+					pls = append(pls, config.Plugin{Name: pl})
+				}
+
+				profile := config.KubeSchedulerProfile{
+					SchedulerName: "default-scheduler",
+					Plugins: &config.Plugins{
+						MultiPoint: config.PluginSet{
+							Enabled: pls,
+						},
+					},
+					PluginConfig: defaults.PluginConfigsV1,
+				}
 
 				// Use zero backoff seconds to bypass backoffQ.
 				// It's intended to not start the scheduler's queue, and hence to
@@ -822,6 +1024,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					t,
 					testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
 					0,
+					scheduler.WithProfiles(profile),
+					scheduler.WithFrameworkOutOfTreeRegistry(customeRegistry),
 					scheduler.WithPodInitialBackoffSeconds(0),
 					scheduler.WithPodMaxBackoffSeconds(0),
 				)
@@ -888,9 +1092,9 @@ func TestCoreResourceEnqueue(t *testing.T) {
 						requeuedPods.Insert(requeuedPod.Name)
 					}
 
-					return requeuedPods.Equal(tt.wantRequeuedPods), nil
+					return requeuedPods.Equal(wantedPods), nil
 				}); err != nil {
-					t.Fatalf("Expect Pods %v to be requeued, but %v are requeued actually", tt.wantRequeuedPods, requeuedPods)
+					t.Fatalf("Expect Pods %v to be requeued, but %v are requeued actually", wantedPods, requeuedPods)
 				}
 			})
 		}

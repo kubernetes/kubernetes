@@ -63,12 +63,12 @@ func (pl *SchedulingGates) EventsToRegister(_ context.Context) ([]framework.Clus
 		return nil, nil
 	}
 	// When the QueueingHint feature is enabled,
-	// the scheduling queue uses Pod/Update Queueing Hint
+	// the scheduling queue uses PodItself/Update Queueing Hint
 	// to determine whether a Pod's update makes the Pod schedulable or not.
 	// https://github.com/kubernetes/kubernetes/pull/122234
 	return []framework.ClusterEventWithHint{
 		// Pods can be more schedulable once it's gates are removed
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdatePodSchedulingGatesEliminated},
+		{Event: framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdatePodSchedulingGatesEliminated},
 	}, nil
 }
 

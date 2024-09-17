@@ -137,7 +137,21 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	podActionType := framework.Add | framework.UpdatePodLabel | framework.Delete
+
+	hints := []framework.ClusterEventWithHint{
+		// All ActionType includes the following events:
+		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
+		// adding an assigned Pod may make it schedulable.
+		// - UpdatePodLabel. Updating on an existing Pod's labels (e.g., removal) may make
+		// an unschedulable Pod schedulable.
+		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
+		// deleting an existing Pod may make it schedulable.
+		{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.Add | framework.UpdatePodLabel | framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		// Node add|delete|update maybe lead an topology key changed,
+		// and make these pod in scheduling schedulable or unschedulable.
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+	}
+
 	if pl.enableSchedulingQueueHint {
 		// When the QueueingHint feature is enabled, the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
@@ -147,22 +161,13 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.Cl
 		// The Pod rejected by this plugin can be schedulable when the Pod has a spread constraint with NodeTaintsPolicy:Honor
 		// and has got a new toleration.
 		// So, we add UpdatePodTolerations here only when QHint is enabled.
-		podActionType = framework.Add | framework.UpdatePodLabel | framework.UpdatePodTolerations | framework.Delete
+		hints = append(hints, framework.ClusterEventWithHint{
+			Event:          framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.UpdatePodTolerations},
+			QueueingHintFn: pl.isSchedulableAfterPodChange,
+		})
 	}
 
-	return []framework.ClusterEventWithHint{
-		// All ActionType includes the following events:
-		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
-		// adding an assigned Pod may make it schedulable.
-		// - UpdatePodLabel. Updating on an existing Pod's labels (e.g., removal) may make
-		// an unschedulable Pod schedulable.
-		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
-		// deleting an existing Pod may make it schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: pl.isSchedulableAfterPodChange},
-		// Node add|delete|update maybe lead an topology key changed,
-		// and make these pod in scheduling schedulable or unschedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}, nil
+	return hints, nil
 }
 
 // involvedInTopologySpreading returns true if the incomingPod is involved in the topology spreading of podWithSpreading.

@@ -1096,24 +1096,25 @@ func TestEventsToRegister(t *testing.T) {
 			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
 			enableInPlacePodVerticalScaling: true,
 			expectedClusterEvents: []framework.ClusterEventWithHint{
-				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.UpdatePodScaleDown | framework.Delete}},
-				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
+				{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.UpdatePodScaleDown | framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
+				{Event: framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.UpdatePodScaleDown}},
 			},
 		},
 		{
 			name:                      "Register events with SchedulingQueueHint feature enabled",
 			enableSchedulingQueueHint: true,
 			expectedClusterEvents: []framework.ClusterEventWithHint{
-				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
-				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable}},
+				{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable}},
 			},
 		},
 		{
 			name:                            "Register events with InPlacePodVerticalScaling feature disabled",
 			enableInPlacePodVerticalScaling: false,
 			expectedClusterEvents: []framework.ClusterEventWithHint{
-				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
-				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
+				{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeTaint | framework.UpdateNodeLabel}},
 			},
 		},
 	}

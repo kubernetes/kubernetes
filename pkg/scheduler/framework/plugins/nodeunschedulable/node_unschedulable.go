@@ -65,10 +65,10 @@ func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]framework.Cl
 		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeLabel event.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 		// When the QueueingHint feature is enabled,
-		// the scheduling queue uses Pod/Update Queueing Hint
+		// the scheduling queue uses PodItself/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
 		// https://github.com/kubernetes/kubernetes/pull/122234
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+		{Event: framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
 	}, nil
 }
 

@@ -77,7 +77,7 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]framework.Clu
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add | framework.UpdatePodLabel | framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: framework.Add | framework.UpdatePodLabel | framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }

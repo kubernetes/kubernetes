@@ -267,10 +267,19 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithH
 		nodeActionType = framework.Add | framework.UpdateNodeAllocatable
 	}
 
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
+	hints := []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.AssignedPod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
-	}, nil
+	}
+
+	if f.enableInPlacePodVerticalScaling {
+		hints = append(hints, framework.ClusterEventWithHint{
+			Event:          framework.ClusterEvent{Resource: framework.PodItself, ActionType: framework.UpdatePodScaleDown},
+			QueueingHintFn: f.isSchedulableAfterPodEvent,
+		})
+	}
+
+	return hints, nil
 }
 
 // isSchedulableAfterPodEvent is invoked whenever a pod deleted or scaled down. It checks whether

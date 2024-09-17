@@ -149,6 +149,8 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	logger := sched.logger
 	pod := obj.(*v1.Pod)
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.UnscheduledPodAdd, nil, pod, nil)
+
 	sched.SchedulingQueue.Add(logger, pod)
 }
 
@@ -173,6 +175,22 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(logger, oldPod, newPod)
+
+	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
+
+	// TODO: remove IsPodUpdated when QHint hits GA?
+	if !isSchedulingQueueHintEnabled && !queue.IsPodUpdated(oldPod, newPod) {
+		return
+	}
+
+	// SchedulingQueue.Update() above triggers PodItselfUpdate for this updated Pod
+	// and hence we have to exclude the Pod from this requeueing process.
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, false)
+	for _, evt := range events {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPod, newPod, func(p *v1.Pod) bool {
+			return p.UID != newPod.UID
+		})
+	}
 }
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
@@ -210,7 +228,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	// event to immediately retry some unscheduled Pods.
 	if fwk.RejectWaitingPod(pod.UID) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodDelete, pod, nil, nil)
+		return
 	}
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.UnscheduledPodDelete, nil, nil, nil)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -266,7 +286,7 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
 	for _, evt := range events {
 		// SchedulingQueue.AssignedPodUpdated has a problem:
 		// It internally pre-filters Pods to move to activeQ,
@@ -464,7 +484,7 @@ func addAllEventHandlers(
 
 	for gvk, at := range gvkMap {
 		switch gvk {
-		case framework.Node, framework.Pod:
+		case framework.Node, framework.Pod, framework.AssignedPod, framework.UnscheduledPod, framework.PodItself:
 			// Do nothing.
 		case framework.CSINode:
 			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
