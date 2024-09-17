@@ -142,7 +142,6 @@ func (s CompletedOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
 
-	// TODO(#125980): remove in 1.32
 	effectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor(s.GenericServerRunOptions.ComponentName)
 	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
 		errs = append(errs, err)

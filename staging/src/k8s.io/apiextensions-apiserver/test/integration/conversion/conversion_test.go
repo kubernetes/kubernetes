@@ -156,6 +156,9 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 		},
 	}
 
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+
 	// TODO: Added for integration testing of conversion webhooks, where decode errors due to conversion webhook failures need to be tested.
 	// Maybe we should identify conversion webhook related errors in decoding to avoid triggering this? Or maybe having this special casing
 	// of test cases in production code should be removed?
