@@ -157,18 +157,12 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
 		framework.ExpectNoError(err)
 
-		// Change the services to NodePort.
-		tcpNodePort, ok := tcpJig.GetUnusedStaticNodePortAndReserve()
-		if !ok {
-			framework.Failf("could not find a free tcp nodeport in static range")
-		}
-		defer tcpJig.ReleaseStaticNodePort(tcpNodePort)
 		ginkgo.By("changing the TCP service to type=NodePort")
 		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
-			s.Spec.Ports[0].NodePort = int32(tcpNodePort)
 		})
 		framework.ExpectNoError(err)
+		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
 		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
@@ -204,7 +198,6 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		framework.ExpectNoError(err)
 		tcpNodePortOld := tcpNodePort
 		tcpNodePort = int(tcpService.Spec.Ports[0].NodePort)
-		defer tcpJig.ReleaseStaticNodePort(tcpNodePort)
 		if tcpNodePort == tcpNodePortOld {
 			framework.Failf("TCP Spec.Ports[0].NodePort (%d) did not change", tcpNodePort)
 		}
@@ -301,18 +294,12 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
 		framework.ExpectNoError(err)
 
-		// Change the services to NodePort.
-		udpNodePort, ok := udpJig.GetUnusedStaticNodePortAndReserve()
-		if !ok {
-			framework.Failf("could not find a free udp nodeport in static range")
-		}
-		defer udpJig.ReleaseStaticNodePort(udpNodePort)
 		ginkgo.By("changing the UDP service to type=NodePort")
 		udpService, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
-			s.Spec.Ports[0].NodePort = int32(udpNodePort)
 		})
 		framework.ExpectNoError(err)
+		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
 		framework.Logf("UDP node port: %d", udpNodePort)
 
 		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
@@ -349,7 +336,6 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		framework.ExpectNoError(err)
 		udpNodePortOld := udpNodePort
 		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
-		defer udpJig.ReleaseStaticNodePort(udpNodePort)
 		if udpNodePort == udpNodePortOld {
 			framework.Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
 		}

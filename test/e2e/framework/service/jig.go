@@ -57,20 +57,29 @@ import (
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
+var errAllocated = errors.New("provided port is already allocated")
+
+type staticPortRange struct {
+	sync.Mutex
+	baseport int
+	length   int
+	sets.Set[int]
+}
+
+func calculateRange(base int, size int) int {
+	minPort := 16
+	step := 32
+	maxPort := 128
+	return min(max(minPort, size/step), maxPort)
+}
+
 // Initialize only once per test
 var (
 	staticPortAllocator = &staticPortRange{
-		nodeports: [87]bool{false},
-		baseport:  30000,
-		mu:        &sync.Mutex{},
+		baseport: NodePortRange.Base,
+		length:   calculateRange(NodePortRange.Base, NodePortRange.Size),
 	}
 )
-
-type staticPortRange struct {
-	mu        *sync.Mutex
-	baseport  int
-	nodeports [87]bool // this is the static port range based on current NodePortRange KEP-3668
-}
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {
@@ -96,17 +105,29 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	return j
 }
 
-// allocateNext allocates a free port from the range and returns its number and true
+// allocatePort reserves the port provided as input.
+// If an invalid port was provided or if the port is already reserved, it returns false
+func (s *staticPortRange) allocatePort(port int) bool {
+	s.Lock()
+	defer s.Unlock()
+	port -= s.baseport
+	if port < 0 || port > s.length || s.Set.Has(port) {
+		return false
+	}
+	s.Set.Insert(port)
+	return true
+}
+
+// nextFreePort allocates a free port from the range and returns its number and true
 // if none is available then it returns -1 and false
-func (s *staticPortRange) allocateNext() (int, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *staticPortRange) nextFreePort() (int, bool) {
+	s.Lock()
+	defer s.Unlock()
 	// start in a random offset
-	start := rand.Intn(len(s.nodeports))
-	for i := 0; i < len(s.nodeports); i++ {
-		port := (start + i) % len(s.nodeports)
-		if port < len(s.nodeports) && port >= 0 && !s.nodeports[port] {
-			s.nodeports[port] = true
+	start := rand.Intn(s.length)
+	for i := 0; i < s.length; i++ {
+		port := (start + i) % s.length
+		if port < s.length && port >= 0 && !s.Set.Has(port) {
 			return s.baseport + port, true
 		}
 	}
@@ -116,27 +137,33 @@ func (s *staticPortRange) allocateNext() (int, bool) {
 // release the port passed as an argument and returns true. If
 // an invalid port or unreserved port was provided, it returns false
 func (s *staticPortRange) release(port int) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	port -= NodePortRange.Base
-	// port is out of range, it can not be allocated
-	if port < 0 || port > len(s.nodeports) {
+	s.Lock()
+	defer s.Unlock()
+	port -= s.baseport
+	// port is out of range, it can not be released
+	if port < 0 || port > s.length || !s.Set.Has(port) {
 		return false
 	}
-	s.nodeports[port] = false
+	s.Set.Delete(port)
 	return true
 }
 
-// GetUnusedStaticNodePortAndReserve reserves first free port in static range
+// ReserveStaticNodePort reserves the port provided as input.
+// If an invalid port was provided or if the port is already reserved, it returns false
+func ReserveStaticNodePort(port int) bool {
+	return staticPortAllocator.allocatePort(port)
+}
+
+// GetUnusedStaticNodePort reserves first free port in static range
 // and returns it and a boolean True value
 // If no port in static range is available it returns -1 and a boolean value False
-func (j *TestJig) GetUnusedStaticNodePortAndReserve() (int, bool) {
-	return staticPortAllocator.allocateNext()
+func GetUnusedStaticNodePort() (int, bool) {
+	return staticPortAllocator.nextFreePort()
 }
 
 // ReleaseStaticNodePort releases a previously reserved static port and returns true
 // If the port was not previously reserved it returns false
-func (j *TestJig) ReleaseStaticNodePort(port int) bool {
+func ReleaseStaticNodePort(port int) bool {
 	return staticPortAllocator.release(port)
 }
 
@@ -616,14 +643,21 @@ func (j *TestJig) WaitForNewIngressIP(ctx context.Context, existingIP string, ti
 func (j *TestJig) ChangeServiceNodePort(ctx context.Context, initial int) (*v1.Service, error) {
 	var err error
 	var service *v1.Service
-	newport, ok := j.GetUnusedStaticNodePortAndReserve()
-	if !ok {
-		err = errors.New("could not find any unused nodeport")
-		return service, err
+	for i := 1; i < NodePortRange.Size; i++ {
+		offs1 := initial - NodePortRange.Base
+		offs2 := (offs1 + i) % NodePortRange.Size
+		newPort := NodePortRange.Base + offs2
+		service, err = j.UpdateService(ctx, func(s *v1.Service) {
+			s.Spec.Ports[0].NodePort = int32(newPort)
+		})
+		if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
+			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			continue
+		}
+		// Otherwise err was nil or err was a real error
+		break
 	}
-	service, err = j.UpdateService(ctx, func(s *v1.Service) {
-		s.Spec.Ports[0].NodePort = int32(newport)
-	})
+
 	return service, err
 }
 
