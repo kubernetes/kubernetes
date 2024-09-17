@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -152,17 +153,23 @@ type watchEncoder struct {
 
 	currentEmbeddedIdentifier runtime.Identifier
 	identifiers               map[watch.EventType]runtime.Identifier
+
+	// initialEventsListBlueprintTransformer an optional function
+	// applied to watchlist requests that transforms
+	// the given object before sending it to a client.
+	initialEventsListBlueprintTransformer func(watch.Event, runtime.Encoder, runtime.Splice) watch.Event
 }
 
-func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
+func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer, initialEventsListBlueprint runtime.Object) *watchEncoder {
 	return &watchEncoder{
-		ctx:             ctx,
-		kind:            kind,
-		embeddedEncoder: embeddedEncoder,
-		encoder:         encoder,
-		framer:          framer,
-		buffer:          runtime.NewSpliceBuffer(),
-		eventBuffer:     runtime.NewSpliceBuffer(),
+		ctx:                                   ctx,
+		kind:                                  kind,
+		embeddedEncoder:                       embeddedEncoder,
+		encoder:                               encoder,
+		framer:                                framer,
+		initialEventsListBlueprintTransformer: computeInitialEventsListBlueprintTransformerFunction(initialEventsListBlueprint),
+		buffer:                                runtime.NewSpliceBuffer(),
+		eventBuffer:                           runtime.NewSpliceBuffer(),
 	}
 }
 
@@ -177,6 +184,7 @@ func (e *watchEncoder) Encode(event watch.Event) error {
 	if co, ok := event.Object.(runtime.CacheableObject); ok {
 		return co.CacheEncode(e.identifier(event.Type), encodeFunc, e.framer)
 	}
+	event = e.initialEventsListBlueprintTransformer(event, e.embeddedEncoder, e.buffer)
 	return encodeFunc(event.Object, e.framer)
 }
 
@@ -477,5 +485,60 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 
 	default:
 		return nil, newNotAcceptableError(fmt.Sprintf("no PartialObjectMetadataList exists in group version %s", groupVersion))
+	}
+}
+
+// computeInitialEventsListBlueprintTransformerFunction returns a transformer function for watchlist bookmark event.
+//
+// note that: for simplicity, nil initialEventsListBlueprint indicates a no-op transformer.
+// otherwise, we assume a watchlist request for which we return a transformer
+// that embeds the given list.
+func computeInitialEventsListBlueprintTransformerFunction(initialEventsListBlueprint runtime.Object) func(watch.Event, runtime.Encoder, runtime.Splice) watch.Event {
+	if initialEventsListBlueprint == nil {
+		return func(e watch.Event, _ runtime.Encoder, _ runtime.Splice) watch.Event {
+			return e
+		}
+	}
+	return func(event watch.Event, encoder runtime.Encoder, buffer runtime.Splice) watch.Event {
+		return annotateInitialEventsListBlueprintBookmark(event, initialEventsListBlueprint, encoder, buffer)
+	}
+}
+
+// annotateInitialEventsEmbeddedListBookmark adds a special annotation to the given object
+// which contains an empty base64 encoded list that is used by client to construct the final response.
+func annotateInitialEventsListBlueprintBookmark(event watch.Event, initialEventsListBlueprint runtime.Object, encoder runtime.Encoder, buffer runtime.Splice) watch.Event {
+	if event.Type != watch.Bookmark {
+		return event
+	}
+	if objectMeta, err := meta.Accessor(event.Object); err != nil {
+		return newWatchEventErrorFor(err)
+	} else if objectMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] != "true" {
+		return event
+	}
+
+	event.Object = event.Object.DeepCopyObject()
+	objectMeta, err := meta.Accessor(event.Object)
+	if err != nil {
+		return newWatchEventErrorFor(err)
+	}
+	annotations := objectMeta.GetAnnotations()
+	defer buffer.Reset()
+	if err = encoder.Encode(initialEventsListBlueprint, buffer); err != nil {
+		return newWatchEventErrorFor(err)
+	}
+	annotations[metav1.InitialEventsListBlueprintAnnotationKey] = base64.StdEncoding.EncodeToString(buffer.Bytes())
+	objectMeta.SetAnnotations(annotations)
+	return event
+}
+
+func newWatchEventErrorFor(err error) watch.Event {
+	return watch.Event{
+		Type: watch.Error,
+		Object: &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: err.Error(),
+			Reason:  metav1.StatusReasonInternalError,
+			Code:    http.StatusInternalServerError,
+		},
 	}
 }

@@ -64,7 +64,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, initialEventsListBlueprint runtime.Object) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -150,6 +150,8 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		ServerShuttingDownCh: serverShuttingDownCh,
 
 		metricsScope: metricsScope,
+
+		initialEventsListBlueprint: initialEventsListBlueprint,
 	}
 
 	if wsstream.IsWebSocketRequest(req) {
@@ -180,6 +182,8 @@ type WatchServer struct {
 	ServerShuttingDownCh <-chan struct{}
 
 	metricsScope string
+
+	initialEventsListBlueprint runtime.Object
 }
 
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
@@ -219,7 +223,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
+	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer, s.initialEventsListBlueprint)
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -288,7 +292,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	framer := newWebsocketFramer(ws, s.UseTextFraming)
 
 	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer)
+	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer, nil)
 	ch := s.Watching.ResultChan()
 
 	for {
