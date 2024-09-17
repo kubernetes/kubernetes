@@ -5015,6 +5015,31 @@ message ReplicationControllerStatus {
   repeated ReplicationControllerCondition conditions = 6;
 }
 
+// Resize is the query options to a Pod's resize call
+message Resize {
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // +optional
+  optional ResizeOptionsSpec spec = 2;
+
+  // +optional
+  optional ResizeOptionsStatus status = 3;
+}
+
+message ResizeOptionsSpec {
+  // Container name to resources.
+  // Not all containers need to be specified.
+  // +optional
+  map<string, ResourceRequirements> resize = 1;
+}
+
+message ResizeOptionsStatus {
+  // Container name to resources
+  // +optional
+  map<string, ResourceRequirements> current = 1;
+}
+
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
 message ResourceClaim {
   // Name must match the name of one entry in pod.spec.resourceClaims of

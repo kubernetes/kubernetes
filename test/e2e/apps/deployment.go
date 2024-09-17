@@ -147,7 +147,7 @@ var _ = SIGDescribe("Deployment", func() {
 	   The Deployment MUST update and verify the scale subresource. The Deployment MUST patch and verify
 	   a scale subresource.
 	*/
-	framework.ConformanceIt("Deployment should have a working scale subresource", func(ctx context.Context) {
+	framework.ConformanceIt("iholder Deployment should have a working scale subresource", func(ctx context.Context) {
 		testDeploymentSubresources(ctx, f)
 	})
 	/*

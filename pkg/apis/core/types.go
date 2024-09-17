@@ -6620,3 +6620,32 @@ type ImageVolumeSource struct {
 	// +optional
 	PullPolicy PullPolicy
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Resize is the query options to a Pod's resize call
+type Resize struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// +optional
+	Spec ResizeOptionsSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// +optional
+	Status ResizeOptionsStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+type ResizeOptionsSpec struct {
+	// Container name to resources.
+	// Not all containers need to be specified.
+	// +optional
+	Resize map[string]ResourceRequirements `json:"resize,omitempty" protobuf:"bytes,1,rep,name=resize"`
+}
+
+type ResizeOptionsStatus struct {
+	// Container name to resources
+	// +optional
+	Current map[string]ResourceRequirements `json:"current,omitempty" protobuf:"bytes,1,rep,name=current"`
+}

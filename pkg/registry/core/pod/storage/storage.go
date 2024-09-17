@@ -59,6 +59,7 @@ type PodStorage struct {
 	Exec                *podrest.ExecREST
 	Attach              *podrest.AttachREST
 	PortForward         *podrest.PortForwardREST
+	Resize              *podrest.ResizeREST
 }
 
 // REST implements a RESTStorage for pods
@@ -114,6 +115,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
 		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
 		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
+		Resize:              &podrest.ResizeREST{PodStore: store},
 	}, nil
 }
 

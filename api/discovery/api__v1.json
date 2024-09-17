@@ -303,6 +303,17 @@
       ]
     },
     {
+      "kind": "Pod",
+      "name": "pods/resize",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "group": "policy",
       "kind": "Eviction",
       "name": "pods/eviction",
