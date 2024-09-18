@@ -18,16 +18,20 @@ package node
 
 import (
 	"context"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -180,7 +184,58 @@ print(f"Time taken for {n}x{n} matrix multiplication: {end_time - start_time:.2f
 	return &pod
 }
 
+const (
+	// Nvidia driver installation can take upwards of 5 minutes.
+	driverInstallTimeout = 10 * time.Minute
+)
+
+func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) bool {
+	framework.Logf("Getting list of Nodes from API server")
+	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
+	framework.ExpectNoError(err, "getting node list")
+	missing := 0
+	for _, node := range nodeList.Items {
+		framework.Logf("Node %s / %v / %v", node.Name, node.Status.Capacity, node.Status.Allocatable)
+		if val, ok := node.Status.Capacity[e2egpu.NVIDIAGPUResourceName]; !ok || val.Value() == 0 {
+			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
+			missing++
+		}
+	}
+	if missing > 0 {
+		framework.Logf("Nvidia GPUs missing on %d of %d schedulable nodes", missing, len(nodeList.Items))
+		return false
+	} else {
+		framework.Logf("Nvidia GPUs exist on %d schedulable nodes", len(nodeList.Items))
+		return true
+	}
+}
+
 func checkEnvironmentAndSkipIfNeeded(ctx context.Context, clientSet clientset.Interface) {
+
+	var name string
+	if framework.ProviderIs("aws") {
+		name = "nvidia-device-plugin-daemonset"
+	} else if framework.ProviderIs("gce") {
+		name = "nvidia-driver-installer"
+	} else {
+		e2eskipper.Skipf("Unsupported provider")
+	}
+	devicepluginPods, err := e2eresource.WaitForControlledPods(ctx, clientSet, "kube-system",
+		name, extensionsinternal.Kind("DaemonSet"))
+	if err != nil {
+		e2eskipper.Skipf("No Nvidia GPU Device Plugin DaemonSet found : %v. Skipping...", err)
+	} else if len(devicepluginPods.Items) == 0 {
+		e2eskipper.Skipf("No Nvidia GPU Device Plugin pods found. Skipping...")
+	}
+	for _, pod := range devicepluginPods.Items {
+		framework.Logf("Nvidia GPU Device Plugin pod %s/%s has status %v", pod.Namespace, pod.Name, pod.Status)
+	}
+
+	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		return areGPUsAvailableOnAllSchedulableNodes(ctx, clientSet)
+	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue(), "Timed out waiting for GPUs")
+
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
 	framework.ExpectNoError(err)
 	capacity := 0

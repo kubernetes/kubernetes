@@ -7,21 +7,23 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nvidia-gpu-device-plugin
+  name: nvidia-driver-installer
   namespace: kube-system
   labels:
-    k8s-app: nvidia-gpu-device-plugin
+    k8s-app: nvidia-driver-installer
     addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   selector:
     matchLabels:
-      k8s-app: nvidia-gpu-device-plugin
+      k8s-app: nvidia-driver-installer
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
-        k8s-app: nvidia-gpu-device-plugin
+        name: nvidia-driver-installer
+        k8s-app: nvidia-driver-installer
     spec:
-      priorityClassName: system-node-critical
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -53,7 +55,7 @@ spec:
         hostPath:
           path: /etc/nvidia
       initContainers:
-      - image: "ubuntu@sha256:3f85b7caad41a95462cf5b787d8a04604c8262cdcdf9a472b8c52ef83375fe15"
+      - image: "ubuntu"
         name: bind-mount-install-dir
         securityContext:
           privileged: true
@@ -143,5 +145,3 @@ spec:
       containers:
       - image: "registry.k8s.io/pause:3.10"
         name: pause
-  updateStrategy:
-    type: RollingUpdate
