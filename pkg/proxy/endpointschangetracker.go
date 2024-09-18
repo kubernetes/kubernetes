@@ -178,18 +178,9 @@ type UpdateEndpointsMapResult struct {
 	// UpdatedServices lists the names of all services with added/updated/deleted
 	// endpoints since the last Update.
 	UpdatedServices sets.Set[types.NamespacedName]
-
-	// DeletedUDPEndpoints identifies UDP endpoints that have just been deleted.
-	// Existing conntrack NAT entries pointing to these endpoints must be deleted to
-	// ensure that no further traffic for the Service gets delivered to them.
-	DeletedUDPEndpoints []ServiceEndpoint
-
-	// NewlyActiveUDPServices identifies UDP Services that have just gone from 0 to
-	// non-0 endpoints. Existing conntrack entries caching the fact that these
-	// services are black holes must be deleted to ensure that traffic can immediately
-	// begin flowing to the new endpoints.
-	NewlyActiveUDPServices []ServicePortName
-
+	// ConntrackCleanupRequired will be true if any UDP ServicePort changed endpoints, false otherwise.
+	// It's used to minimise conntrack cleanup calls.
+	ConntrackCleanupRequired bool
 	// List of the trigger times for all endpoints objects that changed. It's used to export the
 	// network programming latency.
 	// NOTE(oxddr): this can be simplified to []time.Time if memory consumption becomes an issue.
@@ -205,8 +196,6 @@ type EndpointsMap map[ServicePortName][]Endpoint
 func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapResult {
 	result := UpdateEndpointsMapResult{
 		UpdatedServices:        sets.New[types.NamespacedName](),
-		DeletedUDPEndpoints:    make([]ServiceEndpoint, 0),
-		NewlyActiveUDPServices: make([]ServicePortName, 0),
 		LastChangeTriggerTimes: make(map[types.NamespacedName][]time.Time),
 	}
 	if ect == nil {
@@ -222,7 +211,26 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 
 		em.unmerge(change.previous)
 		em.merge(change.current)
-		detectStaleConntrackEntries(change.previous, change.current, &result.DeletedUDPEndpoints, &result.NewlyActiveUDPServices)
+
+		// result.ConntrackCleanupRequired should be true if any one of the UDP
+		// ServicePort changed endpoint. Once true, we don't update the value.
+		if result.ConntrackCleanupRequired {
+			continue
+		}
+		// Check if the changed service had any UDP ServicePort
+		for svcPort := range change.previous {
+			if svcPort.NamespacedName == nn && svcPort.Protocol == v1.ProtocolUDP {
+				result.ConntrackCleanupRequired = true
+				break
+			}
+		}
+		// Check if the changed service has any UDP ServicePort
+		for svcPort := range change.current {
+			if svcPort.NamespacedName == nn && svcPort.Protocol == v1.ProtocolUDP {
+				result.ConntrackCleanupRequired = true
+				break
+			}
+		}
 	}
 	ect.checkoutTriggerTimes(&result.LastChangeTriggerTimes)
 
@@ -283,69 +291,4 @@ func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
 		eps[nsn] = len(ips)
 	}
 	return eps
-}
-
-// detectStaleConntrackEntries detects services that may be associated with stale conntrack entries.
-// (See UpdateEndpointsMapResult.DeletedUDPEndpoints and .NewlyActiveUDPServices.)
-func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, deletedUDPEndpoints *[]ServiceEndpoint, newlyActiveUDPServices *[]ServicePortName) {
-	// Find the UDP endpoints that we were sending traffic to in oldEndpointsMap, but
-	// are no longer sending to newEndpointsMap. The proxier should make sure that
-	// conntrack does not accidentally route any new connections to them.
-	for svcPortName, epList := range oldEndpointsMap {
-		if svcPortName.Protocol != v1.ProtocolUDP {
-			continue
-		}
-
-		for _, ep := range epList {
-			// If the old endpoint wasn't Serving then there can't be stale
-			// conntrack entries since there was no traffic sent to it.
-			if !ep.IsServing() {
-				continue
-			}
-
-			deleted := true
-			// Check if the endpoint has changed, including if it went from
-			// serving to not serving. If it did change stale entries for the old
-			// endpoint have to be cleared.
-			for i := range newEndpointsMap[svcPortName] {
-				if newEndpointsMap[svcPortName][i].String() == ep.String() &&
-					newEndpointsMap[svcPortName][i].IsServing() == ep.IsServing() {
-					deleted = false
-					break
-				}
-			}
-			if deleted {
-				klog.V(4).InfoS("Deleted endpoint may have stale conntrack entries", "portName", svcPortName, "endpoint", ep)
-				*deletedUDPEndpoints = append(*deletedUDPEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
-			}
-		}
-	}
-
-	// Detect services that have gone from 0 to non-0 ready endpoints. If there were
-	// previously 0 endpoints, but someone tried to connect to it, then a conntrack
-	// entry may have been created blackholing traffic to that IP, which should be
-	// deleted now.
-	for svcPortName, epList := range newEndpointsMap {
-		if svcPortName.Protocol != v1.ProtocolUDP {
-			continue
-		}
-
-		epServing := 0
-		for _, ep := range epList {
-			if ep.IsServing() {
-				epServing++
-			}
-		}
-
-		oldEpServing := 0
-		for _, ep := range oldEndpointsMap[svcPortName] {
-			if ep.IsServing() {
-				oldEpServing++
-			}
-		}
-
-		if epServing > 0 && oldEpServing == 0 {
-			*newlyActiveUDPServices = append(*newlyActiveUDPServices, svcPortName)
-		}
-	}
 }
