@@ -3592,6 +3592,17 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
+- testname: VolumeAttachment, apply changes to a volumeattachment status
+  codename: '[sig-storage] VolumeAttachment Conformance should apply changes to a
+    volumeattachment status [Conformance]'
+  description: Creating an initial VolumeAttachment MUST succeed. Patching a VolumeAttachment
+    MUST succeed with its new label found. Reading VolumeAttachment status MUST succeed
+    with its attached status being false. Patching the VolumeAttachment status MUST
+    succeed with its attached status being true. Updating the VolumeAttachment status
+    MUST succeed with its attached status being false. Deleting a VolumeAttachment
+    MUST succeed and it MUST be confirmed.
+  release: v1.32
+  file: test/e2e/storage/volume_attachment.go
 - testname: VolumeAttachment, lifecycle
   codename: '[sig-storage] VolumeAttachment Conformance should run through the lifecycle
     of a VolumeAttachment [Conformance]'

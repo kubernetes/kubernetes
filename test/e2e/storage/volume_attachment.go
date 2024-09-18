@@ -167,7 +167,17 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 			framework.ExpectNoError(err, "Timeout while waiting to confirm deletion of all VolumeAttachments")
 		})
 
-		ginkgo.It("should apply changes to a volumeattachment status", func(ctx context.Context) {
+		/*
+			Release: v1.32
+			Testname: VolumeAttachment, apply changes to a volumeattachment status
+			Description: Creating an initial VolumeAttachment MUST succeed. Patching a VolumeAttachment
+			MUST succeed with its new label found. Reading VolumeAttachment status MUST succeed
+			with its attached status being false. Patching the VolumeAttachment status MUST
+			succeed with its attached status being true. Updating the VolumeAttachment status
+			MUST succeed with its attached status being false. Deleting a VolumeAttachment
+			MUST succeed and it MUST be confirmed.
+		*/
+		framework.ConformanceIt("should apply changes to a volumeattachment status", func(ctx context.Context) {
 
 			vaClient := f.ClientSet.StorageV1().VolumeAttachments()
 
