@@ -26,6 +26,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -194,6 +196,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		// Note that the scheduler won't schedule those Pods,
 		// meaning, those Pods should be already scheduled basically; they should have .spec.nodename.
 		initialPods []*v1.Pod
+		// initialPvcs are the list of PersistentVolumeClaims to be created at first.
+		// Note that PVs are automatically created following PVCs.
+		// Also, the namespace of pvcs is automatically filled in.
+		initialPvcs []*v1.PersistentVolumeClaim
 		// pods are the list of Pods to be created.
 		// All of them are expected to be unschedulable at first.
 		pods []*v1.Pod
@@ -507,6 +513,34 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.New("pod2"),
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			name:         "Pod rejected with PVC by the CSI plugin is requeued when the pod with the same required PVC is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPvcs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc").
+					// Annotation and volume name required for PVC to be considered bound.
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").Container("image").PVC("pvc").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+					return fmt.Errorf("failed to delete Pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -541,6 +575,24 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					}
 				}
 
+				for _, pvc := range tt.initialPvcs {
+					volType := v1.HostPathDirectoryOrCreate
+					_, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+						Name(pvc.Spec.VolumeName).
+						AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+						Capacity(pvc.Spec.Resources.Requests).
+						HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+						Obj())
+					if err != nil {
+						t.Fatalf("cannot create pv: %v", err)
+					}
+
+					pvc.Namespace = ns
+					if _, err = testutils.CreatePVC(cs, pvc); err != nil {
+						t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
+					}
+				}
+
 				for _, pod := range tt.initialPods {
 					if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create an initial Pod %q: %v", pod.Name, err)
@@ -567,6 +619,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				for i := 0; i < len(tt.pods); i++ {
 					testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 				}
+
 				// Wait for the tt.pods to be still present in the scheduling queue.
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
