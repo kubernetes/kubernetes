@@ -1645,7 +1645,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		os.Exit(1)
 	}
 
-	kl.warnCgroupV1Usage()
+	if err := kl.cgroupVersionCheck(); err != nil {
+		klog.V(2).InfoS("Warning: cgroup check", "error", err)
+	}
 
 	// Start volume manager
 	go kl.volumeManager.Run(ctx, kl.sourcesReady)
@@ -3066,13 +3068,4 @@ func (kl *Kubelet) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) err
 // This method implements the RuntimeHelper interface
 func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(ctx, pod)
-}
-
-func (kl *Kubelet) warnCgroupV1Usage() {
-	cgroupVersion := kl.containerManager.GetNodeConfig().CgroupVersion
-	if cgroupVersion == 1 {
-		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.CgroupV1, cm.CgroupV1MaintenanceModeWarning)
-		klog.V(2).InfoS("Warning: cgroup v1", "message", cm.CgroupV1MaintenanceModeWarning)
-	}
-	metrics.CgroupVersion.Set(float64(cgroupVersion))
 }
