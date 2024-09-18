@@ -857,7 +857,7 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 				t.Errorf("unreachable action. testclient called too many times: %+v", action)
 				return true, nil, fmt.Errorf("unreachable action")
 			})
-			lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			lock, err := rl.New(objectType, "foo", "bar", c.CoordinationV1(), resourceLockConfig)
 			if err != nil {
 				t.Fatal("resourcelock.New() = ", err)
 			}
@@ -1097,7 +1097,7 @@ func TestFastPathLeaderElection(t *testing.T) {
 				t.Errorf("unreachable action. testclient called too many times: %+v", action)
 				return true, nil, fmt.Errorf("unreachable action")
 			})
-			lock, err := rl.New("leases", "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			lock, err := rl.New("leases", "foo", "bar", c.CoordinationV1(), resourceLockConfig)
 			if err != nil {
 				t.Fatal("resourcelock.New() = ", err)
 			}
