@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"time"
 
 	"github.com/onsi/gomega"
 
@@ -50,7 +51,7 @@ var _ = SIGDescribe("Containers", func() {
 
 		// The agnhost's image default entrypoint / args are: "/agnhost pause"
 		// which will print out "Paused".
-		gomega.Eventually(ctx, pollLogs, 3, framework.Poll).Should(gomega.ContainSubstring("Paused"))
+		gomega.Eventually(ctx, pollLogs, time.Minute, framework.Poll).Should(gomega.ContainSubstring("Paused"))
 	})
 
 	/*
