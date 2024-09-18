@@ -64,7 +64,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, initialEventsListBlueprint runtime.Object) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -91,25 +91,25 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	ctx := req.Context()
 
 	// locate the appropriate embedded encoder based on the transform
-	var embeddedEncoder runtime.Encoder
+	var rawEncoder runtime.Encoder
 	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
 	if transform {
 		info, ok := runtime.SerializerInfoForMediaType(contentSerializer.SupportedMediaTypes(), serializer.MediaType)
 		if !ok {
 			return nil, fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer)
 		}
-		embeddedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
+		rawEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
 	} else {
-		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+		rawEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
 	}
 
 	var memoryAllocator runtime.MemoryAllocator
 
-	if encoderWithAllocator, supportsAllocator := embeddedEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
+	if encoderWithAllocator, supportsAllocator := rawEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		// don't put the allocator inside the embeddedEncodeFn as that would allocate memory on every call.
 		// instead, we allocate the buffer for the entire watch session and release it when we close the connection.
 		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
-		embeddedEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+		rawEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
 	var tableOptions *metav1.TableOptions
 	if options != nil {
@@ -119,7 +119,11 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 			return nil, fmt.Errorf("unexpected options type: %T", options)
 		}
 	}
-	embeddedEncoder = newWatchEmbeddedEncoder(ctx, embeddedEncoder, mediaTypeOptions.Convert, tableOptions, scope)
+	var embeddedEncoder runtime.Encoder
+	embeddedEncoder = newWatchEmbeddedEncoder(ctx, rawEncoder, mediaTypeOptions.Convert, tableOptions, scope)
+	if initialEventsListBlueprint != nil {
+		embeddedEncoder = newWatchListEncoder(initialEventsListBlueprint, mediaTypeOptions.Convert, rawEncoder, embeddedEncoder)
+	}
 
 	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		if memoryAllocator == nil {
