@@ -61,9 +61,9 @@ var errAllocated = errors.New("provided port is already allocated")
 
 type staticPortRange struct {
 	sync.Mutex
-	baseport int
-	length   int
-	sets.Set[int]
+	baseport      int
+	length        int
+	reservedPorts sets.Set[int]
 }
 
 func calculateRange(base int, size int) int {
@@ -76,8 +76,9 @@ func calculateRange(base int, size int) int {
 // Initialize only once per test
 var (
 	staticPortAllocator = &staticPortRange{
-		baseport: NodePortRange.Base,
-		length:   calculateRange(NodePortRange.Base, NodePortRange.Size),
+		baseport:      NodePortRange.Base,
+		length:        calculateRange(NodePortRange.Base, NodePortRange.Size),
+		reservedPorts: sets.New[int](),
 	}
 )
 
@@ -111,10 +112,10 @@ func (s *staticPortRange) allocatePort(port int) bool {
 	s.Lock()
 	defer s.Unlock()
 	port -= s.baseport
-	if port < 0 || port > s.length || s.Set.Has(port) {
+	if port < 0 || port > s.length || s.reservedPorts.Has(port) {
 		return false
 	}
-	s.Set.Insert(port)
+	s.reservedPorts.Insert(port)
 	return true
 }
 
@@ -127,7 +128,7 @@ func (s *staticPortRange) nextFreePort() (int, bool) {
 	start := rand.Intn(s.length)
 	for i := 0; i < s.length; i++ {
 		port := (start + i) % s.length
-		if port < s.length && port >= 0 && !s.Set.Has(port) {
+		if port < s.length && port >= 0 && !s.reservedPorts.Has(port) {
 			return s.baseport + port, true
 		}
 	}
@@ -141,10 +142,10 @@ func (s *staticPortRange) release(port int) bool {
 	defer s.Unlock()
 	port -= s.baseport
 	// port is out of range, it can not be released
-	if port < 0 || port > s.length || !s.Set.Has(port) {
+	if port < 0 || port > s.length || !s.reservedPorts.Has(port) {
 		return false
 	}
-	s.Set.Delete(port)
+	s.reservedPorts.Delete(port)
 	return true
 }
 
