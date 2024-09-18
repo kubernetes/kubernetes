@@ -146,7 +146,7 @@ const (
 
 type ClusterEventWithHint struct {
 	Event ClusterEvent
-	// QueueingHintFn is executed for the plugin rejected by this plugin when the above Event happens,
+	// QueueingHintFn is executed for the Pod rejected by this plugin when the above Event happens,
 	// and filters out events to reduce useless retry of Pod's scheduling.
 	// It's an optional field. If not set,
 	// the scheduling of Pods will be always retried with backoff when this Event happens.

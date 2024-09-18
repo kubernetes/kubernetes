@@ -271,7 +271,48 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				// It causes pod1 to be requeued.
 				// It causes pod2 not to be requeued.
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node1").Label("group", "b").Obj(), metav1.UpdateOptions{}); err != nil {
-					return fmt.Errorf("failed to remove taints off the node: %w", err)
+					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name: "Pod rejected by the NodeAffinity plugin is not requeued when an updated Node haven't changed the 'match' verdict",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("group", "a").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+				st.MakeNode().Name("node2").Label("group", "b").Obj()},
+			pods: []*v1.Pod{
+				// - The initial pod would be accepted by the NodeAffinity plugin for node1, but will be blocked by the NodeResources plugin.
+				// - The pod will be blocked by the NodeAffinity plugin for node2, therefore we know NodeAffinity will be queried for qhint for both testing nodes.
+				st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"a"}, st.NodeSelectorTypeMatchExpressions).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeUpdate event to add new label.
+				// It won't cause pod to be requeued, because there was a match already before the update, meaning this plugin wasn't blocking the scheduling.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("node1").Label("group", "a").Label("node", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.Set[string]{},
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
+			pods: []*v1.Pod{
+				// - Pod1 will be rejected by the NodeAffinity plugin.
+				st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+				// - Pod2 will be rejected by the NodeAffinity plugin.
+				st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeAdd event with the awaited label.
+				// It causes pod1 to be requeued.
+				// It causes pod2 not to be requeued.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("group", "b").Obj(), metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to update the pod: %w", err)
 				}
 				return nil
 			},

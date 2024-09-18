@@ -1297,6 +1297,13 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
 			expectedHint: framework.Queue,
 		},
+		"skip-unrelated-change-that-keeps-pod-schedulable": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			newObj:       st.MakeNode().Capacity(nil).Label("foo", "bar").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
 		"skip-queue-on-add-scheduler-enforced-node-affinity": {
 			args: &config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
