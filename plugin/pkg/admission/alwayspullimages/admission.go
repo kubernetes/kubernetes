@@ -59,7 +59,6 @@ var _ admission.ValidationInterface = &AlwaysPullImages{}
 
 // Admit makes an admission decision based on the request attributes
 func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
 	}
@@ -159,8 +158,9 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 }
 
 func shouldIgnore(attributes admission.Attributes) bool {
-	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore all calls to subresources other than ephemeralcontainers or resources other than pods.
+	subresource := attributes.GetSubresource()
+	if (len(subresource) != 0 && subresource != "ephemeralcontainers") || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return true
 	}
 
