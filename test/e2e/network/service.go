@@ -3972,7 +3972,7 @@ var _ = common.SIGDescribe("Services", func() {
 			return err
 		})
 
-		gomega.Expect(svc).NotTo(nil, "creating the service")
+		gomega.Expect(svc).NotTo(gomega.BeNil(), "creating the service")
 		e2eservice.ReserveStaticNodePort(int(svc.Spec.HealthCheckNodePort))
 		defer e2eservice.ReleaseStaticNodePort(int(svc.Spec.HealthCheckNodePort))
 
