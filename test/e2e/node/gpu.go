@@ -42,7 +42,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, "Sanity test for Nvidia Device", fu
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		podClient = e2epod.NewPodClient(f)
 	})
 
@@ -197,6 +197,7 @@ func checkEnvironmentAndSkipIfNeeded(ctx context.Context, clientSet clientset.In
 		}
 		allocatable += int(val.Value())
 	}
+	framework.Logf("%s - allocatable=%d capacity=%d", e2egpu.NVIDIAGPUResourceName, allocatable, capacity)
 	if capacity == 0 {
 		e2eskipper.Skipf("%d ready nodes do not have any Nvidia GPU(s). Skipping...", len(nodes.Items))
 	}
