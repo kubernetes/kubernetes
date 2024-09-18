@@ -24,6 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -45,9 +48,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 type priorityPair struct {

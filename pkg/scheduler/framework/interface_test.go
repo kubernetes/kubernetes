@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
