@@ -16,14 +16,35 @@ limitations under the License.
 
 package util
 
+const (
+	minCPUShares = uint64(2)
+	maxCPUShares = uint64(262144)
+	minCPUWeight = uint64(1)
+	maxCPUWeight = uint64(10000)
+)
+
 // Convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
 func CPUSharesToCPUWeight(cpuShares uint64) uint64 {
+	if cpuShares <= minCPUShares {
+		return minCPUWeight
+	}
+	if cpuShares >= maxCPUShares {
+		return maxCPUWeight
+	}
+
 	return (((cpuShares - 2) * 9999) / 262142) + 1
 }
 
 // Convert cgroup v2 cpu.weight value to cgroup v1 cpu.shares
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
 func CPUWeightToCPUShares(cpuWeight uint64) uint64 {
+	if cpuWeight <= minCPUWeight {
+		return minCPUShares
+	}
+	if cpuWeight >= maxCPUWeight {
+		return maxCPUShares
+	}
+
 	return (((cpuWeight - 1) * 262142) / 9999) + 2
 }
