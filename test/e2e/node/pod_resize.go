@@ -35,6 +35,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -431,7 +432,7 @@ func verifyPodContainersCgroupValues(pod *v1.Pod, tcInfo []TestContainerInfo, fl
 			}
 			if podOnCgroupv2Node {
 				// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
-				cpuShares = int64(1 + ((cpuShares-2)*9999)/262142)
+				cpuShares = int64(util.CPUSharesToCPUWeight(uint64(cpuShares)))
 			}
 			if !verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(cpuShares, 10)) {
 				return false
