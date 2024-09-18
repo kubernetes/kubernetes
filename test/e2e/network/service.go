@@ -1682,27 +1682,30 @@ var _ = common.SIGDescribe("Services", func() {
 
 		service := t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-
+		errAllocated := errors.New("provided port is already allocated")
+		noNodePortAvailable := errors.New("no available nodeport found")
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		err := retry.OnError(retry.DefaultRetry, func(e error) bool {
-			return e != nil
+			if e != nil &&
+				(strings.Contains(e.Error(), errAllocated.Error()) ||
+					strings.Contains(e.Error(), noNodePortAvailable.Error())) {
+				return true
+			}
+			return false
 		}, func() error {
 			v, ok := e2eservice.GetUnusedStaticNodePort()
 			if !ok {
-				return errors.New("no available nodeport found")
+				return noNodePortAvailable
 			}
 			service.Spec.Ports[0].NodePort = int32(v)
 			var err error
 			service, err = t.CreateService(service)
-			if err != nil {
-				return errors.New(fmt.Sprintf("failed to create service: %s in namespace: %s", serviceName, ns))
-			}
-			return nil
+			return err
 		})
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 		nodePort := service.Spec.Ports[0].NodePort
 		e2eservice.ReserveStaticNodePort(int(nodePort))
 		defer e2eservice.ReleaseStaticNodePort(int(nodePort))
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -3948,24 +3951,25 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating the service")
 		var svc *v1.Service
+		errAllocated := errors.New("provided port is already allocated")
+		noNodePortAvailable := errors.New("no available nodeport found")
 		retry.OnError(retry.DefaultRetry, func(err error) bool {
-			if err != nil {
+			if err != nil &&
+				(strings.Contains(err.Error(), errAllocated.Error()) ||
+					strings.Contains(err.Error(), noNodePortAvailable.Error())) {
 				return true
 			}
 			return false
 		}, func() error {
 			staticHealthCheckPort, ok := e2eservice.GetUnusedStaticNodePort()
 			if !ok {
-				return errors.New("no free healthcheck nodeport found.")
+				return noNodePortAvailable
 			}
 			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
 				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 				svc.Spec.HealthCheckNodePort = int32(staticHealthCheckPort)
 			})
-			if err != nil {
-				return fmt.Errorf("failed to create service: %s in namespace: %s", serviceName, namespace)
-			}
-			return nil
+			return err
 		})
 
 		gomega.Expect(svc).NotTo(nil, "creating the service")
