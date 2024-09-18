@@ -388,7 +388,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
+	// disabled temporarily until https://issues.redhat.com/browse/OCPBUGS-42087 is fixed
+	ResilientWatchCacheInitialization: {Default: false, PreRelease: featuregate.Beta},
 
 	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
 

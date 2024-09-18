@@ -1284,7 +1284,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	genericfeatures.ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
+	// disabled temporarily until https://issues.redhat.com/browse/OCPBUGS-42087 is fixed
+	genericfeatures.ResilientWatchCacheInitialization: {Default: false, PreRelease: featuregate.Beta},
 
 	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
