@@ -32,6 +32,7 @@ import (
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -268,10 +269,8 @@ func getCPUWeight(cpuShares *uint64) uint64 {
 	if cpuShares == nil {
 		return 0
 	}
-	if *cpuShares >= 262144 {
-		return 10000
-	}
-	return 1 + ((*cpuShares-2)*9999)/262142
+
+	return util.CPUSharesToCPUWeight(*cpuShares)
 }
 
 var (
