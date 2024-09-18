@@ -3947,9 +3947,31 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("creating the service")
-		svc, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+		var svc *v1.Service
+		retry.OnError(retry.DefaultRetry, func(err error) bool {
+			if err != nil {
+				return true
+			}
+			return false
+		}, func() error {
+			staticHealthCheckPort, ok := e2eservice.GetUnusedStaticNodePort()
+			if !ok {
+				return errors.New("no free healthcheck nodeport found.")
+			}
+			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				svc.Spec.HealthCheckNodePort = int32(staticHealthCheckPort)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create service: %s in namespace: %s", serviceName, namespace)
+			}
+			return nil
 		})
+
+		gomega.Expect(svc).NotTo(nil, "creating the service")
+		e2eservice.ReserveStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+		defer e2eservice.ReleaseStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+
 		framework.ExpectNoError(err, "creating the service")
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
@@ -4059,7 +4081,6 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
 
-		// FIXME: this is racy; we need to use a reserved HCNP here.
 		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the endpoint node when ExternalTrafficPolicy is Cluster")
 		checkOneHealthCheck(endpointNodeIP, false, "", deadline)
 		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the execpod node when ExternalTrafficPolicy is Cluster")
@@ -4075,12 +4096,23 @@ var _ = common.SIGDescribe("Services", func() {
 		checkOneNodePort(thirdNodeIP, true, v1.ServiceExternalTrafficPolicyCluster, deadline)
 
 		ginkgo.By("changing ExternalTrafficPolicy back to Local")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
-			// FIXME: we need to use a reserved HCNP here.
-			svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
+
+		// retry a few times in case some other service has taken up the static HCNP
+		// despite being reserved and might release soon
+		retry.OnError(retry.DefaultRetry, func(err error) bool {
+			if err != nil {
+				return true
+			}
+			return false
+		}, func() error {
+			_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				// Request the same healthCheckNodePort as before, to test the user-requested allocation path
+				svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
+			})
+			return err
 		})
+
 		framework.ExpectNoError(err, "updating ExternalTrafficPolicy and HealthCheckNodePort")
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
 
