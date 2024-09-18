@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,9 +39,108 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage"
 
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 )
+
+// watchListEncoder performs encoding of
+// a special watchList bookmark event
+//
+// see: https://github.com/kubernetes/kubernetes/pull/127319
+type watchListEncoder struct {
+	initialEventsListBlueprint runtime.Object
+	targetGVK                  *schema.GroupVersionKind
+
+	rawEncoder    runtime.Encoder
+	objectEncoder runtime.Encoder
+
+	buffer     runtime.Splice
+	identifier runtime.Identifier
+}
+
+func newWatchListEncoder(initialEventsListBlueprint runtime.Object,
+	targetGVK *schema.GroupVersionKind,
+	rawEncoder runtime.Encoder,
+	objectEncoder runtime.Encoder) *watchListEncoder {
+	return &watchListEncoder{
+		initialEventsListBlueprint: initialEventsListBlueprint,
+		targetGVK:                  targetGVK,
+		rawEncoder:                 rawEncoder,
+		objectEncoder:              objectEncoder,
+		buffer:                     runtime.NewSpliceBuffer(),
+	}
+}
+
+func (e *watchListEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	// Note that we don't check if the object supports caching its serializations
+	// because this encoder only encodes a special bookmark event,
+	// and bookmark events don't support serialization caching.
+	if hasAnnotation, err := storage.HasInitialEventsEndBookmarkAnnotation(obj); !hasAnnotation || err != nil {
+		return e.objectEncoder.Encode(obj, w)
+	}
+
+	encodedInitialEventsListBlueprint, err := e.encodeInitialEventsListBlueprint()
+	if err != nil {
+		return err
+	}
+
+	obj = obj.DeepCopyObject()
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+
+	annotations := objectMeta.GetAnnotations()
+	annotations[metav1.InitialEventsListBlueprintAnnotationKey] = base64.StdEncoding.EncodeToString(encodedInitialEventsListBlueprint)
+	objectMeta.SetAnnotations(annotations)
+	return e.objectEncoder.Encode(obj, w)
+}
+
+func (e *watchListEncoder) Identifier() runtime.Identifier {
+	if e.identifier == "" {
+		e.identifier = e.embeddedIdentifier()
+	}
+	return e.identifier
+}
+
+func (e *watchListEncoder) encodeInitialEventsListBlueprint() ([]byte, error) {
+	initialEventsListBlueprint, err := e.transformInitialEventsListBlueprint()
+	if err != nil {
+		return nil, err
+	}
+
+	defer e.buffer.Reset()
+	if err = e.rawEncoder.Encode(initialEventsListBlueprint, e.buffer); err != nil {
+		return nil, err
+	}
+
+	return e.buffer.Bytes(), nil
+}
+
+func (e *watchListEncoder) transformInitialEventsListBlueprint() (runtime.Object, error) {
+	if e.targetGVK != nil && e.targetGVK.Kind == "PartialObjectMetadata" {
+		return asPartialObjectMetadataList(e.initialEventsListBlueprint, e.targetGVK.GroupVersion())
+	}
+	return e.initialEventsListBlueprint, nil
+}
+
+func (e *watchListEncoder) embeddedIdentifier() runtime.Identifier {
+	if e.targetGVK == nil {
+		return e.rawEncoder.Identifier() + e.objectEncoder.Identifier() + "watch-list-encoder"
+	}
+	identifier := watchEmbeddedEncoderIdentifier{
+		Name:    "watch-list-encoder",
+		Encoder: string(e.rawEncoder.Identifier() + e.objectEncoder.Identifier()),
+		Target:  e.targetGVK.String(),
+	}
+
+	result, err := json.Marshal(identifier)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for watchListEncoder: %v", err)
+	}
+	return runtime.Identifier(result)
+}
 
 // watchEmbeddedEncoder performs encoding of the embedded object.
 //
