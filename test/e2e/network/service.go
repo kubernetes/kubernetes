@@ -3953,7 +3953,7 @@ var _ = common.SIGDescribe("Services", func() {
 		var svc *v1.Service
 		errAllocated := errors.New("provided port is already allocated")
 		noNodePortAvailable := errors.New("no available nodeport found")
-		retry.OnError(retry.DefaultRetry, func(err error) bool {
+		err = retry.OnError(retry.DefaultRetry, func(err error) bool {
 			if err != nil &&
 				(strings.Contains(err.Error(), errAllocated.Error()) ||
 					strings.Contains(err.Error(), noNodePortAvailable.Error())) {
@@ -4103,8 +4103,8 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// retry a few times in case some other service has taken up the static HCNP
 		// despite being reserved and might release soon
-		retry.OnError(retry.DefaultRetry, func(err error) bool {
-			if err != nil {
+		err = retry.OnError(retry.DefaultRetry, func(err error) bool {
+			if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
 				return true
 			}
 			return false
