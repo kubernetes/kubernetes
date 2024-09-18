@@ -135,7 +135,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 			expectedHint: framework.Queue,
 		},
 		{
-			name: "skip-unrelated-change",
+			name: "skip-unrelated-change-unschedulable-true",
 			pod:  &v1.Pod{},
 			newObj: &v1.Node{
 				Spec: v1.NodeSpec{
@@ -151,6 +151,27 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 			oldObj: &v1.Node{
 				Spec: v1.NodeSpec{
 					Unschedulable: true,
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name: "skip-unrelated-change-unschedulable-false",
+			pod:  &v1.Pod{},
+			newObj: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+					Taints: []v1.Taint{
+						{
+							Key:    v1.TaintNodeNotReady,
+							Effect: v1.TaintEffectNoExecute,
+						},
+					},
+				},
+			},
+			oldObj: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
 				},
 			},
 			expectedHint: framework.QueueSkip,

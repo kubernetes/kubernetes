@@ -61,18 +61,19 @@ func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]framework.Cl
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable.
 func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
 
-	if !modifiedNode.Spec.Unschedulable {
+	// We queue this Pod when -
+	// 1. the node is updated from unschedulable to schedulable.
+	// 2. the node is added and is schedulable.
+	if (originalNode != nil && originalNode.Spec.Unschedulable && !modifiedNode.Spec.Unschedulable) ||
+		(originalNode == nil && !modifiedNode.Spec.Unschedulable) {
 		logger.V(5).Info("node was created or updated, pod may be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return framework.Queue, nil
 	}
-
-	// TODO: also check if the original node meets the pod's requestments once preCheck is completely removed.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
 
 	logger.V(5).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return framework.QueueSkip, nil
