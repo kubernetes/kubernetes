@@ -340,6 +340,9 @@ NODE_PROBLEM_DETECTOR_TAR_HASH=${NODE_PROBLEM_DETECTOR_TAR_HASH:-}
 NODE_PROBLEM_DETECTOR_RELEASE_PATH=${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS=${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}
 
+# Optional: Install nvidia GPU Plugin
+export ENABLE_NVIDIA_GPU=${KUBE_ENABLE_NVIDIA_GPU:-false}
+
 CNI_HASH=${CNI_HASH:-}
 CNI_TAR_PREFIX=${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}
 CNI_STORAGE_URL_BASE=${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/k8s-artifacts-cni/release}
@@ -613,3 +616,6 @@ fi
 # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
 # feature gates are set to true for kubelet to use external credential provider.
 export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-true}"
+
+# Optional: Enable NVIDIA GPU Plugin
+export ENABLE_NVIDIA_GPU="${ENABLE_NVIDIA_GPU:-false}"

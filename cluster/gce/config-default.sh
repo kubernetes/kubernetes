@@ -565,3 +565,6 @@ fi
 # Also, it is required that DisableKubeletCloudCredentialProviders
 # feature gates are set to true for kubelet to use external credential provider.
 export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-true}"
+
+# Optional: Enable NVIDIA GPU Plugin
+export ENABLE_NVIDIA_GPU="${ENABLE_NVIDIA_GPU:-false}"

@@ -2968,6 +2968,9 @@ EOF
     if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
       setup-nodelocaldns-manifest
     fi
+    if [[ "${ENABLE_NVIDIA_GPU:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
+    fi
   fi
   if [[ "${ENABLE_NETD:-}" == "true" ]]; then
     setup-netd-manifest
