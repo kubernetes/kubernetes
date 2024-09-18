@@ -227,6 +227,9 @@ type TLSClientConfig struct {
 	// Trusted root certificates for server
 	CAFile string
 
+	// Should we reload the TLS files periodically?
+	ReloadTLSFiles bool
+
 	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
 	// CertData takes precedence over CertFile
 	CertData []byte
@@ -510,8 +513,9 @@ func DefaultKubernetesUserAgent() string {
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
 	const (
-		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+		tokenFile                 = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		rootCAFile                = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+		apiClientCredentialBundle = "/var/run/secrets/kubernetes.io/serviceaccount/credentialbundle.pem"
 	)
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
@@ -529,6 +533,15 @@ func InClusterConfig() (*Config, error) {
 		klog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
+	}
+
+	_, err = os.ReadFile(apiClientCredentialBundle)
+	if err != nil {
+		klog.InfoS("(Non-fatal) Could not read API client credential bundle")
+	} else {
+		tlsClientConfig.CertFile = apiClientCredentialBundle
+		tlsClientConfig.KeyFile = apiClientCredentialBundle
+		tlsClientConfig.ReloadTLSFiles = true
 	}
 
 	return &Config{

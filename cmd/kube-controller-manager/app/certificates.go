@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	"k8s.io/utils/clock"
 )
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
@@ -82,6 +83,15 @@ func startCertificateSigningRequestSigningController(ctx context.Context, contro
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %v", err)
 		}
 		go kubeAPIServerClientSigner.Run(ctx, 5)
+
+		pcrClient := controllerContext.ClientBuilder.ClientOrDie("podcertificate-controller")
+		pcrInformer := controllerContext.InformerFactory.Certificates().V1alpha1().PodCertificateRequests()
+
+		kubeAPIServerPodClientSigner, err := signer.NewPodClientCSRSigningController(ctx, pcrClient, pcrInformer, clock.RealClock{}, kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-pod certificate controller: %w", err)
+		}
+		go kubeAPIServerPodClientSigner.Run(ctx, 5)
 	} else {
 		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client")
 	}

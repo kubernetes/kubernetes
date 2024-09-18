@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	"k8s.io/kubernetes/pkg/kubelet/workloadcertificate"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -451,4 +452,11 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, label
 	}
 
 	return fullSet.Bytes(), nil
+}
+
+func (f *fakeKubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, pod workloadcertificate.PodIdentity, volumeName, path, signerName, keyType string) ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeKubeletVolumeHost) ForgetPodCertificateCredentialBundle(ctx context.Context, podUID, volumeName, path string) {
 }

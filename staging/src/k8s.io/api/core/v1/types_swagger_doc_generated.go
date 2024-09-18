@@ -1608,6 +1608,19 @@ func (PodAttachOptions) SwaggerDoc() map[string]string {
 	return map_PodAttachOptions
 }
 
+var map_PodCertificateProjection = map[string]string{
+	"":                     "PodCertificateProjection provides a private key and X.509 certificate in the pod filesystem.",
+	"signerName":           "Kubelet's generated CSRs will be addressed to this signer.",
+	"keyType":              "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", and \"ECDSAP384\".  If left empty, Kubelet defaults to \"ECDSAP256\".",
+	"credentialBundlePath": "Write the credential bundle at this path in the projected volume.\n\nThe credential bundle is a single file that contains multiple PEM blocks. The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private key.\n\nThe remaining blocks are CERTIFICATE blocks, containing the issued certificate chain from the signer (leaf and any intermediates).\n\nPrefer using credentialPath to keyPath and certificatePath, because the single file can be atomically read by your Pod's application code, removing the need to check for consistency between the key and leaf certificate once you load them.\n\nMutually exclusive with keyPath and certificateChainPath.",
+	"keyPath":              "Write the key at this path in the projected volume.\n\nMutually exclusive with credentialPath.",
+	"certificateChainPath": "Write the certificate chain at this path in the projected volume.\n\nMutually exclusive with credentialPath.",
+}
+
+func (PodCertificateProjection) SwaggerDoc() map[string]string {
+	return map_PodCertificateProjection
+}
+
 var map_PodCondition = map[string]string{
 	"":                   "PodCondition contains details for the current condition of this pod.",
 	"type":               "Type is the type of the condition. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
@@ -2700,6 +2713,7 @@ var map_VolumeProjection = map[string]string{
 	"configMap":           "configMap information about the configMap data to project",
 	"serviceAccountToken": "serviceAccountToken is information about the serviceAccountToken data to project",
 	"clusterTrustBundle":  "ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field of ClusterTrustBundle objects in an auto-updating file.\n\nAlpha, gated by the ClusterTrustBundleProjection feature gate.\n\nClusterTrustBundle objects can either be selected by name, or by the combination of signer name and a label selector.\n\nKubelet performs aggressive normalization of the PEM contents written into the pod filesystem.  Esoteric PEM features such as inter-block comments and block headers are stripped.  Certificates are deduplicated. The ordering of certificates within the file is arbitrary, and Kubelet may change the order over time.",
+	"podCertificate":      "Projects an auto-rotating credential bundle (private key and certificate chain) that the pod can use either as a TLS client or server.\n\nKubelet generates a private key and uses it to send a PodCertificateRequest to the named signer.  Once the signer approves the request and issues a certificate chain, Kubelet writes the key and certificate chain to the pod filesystem.  The pod does not start until certificates have been issued for each podCertificate projected volume source in its spec.\n\nKubelet will begin trying to rotate the certificate at the time indicated by the signer using the PodCertificateRequest.Status.BeginRefreshAt timestamp.\n\nKubelet can write a single file, indicated by the credentialBundlePath field, or separate files, indicated by the keyPath and certificateChainPath fields.\n\nThe credential bundle is a single file in PEM format.  The first PEM entry is the private key (in PKCS#8 format), and the remaining PEM entries are the certificate chain issued by the signer (typically, signers will return their certificate chain in leaf-to-root order).\n\nPrefer using the credential bundle format, since your application code can read it atomically.  If you use keyPath and certificateChainPath, your application must make two separate file reads. If these coincide with a certificate rotation, it is possible that the private key and leaf certificate you read may not correspond to each other.  Your application will need to check for this condition, and re-read until they are consistent.\n\nThe named signer controls chooses the format of the certificate it issues; consult the signer implementation's documentation to learn how to use the certificates it issues.",
 }
 
 func (VolumeProjection) SwaggerDoc() map[string]string {

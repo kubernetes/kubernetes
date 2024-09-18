@@ -302,6 +302,13 @@
                 },
                 "optional": true,
                 "path": "pathValue"
+              },
+              "podCertificate": {
+                "signerName": "signerNameValue",
+                "keyType": "keyTypeValue",
+                "credentialBundlePath": "credentialBundlePathValue",
+                "keyPath": "keyPathValue",
+                "certificateChainPath": "certificateChainPathValue"
               }
             }
           ],

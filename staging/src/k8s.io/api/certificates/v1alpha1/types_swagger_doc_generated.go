@@ -57,4 +57,67 @@ func (ClusterTrustBundleSpec) SwaggerDoc() map[string]string {
 	return map_ClusterTrustBundleSpec
 }
 
+var map_PodCertificateRequest = map[string]string{
+	"":       "PodCertificateRequest encodes a pod requesting a certificate from a given signer.\n\nKubelets use this API to implement podCertificate projected volumes",
+	"spec":   "spec contains the details about the certificate being requested.",
+	"status": "status contains the issued certificate, and a standard set of conditions.",
+}
+
+func (PodCertificateRequest) SwaggerDoc() map[string]string {
+	return map_PodCertificateRequest
+}
+
+var map_PodCertificateRequestCondition = map[string]string{
+	"":                   "PodCertificateRequestCondition describes a condition of a PodCertificateRequest object.",
+	"type":               "type of the condition. Known conditions are \"Denied\" and \"Failed\".\n\nA \"Denied\" condition is added via the /status subresource, indicating the request was denied.  Denied conditions cannot be removed once added.\n\nA \"Failed\" condition is added via the /status subresource, indicating the signer failed to issue the certificate.  Failed conditions cannot be removed once added.\n\nOnly one condition of a given type is allowed.",
+	"status":             "status of the condition, one of True, False, Unknown. Approved, Denied, and Failed conditions may not be \"False\" or \"Unknown\".",
+	"reason":             "reason indicates a brief reason for the request state",
+	"message":            "message contains a human readable message with details about the request state",
+	"lastUpdateTime":     "lastUpdateTime is the time of the last update to this condition",
+	"lastTransitionTime": "lastTransitionTime is the time the condition last transitioned from one status to another. If unset, when a new condition type is added or an existing condition's status is changed, the server defaults this to the current time.",
+}
+
+func (PodCertificateRequestCondition) SwaggerDoc() map[string]string {
+	return map_PodCertificateRequestCondition
+}
+
+var map_PodCertificateRequestList = map[string]string{
+	"":      "PodCertificateRequestList is a collection of PodCertificateRequest objects",
+	"items": "items is a collection of PodCertificateRequest objects",
+}
+
+func (PodCertificateRequestList) SwaggerDoc() map[string]string {
+	return map_PodCertificateRequestList
+}
+
+var map_PodCertificateRequestSpec = map[string]string{
+	"":                   "PodCertificateRequestSpec describes the certificate request.  All fields are immutable after creation.",
+	"signerName":         "signerName indicates the request signer.",
+	"podName":            "podName is the name of the pod into which the certificate will be mounted.",
+	"podUID":             "podUID is the UID of the pod into which the certificate will be mounted.",
+	"serviceAccountName": "serviceAccountName is the name of the service account the pod is running as.",
+	"serviceAccountUID":  "serviceAccountUID is the UID of the service account the pod is running as.",
+	"nodeName":           "nodeName is the name of the node the pod is assigned to.",
+	"nodeUID":            "nodeUID is the UID of the node the pod is assigned to.",
+	"pkixPublicKey":      "pkixPublicKey is the PKIX-serialized public key the signer should issue the certificate to.\n\nThe key must be one of RSA-3072, RSA-4096, ECDSA-P256 or ECDSA-P384.",
+	"proofOfPossession":  "proofOfPossession proves that the requesting Kubelet holds the private key corresponding to pkixPublicKey.\n\nIf the key is an RSA key, then the signature is over the ASCII bytes of the pod UID, using  RSASSA-PKCS1-V1_5-SIGN from RSA PKCS #1 v1.5 (as implemented by the golang function crypto/rsa.SignPKCS1v15).\n\nIf the key is an ECDSA key, then the signature is as described by [SEC 1, Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the golang library function crypto/ecdsa.SignASN1)",
+}
+
+func (PodCertificateRequestSpec) SwaggerDoc() map[string]string {
+	return map_PodCertificateRequestSpec
+}
+
+var map_PodCertificateRequestStatus = map[string]string{
+	"conditions":       "conditions applied to the request. Known conditions are \"Denied\" and \"Failed\".",
+	"certificateChain": "certificateChain is populated with an issued certificate by the signer. This field is set via the /status subresource. Once populated, this field is immutable.\n\nIf the certificate signing request is denied, a condition of type \"Denied\" is added and this field remains empty. If the signer cannot issue the certificate, a condition of type \"Failed\" is added and this field remains empty.\n\nValidation requirements:\n 1. certificateChain must contain one or more entries.\n 2. Each entry must contain a single DER-encoded ASN.1 Certificate structure as described in section 4 of RFC5280.\n\nIf more than one entry is present, and the definition of the requested spec.signerName does not indicate otherwise, the first entry is the issued certificate, and subsequent entries should be treated as intermediate certificates and presented in TLS handshakes.\n\nAs a reminder, when serialized as JSON or YAML, each entry is additionally base64-encoded.",
+	"issuedAt":         "issuedAt is the time at which the signer issued the certificate.  This field is set via the /status subresource.  Once populated, it is immutable.",
+	"notBefore":        "notBefore is the time at which the certificate becomes valid.  This field is set via the /status subresource.  Once populated, it is immutable.",
+	"beginRefreshAt":   "beginRefreshAt is the time at which the kubelet should begin trying to refresh the certificate.  This field is set via the /status subresource, and must be set at the same time as certificateChain.  Once populated, this field is immutable.",
+	"notAfter":         "notAfter is the time at which the certificate expires.  This field is set via the /status subresource.  Once populated, it is immutable.",
+}
+
+func (PodCertificateRequestStatus) SwaggerDoc() map[string]string {
+	return map_PodCertificateRequestStatus
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE

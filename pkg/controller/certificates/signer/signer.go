@@ -19,24 +19,34 @@ package signer
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"math/big"
 	"time"
 
 	capi "k8s.io/api/certificates/v1"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	capiv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
+	certificatesv1alpha1informers "k8s.io/client-go/informers/certificates/v1alpha1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/component-helpers/kubernetesx509"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
+	"k8s.io/utils/clock"
 )
+
+var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
 type CSRSigningController struct {
 	certificateController *certificates.CertificateController
@@ -304,4 +314,141 @@ func usagesToSet(usages []capi.KeyUsage) sets.String {
 		result.Insert(string(usage))
 	}
 	return result
+}
+
+type PCRSigningController struct {
+	pcrController       *certificates.PodCertificateRequestController
+	dynamicCertReloader dynamiccertificates.ControllerRunner
+}
+
+func NewPodClientCSRSigningController(
+	ctx context.Context,
+	client clientset.Interface,
+	pcrInformer certificatesv1alpha1informers.PodCertificateRequestInformer,
+	clock clock.Clock,
+	caFile, caKeyFile string,
+) (*PCRSigningController, error) {
+	caProvider, err := newCAProvider(caFile, caKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &podClientSigner{
+		caProvider: caProvider,
+		client:     client,
+		clock:      clock,
+	}
+
+	return &PCRSigningController{
+		pcrController: certificates.NewPodCertificateRequestController(
+			ctx,
+			"podcertificate-signing-pod-client",
+			client,
+			pcrInformer,
+			s.handle,
+		),
+		dynamicCertReloader: caProvider.caLoader,
+	}, nil
+}
+
+// Run the main goroutine responsible for watching and syncing jobs.
+func (c *PCRSigningController) Run(ctx context.Context, workers int) {
+	go c.dynamicCertReloader.Run(ctx, workers)
+
+	c.pcrController.Run(ctx, workers)
+}
+
+type podClientSigner struct {
+	client     clientset.Interface
+	caProvider *caProvider
+	clock      clock.Clock
+}
+
+func (s *podClientSigner) handle(ctx context.Context, req *certificatesv1alpha1.PodCertificateRequest) error {
+	// Ignore denied or failed requests
+	for _, c := range req.Status.Conditions {
+		if c.Type == certificatesv1alpha1.PodCertificateRequestDenied && c.Status == v1.ConditionTrue {
+			return nil
+		}
+		if c.Type == certificatesv1alpha1.PodCertificateRequestFailed && c.Status == v1.ConditionTrue {
+			return nil
+		}
+	}
+
+	// Ignore requests that have already been issued.
+	if len(req.Status.CertificateChain) > 0 {
+		return nil
+	}
+
+	if req.Spec.SignerName != certificatesv1alpha1.KubeAPIServerClientPodSignerName {
+		return nil
+	}
+
+	pubKey, err := x509.ParsePKIXPublicKey(req.Spec.PKIXPublicKey)
+	if err != nil {
+		return fmt.Errorf("while parsing public key: %w", err)
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return fmt.Errorf("while generating serial number: %w", err)
+	}
+
+	// Slightly backdate the certificate to handle clock skew.
+	notBefore := s.clock.Now().Add(-5 * time.Minute)
+	beginRefreshAt := notBefore.Add(12 * time.Hour)
+	notAfter := notBefore.Add(24 * time.Hour)
+
+	keyUsage := x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement
+	if _, ok := pubKey.(*rsa.PublicKey); ok {
+		keyUsage |= x509.KeyUsageKeyEncipherment
+	}
+	extKeyUsage := []x509.ExtKeyUsage{
+		x509.ExtKeyUsageClientAuth,
+	}
+
+	// Compose certificate we want to issue.  There is only the Kubernetes
+	// PodIdentity extension, and a CommonName for backwards-compatibility.
+	tmpl := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName: "system:serviceaccount:" + req.ObjectMeta.Namespace + ":" + req.Spec.ServiceAccountName,
+		},
+		NotBefore:   notBefore,
+		NotAfter:    notAfter,
+		KeyUsage:    keyUsage,
+		ExtKeyUsage: extKeyUsage,
+	}
+
+	pi := &kubernetesx509.PodIdentity{
+		Namespace:          req.ObjectMeta.Namespace,
+		ServiceAccountName: req.Spec.ServiceAccountName,
+		PodName:            req.Spec.PodName,
+		PodUID:             string(req.Spec.PodUID),
+		NodeName:           string(req.Spec.NodeName),
+	}
+	kubernetesx509.AddPodIdentityToCertificate(pi, tmpl)
+
+	currCA, err := s.caProvider.currentCA()
+	if err != nil {
+		return fmt.Errorf("while retrieving current CA: %w", err)
+	}
+
+	der, err := currCA.SignCertificate(tmpl, pubKey)
+	if err != nil {
+		return fmt.Errorf("while signing certificate: %w", err)
+	}
+
+	req.Status.CertificateChain = [][]byte{der}
+	req.Status.IssuedAt = metav1.NewTime(s.clock.Now())
+	req.Status.NotBefore = metav1.NewTime(notBefore)
+	req.Status.BeginRefreshAt = metav1.NewTime(beginRefreshAt)
+	req.Status.NotAfter = metav1.NewTime(notAfter)
+
+	_, err = s.client.CertificatesV1alpha1().PodCertificateRequests(req.ObjectMeta.Namespace).UpdateStatus(ctx, req, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("while updating CSR: %w", err)
+	}
+
+	return nil
 }

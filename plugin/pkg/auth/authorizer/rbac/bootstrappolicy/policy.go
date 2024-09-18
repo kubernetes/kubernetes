@@ -188,6 +188,10 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie())
 	}
+	// Kubelet needs to create arbitrary PodCertificateRequests to implement podCertificate volumes.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateProjection) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie())
+	}
 
 	return nodePolicyRules
 }

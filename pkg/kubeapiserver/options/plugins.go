@@ -92,6 +92,8 @@ var AllOrderedPlugins = []string{
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
 
+	// TODO(ahmedtd): Duplicate the certsigning plugin for PodCertificateRequests
+
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
 
@@ -161,6 +163,8 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		podsecurity.PluginName,                  // PodSecurity
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
+
+	// TODO(ahmedtd): Add the PodCertificate signing plugin to the default-on list.
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }

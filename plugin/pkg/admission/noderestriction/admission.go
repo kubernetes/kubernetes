@@ -113,14 +113,15 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 var (
-	podResource           = api.Resource("pods")
-	nodeResource          = api.Resource("nodes")
-	pvcResource           = api.Resource("persistentvolumeclaims")
-	svcacctResource       = api.Resource("serviceaccounts")
-	leaseResource         = coordapi.Resource("leases")
-	csiNodeResource       = storage.Resource("csinodes")
-	resourceSliceResource = resource.Resource("resourceslices")
-	csrResource           = certapi.Resource("certificatesigningrequests")
+	podResource                   = api.Resource("pods")
+	nodeResource                  = api.Resource("nodes")
+	pvcResource                   = api.Resource("persistentvolumeclaims")
+	svcacctResource               = api.Resource("serviceaccounts")
+	leaseResource                 = coordapi.Resource("leases")
+	csiNodeResource               = storage.Resource("csinodes")
+	resourceSliceResource         = resource.Resource("resourceslices")
+	csrResource                   = certapi.Resource("certificatesigningrequests")
+	podCertificateRequestResource = certapi.Resource("podcertificaterequests")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -165,6 +166,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 
 	case svcacctResource:
 		return p.admitServiceAccount(nodeName, a)
+
+	case podCertificateRequestResource:
+		return p.admitPodCertificateRequest(nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
@@ -599,6 +603,44 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	// a Node binding. Instead, kube-apiserver automatically infers and sets
 	// the Node binding when it receives a Pod binding. See:
 	// https://github.com/kubernetes/kubernetes/issues/121723 for more info.
+
+	return nil
+}
+
+func (p *Plugin) admitPodCertificateRequest(nodeName string, a admission.Attributes) error {
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
+
+	namespace := a.GetNamespace()
+
+	req, ok := a.GetObject().(*certapi.PodCertificateRequest)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	if string(req.Spec.NodeName) != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest.Spec.NodeName=%q, which is not the requesting node %q", req.Spec.NodeName, nodeName))
+	}
+	// TODO(KEP-4317): Validate node UID.
+
+	pod, err := p.podsGetter.Pods(namespace).Get(req.Spec.PodName)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("while retrieving pod %s/%s named in the PodCertificateRequest: %w", namespace, req.Spec.PodName, err)
+	}
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while retrieving pod %s/%s named in the PodCertificateRequest: %w", namespace, req.Spec.PodName, err))
+	}
+
+	if req.Spec.PodUID != pod.ObjectMeta.UID {
+		// We cannot outright forbid because our informer could be running behind.
+		return fmt.Errorf("PodCertificateRequest for pod %s/%s contains UID (%s) which differs from running pod %s", namespace, req.Spec.PodName, req.Spec.PodUID, string(pod.ObjectMeta.UID))
+	}
+	if req.Spec.ServiceAccountName != pod.Spec.ServiceAccountName {
+		// We can outright forbid because this cannot be caused by informer lag (the UIDs match)
+		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest for pod %s/%s contains serviceAccountName (%s) that differs from running pod (%s)", namespace, req.Spec.PodName, req.Spec.ServiceAccountName, pod.Spec.ServiceAccountName))
+	}
+	// TODO(KEP-4317): Validate service account UID.
 
 	return nil
 }

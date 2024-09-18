@@ -119,7 +119,7 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
-		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
+		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, []x509.UserConversion{x509.KubernetesPodIdentityUserConversion, x509.CommonNameUserConversion})
 		authenticators = append(authenticators, certAuth)
 	}
 

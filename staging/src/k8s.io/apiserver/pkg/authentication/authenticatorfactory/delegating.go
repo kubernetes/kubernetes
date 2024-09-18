@@ -86,7 +86,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 
 	// x509 client cert auth
 	if c.ClientCertificateCAContentProvider != nil {
-		authenticators = append(authenticators, x509.NewDynamic(c.ClientCertificateCAContentProvider.VerifyOptions, x509.CommonNameUserConversion))
+		authenticators = append(authenticators, x509.NewDynamic(c.ClientCertificateCAContentProvider.VerifyOptions, []x509.UserConversion{x509.KubernetesPodIdentityUserConversion, x509.CommonNameUserConversion}))
 	}
 
 	if c.TokenAccessReviewClient != nil {

@@ -572,3 +572,73 @@ func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 
 	return allErrors
 }
+
+type ValidatePodCertificateRequestOptions struct {
+	AllowSettingStatusFields bool
+}
+
+// ValidatePodCertificateRequest runs all validation checks on a pod certificate request.
+func ValidatePodCertificateRequest(req *certificates.PodCertificateRequest, opts ValidatePodCertificateRequestOptions) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&req.ObjectMeta, true, validatePodCertificateRequestName, field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), req.Spec.SignerName)
+	allErrors = append(allErrors, signerNameErrors...)
+
+	// TODO(ahmedtd): Validate Spec.PKIXPublicKey
+
+	// TODO(ahmedtd): Validate Spec.ProofOfPossession
+
+	// TODO(ahmedtd): Validate Status.CertificateChain
+
+	// TODO(ahmedtd): Tests
+
+	return allErrors
+}
+
+// ValidatePodCertificateRequestUpdate runs all update validation checks on an
+// update.
+func ValidatePodCertificateRequestUpdate(newReq, oldReq *certificates.PodCertificateRequest, opts ValidatePodCertificateRequestOptions) field.ErrorList {
+	// TODO(ahmedtd): If the caller isn't changing the status.certificateChain
+	// field, don't validate it, to defend against changes in Go X.509 parsing.
+
+	// TODO(ahmedtd): Ditto Spec.PKIXPublicKey
+
+	// TODO(ahmedtd): Ditto Spec.ProofOfPossession
+
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, ValidatePodCertificateRequest(newReq, opts)...)
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
+
+	// All spec fields are immutable.
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.SignerName, oldReq.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PodName, oldReq.Spec.PodName, field.NewPath("spec", "podName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PodUID, oldReq.Spec.PodUID, field.NewPath("spec", "podUID"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.ServiceAccountName, oldReq.Spec.ServiceAccountName, field.NewPath("spec", "serviceAccountName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.NodeName, oldReq.Spec.NodeName, field.NewPath("spec", "nodeName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PKIXPublicKey, oldReq.Spec.PKIXPublicKey, field.NewPath("spec", "pkixPublicKey"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.ProofOfPossession, oldReq.Spec.ProofOfPossession, field.NewPath("spec", "proofOfPossession"))...)
+
+	if !opts.AllowSettingStatusFields {
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.CertificateChain, oldReq.Status.CertificateChain, field.NewPath("status", "certificateChain"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.IssuedAt, oldReq.Status.IssuedAt, field.NewPath("status", "issuedAt"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.NotBefore, oldReq.Status.NotBefore, field.NewPath("status", "notBefore"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.BeginRefreshAt, oldReq.Status.BeginRefreshAt, field.NewPath("status", "beginRefreshAt"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.NotAfter, oldReq.Status.NotAfter, field.NewPath("status", "notAfter"))...)
+	}
+
+	return allErrors
+}
+
+// We don't care what you call your pod certificate requests.
+func validatePodCertificateRequestName(name string, prefix bool) []string {
+	return nil
+}
+
+func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodCertificateRequest) field.ErrorList {
+	return ValidatePodCertificateRequestUpdate(newReq, oldReq, ValidatePodCertificateRequestOptions{
+		AllowSettingStatusFields: true,
+	})
+}

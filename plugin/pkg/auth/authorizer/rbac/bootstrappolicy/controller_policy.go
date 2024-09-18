@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -418,6 +419,19 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateAPIClientCertificates) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcertificate-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("podcertificaterequests/status").RuleOrDie(),
+				rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names(
+					certificatesv1alpha1.KubeAPIServerClientPodSignerName,
+				).RuleOrDie(),
+			},
+		})
+	}
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 		Rules: []rbacv1.PolicyRule{
