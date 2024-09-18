@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -81,7 +80,6 @@ func TestMergeKubeletConfigurations(t *testing.T) {
 		overwrittenConfigFields map[string]interface{}
 		cliArgs                 []string
 		name                    string
-		expectMergeError        string
 	}{
 		{
 			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
@@ -224,55 +222,6 @@ readOnlyPort: 10255
 			},
 			name: "cli args override kubelet.conf",
 		},
-		{
-			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
-				ResolverConfig: "original",
-				Port:           123,
-				ReadOnlyPort:   234,
-			},
-			dropin1: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-resolvConf: dropin1
-`,
-			dropin2: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-port: 0
-`,
-			overwrittenConfigFields: map[string]interface{}{
-				"ResolverConfig": "dropin1",    // overridden by dropin1
-				"Port":           int32(10250), // reset to 0 by dropin2, then re-defaulted
-				"ReadOnlyPort":   int32(234),   // preserved from original config
-			},
-			name: "json conversion is correct",
-		},
-		{
-			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{},
-			dropin1: `
-apiVersion: kubelet.config.k8s.io/v1beta2
-kind: KubeletConfiguration
-`,
-			name:             "invalid drop-in apiVersion",
-			expectMergeError: `unknown apiVersion/kind: kubelet.config.k8s.io/v1beta2, Kind=KubeletConfiguration`,
-		},
-		{
-			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{},
-			dropin1: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration2
-`,
-			name:             "invalid drop-in kind",
-			expectMergeError: `unknown apiVersion/kind: kubelet.config.k8s.io/v1beta1, Kind=KubeletConfiguration2`,
-		},
-		{
-			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{},
-			dropin1: `
-port: 123
-`,
-			name:             "empty drop-in apiVersion/kind",
-			expectMergeError: `'Kind' is missing`,
-		},
 	}
 
 	for _, test := range testCases {
@@ -299,24 +248,15 @@ port: 123
 				err := os.Mkdir(kubeletConfDir, 0755)
 				require.NoError(t, err, "Failed to create kubelet.conf.d directory")
 
-				if len(test.dropin1) > 0 {
-					err = os.WriteFile(filepath.Join(kubeletConfDir, "10-kubelet.conf"), []byte(test.dropin1), 0644)
-					require.NoError(t, err, "failed to create config from a yaml file")
-				}
+				err = os.WriteFile(filepath.Join(kubeletConfDir, "10-kubelet.conf"), []byte(test.dropin1), 0644)
+				require.NoError(t, err, "failed to create config from a yaml file")
 
-				if len(test.dropin2) > 0 {
-					err = os.WriteFile(filepath.Join(kubeletConfDir, "20-kubelet.conf"), []byte(test.dropin2), 0644)
-					require.NoError(t, err, "failed to create config from a yaml file")
-				}
+				err = os.WriteFile(filepath.Join(kubeletConfDir, "20-kubelet.conf"), []byte(test.dropin2), 0644)
+				require.NoError(t, err, "failed to create config from a yaml file")
 
 				// Merge the kubelet configurations
 				err = mergeKubeletConfigurations(kubeletConfig, kubeletConfDir)
-				if test.expectMergeError == "" {
-					require.NoError(t, err, "failed to merge kubelet drop-in configs")
-				} else {
-					require.Error(t, err)
-					require.Contains(t, err.Error(), test.expectMergeError)
-				}
+				require.NoError(t, err, "failed to merge kubelet drop-in configs")
 			}
 
 			// Use kubelet config flag precedence

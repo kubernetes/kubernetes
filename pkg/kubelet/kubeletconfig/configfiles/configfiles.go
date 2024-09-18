@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -34,7 +33,7 @@ type Loader interface {
 	Load() (*kubeletconfig.KubeletConfiguration, error)
 	// LoadIntoJSON loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be
 	// loaded. It returns the configuration as a JSON byte slice
-	LoadIntoJSON() ([]byte, *schema.GroupVersionKind, error)
+	LoadIntoJSON() ([]byte, error)
 }
 
 // fsLoader loads configuration from `configDir`
@@ -82,15 +81,15 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	return kc, nil
 }
 
-func (loader *fsLoader) LoadIntoJSON() ([]byte, *schema.GroupVersionKind, error) {
+func (loader *fsLoader) LoadIntoJSON() ([]byte, error) {
 	data, err := loader.fs.ReadFile(loader.kubeletFile)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read drop-in kubelet config file %q, error: %w", loader.kubeletFile, err)
+		return nil, fmt.Errorf("failed to read drop-in kubelet config file %q, error: %v", loader.kubeletFile, err)
 	}
 
 	// no configuration is an error, some parameters are required
 	if len(data) == 0 {
-		return nil, nil, fmt.Errorf("kubelet config file %q was empty", loader.kubeletFile)
+		return nil, fmt.Errorf("kubelet config file %q was empty", loader.kubeletFile)
 	}
 
 	return utilcodec.DecodeKubeletConfigurationIntoJSON(loader.kubeletCodecs, data)
