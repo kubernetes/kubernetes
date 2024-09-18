@@ -94,25 +94,36 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	}
 
 	var allErrs []error
-	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
+	containerVisitor := func(c *api.Container, p *field.Path) bool {
 		if c.ImagePullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,
 				field.NotSupported(p.Child("imagePullPolicy"), c.ImagePullPolicy, []string{string(api.PullAlways)}),
 			))
 		}
 		return true
-	})
+	}
 
-	// See: https://kep.k8s.io/4639
-	for i, v := range pod.Spec.Volumes {
-		if v.Image != nil && v.Image.PullPolicy != api.PullAlways {
-			allErrs = append(allErrs, admission.NewForbidden(attributes,
-				field.NotSupported(
-					field.NewPath("spec").Child("volumes").Index(i).Child("image").Child("pullPolicy"),
-					v.Image.PullPolicy,
-					[]string{string(api.PullAlways)},
-				),
-			))
+	if attributes.GetSubresource() == "ephemeralcontainers" {
+		fldPath := field.NewPath("spec").Child("ephemeralContainers")
+		for i := range pod.Spec.EphemeralContainers {
+			if !containerVisitor((*api.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), fldPath.Index(i)) {
+				break
+			}
+		}
+	} else {
+		pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), containerVisitor)
+
+		// See: https://kep.k8s.io/4639
+		for i, v := range pod.Spec.Volumes {
+			if v.Image != nil && v.Image.PullPolicy != api.PullAlways {
+				allErrs = append(allErrs, admission.NewForbidden(attributes,
+					field.NotSupported(
+						field.NewPath("spec").Child("volumes").Index(i).Child("image").Child("pullPolicy"),
+						v.Image.PullPolicy,
+						[]string{string(api.PullAlways)},
+					),
+				))
+			}
 		}
 	}
 
