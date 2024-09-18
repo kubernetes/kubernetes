@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
@@ -55,6 +56,7 @@ import (
 func TestUpdatePodInCache(t *testing.T) {
 	ttl := 10 * time.Second
 	nodeName := "node"
+	metrics.Register()
 
 	tests := []struct {
 		name   string
@@ -129,7 +131,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p1").Req(cpu4).Obj(),
 				st.MakePod().Name("p2").Req(cpu16).Obj(),
 				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
-				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
 				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
 				st.MakePod().Name("p6").Obj(),
 				st.MakePod().Name("p7").Node("invalid-node").Obj(),
@@ -150,7 +152,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p1").Req(cpu4).Obj(),
 				st.MakePod().Name("p2").Req(cpu16).Obj(),
 				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
-				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
 				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
 				st.MakePod().Name("p6").Obj(),
 				st.MakePod().Name("p7").Node("invalid-node").Obj(),
@@ -188,10 +190,10 @@ func TestPreCheckForNode(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
+				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
 				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
-				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
+				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).HostPort(80).Obj(),
 			},
 			want: []bool{false, false, true, false, false},
 		},

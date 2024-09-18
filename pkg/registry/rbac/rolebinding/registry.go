@@ -61,8 +61,8 @@ type AuthorizerAdapter struct {
 	Registry Registry
 }
 
-func (a AuthorizerAdapter) ListRoleBindings(namespace string) ([]*rbacv1.RoleBinding, error) {
-	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &metainternalversion.ListOptions{})
+func (a AuthorizerAdapter) ListRoleBindings(ctx context.Context, namespace string) ([]*rbacv1.RoleBinding, error) {
+	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(ctx, namespace), &metainternalversion.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

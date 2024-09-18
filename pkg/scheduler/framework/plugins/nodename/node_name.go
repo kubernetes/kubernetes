@@ -22,11 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
-type NodeName struct{}
+type NodeName struct {
+	enableSchedulingQueueHint bool
+}
 
 var _ framework.FilterPlugin = &NodeName{}
 var _ framework.EnqueueExtensions = &NodeName{}
@@ -42,8 +45,20 @@ const (
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodeName) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = framework.Add
+	}
+
 	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
+		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
+		// (the same as Queue)
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 	}, nil
 }
 
@@ -67,6 +82,8 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &NodeName{}, nil
+func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+	return &NodeName{
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+	}, nil
 }

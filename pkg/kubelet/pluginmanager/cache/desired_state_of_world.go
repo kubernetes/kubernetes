@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 )
 
@@ -132,12 +133,13 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 	}
 
 	// Update the PluginInfo object.
-	// Note that we only update the timestamp in the desired state of world, not the actual state of world
+	// Note that we only update the timestamp and UUID in the desired state of world, not the actual state of world
 	// because in the reconciler, we need to check if the plugin in the actual state of world is the same
 	// version as the plugin in the desired state of world
 	dsw.socketFileToInfo[socketPath] = PluginInfo{
 		SocketPath: socketPath,
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 	}
 	return nil
 }

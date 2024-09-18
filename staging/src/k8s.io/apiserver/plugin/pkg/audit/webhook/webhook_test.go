@@ -45,7 +45,7 @@ import (
 // request body. The caller passes a callback which is called on each webhook POST.
 // The object passed to cb is of the same type as list.
 func newWebhookHandler(t *testing.T, list runtime.Object, cb func(events runtime.Object)) http.Handler {
-	s := json.NewSerializer(json.DefaultMetaFactory, audit.Scheme, audit.Scheme, false)
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, audit.Scheme, audit.Scheme, json.SerializerOptions{})
 	return &testWebhookHandler{
 		t:          t,
 		list:       list,

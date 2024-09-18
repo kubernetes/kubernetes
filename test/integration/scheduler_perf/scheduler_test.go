@@ -18,6 +18,9 @@ package benchmark
 
 import (
 	"testing"
+
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestScheduling(t *testing.T) {
@@ -43,6 +46,17 @@ func TestScheduling(t *testing.T) {
 					informerFactory, tCtx := setupTestCase(t, tc, nil, nil)
 
 					runWorkload(tCtx, tc, w, informerFactory)
+
+					if tc.FeatureGates[features.SchedulerQueueingHints] {
+						// In any case, we should make sure InFlightEvents is empty after running the scenario.
+						if err = checkEmptyInFlightEvents(); err != nil {
+							tCtx.Errorf("%s: %s", w.Name, err)
+						}
+					}
+
+					// Reset metrics to prevent metrics generated in current workload gets
+					// carried over to the next workload.
+					legacyregistry.Reset()
 				})
 			}
 		})

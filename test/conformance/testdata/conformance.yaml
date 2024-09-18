@@ -2267,6 +2267,15 @@
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
   file: test/e2e/node/taints.go
+- testname: Node, resource lifecycle
+  codename: '[sig-node] Node Lifecycle should run through the lifecycle of a node
+    [Conformance]'
+  description: Creating and Reading a Node MUST succeed with required name retrieved.
+    Patching a Node MUST succeed with its new label found. Listing Nodes with a labelSelector
+    MUST succeed with only a single node found. Updating a Node MUST succeed with
+    its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
+  release: v1.32
+  file: test/e2e/node/node_lifecycle.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
@@ -2647,21 +2656,21 @@
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with absolute path
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with absolute path [Slow] [Conformance]'
+    subpath with absolute path [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when absolute path is supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with backticks
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with backticks [Slow] [Conformance]'
+    subpath with backticks [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when backticks are supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[sig-node] Variable Expansion should succeed in writing subpaths in container
-    [Slow] [Conformance]'
+    [Conformance]'
   description: "Verify that a subpath expansion can be used to write files into subpaths.
     1.\tvalid subpathexpr starts a container running 2.\ttest for valid subpath writes
     3.\tsuccessful expansion of the subpathexpr isn't required for volume cleanup"

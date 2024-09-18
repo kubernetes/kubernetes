@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -146,7 +147,7 @@ func TestNodePorts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil)
+			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
@@ -175,7 +176,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, err := New(ctx, nil, nil)
+	p, err := New(ctx, nil, nil, feature.Features{})
 	if err != nil {
 		t.Fatalf("creating plugin: %v", err)
 	}
@@ -341,7 +342,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil)
+			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}

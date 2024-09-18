@@ -263,9 +263,19 @@ func newMetricsCollector(config *metricsCollectorConfig, labels map[string]strin
 	}
 }
 
-func (mc *metricsCollector) init() {
+func (mc *metricsCollector) init() error {
 	// Reset the metrics so that the measurements do not interfere with those collected during the previous steps.
-	legacyregistry.Reset()
+	m, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		return fmt.Errorf("failed to gather metrics to reset: %w", err)
+	}
+	for _, mFamily := range m {
+		// Reset only metrics defined in the collector.
+		if _, ok := mc.Metrics[mFamily.GetName()]; ok {
+			mFamily.Reset()
+		}
+	}
+	return nil
 }
 
 func (*metricsCollector) run(tCtx ktesting.TContext) {
@@ -381,7 +391,8 @@ func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[st
 	}
 }
 
-func (tc *throughputCollector) init() {
+func (tc *throughputCollector) init() error {
+	return nil
 }
 
 func (tc *throughputCollector) run(tCtx ktesting.TContext) {

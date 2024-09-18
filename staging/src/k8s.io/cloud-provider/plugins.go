@@ -39,9 +39,7 @@ var (
 		name     string
 		external bool
 		detail   string
-	}{
-		{"gce", false, "The GCE provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-gcp"},
-	}
+	}{}
 )
 
 const externalCloudProvider = "external"

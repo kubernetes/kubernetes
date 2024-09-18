@@ -143,7 +143,15 @@ var quantityLib = &quantity{}
 type quantity struct{}
 
 func (*quantity) LibraryName() string {
-	return "k8s.quantity"
+	return "kubernetes.quantity"
+}
+
+func (*quantity) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.QuantityType}
+}
+
+func (*quantity) declarations() map[string][]cel.FunctionOpt {
+	return quantityLibraryDecls
 }
 
 var quantityLibraryDecls = map[string][]cel.FunctionOpt{

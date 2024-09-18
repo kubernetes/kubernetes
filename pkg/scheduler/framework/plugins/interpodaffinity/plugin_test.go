@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
+	schedruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -134,7 +136,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			defer cancel()
 
 			snapshot := cache.NewSnapshot(nil, nil)
-			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, namespaces)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			p := pl.(*InterPodAffinity)
 			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if err != nil {
@@ -194,7 +196,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			defer cancel()
 
 			snapshot := cache.NewSnapshot(nil, nil)
-			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, namespaces)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			p := pl.(*InterPodAffinity)
 			actualHint, err := p.isSchedulableAfterNodeChange(logger, tc.pod, tc.oldNode, tc.newNode)
 			if err != nil {

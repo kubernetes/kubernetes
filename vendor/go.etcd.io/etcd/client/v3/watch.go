@@ -442,7 +442,7 @@ func (w *watchGrpcStream) close() (err error) {
 	case err = <-w.errc:
 	default:
 	}
-	return toErr(w.ctx, err)
+	return ContextError(w.ctx, err)
 }
 
 func (w *watcher) closeStream(wgs *watchGrpcStream) {
@@ -653,7 +653,7 @@ func (w *watchGrpcStream) run() {
 
 		// watch client failed on Recv; spawn another if possible
 		case err := <-w.errc:
-			if isHaltErr(w.ctx, err) || toErr(w.ctx, err) == v3rpc.ErrNoLeader {
+			if isHaltErr(w.ctx, err) || ContextError(w.ctx, err) == v3rpc.ErrNoLeader {
 				closeErr = err
 				return
 			}

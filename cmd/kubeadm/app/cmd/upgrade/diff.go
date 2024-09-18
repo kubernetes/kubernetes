@@ -54,17 +54,14 @@ type diffFlags struct {
 	out                           io.Writer
 }
 
-var (
-	defaultAPIServerManifestPath         = constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
-	defaultControllerManagerManifestPath = constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory())
-	defaultSchedulerManifestPath         = constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory())
-)
-
 // newCmdDiff returns the cobra command for `kubeadm upgrade diff`
 func newCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
-		kubeConfigPath: constants.GetAdminKubeConfigPath(),
-		out:            out,
+		kubeConfigPath:                constants.GetAdminKubeConfigPath(),
+		out:                           out,
+		apiServerManifestPath:         constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory()),
+		controllerManagerManifestPath: constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory()),
+		schedulerManifestPath:         constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory()),
 	}
 
 	cmd := &cobra.Command{
@@ -88,22 +85,12 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
-	cmd.Flags().StringVar(&flags.apiServerManifestPath, "api-server-manifest", defaultAPIServerManifestPath, "path to API server manifest")
-	cmd.Flags().MarkDeprecated("api-server-manifest", "This flag is deprecated and will be removed in a future release.")
-	cmd.Flags().StringVar(&flags.controllerManagerManifestPath, "controller-manager-manifest", defaultControllerManagerManifestPath, "path to controller manifest")
-	cmd.Flags().MarkDeprecated("controller-manager-manifest", "This flag is deprecated and will be removed in a future release.")
-	cmd.Flags().StringVar(&flags.schedulerManifestPath, "scheduler-manifest", defaultSchedulerManifestPath, "path to scheduler manifest")
-	cmd.Flags().MarkDeprecated("scheduler-manifest", "This flag is deprecated and will be removed in a future release.")
 	cmd.Flags().IntVarP(&flags.contextLines, "context-lines", "c", 3, "How many lines of context in the diff")
-
 	return cmd
 }
 
 func validateManifestsPath(manifests ...string) (err error) {
 	for _, manifestPath := range manifests {
-		if len(manifestPath) == 0 {
-			return errors.New("empty manifest path")
-		}
 		s, err := os.Stat(manifestPath)
 		if err != nil {
 			if os.IsNotExist(err) {

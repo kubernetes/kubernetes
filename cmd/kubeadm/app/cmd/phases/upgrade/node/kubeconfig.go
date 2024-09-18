@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package node holds phases of "kubeadm upgrade node".
+// Package node implements phases of 'kubeadm upgrade node'.
 package node
 
 import (
@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
 
-// NewKubeconfigPhase creates a kubeadm workflow phase that implements handling of kubeconfig upgrade.
+// NewKubeconfigPhase returns a new kubeconfig phase.
 func NewKubeconfigPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:   "kubeconfig",
@@ -36,6 +36,7 @@ func NewKubeconfigPhase() workflow.Phase {
 		Run:    runKubeconfig(),
 		Hidden: true,
 		InheritFlags: []string{
+			options.CfgPath,
 			options.DryRun,
 			options.KubeconfigPath,
 		},
@@ -50,23 +51,22 @@ func runKubeconfig() func(c workflow.RunData) error {
 			return errors.New("kubeconfig phase invoked with an invalid data struct")
 		}
 
-		// if this is not a control-plane node, this phase should not be executed
+		// If this is not a control-plane node, this phase should not be executed.
 		if !data.IsControlPlaneNode() {
-			fmt.Println("[upgrade] Skipping phase. Not a control plane node.")
+			fmt.Println("[upgrade/kubeconfig] Skipping phase. Not a control plane node.")
 			return nil
 		}
 
-		// otherwise, retrieve all the info required for kubeconfig upgrade
+		// Otherwise, retrieve all the info required for kubeconfig upgrade.
 		cfg := data.InitCfg()
-		dryRun := data.DryRun()
 
 		if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-			if err := upgrade.UpdateKubeletLocalMode(cfg, dryRun); err != nil {
+			if err := upgrade.UpdateKubeletLocalMode(cfg, data.DryRun()); err != nil {
 				return errors.Wrap(err, "failed to update kubelet local mode")
 			}
 		}
 
-		fmt.Println("[upgrade] The kubeconfig for this node was successfully updated!")
+		fmt.Println("[upgrade/kubeconfig] The kubeconfig files for this node were successfully upgraded!")
 
 		return nil
 	}

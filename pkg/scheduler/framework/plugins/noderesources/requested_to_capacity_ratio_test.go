@@ -328,11 +328,11 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
-				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, tf.BuildNodeInfos(test.nodes))
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if !status.IsSuccess() {
 					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 				}
-				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -554,14 +554,14 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, tf.BuildNodeInfos(test.nodes))
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if !status.IsSuccess() {
 				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 			}
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
-				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}

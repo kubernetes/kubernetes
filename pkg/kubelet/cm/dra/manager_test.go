@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -118,7 +119,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -133,7 +134,10 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 
 	teardown := func() {
 		close(stopCh)
-		os.RemoveAll(socketName)
+		if err := os.Remove(socketName); err != nil {
+			logger := klog.FromContext(ctx)
+			logger.Error(err, "failed to remove socket file", "path", socketName)
+		}
 	}
 
 	l, err := net.Listen("unix", socketName)
@@ -159,11 +163,16 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 
 	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
 
-	go func() {
-		go s.Serve(l)
+	go func(ctx context.Context) {
+		go func() {
+			if err := s.Serve(l); err != nil {
+				logger := klog.FromContext(ctx)
+				logger.Error(err, "failed to serve gRPC")
+			}
+		}()
 		<-stopCh
 		s.GracefulStop()
-	}()
+	}(ctx)
 
 	return fakeDRAServerInfo{
 		server:     fakeDRADriverGRPCServer,
@@ -196,7 +205,7 @@ func TestNewManagerImpl(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
 		})
@@ -355,7 +364,7 @@ func TestGetResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -565,7 +574,7 @@ func TestPrepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -593,7 +602,7 @@ func TestPrepareResources(t *testing.T) {
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -702,7 +711,7 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout, nil, test.resp)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -735,7 +744,7 @@ func TestUnprepareResources(t *testing.T) {
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -859,7 +868,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, claimInfos, 1)
 			assert.Equal(t, test.expectedClaimName, claimInfos[0].ClaimInfoState.ClaimName)
 		})
@@ -872,7 +881,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	// Setup and register fake DRA driver
-	draServerInfo, err := setupFakeDRADriverGRPCServer(false, nil, nil, nil)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

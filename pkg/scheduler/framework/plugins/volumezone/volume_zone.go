@@ -33,15 +33,17 @@ import (
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // VolumeZone is a plugin that checks volume zone.
 type VolumeZone struct {
-	pvLister  corelisters.PersistentVolumeLister
-	pvcLister corelisters.PersistentVolumeClaimLister
-	scLister  storagelisters.StorageClassLister
+	pvLister                  corelisters.PersistentVolumeLister
+	pvcLister                 corelisters.PersistentVolumeClaimLister
+	scLister                  storagelisters.StorageClassLister
+	enableSchedulingQueueHint bool
 }
 
 var _ framework.FilterPlugin = &VolumeZone{}
@@ -260,21 +262,22 @@ func getErrorAsStatus(err error) *framework.Status {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// A new node or updating a node's volume zone labels may make a pod schedulable.
+	// A note about UpdateNodeTaint event:
+	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled.
+		nodeActionType = framework.Add | framework.UpdateNodeLabel
+	}
+
 	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
 		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
-		// A new node or updating a node's volume zone labels may make a pod schedulable.
-		//
-		// A note about UpdateNodeTaint event:
-		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
-		// As a common problematic scenario,
-		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
-		// In such cases, this plugin may miss some events that actually make pods schedulable.
-		// As a workaround, we add UpdateNodeTaint event to catch the case.
-		// We can remove UpdateNodeTaint when we remove the preCheck feature.
-		// See: https://github.com/kubernetes/kubernetes/issues/110175
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 		// A new pvc may make a pod schedulable.
 		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
@@ -393,14 +396,15 @@ func (pl *VolumeZone) getPVTopologies(logger klog.Logger, pv *v1.PersistentVolum
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &VolumeZone{
-		pvLister,
-		pvcLister,
-		scLister,
+		pvLister:                  pvLister,
+		pvcLister:                 pvcLister,
+		scLister:                  scLister,
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil
 }

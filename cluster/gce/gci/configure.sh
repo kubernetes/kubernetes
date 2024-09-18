@@ -418,8 +418,6 @@ function install-kube-manifests {
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi
 
-  cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
-
   rm -f "${KUBE_HOME}/${manifests_tar}"
   rm -f "${KUBE_HOME}/${manifests_tar}.sha512"
 }

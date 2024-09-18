@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -44,6 +45,10 @@ const (
 	// resyncPeriod for informer
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123688): disable?
 	resyncPeriod = time.Duration(10 * time.Minute)
+
+	// poolNameIndex is the name for the ResourceSlice store's index function,
+	// which is to index by ResourceSlice.Spec.Pool.Name
+	poolNameIndex = "poolName"
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -58,7 +63,7 @@ type Controller struct {
 	wg         sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
 	queue      workqueue.TypedRateLimitingInterface[string]
-	sliceStore cache.Store
+	sliceStore cache.Indexer
 
 	mutex sync.RWMutex
 
@@ -109,24 +114,11 @@ type Owner struct {
 // the controller is inactive. This can happen when kubelet is run stand-alone
 // without an apiserver. In that case we can't and don't need to publish
 // ResourceSlices.
-func StartController(ctx context.Context, kubeClient kubernetes.Interface, driver string, owner Owner, resources *DriverResources) *Controller {
-	if kubeClient == nil {
-		return nil
-	}
-
+func StartController(ctx context.Context, kubeClient kubernetes.Interface, driver string, owner Owner, resources *DriverResources) (*Controller, error) {
 	logger := klog.FromContext(ctx)
-	ctx, cancel := context.WithCancelCause(ctx)
-
-	c := &Controller{
-		cancel:     cancel,
-		kubeClient: kubeClient,
-		driver:     driver,
-		owner:      owner,
-		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
-		),
-		resources: resources,
+	c, err := newController(ctx, kubeClient, driver, owner, resources)
+	if err != nil {
+		return nil, fmt.Errorf("create controller: %w", err)
 	}
 
 	logger.V(3).Info("Starting")
@@ -142,7 +134,7 @@ func StartController(ctx context.Context, kubeClient kubernetes.Interface, drive
 		c.queue.Add(poolName)
 	}
 
-	return c
+	return c, nil
 }
 
 // Stop cancels all background activity and blocks until the controller has stopped.
@@ -175,9 +167,34 @@ func (c *Controller) Update(resources *DriverResources) {
 	}
 }
 
-// run is running in the background. It handles blocking initialization (like
-// syncing the informer) and then syncs the actual with the desired state.
-func (c *Controller) run(ctx context.Context) {
+// newController creates a new controller.
+func newController(ctx context.Context, kubeClient kubernetes.Interface, driver string, owner Owner, resources *DriverResources) (*Controller, error) {
+	if kubeClient == nil {
+		return nil, fmt.Errorf("kubeClient is nil")
+	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+
+	c := &Controller{
+		cancel:     cancel,
+		kubeClient: kubeClient,
+		driver:     driver,
+		owner:      owner,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
+		),
+		resources: resources,
+	}
+
+	if err := c.initInformer(ctx); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// initInformer initializes the informer used to watch for changes to the resources slice.
+func (c *Controller) initInformer(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 
 	// We always filter by driver name, by node name only for node-local resources.
@@ -185,10 +202,18 @@ func (c *Controller) run(ctx context.Context) {
 	if c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
-	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, nil, func(options *metav1.ListOptions) {
+	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, cache.Indexers{
+		poolNameIndex: func(obj interface{}) ([]string, error) {
+			slice, ok := obj.(*resourceapi.ResourceSlice)
+			if !ok {
+				return []string{}, nil
+			}
+			return []string{slice.Spec.Pool.Name}, nil
+		},
+	}, func(options *metav1.ListOptions) {
 		options.FieldSelector = selector.String()
 	})
-	c.sliceStore = informer.GetStore()
+	c.sliceStore = informer.GetIndexer()
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
@@ -228,10 +253,8 @@ func (c *Controller) run(ctx context.Context) {
 		},
 	})
 	if err != nil {
-		logger.Error(err, "Registering event handler on the ResourceSlice informer failed, disabling resource monitoring")
-		return
+		return fmt.Errorf("registering event handler on the ResourceSlice informer: %w", err)
 	}
-
 	// Start informer and wait for our cache to be populated.
 	logger.V(3).Info("Starting ResourceSlice informer and waiting for it to sync")
 	c.wg.Add(1)
@@ -245,13 +268,15 @@ func (c *Controller) run(ctx context.Context) {
 		select {
 		case <-time.After(time.Second):
 		case <-ctx.Done():
-			return
+			return fmt.Errorf("sync ResourceSlice informer: %w", context.Cause(ctx))
 		}
 	}
 	logger.V(3).Info("ResourceSlice informer has synced")
+	return nil
+}
 
-	// Seed the
-
+// run is running in the background.
+func (c *Controller) run(ctx context.Context) {
 	for c.processNextWorkItem(ctx) {
 	}
 }
@@ -295,10 +320,13 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	logger := klog.FromContext(ctx)
 
 	// Gather information about the actual and desired state.
-	// TODO: index by pool name.
 	var slices []*resourceapi.ResourceSlice
-	for _, obj := range c.sliceStore.List() {
-		if slice, ok := obj.(*resourceapi.ResourceSlice); ok && slice.Spec.Pool.Name == poolName {
+	objs, err := c.sliceStore.ByIndex(poolNameIndex, poolName)
+	if err != nil {
+		return fmt.Errorf("retrieve ResourceSlice objects: %w", err)
+	}
+	for _, obj := range objs {
+		if slice, ok := obj.(*resourceapi.ResourceSlice); ok {
 			slices = append(slices, slice)
 		}
 	}
@@ -345,6 +373,11 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 	slices = currentSlices
+
+	// Sort by name to ensure that keeping only the first slice is deterministic.
+	sort.Slice(slices, func(i, j int) bool {
+		return slices[i].Name < slices[j].Name
+	})
 
 	if pool, ok := resources.Pools[poolName]; ok {
 		if pool.Generation > generation {
@@ -397,6 +430,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 
 		logger.V(5).Info("Removing resource slices after pool removal", "obsoleteSlices", klog.KObjSlice(obsoleteSlices), "slices", klog.KObjSlice(slices), "numDevices", len(pool.Devices))
 		obsoleteSlices = append(obsoleteSlices, slices...)
+		// No need to create or update the slices.
+		slices = nil
 	}
 
 	// Remove stale slices.
@@ -420,7 +455,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// TODO: switch to SSA once unit testing supports it.
 		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
 		if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("delete resource slice: %w", err)
+			return fmt.Errorf("update resource slice: %w", err)
 		}
 	}
 

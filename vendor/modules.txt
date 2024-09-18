@@ -622,11 +622,11 @@ github.com/xiang90/probing
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# go.etcd.io/bbolt v1.3.10
-## explicit; go 1.21
+# go.etcd.io/bbolt v1.3.11
+## explicit; go 1.22
 go.etcd.io/bbolt
-# go.etcd.io/etcd/api/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/api/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
 go.etcd.io/etcd/api/v3/etcdserverpb/gw
@@ -634,8 +634,8 @@ go.etcd.io/etcd/api/v3/membershippb
 go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
-# go.etcd.io/etcd/client/pkg/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/client/pkg/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
 go.etcd.io/etcd/client/pkg/v3/pathutil
@@ -644,18 +644,18 @@ go.etcd.io/etcd/client/pkg/v3/systemd
 go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
-# go.etcd.io/etcd/client/v2 v2.305.15
-## explicit; go 1.21
+# go.etcd.io/etcd/client/v2 v2.305.16
+## explicit; go 1.22
 go.etcd.io/etcd/client/v2
-# go.etcd.io/etcd/client/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/client/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
 go.etcd.io/etcd/client/v3/credentials
 go.etcd.io/etcd/client/v3/internal/endpoint
 go.etcd.io/etcd/client/v3/internal/resolver
-# go.etcd.io/etcd/pkg/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/pkg/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/pkg/v3/adt
 go.etcd.io/etcd/pkg/v3/contention
 go.etcd.io/etcd/pkg/v3/cpuutil
@@ -671,15 +671,15 @@ go.etcd.io/etcd/pkg/v3/runtime
 go.etcd.io/etcd/pkg/v3/schedule
 go.etcd.io/etcd/pkg/v3/traceutil
 go.etcd.io/etcd/pkg/v3/wait
-# go.etcd.io/etcd/raft/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/raft/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/raft/v3
 go.etcd.io/etcd/raft/v3/confchange
 go.etcd.io/etcd/raft/v3/quorum
 go.etcd.io/etcd/raft/v3/raftpb
 go.etcd.io/etcd/raft/v3/tracker
-# go.etcd.io/etcd/server/v3 v3.5.15
-## explicit; go 1.21
+# go.etcd.io/etcd/server/v3 v3.5.16
+## explicit; go 1.22
 go.etcd.io/etcd/server/v3/auth
 go.etcd.io/etcd/server/v3/config
 go.etcd.io/etcd/server/v3/datadir
@@ -1086,40 +1086,40 @@ gopkg.in/yaml.v2
 ## explicit
 gopkg.in/yaml.v3
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/cri-client v0.0.0 => ./staging/src/k8s.io/cri-client
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/dynamic-resource-allocation v0.0.0 => ./staging/src/k8s.io/dynamic-resource-allocation
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/endpointslice v0.0.0 => ./staging/src/k8s.io/endpointslice
-## explicit; go 1.22.0
-# k8s.io/gengo/v2 v2.0.0-20240903080316-fb7743ff00a0
+## explicit; go 1.23.0
+# k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9
 ## explicit; go 1.20
 k8s.io/gengo/v2
 k8s.io/gengo/v2/generator
@@ -1141,11 +1141,11 @@ k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2
 ## explicit; go 1.20
 k8s.io/kube-openapi/cmd/openapi-gen
@@ -1178,21 +1178,21 @@ k8s.io/kube-openapi/pkg/validation/strfmt
 k8s.io/kube-openapi/pkg/validation/strfmt/bson
 k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/pod-security-admission v0.0.0 => ./staging/src/k8s.io/pod-security-admission
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
-## explicit; go 1.22.0
+## explicit; go 1.23.0
 # k8s.io/system-validators v1.8.0
 ## explicit; go 1.16
 k8s.io/system-validators/validators

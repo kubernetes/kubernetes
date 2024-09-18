@@ -298,7 +298,7 @@ type ResourceSliceList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -815,7 +815,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
@@ -830,7 +830,7 @@ type ResourceClaimList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
@@ -916,7 +916,7 @@ type ResourceClaimSchedulingStatus struct {
 const PodSchedulingNodeListMaxSize = 128
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // PodSchedulingContextList is a collection of Pod scheduling objects.
 type PodSchedulingContextList struct {
@@ -1000,7 +1000,7 @@ type DeviceClassConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
@@ -1015,7 +1015,7 @@ type DeviceClassList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 //
@@ -1050,7 +1050,7 @@ type ResourceClaimTemplateSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {

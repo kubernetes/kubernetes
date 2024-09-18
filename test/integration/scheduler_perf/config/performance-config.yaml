@@ -35,7 +35,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -77,7 +77,7 @@
       initPods: 1
       measurePods: 4
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 100
@@ -114,7 +114,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -154,7 +154,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -203,7 +203,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -250,7 +250,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -296,7 +296,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -338,7 +338,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -380,7 +380,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -454,7 +454,7 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -496,7 +496,7 @@
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -538,7 +538,7 @@
       initPods: 10
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -593,13 +593,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 5
       initPods: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [integration-test, performance, fast]
+    labels: [performance, fast]
     params:
       initNodes: 500
       initPods: 200
@@ -708,7 +708,7 @@
       initPods: 2
       measurePods: 10
   - name: 500Nodes/200InitPods
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 200
@@ -755,7 +755,7 @@
       initNodes: 10
       measurePods: 100
   - name: 1000Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 1000
       measurePods: 1000
@@ -796,7 +796,7 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
@@ -850,7 +850,7 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
@@ -907,7 +907,7 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
@@ -961,7 +961,7 @@
     namespace: measure-ns-0
   workloads:
   - name: 10Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       initNodes: 10
       initPodsPerNamespace: 2
@@ -1011,7 +1011,7 @@
       normalNodes: 4
       measurePods: 4
   - name: 500Nodes
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       taintNodes: 100
       normalNodes: 400
@@ -1342,8 +1342,8 @@
     labels: [integration-test, fast]
     params:
       gatedPods: 10
-      deletingPods: 100
-      measurePods: 100
+      deletingPods: 10
+      measurePods: 10
   - name: 1Node_10000GatedPods
     labels: [performance, fast]
     threshold: 130
@@ -1373,7 +1373,7 @@
     collectMetrics: true
   workloads:
   - name: 1Node_10GatedPods
-    labels: [integration-test, fast]
+    labels: [fast]
     params:
       gatedPods: 10
       measurePods: 10
@@ -1383,3 +1383,39 @@
     params:
       gatedPods: 10000
       measurePods: 20000
+
+# This test case simulates the scheduling when pods selected to schedule have deletionTimestamp set.
+# There was a memory leak related to this path of code fixed in:
+# https://github.com/kubernetes/kubernetes/pull/126962
+# Main goal of this test case is to verify if InFlightEvents is empty after the test.
+- name: SchedulingDeletedPodsWithFinalizers
+  featureGates:
+    SchedulerQueueingHints: true
+  defaultPodTemplatePath: config/templates/light-pod.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    # Create pods with finalizers and delete them before they are scheduled.
+    # DeletionTimestamp field should be populated then, 
+    # but a few pods should still be chosen into the scheduling.
+    countParam: $deletingPods
+    podTemplatePath: config/templates/pod-with-finalizer.yaml
+    skipWaitToCompletion: true
+    deletePodsPerSecond: 100
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 10Node_100DeletingPods
+    labels: [integration-test, fast]
+    params:
+      initNodes: 10
+      deletingPods: 10
+      measurePods: 10
+  - name: 1000Node_1000DeletingPods
+    labels: [performance, fast]
+    params:
+      initNodes: 1000
+      deletingPods: 1000
+      measurePods: 1000

@@ -62,13 +62,8 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'kubeadm init phase upload-config' command to
 			create this ConfigMap. This is required so that 'kubeadm upgrade' can configure your upgraded cluster correctly.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		// Without this callback, if a user runs just the "upload"
-		// command without a subcommand, or with an invalid subcommand,
-		// cobra will print usage information, but still exit cleanly.
-		// We want to return an error code in these cases so that the
-		// user knows that their command was invalid.
-		Run: cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
@@ -88,8 +83,8 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 			This command prints configurations for subcommands provided.
 			For details, see: https://pkg.go.dev/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm#section-directories`),
-		Run: cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintResetDefaults(out))
@@ -360,8 +355,8 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
 		Short: "Interact with container images used by kubeadm",
-		Run:   cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 	cmd.AddCommand(newCmdConfigImagesList(out, nil))
 	cmd.AddCommand(newCmdConfigImagesPull())
 	return cmd

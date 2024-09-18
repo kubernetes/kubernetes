@@ -208,21 +208,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MemoryQoS: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 	},
-	MinDomainsInPodTopologySpread: {
-		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-	},
 	MultiCIDRServiceAllocator: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-	},
-	NewVolumeManagerReconstruction: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 	},
 	NFTablesProxyMode: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
@@ -231,11 +219,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	NodeLogQuery: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
-	},
-	NodeOutOfServiceVolumeDetach: {
-		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 	},
 	NodeSwap: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
@@ -303,7 +286,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 	},
-
+	RelaxedDNSSearchValidation: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
 	RelaxedEnvironmentVariableValidation: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -442,5 +427,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	ImageVolume: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	KubeletRegistrationGetOnExistsOnly: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 }

@@ -617,7 +617,7 @@ func TestNodeEvents(t *testing.T) {
 	// make sure the scheduler received the node add event by creating a pod that only fits node2
 	plugPod := st.MakePod().Name("plug-pod").Namespace(testCtx.NS.Name).Container("pause").
 		Req(map[v1.ResourceName]string{v1.ResourceCPU: "40m"}).
-		NodeAffinityIn("affinity-key", []string{"affinity-value"}).
+		NodeAffinityIn("affinity-key", []string{"affinity-value"}, st.NodeSelectorTypeMatchExpressions).
 		Toleration("taint-key").Obj()
 	plugPod, err = testCtx.ClientSet.CoreV1().Pods(plugPod.Namespace).Create(testCtx.Ctx, plugPod, metav1.CreateOptions{})
 	if err != nil {

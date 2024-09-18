@@ -439,7 +439,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy honored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "zone", v1.ScheduleAnyway, barSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -473,7 +473,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "zone", v1.ScheduleAnyway, barSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -1164,7 +1164,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy honoed with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.ScheduleAnyway, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -1188,7 +1188,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.ScheduleAnyway, fooSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -1429,14 +1429,14 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 				var gotList framework.NodeScoreList
 				for _, n := range filteredNodes {
 					nodeName := n.Name
-					score, status := p.Score(context.Background(), state, tt.pod, nodeName)
+					score, status := p.Score(ctx, state, tt.pod, nodeName)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)
 					}
 					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 				}
 
-				status = p.NormalizeScore(context.Background(), state, tt.pod, gotList)
+				status = p.NormalizeScore(ctx, state, tt.pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)
 				}

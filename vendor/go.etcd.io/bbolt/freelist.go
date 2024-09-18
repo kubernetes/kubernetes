@@ -252,6 +252,14 @@ func (f *freelist) rollback(txid txid) {
 	}
 	// Remove pages from pending list and mark as free if allocated by txid.
 	delete(f.pending, txid)
+
+	// Remove pgids which are allocated by this txid
+	for pgid, tid := range f.allocs {
+		if tid == txid {
+			delete(f.allocs, pgid)
+		}
+	}
+
 	f.mergeSpans(m)
 }
 

@@ -6,7 +6,9 @@
 
 module k8s.io/kubernetes
 
-go 1.22.0
+go 1.23.0
+
+godebug default=go1.23
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
@@ -59,9 +61,9 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/vishvananda/netlink v1.3.0
 	github.com/vishvananda/netns v0.0.4
-	go.etcd.io/etcd/api/v3 v3.5.15
-	go.etcd.io/etcd/client/pkg/v3 v3.5.15
-	go.etcd.io/etcd/client/v3 v3.5.15
+	go.etcd.io/etcd/api/v3 v3.5.16
+	go.etcd.io/etcd/client/pkg/v3 v3.5.16
+	go.etcd.io/etcd/client/v3 v3.5.16
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.42.0
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
@@ -198,11 +200,11 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.etcd.io/bbolt v1.3.10 // indirect
-	go.etcd.io/etcd/client/v2 v2.305.15 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.15 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.15 // indirect
-	go.etcd.io/etcd/server/v3 v3.5.15 // indirect
+	go.etcd.io/bbolt v1.3.11 // indirect
+	go.etcd.io/etcd/client/v2 v2.305.16 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.16 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.16 // indirect
+	go.etcd.io/etcd/server/v3 v3.5.16 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
@@ -216,7 +218,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240903080316-fb7743ff00a0 // indirect
+	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect

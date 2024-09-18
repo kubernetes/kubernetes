@@ -144,6 +144,11 @@ func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
 }
 
+func TestWatchListMatchSingle(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchListMatchSingle(ctx, t, store)
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation

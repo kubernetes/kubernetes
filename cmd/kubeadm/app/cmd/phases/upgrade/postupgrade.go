@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apply implements phases of 'kubeadm upgrade apply'.
-package apply
+// Package upgrade holds the common phases for 'kubeadm upgrade'.
+package upgrade
 
 import (
 	"github.com/pkg/errors"
@@ -41,7 +41,7 @@ func NewPostUpgradePhase() workflow.Phase {
 func runPostUpgrade(c workflow.RunData) error {
 	_, ok := c.(Data)
 	if !ok {
-		return errors.New("preflight phase invoked with an invalid data struct")
+		return errors.New("post-upgrade phase invoked with an invalid data struct")
 	}
 	// PLACEHOLDER: this phase should contain any release specific post-upgrade tasks.
 

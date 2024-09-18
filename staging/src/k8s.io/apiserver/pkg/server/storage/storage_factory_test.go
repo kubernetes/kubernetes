@@ -30,6 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/apis/example2"
+	example2install "k8s.io/apiserver/pkg/apis/example2/install"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/version"
 )
@@ -52,6 +54,7 @@ func init() {
 	)
 
 	exampleinstall.Install(scheme)
+	example2install.Install(scheme)
 }
 
 type fakeNegotiater struct {
@@ -107,28 +110,144 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 	return n.serializer
 }
 
-func TestConfigurableStorageFactory(t *testing.T) {
-	ns := &fakeNegotiater{types: []string{"test/test"}}
-	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
-	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
-	called := false
-	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
-		called = true
-		return e
-	}
-	f.AddSerializationChains(testEncoderChain, nil, example.Resource("test"))
-	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
-	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
+type newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
+type newStorageCodecRecorder struct {
+	opt StorageCodecConfig
+}
 
-	config, err := f.NewConfig(example.Resource("test"), nil)
-	if err != nil {
-		t.Fatal(err)
+func (c *newStorageCodecRecorder) Decorators(f newStorageCodecFn) newStorageCodecFn {
+	return func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error) {
+		c.opt = opts
+		return f(opts)
 	}
-	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.Transport.ServerList, []string{"/server2"}) {
-		t.Errorf("unexpected config %#v", config)
+}
+
+func TestConfigurableStorageFactory(t *testing.T) {
+	var emptyResource schema.GroupResource
+
+	testCases := []struct {
+		name                  string
+		enabledResources      []schema.GroupVersionResource
+		overrideResource      schema.GroupResource
+		cohabitatingResources []schema.GroupResource
+		resourceForConfig     schema.GroupResource
+		exampleForConfig      runtime.Object
+		wantStorageVersion    schema.GroupVersion
+	}{
+		{
+			name: "config resource is primary cohabitating resources",
+			enabledResources: []schema.GroupVersionResource{
+				example.Resource("replicasets").WithVersion("v1"),
+				example2.Resource("replicasets").WithVersion("v1"),
+			},
+			cohabitatingResources: []schema.GroupResource{example.Resource("replicasets"), example2.Resource("replicasets")},
+			resourceForConfig:     example.Resource("replicasets"),
+			exampleForConfig:      &example.ReplicaSet{},
+			wantStorageVersion:    schema.GroupVersion{Group: example.GroupName, Version: "v1"},
+		},
+		{
+			name: "config resource is secondary cohabitating resources",
+			enabledResources: []schema.GroupVersionResource{
+				example.Resource("replicasets").WithVersion("v1"),
+				example2.Resource("replicasets").WithVersion("v1"),
+			},
+			cohabitatingResources: []schema.GroupResource{example.Resource("replicasets"), example2.Resource("replicasets")},
+			resourceForConfig:     example2.Resource("replicasets"),
+			exampleForConfig:      &example.ReplicaSet{},
+			wantStorageVersion:    schema.GroupVersion{Group: example.GroupName, Version: "v1"},
+		},
+		{
+			name: "config resource is primary cohabitating resources and not enabled",
+			enabledResources: []schema.GroupVersionResource{
+				// example.Resource("replicasets").WithVersion("v1"), // <- disabled
+				example2.Resource("replicasets").WithVersion("v1"),
+			},
+			cohabitatingResources: []schema.GroupResource{example.Resource("replicasets"), example2.Resource("replicasets")},
+			resourceForConfig:     example.Resource("replicasets"),
+			exampleForConfig:      &example.ReplicaSet{},
+			wantStorageVersion:    schema.GroupVersion{Group: example2.GroupName, Version: "v1"},
+		},
+		{
+			name: "config resource is secondary cohabitating resources and not enabled",
+			enabledResources: []schema.GroupVersionResource{
+				example.Resource("replicasets").WithVersion("v1"),
+				// example2.Resource("replicasets").WithVersion("v1"),  // <- disabled
+			},
+			cohabitatingResources: []schema.GroupResource{example.Resource("replicasets"), example2.Resource("replicasets")},
+			resourceForConfig:     example2.Resource("replicasets"),
+			exampleForConfig:      &example.ReplicaSet{},
+			wantStorageVersion:    schema.GroupVersion{Group: example.GroupName, Version: "v1"},
+		},
+		{
+			name: "override config for one resource of group",
+			enabledResources: []schema.GroupVersionResource{
+				example.Resource("replicasets").WithVersion("v1"),
+				example2.Resource("replicasets").WithVersion("v1"),
+			},
+			overrideResource:   example.Resource("replicasets"),
+			resourceForConfig:  example.Resource("replicasets"),
+			exampleForConfig:   &example.ReplicaSet{},
+			wantStorageVersion: schema.GroupVersion{Group: example.GroupName, Version: "v1"},
+		},
+		{
+			name: "override config for all resource of group",
+			enabledResources: []schema.GroupVersionResource{
+				example.Resource("replicasets").WithVersion("v1"),
+				example2.Resource("replicasets").WithVersion("v1"),
+			},
+			cohabitatingResources: []schema.GroupResource{example.Resource("replicasets"), example2.Resource("replicasets")},
+			overrideResource:      example.Resource("*"),
+			resourceForConfig:     example.Resource("replicasets"),
+			exampleForConfig:      &example.ReplicaSet{},
+			wantStorageVersion:    schema.GroupVersion{Group: example.GroupName, Version: "v1"},
+		},
 	}
-	if !called {
-		t.Errorf("expected encoder chain to be called")
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ns := &fakeNegotiater{types: []string{"test/test"}}
+			resourceConfig := NewResourceConfig()
+			resourceConfig.EnableResources(test.enabledResources...)
+
+			f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), resourceConfig, nil)
+
+			encoderChainCalled := false
+			recorder := newStorageCodecRecorder{}
+
+			f.newStorageCodecFn = recorder.Decorators(f.newStorageCodecFn)
+			f.AddCohabitatingResources(test.cohabitatingResources...)
+
+			if test.overrideResource != emptyResource {
+				testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
+					encoderChainCalled = true
+					return e
+				}
+
+				f.SetEtcdLocation(test.overrideResource, []string{"/server2"})
+				f.AddSerializationChains(testEncoderChain, nil, test.overrideResource)
+				f.SetEtcdPrefix(test.overrideResource, "/prefix_for_test")
+			}
+
+			config, err := f.NewConfig(test.resourceForConfig, test.exampleForConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// check override resources config
+			if test.overrideResource != emptyResource {
+				if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.Transport.ServerList, []string{"/server2"}) {
+					t.Errorf("unexpected config %#v", config)
+				}
+				if !encoderChainCalled {
+					t.Errorf("expected encoder chain to be called")
+				}
+			}
+
+			// check cohabitating resources config
+			if recorder.opt.StorageVersion != test.wantStorageVersion {
+				t.Errorf("unexpected encoding version %#v, but expected %#v", recorder.opt.StorageVersion, test.wantStorageVersion)
+			}
+		})
 	}
 }
 

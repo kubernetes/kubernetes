@@ -137,11 +137,7 @@ var (
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
-			// Label selector...
-			nodeSelector := st.MakeNodeSelector().In("metadata.name", []string{nodeName}).Obj()
-			// ... but we need a field selector, so let's swap.
-			nodeSelector.NodeSelectorTerms[0].MatchExpressions, nodeSelector.NodeSelectorTerms[0].MatchFields = nodeSelector.NodeSelectorTerms[0].MatchFields, nodeSelector.NodeSelectorTerms[0].MatchExpressions
-			return nodeSelector
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
 	deallocatingClaim = st.FromResourceClaim(pendingClaim).
@@ -160,10 +156,10 @@ var (
 			Obj()
 
 	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
-					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}, st.NodeSelectorTypeMatchExpressions).Obj()}).
 					Obj()
 	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
-					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}).Obj()}).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}, st.NodeSelectorTypeMatchExpressions).Obj()}).
 					Obj()
 	otherClaim = st.MakeResourceClaim(controller).
 			Name("not-my-claim").

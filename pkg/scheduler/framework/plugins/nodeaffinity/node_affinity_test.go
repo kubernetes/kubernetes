@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -907,7 +908,7 @@ func TestNodeAffinity(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			p, err := New(ctx, &test.args, nil)
+			p, err := New(ctx, &test.args, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
@@ -915,7 +916,7 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *framework.Status
 			if test.runPreFilter {
-				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
 				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
 					t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
 				}
@@ -923,7 +924,7 @@ func TestNodeAffinity(t *testing.T) {
 					t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
 				}
 			}
-			gotStatus = p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfo)
+			gotStatus = p.(framework.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}
@@ -1192,7 +1193,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 
 			state := framework.NewCycleState()
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
-			p, err := New(ctx, &test.args, fh)
+			p, err := New(ctx, &test.args, fh, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
@@ -1233,7 +1234,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 }
 
 func Test_isSchedulableAfterNodeChange(t *testing.T) {
-	podWithNodeAffinity := st.MakePod().NodeAffinityIn("foo", []string{"bar"})
+	podWithNodeAffinity := st.MakePod().NodeAffinityIn("foo", []string{"bar"}, st.NodeSelectorTypeMatchExpressions)
 	testcases := map[string]struct {
 		args           *config.NodeAffinityArgs
 		pod            *v1.Pod
@@ -1345,7 +1346,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, tc.args, nil)
+			p, err := New(ctx, tc.args, nil, feature.Features{})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}

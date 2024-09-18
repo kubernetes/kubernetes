@@ -24,20 +24,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type pullerExpects struct {
@@ -45,6 +48,7 @@ type pullerExpects struct {
 	err                             error
 	shouldRecordStartedPullingTime  bool
 	shouldRecordFinishedPullingTime bool
+	events                          []v1.Event
 }
 
 type pullerTestCase struct {
@@ -69,7 +73,11 @@ func pullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
 			}},
 
 		{ // image present, don't pull
@@ -81,9 +89,18 @@ func pullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, nil, false, false},
-				{[]string{"GetImageRef"}, nil, false, false},
-				{[]string{"GetImageRef"}, nil, false, false},
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}},
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}},
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}},
 			}},
 		// image present, pull it
 		{containerImage: "present_image",
@@ -94,9 +111,21 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
 			}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
@@ -107,9 +136,18 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
-				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
-				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
+					[]v1.Event{
+						{Reason: "ErrImageNeverPull"},
+					}},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
+					[]v1.Event{
+						{Reason: "ErrImageNeverPull"},
+					}},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
+					[]v1.Event{
+						{Reason: "ErrImageNeverPull"},
+					}},
 			}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
@@ -120,9 +158,18 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
-				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
-				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
 			}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
@@ -133,12 +180,33 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}},
 			}},
 		// image present, non-zero qps, try to pull
 		{containerImage: "present_image",
@@ -149,9 +217,21 @@ func pullerTestCases() []pullerTestCase {
 			qps:        400.0,
 			burst:      600,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
+				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}},
 			}},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
@@ -162,9 +242,20 @@ func pullerTestCases() []pullerTestCase {
 			qps:        2000.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImagePull, true, false},
-				{[]string{"GetImageRef"}, ErrImagePull, true, false},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
+				{[]string(nil), ErrImagePull, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}},
+				{[]string(nil), ErrImagePull, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}},
+				{[]string(nil), ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}},
 			}},
 		// error case if image name fails validation due to invalid reference format
 		{containerImage: "FAILED_IMAGE",
@@ -175,7 +266,10 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string(nil), ErrInvalidImageName, false, false},
+				{[]string(nil), ErrInvalidImageName, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
 			}},
 		// error case if image name contains http
 		{containerImage: "http://url",
@@ -186,7 +280,10 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string(nil), ErrInvalidImageName, false, false},
+				{[]string(nil), ErrInvalidImageName, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
 			}},
 		// error case if image name contains sha256
 		{containerImage: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -197,7 +294,10 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string(nil), ErrInvalidImageName, false, false},
+				{[]string(nil), ErrInvalidImageName, false, false,
+					[]v1.Event{
+						{Reason: "InspectFailed"},
+					}},
 			}},
 	}
 }
@@ -227,7 +327,7 @@ func (m *mockPodPullingTimeRecorder) reset() {
 	m.finishedPullingRecorded = false
 }
 
-func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container, fakePodPullingTimeRecorder *mockPodPullingTimeRecorder) {
+func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container, fakePodPullingTimeRecorder *mockPodPullingTimeRecorder, fakeRecorder *testutil.FakeRecorder) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -239,7 +339,7 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 	backOff.Clock = fakeClock
 
 	fakeRuntime = &ctest.FakeRuntime{T: t}
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder = testutil.NewFakeRecorder()
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
@@ -266,7 +366,7 @@ func TestParallelPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
@@ -298,7 +398,7 @@ func TestSerializedPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
@@ -356,13 +456,13 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil},
 		}}
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		ctx := context.Background()
-		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
@@ -412,14 +512,14 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil},
 		}}
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		ctx := context.Background()
-		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
@@ -473,7 +573,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	maxParallelImagePulls := 5
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container, _ := pullerTestEnv(t, *testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container, _, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t
@@ -570,6 +670,45 @@ func TestEvalCRIPullErr(t *testing.T) {
 			t.Parallel()
 			msg, err := evalCRIPullErr("test", testInput)
 			testAssert(msg, err)
+		})
+	}
+}
+
+func TestImagePullPrecheck(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+		}}
+
+	cases := pullerTestCases()
+
+	useSerializedEnv := true
+	for _, c := range cases {
+		t.Run(c.testName, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			puller, fakeClock, fakeRuntime, container, _, fakeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+
+			for _, expected := range c.expected {
+				fakeRuntime.CalledFunctions = nil
+				fakeRecorder.Events = []*v1.Event{}
+				fakeClock.Step(time.Second)
+
+				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
+				fakeRuntime.AssertCalls(expected.calls)
+				var recorderEvents []v1.Event
+				for _, event := range fakeRecorder.Events {
+					recorderEvents = append(recorderEvents, v1.Event{Reason: event.Reason})
+				}
+				if diff := cmp.Diff(recorderEvents, expected.events); diff != "" {
+					t.Errorf("unexpected events diff (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(expected.err, err, cmpopts.EquateErrors()); diff != "" {
+					ctx.Errorf("did not get expected error: %v\ndiff (-want, +got):\n%s", err, diff)
+				}
+			}
 		})
 	}
 }

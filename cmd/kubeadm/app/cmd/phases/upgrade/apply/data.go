@@ -18,26 +18,14 @@ limitations under the License.
 package apply
 
 import (
-	"io"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
-
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade"
 )
 
 // Data is the interface to use for kubeadm upgrade apply phases.
 // The "applyData" type from "cmd/upgrade/apply.go" must satisfy this interface.
 type Data interface {
-	EtcdUpgrade() bool
-	RenewCerts() bool
-	DryRun() bool
-	Cfg() *kubeadmapi.UpgradeConfiguration
-	InitCfg() *kubeadmapi.InitConfiguration
-	Client() clientset.Interface
-	IgnorePreflightErrors() sets.Set[string]
-	PatchesDir() string
-	OutputWriter() io.Writer
+	upgrade.Data
+
 	SessionIsInteractive() bool
 	AllowExperimentalUpgrades() bool
 	AllowRCUpgrades() bool

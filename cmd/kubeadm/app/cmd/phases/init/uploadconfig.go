@@ -65,7 +65,6 @@ func NewUploadConfigPhase() workflow.Phase {
 		Name:    "upload-config",
 		Aliases: []string{"uploadconfig"},
 		Short:   "Upload the kubeadm and kubelet configuration to a ConfigMap",
-		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",

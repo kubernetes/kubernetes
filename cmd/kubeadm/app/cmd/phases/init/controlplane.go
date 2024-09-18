@@ -66,7 +66,6 @@ func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "control-plane",
 		Short: "Generate all static Pod manifest files necessary to establish the control plane",
-		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",

@@ -2,10 +2,13 @@
 
 module k8s.io/apiserver
 
-go 1.22.0
+go 1.23.0
+
+godebug default=go1.23
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
+	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.11.0
@@ -23,10 +26,10 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
-	go.etcd.io/etcd/api/v3 v3.5.15
-	go.etcd.io/etcd/client/pkg/v3 v3.5.15
-	go.etcd.io/etcd/client/v3 v3.5.15
-	go.etcd.io/etcd/server/v3 v3.5.15
+	go.etcd.io/etcd/api/v3 v3.5.16
+	go.etcd.io/etcd/client/pkg/v3 v3.5.16
+	go.etcd.io/etcd/client/v3 v3.5.16
+	go.etcd.io/etcd/server/v3 v3.5.16
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
 	go.opentelemetry.io/otel v1.28.0
@@ -64,7 +67,6 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
@@ -106,10 +108,10 @@ require (
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	go.etcd.io/bbolt v1.3.10 // indirect
-	go.etcd.io/etcd/client/v2 v2.305.15 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.15 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.15 // indirect
+	go.etcd.io/bbolt v1.3.11 // indirect
+	go.etcd.io/etcd/client/v2 v2.305.16 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.16 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.16 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

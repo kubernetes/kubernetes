@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -307,7 +308,7 @@ func TestClaimInfoHasPodReference(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.Equal(t, test.claimInfo.hasPodReference(podUID), test.expectedResult)
+			assert.Equal(t, test.expectedResult, test.claimInfo.hasPodReference(podUID))
 		})
 	}
 }
@@ -401,7 +402,7 @@ func TestClaimInfoIsPrepared(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.Equal(t, test.claimInfo.isPrepared(), test.expectedResult)
+			assert.Equal(t, test.expectedResult, test.claimInfo.isPrepared())
 		})
 	}
 }
@@ -440,7 +441,7 @@ func TestNewClaimInfoCache(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, result)
 		})
 	}
@@ -494,7 +495,7 @@ func TestClaimInfoCacheWithLock(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, cache)
 			err = cache.withLock(test.funcGen(cache))
 			if test.wantErr {
@@ -554,7 +555,7 @@ func TestClaimInfoCacheWithRLock(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, cache)
 			err = cache.withRLock(test.funcGen(cache))
 			if test.wantErr {
@@ -583,7 +584,7 @@ func TestClaimInfoCacheAdd(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, cache)
 			cache.add(test.claimInfo)
 			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
@@ -754,13 +755,13 @@ func TestSyncToCheckpoint(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			cache, err := newClaimInfoCache(test.stateDir, test.checkpointName)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = cache.syncToCheckpoint()
 			if test.wantErr {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	}
 }

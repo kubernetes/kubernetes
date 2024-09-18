@@ -38,7 +38,7 @@ import (
 func TestRoundtripObjectMeta(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	codec := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
+	codec := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{})
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(seed), codecs)
 
