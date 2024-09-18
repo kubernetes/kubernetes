@@ -76,14 +76,6 @@ func newTestTypes(c *ExampleV1Client, namespace string) *testTypes {
 }
 
 // GetClusterTestType takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *examplev1.TestType, err error) {
-	result = &examplev1.TestType{}
-	err = c.GetClient().Get().
-		Namespace(c.GetNamespace()).
-		Resource("testtypes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (*examplev1.TestType, error) {
+	return gentype.Get[examplev1.TestType](ctx, &c.Client.ResourceClient, name, options)
 }

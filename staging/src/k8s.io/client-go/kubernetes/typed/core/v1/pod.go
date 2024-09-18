@@ -78,33 +78,11 @@ func newPods(c *CoreV1Client, namespace string) *pods {
 }
 
 // UpdateEphemeralContainers takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
-	result = &corev1.Pod{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("pods").
-		Name(podName).
-		SubResource("ephemeralcontainers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pod).
-		Do(ctx).
-		Into(result)
-	return
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, podName, pod, "ephemeralcontainers", &corev1.Pod{}, opts)
 }
 
 // UpdateResize takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) UpdateResize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
-	result = &corev1.Pod{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("pods").
-		Name(podName).
-		SubResource("resize").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pod).
-		Do(ctx).
-		Into(result)
-	return
+func (c *pods) UpdateResize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, podName, pod, "resize", &corev1.Pod{}, opts)
 }

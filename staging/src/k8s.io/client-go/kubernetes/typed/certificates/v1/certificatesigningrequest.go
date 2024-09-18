@@ -79,16 +79,6 @@ func newCertificateSigningRequests(c *CertificatesV1Client) *certificateSigningR
 }
 
 // UpdateApproval takes the top resource name and the representation of a certificateSigningRequest and updates it. Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
-func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *certificatesv1.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificatesv1.CertificateSigningRequest, err error) {
-	result = &certificatesv1.CertificateSigningRequest{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Resource("certificatesigningrequests").
-		Name(certificateSigningRequestName).
-		SubResource("approval").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(certificateSigningRequest).
-		Do(ctx).
-		Into(result)
-	return
+func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *certificatesv1.CertificateSigningRequest, opts metav1.UpdateOptions) (*certificatesv1.CertificateSigningRequest, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, certificateSigningRequestName, certificateSigningRequest, "approval", &certificatesv1.CertificateSigningRequest{}, opts)
 }

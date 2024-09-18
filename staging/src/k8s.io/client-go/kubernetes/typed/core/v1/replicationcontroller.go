@@ -79,32 +79,11 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
-func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Get().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("replicationcontrollers").
-		Name(replicationControllerName).
-		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (*autoscalingv1.Scale, error) {
+	return gentype.GetSubresource[autoscalingv1.Scale](ctx, &c.Client.ResourceClient, replicationControllerName, "scale", options)
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("replicationcontrollers").
-		Name(replicationControllerName).
-		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(scale).
-		Do(ctx).
-		Into(result)
-	return
+func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, replicationControllerName, scale, "scale", &autoscalingv1.Scale{}, opts)
 }

@@ -20,7 +20,6 @@ package v1
 
 import (
 	context "context"
-	fmt "fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -31,7 +30,6 @@ import (
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	apply "k8s.io/client-go/util/apply"
 )
 
 // StatefulSetsGetter has a method to return a StatefulSetInterface.
@@ -83,57 +81,17 @@ func newStatefulSets(c *AppsV1Client, namespace string) *statefulSets {
 }
 
 // GetScale takes name of the statefulSet, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
-func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Get().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("statefulsets").
-		Name(statefulSetName).
-		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options metav1.GetOptions) (*autoscalingv1.Scale, error) {
+	return gentype.GetSubresource[autoscalingv1.Scale](ctx, &c.Client.ResourceClient, statefulSetName, "scale", options)
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("statefulsets").
-		Name(statefulSetName).
-		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(scale).
-		Do(ctx).
-		Into(result)
-	return
+func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, statefulSetName, scale, "scale", &autoscalingv1.Scale{}, opts)
 }
 
 // ApplyScale takes top resource name and the apply declarative configuration for scale,
 // applies it and returns the applied scale, and an error, if there is any.
 func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, scale *applyconfigurationsautoscalingv1.ScaleApplyConfiguration, opts metav1.ApplyOptions) (result *autoscalingv1.Scale, err error) {
-	if scale == nil {
-		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	request, err := apply.NewRequest(c.GetClient(), scale)
-	if err != nil {
-		return nil, err
-	}
-
-	result = &autoscalingv1.Scale{}
-	err = request.
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("statefulsets").
-		Name(statefulSetName).
-		SubResource("scale").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+	return gentype.ApplySubresource(ctx, c.Client, statefulSetName, scale, "scale", &autoscalingv1.Scale{}, opts)
 }

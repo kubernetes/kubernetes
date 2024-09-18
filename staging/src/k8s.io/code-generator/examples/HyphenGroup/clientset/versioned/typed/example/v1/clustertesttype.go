@@ -78,28 +78,11 @@ func newClusterTestTypes(c *ExampleGroupV1Client) *clusterTestTypes {
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
-func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Get().
-		Resource("clustertesttypes").
-		Name(clusterTestTypeName).
-		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscalingv1.Scale, error) {
+	return gentype.GetSubresource[autoscalingv1.Scale](ctx, &c.Client.ResourceClient, clusterTestTypeName, "scale", options)
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Put().
-		Resource("clustertesttypes").
-		Name(clusterTestTypeName).
-		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(scale).
-		Do(ctx).
-		Into(result)
-	return
+func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error) {
+	return gentype.UpdateSubresource(ctx, c.Client, clusterTestTypeName, scale, "scale", &autoscalingv1.Scale{}, opts)
 }

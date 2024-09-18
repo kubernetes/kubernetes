@@ -74,17 +74,6 @@ func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 }
 
 // CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
-func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
-	result = &authenticationv1.TokenRequest{}
-	err = c.GetClient().Post().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("serviceaccounts").
-		Name(serviceAccountName).
-		SubResource("token").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(tokenRequest).
-		Do(ctx).
-		Into(result)
-	return
+func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (*authenticationv1.TokenRequest, error) {
+	return gentype.CreateSubresource(ctx, c.Client, serviceAccountName, tokenRequest, "token", &authenticationv1.TokenRequest{}, opts)
 }
