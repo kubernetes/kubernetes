@@ -69,7 +69,8 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
-	// UpdatePodTolerations is an update for pod's tolerations.
+	// UpdatePodTolerations is an addition for pod's tolerations.
+	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
 	UpdatePodTolerations
 	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
 	UpdatePodSchedulingGatesEliminated
