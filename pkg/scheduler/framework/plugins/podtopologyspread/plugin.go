@@ -263,9 +263,11 @@ func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, po
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 			return framework.QueueSkip, nil
 		}
-		logger.V(5).Info("node that match topology spread constraints was created/updated, and the pod may be schedulable now",
-			"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.Queue, nil
+		if (originalNode != nil && originalNode.Spec.Unschedulable || originalNode == nil) && !modifiedNode.Spec.Unschedulable {
+			logger.V(5).Info("node that match topology spread constraints was created/updated, and the pod may be schedulable now",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, nil
+		}
 	}
 
 	// framework.Delete: return Queue when node has topologyKey in its labels, else return QueueSkip.

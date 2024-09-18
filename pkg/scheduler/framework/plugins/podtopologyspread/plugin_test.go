@@ -125,9 +125,16 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
-			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node2").Obj(),
 			expectedHint: framework.Queue,
+		},
+		{
+			name: "non-matching node deleted",
+			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node1").Label("region", "region1").Obj(),
+			newNode:      nil,
+			expectedHint: framework.QueueSkip,
 		},
 	}
 
