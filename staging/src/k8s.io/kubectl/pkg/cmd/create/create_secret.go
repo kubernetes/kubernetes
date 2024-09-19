@@ -230,7 +230,7 @@ func (o *CreateSecretOptions) Validate() error {
 		return fmt.Errorf("name must be specified")
 	}
 	if len(o.EnvFileSources) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0 || len(o.EncodedSources) > 0) {
-		return fmt.Errorf("from-env-file cannot be combined with from-file, from-literal or from-encoded-literal")
+		return fmt.Errorf("from-env-file cannot be combined with from-file, from-literal or from-base64-literal")
 	}
 	return nil
 }
@@ -419,7 +419,7 @@ func handleSecretFromEncodedSources(secret *corev1.Secret, encodedSources []stri
 		}
 		actualValue, err := base64.StdEncoding.DecodeString(value)
 		if err != nil {
-			return err
+			return fmt.Errorf("base64 string decoding error")
 		}
 		if err = addKeyFromLiteralToSecret(secret, keyName, actualValue); err != nil {
 			return err
