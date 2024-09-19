@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -447,6 +448,8 @@ func TestStoreCreateWithRetryNameGenerate(t *testing.T) {
 }
 
 func TestStoreCreateWithRetryNameGenerateFeatureDisabled(t *testing.T) {
+	// Preserve testing of disabled RetryGenerateName feature gate since it can still be disabled when emulation version is set.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, false)
 	namedObj := func(id int) *example.Pod {
 		return &example.Pod{
@@ -2981,6 +2984,8 @@ func (p *predictableNameGenerator) GenerateName(base string) string {
 }
 
 func TestStoreCreateGenerateNameConflict(t *testing.T) {
+	// Preserve testing of disabled RetryGenerateName feature gate since it can still be disabled when emulation version is set.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, false)
 
 	// podA will be stored with name foo12345
