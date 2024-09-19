@@ -271,76 +271,70 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		m["inputType"] = &inputType
 		m["resultType"] = &resultType
 		m["subresourcePath"] = e.SubResourcePath
+		m["verb"] = e.VerbName
 		if e.HasVerb("apply") {
 			m["inputApplyConfig"] = types.Ref(path.Join(g.applyConfigurationPackage, inputGVString), inputType.Name.Name+"ApplyConfiguration")
 		}
 
 		if e.HasVerb("get") {
 			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, getSubresourceTemplate), m)
+				sw.Do(getSubresourceTemplate, m)
 			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, getTemplate), m)
+				sw.Do(getTemplate, m)
 			}
 		}
 
 		if e.HasVerb("list") {
 			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listSubresourceTemplate), m)
+				sw.Do(listSubresourceTemplate, m)
 			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, privateListTemplate), m)
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, watchListTemplate), m)
+				sw.Do(listTemplate, m)
+				sw.Do(privateListTemplate, m)
+				sw.Do(watchListTemplate, m)
 			}
 		}
 
 		// TODO: Figure out schemantic for watching a sub-resource.
 		if e.HasVerb("watch") {
-			sw.Do(adjustTemplate(e.VerbName, e.VerbType, watchTemplate), m)
+			sw.Do(watchTemplate, m)
 		}
 
 		if e.HasVerb("create") {
 			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, createSubresourceTemplate), m)
+				sw.Do(createSubresourceTemplate, m)
 			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, createTemplate), m)
+				sw.Do(createTemplate, m)
 			}
 		}
 
 		if e.HasVerb("update") {
 			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, updateSubresourceTemplate), m)
+				sw.Do(updateSubresourceTemplate, m)
 			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, updateTemplate), m)
+				sw.Do(updateTemplate, m)
 			}
 		}
 
 		// TODO: Figure out schemantic for deleting a sub-resource (what arguments
 		// are passed, does it need two names? etc.
 		if e.HasVerb("delete") {
-			sw.Do(adjustTemplate(e.VerbName, e.VerbType, deleteTemplate), m)
+			sw.Do(deleteTemplate, m)
 		}
 
 		if e.HasVerb("patch") {
-			sw.Do(adjustTemplate(e.VerbName, e.VerbType, patchTemplate), m)
+			sw.Do(patchTemplate, m)
 		}
 
 		if e.HasVerb("apply") {
 			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, applySubresourceTemplate), m)
+				sw.Do(applySubresourceTemplate, m)
 			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, applyTemplate), m)
+				sw.Do(applyTemplate, m)
 			}
 		}
 	}
 
 	return sw.Error()
-}
-
-// adjustTemplate adjust the origin verb template using the expansion name.
-// TODO: Make the verbs in templates parametrized so the strings.Replace() is
-// not needed.
-func adjustTemplate(name, verbType, template string) string {
-	return strings.ReplaceAll(template, " "+titler.String(verbType), " "+name)
 }
 
 func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {
@@ -583,8 +577,8 @@ var newStruct = []string{
 }
 
 var listTemplate = `
-// List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) List(ctx $.context|raw$, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
+// $.verb$ takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
     if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr  := $.PrepareWatchListOptionsFromListOptions|raw$(opts); watchListOptionsErr  != nil {
         klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr )
     } else if hasWatchListOptionsPrepared {
@@ -623,8 +617,8 @@ func (c *$.type|privatePlural$) list(ctx $.context|raw$, opts $.ListOptions|raw$
 `
 
 var listSubresourceTemplate = `
-// List takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) List(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+// $.verb$ takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil{
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -644,8 +638,8 @@ func (c *$.type|privatePlural$) List(ctx $.context|raw$, $.type|private$Name str
 `
 
 var getTemplate = `
-// Get takes name of the $.type|private$, and returns the corresponding $.resultType|private$ object, and an error if there is any.
-func (c *$.type|privatePlural$) Get(ctx $.context|raw$, name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|private$ object, and an error if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Get().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -659,8 +653,8 @@ func (c *$.type|privatePlural$) Get(ctx $.context|raw$, name string, options $.G
 `
 
 var getSubresourceTemplate = `
-// Get takes name of the $.type|private$, and returns the corresponding $.resultType|raw$ object, and an error if there is any.
-func (c *$.type|privatePlural$) Get(ctx $.context|raw$, $.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|raw$ object, and an error if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Get().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -675,8 +669,8 @@ func (c *$.type|privatePlural$) Get(ctx $.context|raw$, $.type|private$Name stri
 `
 
 var deleteTemplate = `
-// Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
-func (c *$.type|privatePlural$) Delete(ctx $.context|raw$, name string, opts $.DeleteOptions|raw$) error {
+// $.verb$ takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.DeleteOptions|raw$) error {
 	return c.GetClient().Delete().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
@@ -688,8 +682,8 @@ func (c *$.type|privatePlural$) Delete(ctx $.context|raw$, name string, opts $.D
 `
 
 var createSubresourceTemplate = `
-// Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Create(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Post().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -705,8 +699,8 @@ func (c *$.type|privatePlural$) Create(ctx $.context|raw$, $.type|private$Name s
 `
 
 var createTemplate = `
-// Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Create(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Post().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -720,8 +714,8 @@ func (c *$.type|privatePlural$) Create(ctx $.context|raw$, $.inputType|private$ 
 `
 
 var updateSubresourceTemplate = `
-// Update takes the top resource name and the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Update(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes the top resource name and the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Put().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -737,8 +731,8 @@ func (c *$.type|privatePlural$) Update(ctx $.context|raw$, $.type|private$Name s
 `
 
 var updateTemplate = `
-// Update takes the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Update(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Put().
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -753,8 +747,8 @@ func (c *$.type|privatePlural$) Update(ctx $.context|raw$, $.inputType|private$ 
 `
 
 var watchTemplate = `
-// Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
-func (c *$.type|privatePlural$) Watch(ctx $.context|raw$, opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
+// $.verb$ returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil{
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -788,8 +782,8 @@ func (c *$.type|privatePlural$) watchList(ctx $.context|raw$, opts $.ListOptions
 `
 
 var patchTemplate = `
-// Patch applies the patch and returns the patched $.resultType|private$.
-func (c *$.type|privatePlural$) Patch(ctx $.context|raw$, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
+// $.verb$ applies the patch and returns the patched $.resultType|private$.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Patch(pt).
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
@@ -805,10 +799,10 @@ func (c *$.type|privatePlural$) Patch(ctx $.context|raw$, name string, pt $.Patc
 `
 
 var applyTemplate = `
-// Apply takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
-func (c *$.type|privatePlural$) Apply(ctx $.context|raw$, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+// $.verb$ takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to Apply must not be nil")
+		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
 	data, err := $.jsonMarshal|raw$($.inputType|private$)
@@ -817,7 +811,7 @@ func (c *$.type|privatePlural$) Apply(ctx $.context|raw$, $.inputType|private$ *
 	}
     name := $.inputType|private$.Name
 	if name == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$.Name must be provided to Apply")
+		return nil, $.fmtErrorf|raw$("$.inputType|private$.Name must be provided to $.verb$")
 	}
 	result = &$.resultType|raw${}
 	err = c.GetClient().Patch($.ApplyPatchType|raw$).
@@ -833,11 +827,11 @@ func (c *$.type|privatePlural$) Apply(ctx $.context|raw$, $.inputType|private$ *
 `
 
 var applySubresourceTemplate = `
-// Apply takes top resource name and the apply declarative configuration for $.subresourcePath$,
+// $.verb$ takes top resource name and the apply declarative configuration for $.subresourcePath$,
 // applies it and returns the applied $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Apply(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to Apply must not be nil")
+		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
 	data, err := $.jsonMarshal|raw$($.inputType|private$)
