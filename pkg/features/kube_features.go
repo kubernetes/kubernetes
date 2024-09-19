@@ -38,13 +38,6 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @ttakahashi21 @mkimuram
-	// kep: https://kep.k8s.io/3294
-	// alpha: v1.26
-	//
-	// Enable usage of Provision of PVCs from snapshots in other namespaces
-	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
-
 	// owner: @aojea
 	// Deprecated: v1.31
 	//
@@ -177,6 +170,13 @@ const (
 	// beta: v1.28
 	// Set the scheduled time as an annotation in the job.
 	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
+
+	// owner: @ttakahashi21 @mkimuram
+	// kep: https://kep.k8s.io/3294
+	// alpha: v1.26
+	//
+	// Enable usage of Provision of PVCs from snapshots in other namespaces
+	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
@@ -954,17 +954,12 @@ func init() {
 	clientfeatures.ReplaceFeatureGates(ca)
 }
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
+// defaultKubernetesFeatureGates consists of legacy unversioned Kubernetes-specific feature keys.
+// Please do not add to this file and use pkg/features/versioned_kube_features.go instead.
 //
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
-
-	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Deprecated}, // default on in 1.33
-
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 
@@ -1047,7 +1042,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// ...
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 
+	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
+
 	AllowInsecureKubeletCertificateSigningRequests: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
+
+	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Deprecated}, // default on in 1.33
 
 	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
 
