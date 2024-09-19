@@ -188,7 +188,7 @@ func TestSchedulingGates(t *testing.T) {
 func TestCoreResourceEnqueue(t *testing.T) {
 	tests := []struct {
 		name string
-		// initialNode is the Node to be created at first.
+		// initialNodes is the list of Nodes to be created at first.
 		initialNodes []*v1.Node
 		// initialPods is the list of Pods to be created at first if it's not empty.
 		// Note that the scheduler won't schedule those Pods,
@@ -484,6 +484,58 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				return nil
 			},
 			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the NodeUnschedulable plugin is requeued when the node is turned to ready",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Unschedulable(true).Obj()},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeUpdate event to change the Node to ready.
+				// It makes Pod1 schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Unschedulable(false).Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update the node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pod rejected by the NodeUnschedulable plugin is requeued when a new node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeCreated event.
+				// It makes Pod1 schedulable.
+				node := st.MakeNode().Name("fake-node2").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create a new node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pod rejected by the NodeUnschedulable plugin isn't requeued when another unschedulable node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a NodeCreated event, but with unschedulable node, which wouldn't make Pod1 schedulable.
+				node := st.MakeNode().Name("fake-node2").Unschedulable(true).Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create a new node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.Set[string]{},
+			// This test case is valid only when QHint is enabled
+			// because QHint filters out a node creation made in triggerFn.
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
