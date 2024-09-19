@@ -178,7 +178,7 @@ type Interface interface {
 	// However, the implementations have to retry in case suggestion is stale.
 	Delete(
 		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
-		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object) error
+		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object, opts DeleteOptions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -311,4 +311,8 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+}
+
+// DeleteOptions provides the options that may be provided for storage delete operations.
+type DeleteOptions struct {
 }
