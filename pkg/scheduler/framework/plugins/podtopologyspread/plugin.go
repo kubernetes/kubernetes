@@ -277,9 +277,6 @@ func (pl *PodTopologySpread) getConstraints(pod *v1.Pod) ([]topologySpreadConstr
 }
 
 // isSchedulableAfterNodeChange returns Queue when node has topologyKey in its labels, else return QueueSkip.
-//
-// TODO: we can filter out node update events in a more fine-grained way once preCheck is completely removed.
-// See: https://github.com/kubernetes/kubernetes/issues/110175
 func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
@@ -291,23 +288,64 @@ func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, po
 		return framework.Queue, err
 	}
 
+	var originalNodeMatching, modifiedNodeMatching bool
+	if originalNode != nil {
+		originalNodeMatching = nodeLabelsMatchSpreadConstraints(originalNode.Labels, constraints)
+	}
 	if modifiedNode != nil {
-		if !nodeLabelsMatchSpreadConstraints(modifiedNode.Labels, constraints) {
-			logger.V(5).Info("the created/updated node doesn't match pod topology spread constraints",
+		modifiedNodeMatching = nodeLabelsMatchSpreadConstraints(modifiedNode.Labels, constraints)
+	}
+
+	// We return Queue in the following cases:
+	// 1. Node/UpdateNodeLabel:
+	// - The original node matched the pod's topology spread constraints, but the modified node does not.
+	// - The modified node matches the pod's topology spread constraints, but the original node does not.
+	// - The modified node matches the pod's topology spread constraints, and the original node and the modified node have different label values for any topologyKey.
+	// 2. Node/UpdateNodeTaint:
+	//  - The modified node match the pod's topology spread constraints, and the original node and the modified node have different taints.
+	// 3. Node/Add: The created node matches the pod's topology spread constraints.
+	// 4. Node/Delete: The original node matched the pod's topology spread constraints.
+	if originalNode != nil && modifiedNode != nil {
+		if originalNodeMatching != modifiedNodeMatching {
+			logger.V(5).Info("the node is updated and now pod topology spread constraints has changed, and the pod may be schedulable now",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode), "originalMatching", originalNodeMatching, "newMatching", modifiedNodeMatching)
+			return framework.Queue, nil
+		}
+		if modifiedNodeMatching && (checkTopologyKeyLabelsChanged(originalNode.Labels, modifiedNode.Labels, constraints) || !equality.Semantic.DeepEqual(originalNode.Spec.Taints, modifiedNode.Spec.Taints)) {
+			logger.V(5).Info("the node is updated and now has different taints or labels, and the pod may be schedulable now",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, nil
+		}
+		return framework.QueueSkip, nil
+	}
+
+	if modifiedNode != nil {
+		if !modifiedNodeMatching {
+			logger.V(5).Info("the created node doesn't match pod topology spread constraints",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 			return framework.QueueSkip, nil
 		}
-		logger.V(5).Info("node that match topology spread constraints was created/updated, and the pod may be schedulable now",
+		logger.V(5).Info("the created node matches topology spread constraints, and the pod may be schedulable now",
 			"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return framework.Queue, nil
 	}
 
-	// framework.Delete: return Queue when node has topologyKey in its labels, else return QueueSkip.
-	if !nodeLabelsMatchSpreadConstraints(originalNode.Labels, constraints) {
+	if !originalNodeMatching {
 		logger.V(5).Info("the deleted node doesn't match pod topology spread constraints", "pod", klog.KObj(pod), "node", klog.KObj(originalNode))
 		return framework.QueueSkip, nil
 	}
-	logger.V(5).Info("node that match topology spread constraints was deleted, and the pod may be schedulable now",
+	logger.V(5).Info("the deleted node matches topology spread constraints, and the pod may be schedulable now",
 		"pod", klog.KObj(pod), "node", klog.KObj(originalNode))
 	return framework.Queue, nil
+}
+
+// checkTopologyKeyLabelsChanged checks if any of the labels specified as topologyKey in the constraints have changed.
+func checkTopologyKeyLabelsChanged(originalLabels, modifiedLabels map[string]string, constraints []topologySpreadConstraint) bool {
+	for _, constraint := range constraints {
+		topologyKey := constraint.TopologyKey
+		if originalLabels[topologyKey] != modifiedLabels[topologyKey] {
+			return true
+		}
+	}
+	return false
 }
