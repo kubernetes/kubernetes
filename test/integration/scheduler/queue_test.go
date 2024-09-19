@@ -544,7 +544,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 		},
 		{
-			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label to make it match the podAntiAffinity",
+			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label that matches the podAntiAffinity",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("pod1").Label("anti1", "anti1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
@@ -578,7 +578,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
-				// Add label to the pod which will make it match pod2's nodeAffinity.
+				// Add label to the pod which will make it match pod2's podAffinity.
 				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 					return nil, fmt.Errorf("failed to update pod1: %w", err)
 				}
@@ -587,24 +587,89 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.New("pod2"),
 			enableSchedulingQueueHint: []bool{true},
 		},
-
 		{
-			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the label of the node to make it match the pod affinity",
-			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			name:         "Pod rejected by the interPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod affinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("aaa", "fake-node").Obj()},
 			pods: []*v1.Pod{
 				// - pod1 and pod2 will be rejected by the PodAffinity plugin.
 				st.MakePod().Name("pod1").PodAffinityExists("bbb", "zone", st.PodAffinityWithRequiredReq).Container("image").Obj(),
 				st.MakePod().Name("pod2").PodAffinityExists("ccc", "region", st.PodAffinityWithRequiredReq).Container("image").Obj(),
 			},
-
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
-				// Add label to the node which will make it match pod1's podAffinity.
-				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("zone", "zone1").Obj(), metav1.UpdateOptions{}); err != nil {
-					return nil, fmt.Errorf("failed to update pod1: %w", err)
+				// Create the node which will make it match pod1's podAffinity.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("zone", "zone1").Obj(), metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create fake-node2: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name: "Pod rejected by the interPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod affinity",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("affinity1", "affinity1").Container("image").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - pod2, pod3 will be rejected by the PodAffinity plugin.
+				st.MakePod().Name("pod2").Label("affinity1", "affinity1").PodAffinityExists("affinity1", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod3").Label("affinity1", "affinity1").PodAffinityExists("affinity1", "other", st.PodAffinityWithRequiredReq).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Add "node" label to the node which may make pod2 schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update fake-node: %w", err)
 				}
 				return map[framework.ClusterEvent]uint64{framework.NodeLabelChange: 1}, nil
 			},
-			wantRequeuedPods:          sets.New("pod1"),
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the interPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod anti affinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("service", "service-a").Label("other", "fake-node").Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - pod2, pod3, pod4 will be rejected by the PodAffinity plugin.
+				st.MakePod().Name("pod2").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod3").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "service", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod4").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "other", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Remove "node" label from the node which will make it not match pod2's podAntiAffinity.
+				// Change "service" label from service-a to service-b which may pod3 schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("service", "service-b").Label("region", "fake-node").Label("other", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update fake-node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeLabelChange: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod2", "pod3"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the interPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod anti affinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("zone", "fake-node").Label("node", "fake-node").Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node1").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - pod2, pod3 will be rejected by the PodAntiAffinity plugin.
+				st.MakePod().Name("pod2").PodAntiAffinityExists("anti1", "zone", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+				st.MakePod().Name("pod3").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Create the node which will make pod2, pod3 be schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(), metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create fake-node2: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod2", "pod3"),
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
@@ -1287,7 +1352,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 					return len(pendingPods) == len(tt.pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.pods), nil
 				}); err != nil {
-					t.Fatal(err)
+					t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
 				}
 
 				t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
@@ -1306,7 +1371,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 					return len(pendingPods) == len(tt.pods), nil
 				}); err != nil {
-					t.Fatal(err)
+					t.Fatalf("Failed to wait for all pods to remain in the scheduling queue after scheduling attempts: %v", err)
 				}
 
 				t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
