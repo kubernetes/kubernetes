@@ -19,9 +19,9 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -139,10 +139,11 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	podActionType := framework.Add | framework.UpdatePodLabel | framework.Delete
 	if pl.enableSchedulingQueueHint {
-		// When the QueueingHint feature is enabled,
-		// the scheduling queue uses Pod/Update Queueing Hint
+		// When the QueueingHint feature is enabled, the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
 		// https://github.com/kubernetes/kubernetes/pull/122234
+		// (If not, the scheduling queue always retries the unschedulable Pods when they're updated.)
+		//
 		// The Pod rejected by this plugin can be schedulable when the Pod has a spread constraint with NodeTaintsPolicy:Honor
 		// and has got a new toleration.
 		// So, we add UpdatePodTolerations here only when QHint is enabled.
@@ -199,14 +200,14 @@ func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod
 
 	// Pod is modified. Return Queue when the label(s) matching topologySpread's selector is added, changed, or deleted.
 	if modifiedPod != nil && originalPod != nil {
-		if pod.UID == modifiedPod.UID && !reflect.DeepEqual(modifiedPod.Spec.Tolerations, originalPod.Spec.Tolerations) && hasConstraintWithNodeTaintsPolicyHonor(constraints) {
+		if pod.UID == modifiedPod.UID && !equality.Semantic.DeepEqual(modifiedPod.Spec.Tolerations, originalPod.Spec.Tolerations) && hasConstraintWithNodeTaintsPolicyHonor(constraints) {
 			// If any constraint has `NodeTaintsPolicy: Honor`, we can return Queue when the target Pod has got a new toleration.
 			logger.V(5).Info("the unschedulable pod has got a new toleration, which could make it schedulable",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return framework.Queue, nil
 		}
 
-		if reflect.DeepEqual(modifiedPod.Labels, originalPod.Labels) {
+		if equality.Semantic.DeepEqual(modifiedPod.Labels, originalPod.Labels) {
 			logger.V(5).Info("the pod's update doesn't include the label update, which doesn't make the target pod schedulable",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return framework.QueueSkip, nil
