@@ -363,21 +363,68 @@ func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod
 }
 
 // isSchedulableAfterNodeChange is invoked whenever a node added or changed. It checks whether
-// that change made a previously unschedulable pod schedulable.
+// that change could make a previously unschedulable pod schedulable.
 func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedNode, err := schedutil.As[*v1.Node](oldObj, newObj)
+	originalNode, modifiedNode, err := schedutil.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
-	// TODO: also check if the original node meets the pod's resource requestments once preCheck is completely removed.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
-	if isFit(pod, modifiedNode) {
-		logger.V(5).Info("node was updated, and may fit with the pod's resource requestments", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	// Leaving in the queue, since the pod won't fit into the modified node anyway.
+	if !isFit(pod, modifiedNode) {
+		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+	// The pod will fit, so since it's add, unblock scheduling.
+	if originalNode == nil {
+		logger.V(5).Info("node was added and it might fit the pod's resource requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return framework.Queue, nil
 	}
+	// The pod will fit, but since there was no increase in available resources, the change won't make the pod schedulable.
+	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode) {
+		logger.V(5).Info("node was updated, but haven't changed the pod's resource requestments fit assessment", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
 
-	logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-	return framework.QueueSkip, nil
+	logger.V(5).Info("node was updated, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.Queue, nil
+}
+
+// haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
+func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node) bool {
+	podRequest := computePodResourceRequest(pod)
+	originalNodeInfo := framework.NewNodeInfo()
+	originalNodeInfo.SetNode(originalNode)
+	modifiedNodeInfo := framework.NewNodeInfo()
+	modifiedNodeInfo.SetNode(modifiedNode)
+
+	if modifiedNodeInfo.Allocatable.AllowedPodNumber > originalNodeInfo.Allocatable.AllowedPodNumber {
+		return true
+	}
+
+	if podRequest.MilliCPU == 0 &&
+		podRequest.Memory == 0 &&
+		podRequest.EphemeralStorage == 0 &&
+		len(podRequest.ScalarResources) == 0 {
+		return false
+	}
+
+	if (podRequest.MilliCPU > 0 && modifiedNodeInfo.Allocatable.MilliCPU > originalNodeInfo.Allocatable.MilliCPU) ||
+		(podRequest.Memory > 0 && modifiedNodeInfo.Allocatable.Memory > originalNodeInfo.Allocatable.Memory) ||
+		(podRequest.EphemeralStorage > 0 && modifiedNodeInfo.Allocatable.EphemeralStorage > originalNodeInfo.Allocatable.EphemeralStorage) {
+		return true
+	}
+
+	for rName, rQuant := range podRequest.ScalarResources {
+		// Skip in case request quantity is zero
+		if rQuant == 0 {
+			continue
+		}
+
+		if modifiedNodeInfo.Allocatable.ScalarResources[rName] > originalNodeInfo.Allocatable.ScalarResources[rName] {
+			return true
+		}
+	}
+	return false
 }
 
 // isFit checks if the pod fits the node. If the node is nil, it returns false.
