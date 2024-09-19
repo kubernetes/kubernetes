@@ -439,6 +439,8 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+
+	InitialEventsEmbeddedListAnnotationKey = "kubernetes.io/initial-events-embedded-list"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
