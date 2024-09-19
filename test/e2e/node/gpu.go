@@ -18,7 +18,6 @@ package node
 
 import (
 	"context"
-	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"os"
 	"regexp"
 	"time"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -46,9 +46,13 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe(feature.GPUDevicePlugin, "Sanity test for Nvidia Device", func() {
+// NOTE: All the tests in this file are run serially because they share a limited set of GPU(s), please inspect
+// the CI job definitions to see how many GPU(s) are available in the environment
+// Currently the CI jobs have 2 nodes each with 4 Nvidia T4's across both GCE and AWS harness(es).
 
-	f := framework.NewDefaultFramework("nvidia-gpu")
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity test using nvidia-smi", func() {
+
+	f := framework.NewDefaultFramework("nvidia-gpu1")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 
@@ -74,6 +78,18 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, "Sanity test for Nvidia Device", fu
 		gomega.Expect(log).To(gomega.ContainSubstring("Driver Version:"))
 		gomega.Expect(log).To(gomega.ContainSubstring("CUDA Version:"))
 	})
+})
+
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Pod", func() {
+
+	f := framework.NewDefaultFramework("nvidia-gpu2")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var podClient *e2epod.PodClient
+
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("aws", "gce")
+		podClient = e2epod.NewPodClient(f)
+	})
 
 	f.It("should run gpu based matrix multiplication", func(ctx context.Context) {
 		SetupEnvironmentAndSkipIfNeeded(ctx, f, f.ClientSet)
@@ -90,6 +106,16 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, "Sanity test for Nvidia Device", fu
 		gomega.Expect(log).To(gomega.ContainSubstring("TensorFlow version"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Matrix multiplication result:"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Time taken for 5000x5000 matrix multiplication"))
+	})
+})
+
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Job", func() {
+
+	f := framework.NewDefaultFramework("nvidia-gpu2")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 	})
 
 	f.It("should run gpu based jobs", func(ctx context.Context) {
