@@ -92,7 +92,7 @@ var (
 	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
 
 	  # Create a new secret named my-secret with key1=c3VwZXJzZWNyZXQK(base64 encoded "supersecret") and key2=dG9wc2VjcmV0Cg==(base64 encoded "secret")
-	  kubectl create secret generic my-secret --from-literal=key1=c3VwZXJzZWNyZXQK --from-literal=key2=dG9wc2VjcmV0Cg==
+	  kubectl create secret generic my-secret --from-base64-literal=key1=c3VwZXJzZWNyZXQK --from-base64-literal=key2=dG9wc2VjcmV0Cg==
 
 	  # Create a new secret named my-secret using a combination of a file and a literal
 	  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/to/id_rsa --from-literal=passphrase=topsecret
@@ -230,7 +230,7 @@ func (o *CreateSecretOptions) Validate() error {
 		return fmt.Errorf("name must be specified")
 	}
 	if len(o.EnvFileSources) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0 || len(o.EncodedSources) > 0) {
-		return fmt.Errorf("from-env-file cannot be combined with from-file, from-literal or from-encoded-literal")
+		return fmt.Errorf("from-env-file cannot be combined with from-file, from-literal or from-base64-literal")
 	}
 	return nil
 }
@@ -419,7 +419,7 @@ func handleSecretFromEncodedSources(secret *corev1.Secret, encodedSources []stri
 		}
 		actualValue, err := base64.StdEncoding.DecodeString(value)
 		if err != nil {
-			return err
+			return fmt.Errorf("base64 string decoding error")
 		}
 		if err = addKeyFromLiteralToSecret(secret, keyName, actualValue); err != nil {
 			return err
