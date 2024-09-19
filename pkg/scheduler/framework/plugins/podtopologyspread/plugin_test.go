@@ -131,6 +131,26 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node2").Obj(),
 			expectedHint: framework.Queue,
 		},
+		{
+			name: "update node with different taints that match all topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Taints([]v1.Taint{{Key: "ccc", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name: "update node with different taints that only match one of topologySpreadConstraints",
+			pod: st.MakePod().Name("p").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("node", "node1").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("node", "node1").Taints([]v1.Taint{{Key: "ccc", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
 	}
 
 	for _, tc := range testcases {
