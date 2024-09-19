@@ -21,6 +21,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 )
 
@@ -72,6 +74,8 @@ type managerImpl struct {
 	recorder     record.EventRecorder
 	nodeRef      *v1.ObjectReference
 	probeManager prober.Manager
+
+	volumeManager volumemanager.VolumeManager
 
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 
@@ -123,6 +127,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		logger:                           conf.Logger,
 		probeManager:                     conf.ProbeManager,
 		recorder:                         conf.Recorder,
+		volumeManager:                    conf.VolumeManager,
 		nodeRef:                          conf.NodeRef,
 		getPods:                          conf.GetPodsFunc,
 		killPodFunc:                      conf.KillPodFunc,
@@ -395,19 +400,44 @@ func (m *managerImpl) processShutdownEvent() error {
 			}(pod, group)
 		}
 
+		// This duration determines how long the shutdown manager will wait for the pods in this group
+		// to terminate before proceeding to the next group.
+		var groupTerminationWaitDuration = time.Duration(group.ShutdownGracePeriodSeconds) * time.Second
 		var (
-			doneCh = make(chan struct{})
-			timer  = m.clock.NewTimer(time.Duration(group.ShutdownGracePeriodSeconds) * time.Second)
+			doneCh         = make(chan struct{})
+			timer          = m.clock.NewTimer(groupTerminationWaitDuration)
+			ctx, ctxCancel = context.WithTimeout(context.Background(), groupTerminationWaitDuration)
 		)
 		go func() {
 			defer close(doneCh)
+			defer ctxCancel()
 			wg.Wait()
+			// The signal to kill a Pod was sent successfully to all the pods,
+			// let's wait until all the volumes are unmounted from all the pods before
+			// continuing to the next group. This is done so that the CSI Driver (assuming
+			// that it's part of the highest group) has a chance to perform unmounts.
+			if err := m.volumeManager.WaitForAllPodsUnmount(ctx, group.Pods); err != nil {
+				var podIdentifiers []string
+				for _, pod := range group.Pods {
+					podIdentifiers = append(podIdentifiers, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+				}
+
+				// Waiting for volume teardown is done on a best basis effort,
+				// report an error and continue.
+				//
+				// Depending on the user provided kubelet configuration value
+				// either the `timer` will tick and we'll continue to shutdown the next group, or,
+				// WaitForAllPodsUnmount will timeout, therefore this goroutine
+				// will close doneCh and we'll continue to shutdown the next group.
+				m.logger.Error(err, "Failed while waiting for all the volumes belonging to Pods in this group to unmount", "pods", podIdentifiers)
+			}
 		}()
 
 		select {
 		case <-doneCh:
 			timer.Stop()
 		case <-timer.C():
+			ctxCancel()
 			m.logger.V(1).Info("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
 		}
 	}

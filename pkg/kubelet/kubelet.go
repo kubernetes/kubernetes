@@ -931,6 +931,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
 		Logger:                           logger,
 		ProbeManager:                     klet.probeManager,
+		VolumeManager:                    klet.volumeManager,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
 		GetPodsFunc:                      klet.GetActivePods,

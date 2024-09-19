@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -31,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -105,6 +107,12 @@ type VolumeManager interface {
 	// An error is returned if all volumes are not unmounted within
 	// the duration defined in podAttachAndMountTimeout.
 	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
+
+	// WaitForAllPodsUnmount is a version of WaitForUnmount that blocks and
+	// waits until all the volumes belonging to all the pods are unmounted.
+	// An error is returned if there's at least one Pod with volumes not unmounted
+	// within the duration defined in podAttachAndMountTimeout.
+	WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
@@ -477,6 +485,24 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 
 	klog.V(3).InfoS("All volumes are unmounted for pod", "pod", klog.KObj(pod))
 	return nil
+}
+
+func (vm *volumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
+	var (
+		errors []error
+		wg     sync.WaitGroup
+	)
+	wg.Add(len(pods))
+	for _, pod := range pods {
+		go func(pod *v1.Pod) {
+			defer wg.Done()
+			if err := vm.WaitForUnmount(ctx, pod); err != nil {
+				errors = append(errors, err)
+			}
+		}(pod)
+	}
+	wg.Wait()
+	return utilerrors.NewAggregate(errors)
 }
 
 func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {
