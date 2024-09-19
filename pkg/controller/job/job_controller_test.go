@@ -6641,6 +6641,7 @@ func TestSyncOrphanPod(t *testing.T) {
 		job                  *batch.Job
 		inCache              bool
 		wantFinalizerRemoved bool
+		podSelector          *metav1.LabelSelector
 	}{
 		"controlled_by_existing_running_job": {
 			owner: &metav1.OwnerReference{
@@ -6743,6 +6744,14 @@ func TestSyncOrphanPod(t *testing.T) {
 			},
 			wantFinalizerRemoved: true,
 		},
+		"orphan_pods_by_label_selector": {
+			podSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test",
+				},
+			},
+			wantFinalizerRemoved: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -6756,19 +6765,35 @@ func TestSyncOrphanPod(t *testing.T) {
 					}
 				})
 			}
-
 			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
 			if tc.owner != nil {
 				podBuilder = podBuilder.owner(*tc.owner)
 			}
-			orphanPod := podBuilder.Pod
-			orphanPod, err := clientset.CoreV1().Pods("default").Create(ctx, orphanPod, metav1.CreateOptions{})
+			orphanKey := orphanPodKey{
+				kind:      OrphanPodKeyKindName,
+				namespace: podBuilder.Pod.Namespace,
+				value:     podBuilder.Pod.Name,
+			}
+			if tc.podSelector != nil {
+				podBuilder = podBuilder.labels(tc.podSelector.MatchLabels)
+				selector, err := metav1.LabelSelectorAsSelector(tc.podSelector)
+				if err != nil {
+					t.Fatalf("Error parsing pod label selector: %v", err)
+				}
+				orphanKey = orphanPodKey{
+					kind:      OrphanPodKeyKindSelector,
+					namespace: podBuilder.Pod.Namespace,
+					value:     selector.String(),
+				}
+			}
+			orphanPod, err := clientset.CoreV1().Pods("default").Create(ctx, podBuilder.Pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Creating orphan pod: %v", err)
 			}
-			err = manager.syncOrphanPod(ctx, cache.MetaObjectToName(orphanPod).String())
+			// Sync orphan pod by name or selector
+			err = manager.syncOrphanPod(ctx, orphanKey)
 			if err != nil {
-				t.Fatalf("Failed sync orphan pod: %v", err)
+				t.Fatalf("Failed to sync orphan pod: %v", err)
 			}
 			if tc.wantFinalizerRemoved {
 				if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
@@ -6786,7 +6811,7 @@ func TestSyncOrphanPod(t *testing.T) {
 				time.Sleep(time.Millisecond)
 				orphanPod, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(ctx, orphanPod.Name, metav1.GetOptions{})
 				if err != nil {
-					t.Fatalf("Failed to the latest pod: %v", err)
+					t.Fatalf("Failed to retrieve the latest pod: %v", err)
 				}
 				if !hasJobTrackingFinalizer(orphanPod) {
 					t.Errorf("Unexpected removal of the Job's finalizer")
@@ -7793,6 +7818,11 @@ func (pb podBuilder) ns(n string) podBuilder {
 
 func (pb podBuilder) uid(u string) podBuilder {
 	pb.UID = types.UID(u)
+	return pb
+}
+
+func (pb podBuilder) labels(labels map[string]string) podBuilder {
+	pb.Labels = labels
 	return pb
 }
 

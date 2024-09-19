@@ -46,7 +46,13 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+	CgroupV1MaintenanceModeWarning = "cgroup v1 support is in maintenance mode, please migrate to cgroup v2"
+
+	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
+	// `cpu.stat` was added to root cgroup in kernel 5.8.
+	// (ref: https://github.com/torvalds/linux/commit/936f2a70f2077f64fab1dcb3eca71879e82ecd3f)
+	CgroupV2KernelWarning = "cgroup v2 is being used on a kernel, which doesn't support root `cpu.stat`." +
+		"Kubelet will continue, but may experience instability or wrong behavior"
 )
 
 type ActivePodsFunc func() []*v1.Pod
