@@ -34,6 +34,9 @@ const (
 	FailedToCreatePodContainer     = "FailedCreatePodContainer"
 	FailedToMakePodDataDirectories = "Failed"
 	NetworkNotReady                = "NetworkNotReady"
+	StartingVerticalScalingPod     = "StartingVerticalScalingPod"
+	FailedToVerticalScalingPod     = "FailedVerticalScalingPod"
+	FinishedVerticalScalingPod     = "FinishedVerticalScalingPod"
 )
 
 // Image event reason list
