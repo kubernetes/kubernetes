@@ -3713,3 +3713,339 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 		framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
 	})
 })
+
+// This test set will verify that pod workers in kubelet doen't get blocked at handling
+// pod lifecycle events with Evented PLEG (issue #124704). Each test triggers events
+// frequently in a short time. These tests also should be passed with Generic PLEG in
+// order to confirm both PLEGs work equally.
+var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle Frequent Events", func() {
+	f := framework.NewDefaultFramework("containers-lifecycle-test-frequent-events")
+	addAfterEachForCleaningUpPods(f)
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.It("Conainers should get started in a short time", func(ctx context.Context) {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name: regular1,
+						// Run a web server that binds a port for detecting the issue #123087
+						// where containers are created repeatedly.
+						Image: agnhostImage,
+						Args:  []string{"test-webserver", "--port", "8081"},
+					},
+					{
+						Name:  regular2,
+						Image: agnhostImage,
+						Args:  []string{"test-webserver", "--port", "8082"},
+					},
+					{
+						Name:  regular3,
+						Image: agnhostImage,
+						Args:  []string{"test-webserver", "--port", "8083"},
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+		ginkgo.By("Waiting for the pod to get running")
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 10*time.Second)
+		framework.ExpectNoError(err, "running containers in expected seconds")
+
+		ginkgo.By("deleting the pod gracefully")
+		err = client.Delete(ctx, podSpec.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "deleting a pod")
+
+		ginkgo.By("waiting for the pod to be deleted")
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Second)
+		framework.ExpectNoError(err, "deleting pod in expected seconds")
+	})
+
+	ginkgo.It("Short-lived init containers should complete in a short time", func(ctx context.Context) {
+
+		init1 := "init-1"
+		init2 := "init-2"
+		init3 := "init-3"
+		regular1 := "regular-1"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "initcontainer-test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: busyboxImage,
+						// `mkdir` is executed for detecting the issue #123087
+						// where containers are created repeatedly.
+						Command: []string{"mkdir", "/persistent/init1"},
+					},
+					{
+						Name:    init2,
+						Image:   busyboxImage,
+						Command: []string{"mkdir", "/persistent/init2"},
+					},
+					{
+						Name:    init3,
+						Image:   busyboxImage,
+						Command: []string{"mkdir", "/persistent/init3"},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							LoopForever: true,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+		ginkgo.By("Waiting for the pod to get running")
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 10*time.Second)
+		framework.ExpectNoError(err, "starting containers in expected seconds")
+
+		ginkgo.By("deleting the pod gracefully")
+		err = client.Delete(ctx, podSpec.Name, metav1.DeleteOptions{})
+
+		framework.ExpectNoError(err, "deleting a pod")
+		ginkgo.By("waiting for the pod to be deleted")
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Second)
+		framework.ExpectNoError(err, "deleting pod in expected seconds")
+	})
+
+	ginkgo.It("Completed pod should be deleted immediately", func(ctx context.Context) {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyOnFailure,
+				Containers: []v1.Container{
+					{
+						Name:    regular1,
+						Image:   busyboxImage,
+						Command: []string{"mkdir", "/persistent/regular1"},
+					},
+					{
+						Name:    regular2,
+						Image:   busyboxImage,
+						Command: []string{"mkdir", "/persistent/regular2"},
+					},
+					{
+						Name:    regular3,
+						Image:   busyboxImage,
+						Command: []string{"mkdir", "/persistent/regular3"},
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+
+		ginkgo.By("Waiting for the pod complete")
+		err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 10*time.Second)
+		framework.ExpectNoError(err, "running containers in expected seconds")
+
+		ginkgo.By("deleting the pod gracefully")
+		err = client.Delete(ctx, podSpec.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "deleting a pod")
+
+		ginkgo.By("waiting for the pod to be deleted")
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 3*time.Second)
+		framework.ExpectNoError(err, "deleting pod in expected seconds")
+	})
+
+	ginkgo.It("Conainer with no-op readiness probe should get ready soon", func(ctx context.Context) {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		readinessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/true"},
+				},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+		}
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "readiness-test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:           regular1,
+						Image:          agnhostImage,
+						Args:           []string{"test-webserver", "--port", "8081"},
+						ReadinessProbe: readinessProbe,
+					},
+					{
+						Name:           regular2,
+						Image:          agnhostImage,
+						Args:           []string{"test-webserver", "--port", "8082"},
+						ReadinessProbe: readinessProbe,
+					},
+					{
+						Name:           regular3,
+						Image:          agnhostImage,
+						Args:           []string{"test-webserver", "--port", "8083"},
+						ReadinessProbe: readinessProbe,
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+		ginkgo.By("Waiting for the pod to get ready")
+		err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 10*time.Second)
+		framework.ExpectNoError(err, "getting pod ready in expected seconds")
+	})
+
+	ginkgo.It("Conainer with no-op startup probe should get ready soon", func(ctx context.Context) {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		startupProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/true"},
+				},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+		}
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "startup-test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:         regular1,
+						Image:        agnhostImage,
+						Args:         []string{"test-webserver", "--port", "8081"},
+						StartupProbe: startupProbe,
+					},
+					{
+						Name:         regular2,
+						Image:        agnhostImage,
+						Args:         []string{"test-webserver", "--port", "8082"},
+						StartupProbe: startupProbe,
+					},
+					{
+						Name:         regular3,
+						Image:        agnhostImage,
+						Args:         []string{"test-webserver", "--port", "8083"},
+						StartupProbe: startupProbe,
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+		ginkgo.By("Waiting for the pod to get ready")
+		err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 10*time.Second)
+		framework.ExpectNoError(err, "getting pod ready in expected seconds")
+	})
+
+	ginkgo.It("Conainer with failing liveness probe should stop soon", func(ctx context.Context) {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		livenessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/false"},
+				},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			FailureThreshold:    1,
+		}
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "liveness-test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:          regular1,
+						Image:         agnhostImage,
+						Args:          []string{"test-webserver", "--port", "8081"},
+						LivenessProbe: livenessProbe,
+					},
+					{
+						Name:          regular2,
+						Image:         agnhostImage,
+						Args:          []string{"test-webserver", "--port", "8082"},
+						LivenessProbe: livenessProbe,
+					},
+					{
+						Name:          regular3,
+						Image:         agnhostImage,
+						Args:          []string{"test-webserver", "--port", "8083"},
+						LivenessProbe: livenessProbe,
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(ctx, podSpec)
+		ginkgo.By("Waiting for the pod complete")
+		err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 15*time.Second)
+		framework.ExpectNoError(err, "stopping container in expected seconds")
+	})
+
+})
