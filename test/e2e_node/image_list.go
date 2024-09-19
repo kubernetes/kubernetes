@@ -32,7 +32,6 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	commontest "k8s.io/kubernetes/test/e2e/common"
-	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -82,11 +81,6 @@ func updateImageAllowList(ctx context.Context) {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(sriovDevicePluginImage)
-	}
-	if gpuDevicePluginImage, err := getGPUDevicePluginImage(ctx); err != nil {
-		klog.Errorln(err)
-	} else {
-		e2epod.ImagePrePullList.Insert(gpuDevicePluginImage)
 	}
 	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginDSYAML); err != nil {
 		klog.Errorln(err)
@@ -215,21 +209,6 @@ func PrePullAllImages() error {
 
 	wg.Wait()
 	return utilerrors.NewAggregate(pullErrs)
-}
-
-// getGPUDevicePluginImage returns the image of GPU device plugin.
-func getGPUDevicePluginImage(ctx context.Context) (string, error) {
-	ds, err := e2emanifest.DaemonSetFromURL(ctx, e2egpu.GPUDevicePluginDSYAML)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
-	}
-	if ds == nil {
-		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
-	}
-	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
-	}
-	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
 func getContainerImageFromE2ETestDaemonset(dsYamlPath string) (string, error) {
