@@ -25,6 +25,10 @@ import (
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
 // To add a new feature, define a key for it in pkg/features/kube_features.go and add it here. The features will be
 // available throughout Kubernetes binaries.
+// For features available via specific kubernetes components like apiserver,
+// cloud-controller-manager, etc find the respective kube_features.go file
+// (eg:staging/src/apiserver/pkg/features/kube_features.go), define the versioned
+// feature gate there, and reference it in this file.
 // To support n-3 compatibility version, features may only be removed 3 releases after graduation.
 //
 // Entries are alphabetized.
