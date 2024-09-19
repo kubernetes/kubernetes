@@ -132,6 +132,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
 
   # Get the compute zone
   zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone.value)')"}
+  zone=${zone// /}
   if [[ ${zone} == "" ]]; then
     echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone.value)'\`"
     exit 1
@@ -139,6 +140,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
 
   # Get the compute project
   project=$(gcloud info --format='value(config.project)')
+  project=${project// /}
   if [[ ${project} == "" ]]; then
     echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
