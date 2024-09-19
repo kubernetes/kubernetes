@@ -147,6 +147,9 @@ goflags=()
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
+# if the user passed no target in, we can skip slow normalization.
+normalize="true"
+
 for arg; do
   if [[ "${arg}" == -* ]]; then
     goflags+=("${arg}")
@@ -155,7 +158,14 @@ for arg; do
   fi
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
+  normalize="false"
   kube::util::read-array testcases < <(kube::test::find_dirs)
+fi
+
+if [[ "${normalize}" == "true" ]]; then
+  # This can be slow!
+  kube::log::status "Normalizing Go targets"
+  kube::util::read-array testcases < <(kube::golang::normalize_go_targets "${testcases[@]}")
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
@@ -189,11 +199,6 @@ runTests() {
   junit_filename_prefix=$(junitFilenamePrefix)
 
   installTools
-
-  # Try to normalize input names. This is slow!
-  local -a targets
-  kube::log::status "Normalizing Go targets"
-  kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
 
   # Enable coverage data collection?
   local cover_msg
@@ -229,7 +234,7 @@ runTests() {
             go test -json \
             "${goflags[@]:+${goflags[@]}}" \
             "${KUBE_TIMEOUT}" \
-            "${targets[@]}" \
+            "$@" \
             "${testargs[@]:+${testargs[@]}}" \
     && rc=$? || rc=$?
 
