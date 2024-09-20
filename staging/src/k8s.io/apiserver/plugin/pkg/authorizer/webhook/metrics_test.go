@@ -122,7 +122,7 @@ func TestAuthorizerMetrics(t *testing.T) {
 			defer server.Close()
 
 			fakeAuthzMetrics := &fakeAuthorizerMetrics{}
-			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, fakeAuthzMetrics, []apiserver.WebhookMatchCondition{}, "")
+			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, fakeAuthzMetrics, cel.NewDefaultCompiler(), []apiserver.WebhookMatchCondition{}, "")
 			if err != nil {
 				t.Error("failed to create client")
 				return
