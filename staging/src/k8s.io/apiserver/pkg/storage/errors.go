@@ -160,7 +160,15 @@ func IsInvalidObj(err error) bool {
 // a) the given object data retrieved from the storage is not transformable, or
 // b) the given object failed to decode properly
 func IsCorruptObject(err error) bool {
-	return isErrCode(err, ErrCodeCorruptObj)
+	if err == nil {
+		return false
+	}
+	var storageErr *StorageError
+	if !errors.As(err, &storageErr) {
+		return false
+	}
+
+	return storageErr.Code == ErrCodeCorruptObj
 }
 
 func isErrCode(err error, code int) bool {
