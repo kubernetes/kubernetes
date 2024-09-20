@@ -474,7 +474,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 
 	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner, listErrAggregatorFactory)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
-		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store)
+		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store, c.GroupResource)
 	}
 
 	return store, destroyFunc, nil
