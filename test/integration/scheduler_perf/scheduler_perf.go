@@ -86,6 +86,7 @@ const (
 	createResourceClaimsOpcode   operationCode = "createResourceClaims"
 	createResourceDriverOpcode   operationCode = "createResourceDriver"
 	churnOpcode                  operationCode = "churn"
+	updateAnyOpcode              operationCode = "updateAny"
 	barrierOpcode                operationCode = "barrier"
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
@@ -437,6 +438,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		createResourceClaimsOpcode:   &createResourceClaimsOp{},
 		createResourceDriverOpcode:   &createResourceDriverOp{},
 		churnOpcode:                  &churnOp{},
+		updateAnyOpcode:              &updateAny{},
 		barrierOpcode:                &barrierOp{},
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
