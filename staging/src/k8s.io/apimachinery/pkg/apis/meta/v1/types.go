@@ -933,6 +933,22 @@ const (
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
+	// StatusReasonStoreReadError means that the server encountered an error while
+	// retrieving resources from the backend object store.
+	// This may be due to backend database error, or because processing of the read
+	// resource failed.
+	// Details:
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "name" string - the prefix where the reading error(s) occurred
+	//   "causes" []StatusCause
+	//      - (optional):
+	//        - "type" CauseType - CauseTypeUnexpectedServerResponse
+	//        - "message" string - the error message from the store backend
+	//        - "field" string - the full path with the key of the resource that failed reading
+	//
+	// Status code 500
+	StatusReasonStoreReadError StatusReason = "StorageReadError"
+
 	// StatusReasonTimeout means that the request could not be completed within the given time.
 	// Clients can get this response only when they specified a timeout param in the request,
 	// or if the server cannot complete the operation within a reasonable amount of time.
