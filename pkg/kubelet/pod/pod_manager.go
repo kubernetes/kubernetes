@@ -123,7 +123,7 @@ func NewBasicPodManager() Manager {
 	return pm
 }
 
-// Set the internal pods based on the new pods.
+// SetPods set the internal pods based on the new pods.
 func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
@@ -336,5 +336,4 @@ func (pm *basicManager) GetPodAndMirrorPod(aPod *v1.Pod) (pod, mirrorPod *v1.Pod
 		return pm.podByFullName[fullName], aPod, true
 	}
 	return aPod, pm.mirrorPodByFullName[fullName], false
-
 }

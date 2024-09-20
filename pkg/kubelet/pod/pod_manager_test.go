@@ -17,151 +17,280 @@ limitations under the License.
 package pod
 
 import (
-	"reflect"
+	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-// Stub out mirror client for testing purpose.
-func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
-	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	manager := NewBasicPodManager().(*basicManager)
-	return manager, fakeMirrorClient
+var (
+	mirrorPodUID  = "mirror-pod-uid"
+	staticPodUID  = "static-pod-uid"
+	normalPodUID  = "normal-pod-uid"
+	mirrorPodName = "mirror-static-pod-name"
+	staticPodName = "mirror-static-pod-name"
+	normalPodName = "normal-pod-name"
+
+	mirrorPod = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(mirrorPodUID),
+			Name:      mirrorPodName,
+			Namespace: metav1.NamespaceDefault,
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: "api",
+				kubetypes.ConfigMirrorAnnotationKey: "mirror",
+				kubetypes.ConfigHashAnnotationKey:   "mirror",
+			},
+		},
+	}
+	staticPod = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         types.UID(staticPodUID),
+			Name:        staticPodName,
+			Namespace:   metav1.NamespaceDefault,
+			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
+		},
+	}
+	normalPod = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         types.UID(normalPodUID),
+			Name:        normalPodName,
+			Namespace:   metav1.NamespaceDefault,
+			Annotations: map[string]string{},
+		},
+	}
+	sortOpt = cmpopts.SortSlices(func(a, b *v1.Pod) bool { return a.Name < b.Name })
+)
+
+func TestAddOrUpdatePod(t *testing.T) {
+	tests := []struct {
+		name     string
+		isMirror bool
+		pod      *v1.Pod
+	}{
+		{
+			name:     "mirror pod",
+			pod:      mirrorPod,
+			isMirror: true,
+		},
+		{
+			name:     "static pod",
+			pod:      staticPod,
+			isMirror: false,
+		},
+		{
+			name:     "normal pod",
+			pod:      normalPod,
+			isMirror: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pm := &basicManager{
+				podByUID:            make(map[kubetypes.ResolvedPodUID]*v1.Pod),
+				mirrorPodByUID:      make(map[kubetypes.MirrorPodUID]*v1.Pod),
+				podByFullName:       make(map[string]*v1.Pod),
+				mirrorPodByFullName: make(map[string]*v1.Pod),
+				translationByUID:    make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID),
+			}
+			pm.AddPod(test.pod)
+			verify(t, pm, test.isMirror, test.pod)
+			test.pod.Annotations["testLabel"] = "updated"
+			pm.UpdatePod(test.pod)
+			verify(t, pm, test.isMirror, test.pod)
+		})
+	}
+
+}
+
+func verify(t *testing.T, pm *basicManager, isMirror bool, expectedPod *v1.Pod) {
+	fullName := fmt.Sprintf("%s_%s", expectedPod.Name, expectedPod.Namespace)
+	if isMirror {
+		inputPod, ok := pm.mirrorPodByUID[kubetypes.MirrorPodUID(expectedPod.UID)]
+		assert.True(t, ok)
+		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByUID map verification failed.")
+		inputPod, ok = pm.mirrorPodByFullName[fullName]
+		assert.True(t, ok)
+		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByFullName map verification failed.")
+	} else {
+		inputPod, ok := pm.podByUID[kubetypes.ResolvedPodUID(expectedPod.UID)]
+		assert.True(t, ok)
+		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "PodByUID map verification failed.")
+		inputPod, ok = pm.podByFullName[fullName]
+		assert.True(t, ok)
+		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "PodByFullName map verification failed.")
+	}
 }
 
 // Tests that pods/maps are properly set after the pod update, and the basic
 // methods work correctly.
 func TestGetSetPods(t *testing.T) {
-	mirrorPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "987654321",
-			Name:      "bar",
-			Namespace: "default",
-			Annotations: map[string]string{
-				kubetypes.ConfigSourceAnnotationKey: "api",
-				kubetypes.ConfigMirrorAnnotationKey: "mirror",
-			},
-		},
-	}
-	staticPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:         "123456789",
-			Name:        "bar",
-			Namespace:   "default",
-			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
-		},
-	}
-
-	expectedPods := []*v1.Pod{
+	testCase := []struct {
+		name                 string
+		podList              []*v1.Pod
+		wantUID              types.UID
+		wantPod              *v1.Pod
+		isMirrorPod          bool
+		expectPods           []*v1.Pod
+		expectPod            *v1.Pod
+		expectedMirrorPod    *v1.Pod
+		expectUID            types.UID
+		expectPodToMirrorMap map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID
+		expectMirrorToPodMap map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
+	}{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:         "999999999",
-				Name:        "taco",
-				Namespace:   "default",
-				Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "api"},
+			name:              "Get normal pod",
+			podList:           []*v1.Pod{mirrorPod, staticPod, normalPod},
+			wantUID:           types.UID("normal-pod-uid"),
+			wantPod:           normalPod,
+			isMirrorPod:       false,
+			expectedMirrorPod: nil,
+			expectPods:        []*v1.Pod{staticPod, normalPod},
+			expectPod:         normalPod,
+			expectUID:         types.UID("normal-pod-uid"),
+			expectPodToMirrorMap: map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID{
+				kubetypes.ResolvedPodUID("static-pod-uid"): kubetypes.MirrorPodUID("mirror-pod-uid"),
+			},
+			expectMirrorToPodMap: map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID{
+				kubetypes.MirrorPodUID("mirror-pod-uid"): kubetypes.ResolvedPodUID("static-pod-uid"),
 			},
 		},
-		staticPod,
+		{
+			name:              "Get static pod",
+			podList:           []*v1.Pod{mirrorPod, staticPod, normalPod},
+			wantUID:           types.UID("static-pod-uid"),
+			wantPod:           staticPod,
+			isMirrorPod:       false,
+			expectPods:        []*v1.Pod{staticPod, normalPod},
+			expectPod:         staticPod,
+			expectedMirrorPod: mirrorPod,
+			expectUID:         types.UID("static-pod-uid"),
+			expectPodToMirrorMap: map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID{
+				kubetypes.ResolvedPodUID("static-pod-uid"): kubetypes.MirrorPodUID("mirror-pod-uid"),
+			},
+			expectMirrorToPodMap: map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID{
+				kubetypes.MirrorPodUID("mirror-pod-uid"): kubetypes.ResolvedPodUID("static-pod-uid"),
+			},
+		},
+		{
+			name:              "Get mirror pod",
+			podList:           []*v1.Pod{mirrorPod, staticPod, normalPod},
+			wantUID:           types.UID("static-pod-uid"),
+			wantPod:           mirrorPod,
+			isMirrorPod:       true,
+			expectPods:        []*v1.Pod{staticPod, normalPod},
+			expectPod:         staticPod,
+			expectedMirrorPod: mirrorPod,
+			expectUID:         types.UID("static-pod-uid"),
+			expectPodToMirrorMap: map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID{
+				kubetypes.ResolvedPodUID("static-pod-uid"): kubetypes.MirrorPodUID("mirror-pod-uid"),
+			},
+			expectMirrorToPodMap: map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID{
+				kubetypes.MirrorPodUID("mirror-pod-uid"): kubetypes.ResolvedPodUID("static-pod-uid"),
+			},
+		},
 	}
-	updates := append(expectedPods, mirrorPod)
-	podManager, _ := newTestManager()
-	podManager.SetPods(updates)
+	for _, test := range testCase {
+		t.Run(test.name, func(t *testing.T) {
+			podManager := NewBasicPodManager()
+			podManager.SetPods(test.podList)
+			actualPods := podManager.GetPods()
+			assert.Empty(t, cmp.Diff(test.expectPods, actualPods, sortOpt), "actualPods and expectPods differ")
 
-	// Tests that all regular pods are recorded correctly.
-	actualPods := podManager.GetPods()
-	if len(actualPods) != len(expectedPods) {
-		t.Errorf("expected %d pods, got %d pods; expected pods %#v, got pods %#v", len(expectedPods), len(actualPods),
-			expectedPods, actualPods)
-	}
-	for _, expected := range expectedPods {
-		found := false
-		for _, actual := range actualPods {
-			if actual.UID == expected.UID {
-				if !reflect.DeepEqual(&expected, &actual) {
-					t.Errorf("pod was recorded incorrectly. expect: %#v, got: %#v", expected, actual)
-				}
-				found = true
-				break
+			uid := podManager.TranslatePodUID(test.wantPod.UID)
+			assert.Equal(t, kubetypes.ResolvedPodUID(test.expectUID), uid, "unable to translate pod UID")
+
+			fullName := fmt.Sprintf("%s_%s", test.wantPod.Name, test.wantPod.Namespace)
+			actualPod, ok := podManager.GetPodByFullName(fullName)
+			assert.True(t, ok)
+			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by full name and expectGetPod differ")
+
+			actualPod, ok = podManager.GetPodByName(test.wantPod.Namespace, test.wantPod.Name)
+			assert.True(t, ok)
+			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
+
+			actualPod, ok = podManager.GetPodByUID(test.wantUID)
+			assert.True(t, ok)
+			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
+
+			podToMirror, mirrorToPod := podManager.GetUIDTranslations()
+			assert.Empty(t, cmp.Diff(test.expectPodToMirrorMap, podToMirror), "podToMirror and expectPodToMirror differ")
+			assert.Empty(t, cmp.Diff(test.expectMirrorToPodMap, mirrorToPod), "mirrorToPod and expectMirrorToPod differ")
+
+			actualPod, ok = podManager.GetMirrorPodByPod(test.wantPod)
+			assert.Equal(t, test.expectedMirrorPod != nil, ok)
+			assert.Empty(t, cmp.Diff(test.expectedMirrorPod, actualPod), "actualPod and expectShouldBeMirrorPod differ")
+
+			actualPod, actualMirrorPod, isMirrorPod := podManager.GetPodAndMirrorPod(test.wantPod)
+			assert.Equal(t, test.isMirrorPod, isMirrorPod)
+			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
+			assert.Empty(t, cmp.Diff(test.expectedMirrorPod, actualMirrorPod), "actualMirrorPod and shouldBeMirrorPod differ")
+
+			isMirrorPod = IsMirrorPodOf(test.wantPod, mirrorPod)
+			assert.Equal(t, test.isMirrorPod, isMirrorPod)
+
+			if test.isMirrorPod {
+				actualPod, ok = podManager.GetPodByMirrorPod(test.wantPod)
+				assert.Equal(t, test.expectedMirrorPod != nil, ok)
+				assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
 			}
-		}
-		if !found {
-			t.Errorf("pod %q was not found in %#v", expected.UID, actualPods)
-		}
+		})
 	}
-	// Tests UID translation works as expected. Convert static pod UID for comparison only.
-	if uid := podManager.TranslatePodUID(mirrorPod.UID); uid != kubetypes.ResolvedPodUID(staticPod.UID) {
-		t.Errorf("unable to translate UID %q to the static POD's UID %q; %#v",
-			mirrorPod.UID, staticPod.UID, podManager.mirrorPodByUID)
-	}
-
-	// Test the basic Get methods.
-	actualPod, ok := podManager.GetPodByFullName("bar_default")
-	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
-		t.Errorf("unable to get pod by full name; expected: %#v, got: %#v", staticPod, actualPod)
-	}
-	actualPod, ok = podManager.GetPodByName("default", "bar")
-	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
-		t.Errorf("unable to get pod by name; expected: %#v, got: %#v", staticPod, actualPod)
-	}
-
 }
 
 func TestRemovePods(t *testing.T) {
-	mirrorPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID("mirror-pod-uid"),
-			Name:      "mirror-static-pod-name",
-			Namespace: metav1.NamespaceDefault,
-			Annotations: map[string]string{
-				kubetypes.ConfigSourceAnnotationKey: "api",
-				kubetypes.ConfigMirrorAnnotationKey: "mirror",
-			},
-		},
-	}
-	staticPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:         types.UID("static-pod-uid"),
-			Name:        "mirror-static-pod-name",
-			Namespace:   metav1.NamespaceDefault,
-			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
-		},
-	}
-
-	expectedPods := []*v1.Pod{
+	testCase := []struct {
+		name                             string
+		podList                          []*v1.Pod
+		needToRemovePod                  *v1.Pod
+		expectPods                       []*v1.Pod
+		expectMirrorPods                 []*v1.Pod
+		expectOrphanedMirrorPodFullnames []string
+	}{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:         types.UID("extra-pod-uid"),
-				Name:        "extra-pod-name",
-				Namespace:   metav1.NamespaceDefault,
-				Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "api"},
-			},
+			name:             "Remove mirror pod",
+			podList:          []*v1.Pod{mirrorPod, staticPod, normalPod},
+			needToRemovePod:  mirrorPod,
+			expectPods:       []*v1.Pod{normalPod, staticPod},
+			expectMirrorPods: []*v1.Pod{},
 		},
-		staticPod,
-	}
-	updates := append(expectedPods, mirrorPod)
-	podManager, _ := newTestManager()
-	podManager.SetPods(updates)
-
-	podManager.RemovePod(staticPod)
-
-	actualPods := podManager.GetPods()
-	if len(actualPods) == len(expectedPods) {
-		t.Fatalf("Run RemovePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
-	}
-
-	_, _, orphanedMirrorPodNames := podManager.GetPodsAndMirrorPods()
-	expectedOrphanedMirrorPodNameNum := 1
-	if len(orphanedMirrorPodNames) != expectedOrphanedMirrorPodNameNum {
-		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected %d orphaned mirror pods, got %d orphaned mirror pods; ", expectedOrphanedMirrorPodNameNum, len(orphanedMirrorPodNames))
+		{
+			name:                             "Remove static pod",
+			podList:                          []*v1.Pod{mirrorPod, staticPod, normalPod},
+			needToRemovePod:                  staticPod,
+			expectPods:                       []*v1.Pod{normalPod},
+			expectMirrorPods:                 []*v1.Pod{mirrorPod},
+			expectOrphanedMirrorPodFullnames: []string{"mirror-static-pod-name_default"},
+		},
+		{
+			name:             "Remove normal pod",
+			podList:          []*v1.Pod{mirrorPod, staticPod, normalPod},
+			needToRemovePod:  normalPod,
+			expectPods:       []*v1.Pod{staticPod},
+			expectMirrorPods: []*v1.Pod{mirrorPod},
+		},
 	}
 
-	expectedOrphanedMirrorPodName := mirrorPod.Name + "_" + mirrorPod.Namespace
-	if orphanedMirrorPodNames[0] != expectedOrphanedMirrorPodName {
-		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected orphaned mirror pod name : %s, got orphaned mirror pod name %s; ", expectedOrphanedMirrorPodName, orphanedMirrorPodNames[0])
+	for _, test := range testCase {
+		t.Run(test.name, func(t *testing.T) {
+			podManager := NewBasicPodManager()
+			podManager.SetPods(test.podList)
+			podManager.RemovePod(test.needToRemovePod)
+			actualPods1 := podManager.GetPods()
+			actualPods2, actualMirrorPods, orphanedMirrorPodFullnames := podManager.GetPodsAndMirrorPods()
+			// Check if the actual pods and mirror pods match the expected ones.
+			assert.Empty(t, cmp.Diff(actualPods1, actualPods2, sortOpt), "actualPods by GetPods() and GetPodsAndMirrorPods() differ")
+			assert.Empty(t, cmp.Diff(test.expectPods, actualPods1, sortOpt), "actualPods and expectPods differ")
+			assert.Empty(t, cmp.Diff(test.expectMirrorPods, actualMirrorPods, sortOpt), "actualMirrorPods and expectMirrorPods differ")
+			assert.Empty(t, cmp.Diff(test.expectOrphanedMirrorPodFullnames, orphanedMirrorPodFullnames), "orphanedMirrorPodFullnames and expectOrphanedMirrorPodFullnames differ")
+		})
 	}
 }
