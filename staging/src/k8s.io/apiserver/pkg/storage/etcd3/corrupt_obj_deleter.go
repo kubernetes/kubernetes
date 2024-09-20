@@ -20,9 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/klog/v2"
@@ -30,11 +34,12 @@ import (
 
 // NewStoreWithUnsafeCorruptObjectDeletion wraps the given store implementation
 // and adds support for unsafe deletion of corrupt objects
-func NewStoreWithUnsafeCorruptObjectDeletion(delegate storage.Interface) storage.Interface {
+func NewStoreWithUnsafeCorruptObjectDeletion(delegate storage.Interface, gr schema.GroupResource) storage.Interface {
 	return &corruptObjectDeleter{
 		Interface: delegate,
 		// TODO: make it configurable?
 		aggregateErrMaxCount: 100,
+		groupResource:        gr,
 	}
 }
 
@@ -58,6 +63,7 @@ func WithCorruptObjErrorHandlingTransformer(transformer value.Transformer) value
 // corruptObjectDeleter facilitates unsafe deletion of corrupt objects for etcd
 type corruptObjectDeleter struct {
 	storage.Interface
+	groupResource        schema.GroupResource
 	aggregateErrMaxCount int
 }
 
@@ -98,7 +104,7 @@ func (s *corruptObjectDeleter) GetList(ctx context.Context, key string, opts sto
 	if len(aggregateErr.errs) > 0 {
 		// we have aggregated a list of corrupt objects
 		klog.V(5).ErrorS(aggregateErr, "listing corrupt objects")
-		return aggregateErr
+		return aggregateErr.NewAPIStatusError(s.groupResource)
 	}
 	return err
 }
@@ -190,4 +196,33 @@ func (e *aggregatedStorageError) Error() string {
 	}
 	b.WriteString("}")
 	return b.String()
+}
+
+// NewAPIStatusError creates a new APIStatus object from the
+// aggregated list of StorageError
+func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.GroupResource) *apierrors.StatusError {
+	var causes []metav1.StatusCause
+	for _, err := range e.errs {
+		causes = append(causes, metav1.StatusCause{
+			Type:  metav1.CauseTypeUnexpectedServerResponse,
+			Field: err.Key,
+			// TODO: do we need to expose the internal error message here?
+			Message: err.Error(),
+		})
+	}
+
+	return &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Status: metav1.StatusFailure,
+			Code:   http.StatusInternalServerError,
+			Reason: metav1.StatusReasonStoreReadError,
+			Details: &metav1.StatusDetails{
+				Group:  qualifiedResource.Group,
+				Kind:   qualifiedResource.Resource,
+				Name:   e.resourcePrefix,
+				Causes: causes,
+			},
+			Message: fmt.Sprintf("failed to read one or more %s from the storage", qualifiedResource.String()),
+		},
+	}
 }
