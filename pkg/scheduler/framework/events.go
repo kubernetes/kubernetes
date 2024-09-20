@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -65,6 +66,8 @@ var (
 	PodTolerationChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodTolerations, Label: "PodTolerationChange"}
 	// PodSchedulingGateEliminatedChange is the event when a pod's scheduling gate is changed.
 	PodSchedulingGateEliminatedChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodSchedulingGatesEliminated, Label: "PodSchedulingGateChange"}
+	// PodGeneratedResourceClaimChange is the event when a pod's list of generated ResourceClaims changes.
+	PodGeneratedResourceClaimChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodGeneratedResourceClaim, Label: "PodGeneratedResourceClaimChange"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = ClusterEvent{Resource: Node, ActionType: UpdateNodeTaint, Label: "NodeSpecUnschedulableChange"}
 	// NodeAllocatableChange is the event when node allocatable is changed.
@@ -152,6 +155,9 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		podChangeExtracters = append(podChangeExtracters, extractPodGeneratedResourceClaimChange)
+	}
 
 	for _, fn := range podChangeExtracters {
 		if event := fn(newPod, oldPod); event != nil {
@@ -217,6 +223,14 @@ func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) *C
 	if len(newPod.Spec.SchedulingGates) == 0 && len(oldPod.Spec.SchedulingGates) != 0 {
 		// A scheduling gate on the pod is completely removed.
 		return &PodSchedulingGateEliminatedChange
+	}
+
+	return nil
+}
+
+func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) *ClusterEvent {
+	if !resourceclaim.PodStatusEqual(newPod.Status.ResourceClaimStatuses, oldPod.Status.ResourceClaimStatuses) {
+		return &PodGeneratedResourceClaimChange
 	}
 
 	return nil

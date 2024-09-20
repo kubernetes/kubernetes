@@ -292,6 +292,12 @@ func (p *PodWrapper) PodResourceClaims(podResourceClaims ...v1.PodResourceClaim)
 	return p
 }
 
+// PodResourceClaims appends claim statuses into PodSpec of the inner pod.
+func (p *PodWrapper) ResourceClaimStatuses(resourceClaimStatuses ...v1.PodResourceClaimStatus) *PodWrapper {
+	p.Status.ResourceClaimStatuses = append(p.Status.ResourceClaimStatuses, resourceClaimStatuses...)
+	return p
+}
+
 // Priority sets a priority value into PodSpec of the inner pod.
 func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	p.Spec.Priority = &val
