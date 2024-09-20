@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -109,7 +110,7 @@ func TestGetResourceRequest(t *testing.T) {
 	as := assert.New(t)
 	for idx, tc := range cases {
 		actual := GetResourceRequest(tc.pod, tc.resourceName)
-		as.Equal(actual, tc.expectedValue, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
 	}
 }
 
@@ -259,9 +260,9 @@ func TestExtractResourceValue(t *testing.T) {
 	for idx, tc := range cases {
 		actual, err := ExtractResourceValueByContainerName(tc.fs, tc.pod, tc.cName)
 		if tc.expectedError != nil {
-			as.Equal(tc.expectedError, err, "expected test case [%d] to fail with error %v; got %v", idx, tc.expectedError, err)
+			require.EqualError(t, err, tc.expectedError.Error(), "expected test case [%d] to fail with error %v; got %v", idx, tc.expectedError, err)
 		} else {
-			as.Nil(err, "expected test case [%d] to not return an error; got %v", idx, err)
+			require.NoError(t, err, "expected test case [%d] to not return an error; got %v", idx, err)
 			as.Equal(tc.expectedValue, actual, "expected test case [%d] to return %q; got %q instead", idx, tc.expectedValue, actual)
 		}
 	}
