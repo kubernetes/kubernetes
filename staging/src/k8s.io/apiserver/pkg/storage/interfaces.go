@@ -313,6 +313,15 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+
+	// AggregateErrFn, if provided, will be invoked so the error(s)
+	// incurred during the list operation can be aggregated.
+	// The default is nil, and and maintains backward compatibility, which is
+	// the list operation will abort and return the first error it encounters.
+	// - key: identifies the object in the underlying storage
+	// - err: the error that occurred while retrieving the given object from the storage
+	// - done: if true, the list operation will abort, otherwise, it will continue
+	AggregateErrFn func(key string, err error) (done bool)
 }
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
