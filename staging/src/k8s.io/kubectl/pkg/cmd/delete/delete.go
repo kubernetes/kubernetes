@@ -103,7 +103,10 @@ var (
 		kubectl delete pod foo --force
 
 		# Delete all pods
-		kubectl delete pods --all`))
+		kubectl delete pods --all
+
+		# Delete all pods only if the user confirms the deletion
+		kubectl delete pods --all --interactive`))
 )
 
 type DeleteOptions struct {
