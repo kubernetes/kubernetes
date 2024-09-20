@@ -30,7 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -172,11 +173,20 @@ func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 	}
 }
 
-// NodeV1alpha3 explicitly chooses whether the DRA gRPC API v1alpha3
+// NodeV1alpha4 explicitly chooses whether the DRA gRPC API v1alpha4
 // gets enabled.
-func NodeV1alpha3(enabled bool) Option {
+func NodeV1alpha4(enabled bool) Option {
 	return func(o *options) error {
-		o.nodeV1alpha3 = enabled
+		o.nodeV1alpha4 = enabled
+		return nil
+	}
+}
+
+// NodeV1beta1 explicitly chooses whether the DRA gRPC API v1beta1
+// gets enabled.
+func NodeV1beta1(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1beta1 = enabled
 		return nil
 	}
 }
@@ -226,7 +236,8 @@ type options struct {
 	streamInterceptors         []grpc.StreamServerInterceptor
 	kubeClient                 kubernetes.Interface
 
-	nodeV1alpha3 bool
+	nodeV1alpha4 bool
+	nodeV1beta1  bool
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -265,7 +276,8 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
-		nodeV1alpha3:  true,
+		nodeV1alpha4:  true,
+		nodeV1beta1:   true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -320,9 +332,14 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	implemented := false
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
-		if nodeServer, ok := nodeServer.(drapb.NodeServer); ok && o.nodeV1alpha3 {
-			logger.V(5).Info("registering drapbv1alpha3.NodeServer")
-			drapb.RegisterNodeServer(grpcServer, nodeServer)
+		if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
+			logger.V(5).Info("registering drapbv1alpha4.NodeServer")
+			drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
+			implemented = true
+		}
+		if nodeServer, ok := nodeServer.(drapbv1beta1.NodeServer); ok && o.nodeV1beta1 {
+			logger.V(5).Info("registering drapbv1beta1.NodeServer")
+			drapbv1beta1.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
 	})

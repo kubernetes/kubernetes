@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -122,7 +122,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 		clientCallTimeout: defaultClientCallTimeout,
 	}
 
-	conn, err := p.getOrCreateGRPCConn()
+	conn, _, err := p.getOrCreateGRPCConn()
 	defer func() {
 		err := conn.Close()
 		if err != nil {
@@ -261,7 +261,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 				clientCallTimeout: defaultClientCallTimeout,
 			}
 
-			conn, err := p.getOrCreateGRPCConn()
+			conn, _, err := p.getOrCreateGRPCConn()
 			defer func() {
 				err := conn.Close()
 				if err != nil {
