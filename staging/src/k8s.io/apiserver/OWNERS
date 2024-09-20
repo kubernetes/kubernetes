@@ -13,7 +13,6 @@ reviewers:
   - caesarxuchao
   - liggitt
   - sttts
-  - ncdc
   - enj
   - hzxuzhonghu
   - apelisse
@@ -24,3 +23,5 @@ labels:
   - area/apiserver
 emeritus_approvers:
   - lavalamp
+emeritus_reviewers:
+  - ncdc
