@@ -65,8 +65,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
+	NodePrepareResourcesMethod   = "/v1beta1.Node/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1beta1.Node/NodeUnprepareResources"
 )
 
 type Nodes struct {
@@ -191,10 +191,12 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() R
 // be started explicitly with Run. May be used inside ginkgo.It.
 func NewDriverInstance(f *framework.Framework) *Driver {
 	d := &Driver{
-		f:            f,
-		fail:         map[MethodInstance]bool{},
-		callCounts:   map[MethodInstance]int64{},
-		NodeV1alpha3: true,
+		f:          f,
+		fail:       map[MethodInstance]bool{},
+		callCounts: map[MethodInstance]int64{},
+		// By default, test only with the latest gRPC API.
+		NodeV1alpha4: false,
+		NodeV1beta1:  true,
 	}
 	d.initName()
 	return d
@@ -231,7 +233,8 @@ type Driver struct {
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
 
-	NodeV1alpha3 bool
+	NodeV1alpha4 bool
+	NodeV1beta1  bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -425,7 +428,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1alpha3(d.NodeV1alpha3),
+			kubeletplugin.NodeV1alpha4(d.NodeV1alpha4),
+			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
