@@ -55,3 +55,8 @@ ADD rsyncd.password /
 RUN chmod a+r /rsyncd.password
 ADD rsyncd.sh /
 RUN chmod a+rx /rsyncd.sh
+
+# Enable fips build
+ENV GOEXPERIMENT=boringcrypto
+# Enable debug to keep symbols around, allowing us to do go tool nm
+ENV DBG=1
