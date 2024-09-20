@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
@@ -113,6 +114,34 @@ func (s *corruptObjectDeleter) Get(ctx context.Context, key string, opts storage
 	return nil
 }
 
+func (s *corruptObjectDeleter) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	aggregateErr := &aggregatedStorageError{resourcePrefix: "list"}
+	opts.AggregateCorruptObjFn = func(itemKey string, err error) bool {
+		// TODO: make it configurable?
+		if len(aggregateErr.errs) > 100 {
+			return true
+		}
+		var corruptObjErr *corruptObjectError
+		if !errors.As(err, &corruptObjErr) {
+			// this error does not represent a corrupt object,
+			// so we will abort the list operation
+			return true
+		}
+
+		aggregateErr.errs = append(aggregateErr.errs, corruptObjErr.NewStorageError(itemKey))
+		return false
+	}
+
+	err := s.Interface.GetList(ctx, key, opts, listObj)
+
+	if len(aggregateErr.errs) > 0 {
+		// we have aggregated a list of corrupt objects
+		klog.V(5).ErrorS(aggregateErr, "listing corrupt objectss")
+		return aggregateErr
+	}
+	return err
+}
+
 // errorInterpretingDecoder wraps the error returned by the decorated decoder
 type errorInterpretingDecoder struct {
 	storage.Decoder
@@ -177,4 +206,27 @@ func (e *corruptObjectError) Error() string {
 
 func (e *corruptObjectError) NewStorageError(key string) *storage.StorageError {
 	return storage.NewCorruptObjError(key, typeToMessage[e.errType], e.err)
+}
+
+// aggregatedStorageError holds an aggregated list of storage.StorageError
+type aggregatedStorageError struct {
+	resourcePrefix string
+	errs           []*storage.StorageError
+}
+
+func (e *aggregatedStorageError) Error() string {
+	if len(e.errs) == 0 {
+		return ""
+	}
+	if len(e.errs) == 1 {
+		return e.errs[0].Error()
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "unable to transform or decode %d objects: {\n", len(e.errs))
+	for _, err := range e.errs {
+		fmt.Fprintf(&b, "\t%s\n", err.Error())
+	}
+	b.WriteString("}")
+	return b.String()
 }
