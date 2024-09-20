@@ -118,12 +118,31 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				}
 			}
 		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) && options != nil {
+			options.IgnoreStoreReadErrorWithClusterBreakingPotential = nil
+		}
 		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
+				// let's make sure that the audit will reflect that this delete request
+				// was tried with ignoreStoreReadErrorWithClusterBreakingPotential enabled
+				audit.AddAuditAnnotation(ctx, "apiserver.k8s.io/unsafe-delete-ignore-read-error", "")
+
+				p, ok := r.(rest.CorruptObjectDeleterProvider)
+				if !ok || p.GetCorruptObjDeleter() == nil {
+					// this is a developer error
+					scope.err(errors.NewInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential")), w, req)
+					return
+				}
+				r = p.GetCorruptObjDeleter()
+			}
+		}
 
 		span.AddEvent("About to delete object from database")
 		wasDeleted := true
@@ -262,19 +281,24 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				}
 			}
 		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) && options != nil {
+			options.IgnoreStoreReadErrorWithClusterBreakingPotential = nil
+		}
 		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
 		}
 
-		if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, true) {
-			fieldErrList := field.ErrorList{
-				field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is not allowed with DELETECOLLECTION, try again after removing the option"),
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, true) {
+				fieldErrList := field.ErrorList{
+					field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is not allowed with DELETECOLLECTION, try again after removing the option"),
+				}
+				err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", fieldErrList)
+				scope.err(err, w, req)
+				return
 			}
-			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", fieldErrList)
-			scope.err(err, w, req)
-			return
 		}
 
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))

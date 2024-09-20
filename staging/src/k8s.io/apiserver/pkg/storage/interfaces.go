@@ -317,4 +317,11 @@ type ListOptions struct {
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
+	// IgnoreStoreReadError, if enabled, will ignore store read error
+	// such as transformation or decode failure and go ahead with the
+	// deletion of the object.
+	// NOTE: for normal deletion flow it should always be false, it may be
+	// enabled by the caller only to facilitate unsafe deletion of corrupt
+	// object which otherwise can not be deleted using the normal flow
+	IgnoreStoreReadError bool
 }

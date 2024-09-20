@@ -234,6 +234,18 @@ type Store struct {
 	// If set, DestroyFunc has to be implemented in thread-safe way and
 	// be prepared for being called more than once.
 	DestroyFunc func()
+
+	// corruptObjDeleter implements unsafe deletion flow to enable deletion
+	// of corrupt object(s), it makes an attempt to perform a normal
+	// deletion flow first, and if the normal deletion flow fails with a
+	// corrupt object error then it proceeds with the unsafe deletion
+	// of the object from the storage.
+	// NOTE: it skips precondition checks, finalizer constraints, and any
+	// after delete hook defined in 'AfterDelete' of the registry.
+	// WARNING: This may break the cluster if the resource has
+	// dependencies. Use when the cluster is broken, and there is no
+	// other viable option to repair the cluster.
+	corruptObjDeleter rest.GracefulDeleter
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -243,6 +255,8 @@ var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
 
 var _ rest.SingularNameProvider = &Store{}
+
+var _ rest.CorruptObjectDeleterProvider = &Store{}
 
 const (
 	OptimisticLockErrorMsg        = "the object has been modified; please apply your changes to the latest version and try again"
@@ -342,6 +356,11 @@ func (e *Store) GetUpdateStrategy() rest.RESTUpdateStrategy {
 // GetDeleteStrategy implements GenericStore.
 func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 	return e.DeleteStrategy
+}
+
+// GetCorruptObjDeleter returns the unsafe corrupt object deleter
+func (e *Store) GetCorruptObjDeleter() rest.GracefulDeleter {
+	return e.corruptObjDeleter
 }
 
 // List returns a list of items matching labels and field according to the
@@ -1629,6 +1648,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 	if e.Storage.Storage != nil {
 		e.ReadinessCheckFunc = e.Storage.Storage.ReadinessCheck
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		e.corruptObjDeleter = NewCorruptObjectDeleter(e)
 	}
 
 	return nil

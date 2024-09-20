@@ -407,3 +407,10 @@ type UpdateResetFieldsStrategy interface {
 	RESTUpdateStrategy
 	ResetFieldsStrategy
 }
+
+// CorruptObjectDeleterProvider is an interface the storage implements
+// to support unsafe deletion of corrupt object(s). It returns a
+// GracefulDeleter that is used to perform unsafe deletion of corrupt object(s).
+type CorruptObjectDeleterProvider interface {
+	GetCorruptObjDeleter() GracefulDeleter
+}
