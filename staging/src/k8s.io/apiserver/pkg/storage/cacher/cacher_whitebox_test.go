@@ -866,8 +866,8 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		},
 	}, listResult)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err == nil {
-			t.Fatalf("Success to create GetList: %v", err)
+		if err != nil {
+			t.Fatalf("Failed to create GetList: %v", err)
 		}
 	} else {
 		if err != nil {
