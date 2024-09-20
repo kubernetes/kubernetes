@@ -3036,24 +3036,6 @@ func TestMarkPodProposedForResize(t *testing.T) {
 				},
 			},
 		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			MarkPodProposedForResize(tc.oldPod, tc.newPod)
-			if diff := cmp.Diff(tc.expectedPod, tc.newPod); diff != "" {
-				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestMarkPodProposedForResizeWithUnexpectedContainers(t *testing.T) {
-	testCases := []struct {
-		desc        string
-		newPod      *api.Pod
-		oldPod      *api.Pod
-		expectedPod *api.Pod
-	}{
 		{
 			desc: "the number of containers in the pod has decreased; no action should be taken.",
 			newPod: &api.Pod{
