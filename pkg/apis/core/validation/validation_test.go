@@ -24140,40 +24140,83 @@ func TestValidateSleepAction(t *testing.T) {
 		return fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d)", gracePeriod)
 	}
 
+	getInvalidStrWithZeroValueEnabled := func(gracePeriod int64) string {
+		return fmt.Sprintf("must be non-negative and less than terminationGracePeriodSeconds (%d)", gracePeriod)
+	}
+
 	testCases := []struct {
-		name        string
-		action      *core.SleepAction
-		gracePeriod int64
-		expectErr   field.ErrorList
+		name             string
+		action           *core.SleepAction
+		gracePeriod      int64
+		zeroValueEnabled bool
+		expectErr        field.ErrorList
 	}{
 		{
 			name: "valid setting",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 30,
+			gracePeriod:      30,
+			zeroValueEnabled: false,
 		},
 		{
 			name: "negative seconds",
 			action: &core.SleepAction{
 				Seconds: -1,
 			},
-			gracePeriod: 30,
-			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
 		},
 		{
 			name: "longer than gracePeriod",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 3,
-			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+			gracePeriod:      3,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+		},
+		{
+			name: "sleep duration of zero with zero value feature gate disabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, 0, getInvalidStr(30))},
+		},
+		{
+			name: "sleep duration of zero with zero value feature gate enabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: true,
+		},
+		{
+			name: "invalide sleep duration (negative value) with zero value disabled",
+			action: &core.SleepAction{
+				Seconds: -1,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+		},
+		{
+			name: "invalide sleep duration (negative value) with zero value enabled",
+			action: &core.SleepAction{
+				Seconds: -1,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: true,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStrWithZeroValueEnabled(30))},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath, PodValidationOptions{})
+			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath, PodValidationOptions{AllowPodLifecycleSleepActionZeroValue: tc.zeroValueEnabled})
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
