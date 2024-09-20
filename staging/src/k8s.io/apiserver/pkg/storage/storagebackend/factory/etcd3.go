@@ -461,7 +461,17 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	}
 
 	decoder := etcd3.NewDefaultDecoder()
-	return etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder), destroyFunc, nil
+	if c.AllowUnsafeCorruptObjectDeletion {
+		transformer = etcd3.NewErrorInterpretingTransformer(transformer)
+		decoder = etcd3.NewErrorInterpretingDecoder(decoder)
+	}
+
+	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder)
+	if c.AllowUnsafeCorruptObjectDeletion {
+		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store)
+	}
+
+	return store, destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the

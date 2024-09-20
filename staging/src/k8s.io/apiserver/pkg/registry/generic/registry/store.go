@@ -1657,6 +1657,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.ReadinessCheckFunc = e.Storage.Storage.ReadinessCheck
 	}
 
+	if opts.AllowUnsafeCorruptObjectDeletion {
+		e.CorruptObjDeleter = NewCorruptObjectDeleter(e)
+	}
+
 	return nil
 }
 
