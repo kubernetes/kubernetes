@@ -228,7 +228,7 @@ func UpdateEtcdDbSize(ep string, size int64) {
 
 // SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
 func SetStorageMonitorGetter(getter func() ([]Monitor, error)) {
-	storageMonitor.monitorGetter = getter
+	storageMonitor.setGetter(getter)
 }
 
 // UpdateLeaseObjectCount sets the etcd_lease_object_counts metric.
@@ -258,7 +258,31 @@ type StorageMetrics struct {
 type monitorCollector struct {
 	compbasemetrics.BaseStableCollector
 
+	mutex sync.Mutex
 	monitorGetter func() ([]Monitor, error)
+	monitors      *[]Monitor
+
+	// get storage metric monitor is protected by mutex
+	monitorMutex sync.Mutex
+}
+
+func (m *monitorCollector) getMonitors() ([]Monitor, error) {
+	m.monitorMutex.Lock()
+	defer m.monitorMutex.Unlock()
+	if m.monitors == nil {
+		getters, err := m.monitorGetter()
+		if err != nil {
+			return nil, err
+		}
+		m.monitors = &getters
+	}
+	return *m.monitors, nil
+}
+
+func (m *monitorCollector) setGetter(monitorGetter func() ([]Monitor, error)) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.monitorGetter = monitorGetter
 }
 
 // DescribeWithStability implements compbasemetrics.StableColletor
@@ -268,7 +292,7 @@ func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc
 
 // CollectWithStability implements compbasemetrics.StableColletor
 func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric) {
-	monitors, err := c.monitorGetter()
+	monitors, err := c.getMonitors()
 	if err != nil {
 		return
 	}
@@ -280,7 +304,6 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		metrics, err := m.Monitor(ctx)
 		cancel()
-		m.Close()
 		if err != nil {
 			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
 			continue
