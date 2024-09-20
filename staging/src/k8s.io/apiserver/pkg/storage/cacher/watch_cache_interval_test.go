@@ -41,7 +41,7 @@ func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
 	}
 	indexValidator := func(_ int) bool { return true }
 
-	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, locker)
+	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, 0, locker)
 }
 
 func bufferFromEvents(events []*watchCacheEvent) *watchCacheIntervalBuffer {
@@ -300,6 +300,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				wc.endIndex,
 				indexerFunc,
 				wc.isIndexValidLocked,
+				wc.resourceVersion,
 				&wc.RWMutex,
 			)
 
