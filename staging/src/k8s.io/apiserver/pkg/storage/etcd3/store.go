@@ -270,7 +270,7 @@ func (s *store) Delete(
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 
-	skipTransformDecode := false
+	skipTransformDecode := opts.IgnoreStoreReadError
 	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, skipTransformDecode)
 }
 
