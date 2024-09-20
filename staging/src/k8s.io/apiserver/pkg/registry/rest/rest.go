@@ -180,6 +180,29 @@ type GracefulDeleter interface {
 	Delete(ctx context.Context, name string, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error)
 }
 
+// CorruptObjectDeleter should not be used for normal deletion flow, it should
+// be used only when:
+// a) the normal deletion flow hasfailed
+// b) the error from the storage represents a corrupt object
+// c) the user has set the option to ignore corrupt object error
+type CorruptObjectDeleter interface {
+	// for a corrupt object we forego graceful deletion and finalizer
+	// constraints, and delete the object from the storage
+	GracefulDeleter
+
+	// IsCandidateForUnsafeDeletion should returns true if and only if:
+	// a) the given error originating the storage layer while retrieving
+	// the object represents a corrupt object (the given object is not
+	// transformable or decodable), and
+	// b) the user has set the delete option
+	// 'IgnoreStoreReadErrorWithClusterBreakingPotential' to true
+	// This function should return true if both 'a' and 'b' are
+	// true, otherwise it should return false
+	// The Delete method should be invoked only when
+	// IsCandidateForUnsafeDeletion returns true
+	IsCandidateForUnsafeDeletion(err error, options *metav1.DeleteOptions) bool
+}
+
 // MayReturnFullObjectDeleter may return deleted object (instead of a simple status) on deletion.
 type MayReturnFullObjectDeleter interface {
 	DeleteReturnsDeletedObject() bool

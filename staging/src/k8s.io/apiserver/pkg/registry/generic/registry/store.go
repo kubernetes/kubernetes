@@ -234,6 +234,20 @@ type Store struct {
 	// If set, DestroyFunc has to be implemented in thread-safe way and
 	// be prepared for being called more than once.
 	DestroyFunc func()
+
+	// CorruptObjDeleter, if initialized, will make an attempt to
+	// perform the normal deletion flow, but if either of the below occurs:
+	// a) the data (associated with the resource being deleted) retrieved
+	// from the storage failed to transform properly (eg. decryption failure)
+	// b) the data (associated with the resource being deleted) failed to
+	// decode properly (eg. corrupt data)
+	// it will disregard these errors, bypass the finalzer constraints,
+	// deletion hook(s) and go ahead with the deletion of the object.
+	//
+	// WARNING: This may break the cluster if the resource has
+	// dependencies. Use when the cluster is broken, and there is no
+	// other viable option to repair the cluster.
+	CorruptObjDeleter rest.CorruptObjectDeleter
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -1113,7 +1127,19 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
+
+	err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj)
+	if err != nil {
+		// normal deletion flow is going to fail here, but if the user
+		// has instructed us to ignore store read error, then let's
+		// go ahead with the unsafe deletion flow.
+		if e.CorruptObjDeleter != nil && e.CorruptObjDeleter.IsCandidateForUnsafeDeletion(err, options) {
+			obj, deleted, err := e.CorruptObjDeleter.Delete(ctx, name, deleteValidation, options)
+			if err != nil {
+				return obj, deleted, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+			}
+			return obj, deleted, nil
+		}
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
 
