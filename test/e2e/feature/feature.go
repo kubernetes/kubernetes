@@ -357,6 +357,9 @@ var (
 	// (used for testing fine-grained SupplementalGroups control <https://kep.k8s.io/3619>)
 	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
+
 	// Owner: sig-network
 	// Marks tests that require a cluster with Topology Hints enabled.
 	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
