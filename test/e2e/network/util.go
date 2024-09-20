@@ -81,7 +81,7 @@ func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
+	framework.Logf("%s", desc)
 }
 
 // CheckSCTPModuleLoadedOnNodes checks whether any node on the list has the

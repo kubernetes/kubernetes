@@ -560,7 +560,7 @@ func DescribeIng(ns string) {
 	framework.Logf("\nOutput of kubectl describe ing:\n")
 	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "ing")
-	framework.Logf(desc)
+	framework.Logf("%s", desc)
 }
 
 // Update retrieves the ingress, performs the passed function, and then updates it.
@@ -829,7 +829,7 @@ func (j *TestJig) VerifyURL(ctx context.Context, route, host string, iterations 
 	for i := 0; i < iterations; i++ {
 		b, err := SimpleGET(ctx, httpClient, route, host)
 		if err != nil {
-			framework.Logf(b)
+			framework.Logf("%s", b)
 			return err
 		}
 		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)

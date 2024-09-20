@@ -185,7 +185,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 		if !reflect.DeepEqual(expectedDefaults, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expectedDefaults, defaults))
+			t.Log(cmp.Diff(expectedDefaults, defaults))
 		}
 	})
 	t.Run("hostnet PodTemplateSpec with ports", func(t *testing.T) {
@@ -223,7 +223,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		}()
 		if !reflect.DeepEqual(expected, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expected, defaults))
+			t.Log(cmp.Diff(expected, defaults))
 		}
 	})
 }
@@ -374,7 +374,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(cmp.Diff(expectedDefaults, defaults))
+		t.Log(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 

@@ -112,19 +112,19 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 			ginkgo.By("deploying the GMSA webhook")
 			err := deployGmsaWebhook(ctx, f)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
 			err = createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
 			rbacRoleName, err := createRBACRoleForGmsa(ctx, f)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating a service account")
@@ -176,19 +176,19 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 			ginkgo.By("deploying the GMSA webhook")
 			err := deployGmsaWebhook(ctx, f)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
 			err = createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
 			rbacRoleName, err := createRBACRoleForGmsa(ctx, f)
 			if err != nil {
-				framework.Failf(err.Error())
+				framework.Fail(err.Error())
 			}
 
 			ginkgo.By("creating a service account")

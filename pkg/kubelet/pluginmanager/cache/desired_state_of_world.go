@@ -21,6 +21,7 @@ keep track of registered plugins.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -101,7 +102,7 @@ func (plugin *PluginInfo) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, d
 // that can be used in logs.
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ",
 func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for plugins to register
@@ -109,7 +110,7 @@ func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (de
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ".
 func (plugin *PluginInfo) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := plugin.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // Generates an error string with the format ": <err>" if err exists

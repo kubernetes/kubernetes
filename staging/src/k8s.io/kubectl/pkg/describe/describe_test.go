@@ -3568,8 +3568,8 @@ Events:       <none>
 				t.Errorf("unexpected error: %v", err)
 			}
 			if out != test.output {
-				t.Logf(out)
-				t.Logf(test.output)
+				t.Log(out)
+				t.Log(test.output)
 				t.Errorf("expected: \n%q\n but got output: \n%q\n", test.output, out)
 			}
 		})
@@ -5222,7 +5222,7 @@ Parameters:
 				t.Errorf("unexpected error: %v", err)
 			}
 			if out != expectedOut {
-				t.Logf(out)
+				t.Log(out)
 				t.Errorf("expected : %q\n but got output:\n %q", test.output, out)
 			}
 		})
@@ -6401,7 +6401,7 @@ Events:         <none>` + "\n",
 				t.Errorf("unexpected error: %v", err)
 			}
 			if out != tc.output {
-				t.Logf(out)
+				t.Log(out)
 				t.Errorf("expected :\n%s\nbut got output:\n%s", tc.output, out)
 			}
 		})

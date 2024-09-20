@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -320,7 +321,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 		cleanupErrors = append(cleanupErrors, fmt.Sprintf("timed out waiting for PVs to be deleted: %s", err))
 	}
 	if len(cleanupErrors) != 0 {
-		return fmt.Errorf("test cleanup failed: " + strings.Join(cleanupErrors, "; "))
+		return errors.New("test cleanup failed: " + strings.Join(cleanupErrors, "; "))
 	}
 	return nil
 }

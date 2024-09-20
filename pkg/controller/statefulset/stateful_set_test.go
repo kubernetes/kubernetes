@@ -824,35 +824,35 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 		logger, ctx := ktesting.NewTestContext(t)
 		ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
 		if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
-			t.Errorf(onPolicy("Failed to turn up StatefulSet : %s", err))
+			t.Error(onPolicy("Failed to turn up StatefulSet : %s", err))
 		}
 		var err error
 		if set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name); err != nil {
-			t.Errorf(onPolicy("Could not get scaled up set: %v", err))
+			t.Error(onPolicy("Could not get scaled up set: %v", err))
 		}
 		if set.Status.Replicas != 3 {
-			t.Errorf(onPolicy("set.Status.Replicas = %v; want 3", set.Status.Replicas))
+			t.Error(onPolicy("set.Status.Replicas = %v; want 3", set.Status.Replicas))
 		}
 		*set.Spec.Replicas = 2
 		if err := scaleDownStatefulSetController(logger, set, ssc, spc, om); err != nil {
-			t.Errorf(onPolicy("Failed to scale down StatefulSet : msg, %s", err))
+			t.Error(onPolicy("Failed to scale down StatefulSet : msg, %s", err))
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
-			t.Errorf(onPolicy("Could not get scaled down StatefulSet: %v", err))
+			t.Error(onPolicy("Could not get scaled down StatefulSet: %v", err))
 		}
 		if set.Status.Replicas != 2 {
-			t.Errorf(onPolicy("Failed to scale statefulset to 2 replicas"))
+			t.Error(onPolicy("Failed to scale statefulset to 2 replicas"))
 		}
 
 		var claim *v1.PersistentVolumeClaim
 		claim, err = om.claimsLister.PersistentVolumeClaims(set.Namespace).Get("datadir-foo-2")
 		if err != nil {
-			t.Errorf(onPolicy("Could not find expected pvc datadir-foo-2"))
+			t.Error(onPolicy("Could not find expected pvc datadir-foo-2"))
 		}
 		refs := claim.GetOwnerReferences()
 		if len(refs) != 1 {
-			t.Errorf(onPolicy("Expected only one refs: %v", refs))
+			t.Error(onPolicy("Expected only one refs: %v", refs))
 		}
 		// Make the pod ref stale.
 		for i := range refs {
@@ -863,29 +863,29 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 		}
 		claim.SetOwnerReferences(refs)
 		if err = om.claimsIndexer.Update(claim); err != nil {
-			t.Errorf(onPolicy("Could not update claim with new owner ref: %v", err))
+			t.Error(onPolicy("Could not update claim with new owner ref: %v", err))
 		}
 
 		*set.Spec.Replicas = 3
 		// Until the stale PVC goes away, the scale up should never finish. Run 10 iterations, then delete the PVC.
 		if err := scaleUpStatefulSetControllerBounded(logger, set, ssc, spc, om, 10); err != nil {
-			t.Errorf(onPolicy("Failed attempt to scale StatefulSet back up: %v", err))
+			t.Error(onPolicy("Failed attempt to scale StatefulSet back up: %v", err))
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
-			t.Errorf(onPolicy("Could not get scaled down StatefulSet: %v", err))
+			t.Error(onPolicy("Could not get scaled down StatefulSet: %v", err))
 		}
 		if set.Status.Replicas != 2 {
-			t.Errorf(onPolicy("Expected set to stay at two replicas"))
+			t.Error(onPolicy("Expected set to stay at two replicas"))
 		}
 
 		claim, err = om.claimsLister.PersistentVolumeClaims(set.Namespace).Get("datadir-foo-2")
 		if err != nil {
-			t.Errorf(onPolicy("Could not find expected pvc datadir-foo-2"))
+			t.Error(onPolicy("Could not find expected pvc datadir-foo-2"))
 		}
 		refs = claim.GetOwnerReferences()
 		if len(refs) != 1 {
-			t.Errorf(onPolicy("Unexpected change to condemned pvc ownerRefs: %v", refs))
+			t.Error(onPolicy("Unexpected change to condemned pvc ownerRefs: %v", refs))
 		}
 		foundPodRef := false
 		for i := range refs {
@@ -895,21 +895,21 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 			}
 		}
 		if !foundPodRef {
-			t.Errorf(onPolicy("Claim ref unexpectedly changed: %v", refs))
+			t.Error(onPolicy("Claim ref unexpectedly changed: %v", refs))
 		}
 		if err = om.claimsIndexer.Delete(claim); err != nil {
-			t.Errorf(onPolicy("Could not delete stale pvc: %v", err))
+			t.Error(onPolicy("Could not delete stale pvc: %v", err))
 		}
 
 		if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
-			t.Errorf(onPolicy("Failed to scale StatefulSet back up: %v", err))
+			t.Error(onPolicy("Failed to scale StatefulSet back up: %v", err))
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
-			t.Errorf(onPolicy("Could not get scaled down StatefulSet: %v", err))
+			t.Error(onPolicy("Could not get scaled down StatefulSet: %v", err))
 		}
 		if set.Status.Replicas != 3 {
-			t.Errorf(onPolicy("Failed to scale set back up once PVC was deleted"))
+			t.Error(onPolicy("Failed to scale set back up once PVC was deleted"))
 		}
 	}
 }
