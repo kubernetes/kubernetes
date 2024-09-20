@@ -61,10 +61,9 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	f.It("should run nvidia-smi cli", func(ctx context.Context) {
+	f.It("should run nvidia-smi and cuda-demo-suite", func(ctx context.Context) {
 		SetupEnvironmentAndSkipIfNeeded(ctx, f, f.ClientSet)
 		pod := testNvidiaCLIPod()
-		pod.Spec.Containers[0].Command = []string{"nvidia-smi"}
 
 		ginkgo.By("Creating a pod that runs nvidia-smi")
 		createAndValidatePod(ctx, f, podClient, pod)
@@ -103,6 +102,8 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking output from nvidia-smi")
+		framework.Logf("Got container logs for %s:\n%v", pod.Spec.Containers[0].Name, log)
+
 		gomega.Expect(log).To(gomega.ContainSubstring("TensorFlow version"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Matrix multiplication result:"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Time taken for 5000x5000 matrix multiplication"))
@@ -178,7 +179,20 @@ func testNvidiaCLIPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nvidia-smi",
-					Image: "nvidia/cuda:12.3.2-runtime-ubuntu22.04",
+					Image: "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Command: []string{
+						"bash",
+						"-c",
+						`
+nvidia-smi
+apt-get update -y && \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated cuda-demo-suite-12-5
+/usr/local/cuda/extras/demo_suite/deviceQuery
+/usr/local/cuda/extras/demo_suite/vectorAdd
+/usr/local/cuda/extras/demo_suite/bandwidthTest --device=all --csv
+/usr/local/cuda/extras/demo_suite/busGrind -a
+`,
+					},
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							"nvidia.com/gpu": resource.MustParse("1"),
