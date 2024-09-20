@@ -406,28 +406,19 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	var (
 		lastError   error
 		respMembers []*etcdserverpb.Member
-		learnerID   uint64
 		resp        *clientv3.MemberAddResponse
 	)
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
 		if isLearner {
-			// if learnerID is set, it means the etcd member is already added successfully.
-			if learnerID == 0 {
-				klog.V(1).Info("[etcd] Adding etcd member as learner")
-				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
-				if err != nil {
-					lastError = err
-					return false, nil
-				}
-				learnerID = resp.Member.ID
-			}
-			respMembers = resp.Members
-			return true, nil
+			klog.V(1).Infof("[etcd] Adding etcd member %q as learner", peerAddrs)
+			resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
+		} else {
+			klog.V(1).Infof("[etcd] Adding etcd member %q", peerAddrs)
+			resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
 		}
 
-		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
 		if err == nil {
 			respMembers = resp.Members
 			return true, nil
