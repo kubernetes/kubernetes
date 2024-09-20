@@ -92,6 +92,10 @@ type watchCacheInterval struct {
 	// lock on each invocation of Next().
 	buffer *watchCacheIntervalBuffer
 
+	// resourceVersion is the resourceVersion from which
+	// the interval was constructed.
+	resourceVersion uint64
+
 	// lock effectively protects access to the underlying source
 	// of events through - indexer and indexValidator.
 	//
@@ -104,14 +108,15 @@ type attrFunc func(runtime.Object) (labels.Set, fields.Set, error)
 type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
-func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, locker sync.Locker) *watchCacheInterval {
+func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, resourceVersion uint64, locker sync.Locker) *watchCacheInterval {
 	return &watchCacheInterval{
-		startIndex:     startIndex,
-		endIndex:       endIndex,
-		indexer:        indexer,
-		indexValidator: indexValidator,
-		buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
-		lock:           locker,
+		startIndex:      startIndex,
+		endIndex:        endIndex,
+		indexer:         indexer,
+		indexValidator:  indexValidator,
+		buffer:          &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
+		resourceVersion: resourceVersion,
+		lock:            locker,
 	}
 }
 
@@ -173,8 +178,9 @@ func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getA
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.
-		endIndex: 0,
-		buffer:   buffer,
+		endIndex:        0,
+		buffer:          buffer,
+		resourceVersion: resourceVersion,
 	}
 
 	return ci, nil
