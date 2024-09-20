@@ -44,6 +44,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.32"
+- name: AllowUnsafeMalformedObjectDeletion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: AnonymousAuthConfigurableEndpoints
   versionedSpecs:
   - default: false
