@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
+	"k8s.io/utils/ptr"
 )
 
 // DeleteResource returns a function that will handle a resource deletion
@@ -121,6 +122,18 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			return
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
+				p, ok := r.(rest.CorruptObjectDeleterProvider)
+				if !ok {
+					// TODO: this is a developer error
+					scope.err(fmt.Errorf("ignoreStoreReadErrorWithClusterBreakingPotential is not supported"), w, req)
+					return
+				}
+				r = p.GetCorruptObjDeleter()
+			}
+		}
 
 		span.AddEvent("About to delete object from database")
 		wasDeleted := true
