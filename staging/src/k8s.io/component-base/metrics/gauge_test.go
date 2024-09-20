@@ -23,6 +23,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -88,7 +89,7 @@ func TestGauge(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -99,7 +100,7 @@ func TestGauge(t *testing.T) {
 			c.Set(101)
 			expected := 101
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				for _, m := range mf.GetMetric() {
@@ -176,7 +177,7 @@ func TestGaugeVec(t *testing.T) {
 			c.WithLabelValues("1", "2").Set(1.0)
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
@@ -185,7 +186,7 @@ func TestGaugeVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Set(1.0)
 			c.WithLabelValues("2", "3").Set(1.0)
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
@@ -317,7 +318,7 @@ func TestGaugeWithLabelValueAllowList(t *testing.T) {
 				g.WithLabelValues(lv...).Set(100.0)
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -339,7 +340,7 @@ func TestGaugeWithLabelValueAllowList(t *testing.T) {
 					expectedValue, ok := test.expectMetricValues[labelValuePair]
 					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
 					actualValue := m.GetGauge().GetValue()
-					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the gauge while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
+					assert.InDeltaf(t, expectedValue, actualValue, 0.01, "Got %v, wanted %v as the gauge while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
 				}
 			}
 		})
