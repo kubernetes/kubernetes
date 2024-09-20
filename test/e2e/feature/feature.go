@@ -363,6 +363,14 @@ var (
 	// (used for testing fine-grained SupplementalGroups control <https://kep.k8s.io/3619>)
 	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
+	// Owner: sig-node
+	// Tests marked with this feature MUST run with the CRI Proxy configured so errors can be injected into the kubelet's CRI calls.
+	// This is useful for testing how the kubelet handles various error conditions in its CRI interactions.
+	// test-infra jobs:
+	// - pull-kubernetes-node-e2e-cri-proxy-serial (need manual trigger)
+	// - ci-kubernetes-node-e2e-cri-proxy-serial
+	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
+
 	// Owner: sig-network
 	// Marks tests that require a cluster with Topology Hints enabled.
 	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
