@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22
+        go-version: 1.25
     - name: Set env
       run: echo SANITIZED_TARGET_PLATFORM=${KUBE_BUILD_PLATFORM/\//-} >> $GITHUB_ENV
       env:
@@ -34,9 +34,10 @@ jobs:
         sudo rm -rf /usr/local/.ghcup
     - name: Build
       env:
+        GOFLAGS: "-tags=fips"
         KUBE_BUILD_PLATFORMS: ${{ matrix.platform }}
         KUBE_RELEASE_RUN_TESTS: n
-      run: make quick-release KUBE_BUILD_PLATFORMS=$KUBE_BUILD_PLATFORMS
+      run: make quick-release CGO_ENABLED=1 KUBE_CGO_OVERRIDES="kube-apiserver kube-controller-manager kube-scheduler kubelet" KUBE_BUILD_PLATFORMS=$KUBE_BUILD_PLATFORMS GOFLAGS=$GOFLAGS
     - name: Calculate checksums
       id: calculate_checksums
       shell: bash
