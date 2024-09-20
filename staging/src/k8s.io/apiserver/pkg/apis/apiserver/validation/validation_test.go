@@ -34,16 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
-	"k8s.io/apiserver/pkg/cel/environment"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
-)
-
-var (
-	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
@@ -619,7 +615,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateAuthenticationConfiguration(tt.in, tt.disallowedIssuers).ToAggregate()
+			got := ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), tt.in, tt.disallowedIssuers).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("AuthenticationConfiguration validation mismatch (-want +got):\n%s", d)
 			}
@@ -1044,7 +1040,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{}
-			got := validateClaimValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateClaimValidationRules(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("ClaimValidationRules validation mismatch (-want +got):\n%s", d)
 			}
@@ -1572,7 +1568,7 @@ func TestValidateClaimMappings(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{usesEmailVerifiedClaim: tt.usesEmailVerifiedClaim}
-			got := validateClaimMappings(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateClaimMappings(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				fmt.Println(errString(got))
 				t.Fatalf("ClaimMappings validation mismatch (-want +got):\n%s", d)
@@ -1661,7 +1657,7 @@ func TestValidateUserValidationRules(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{}
-			got := validateUserValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateUserValidationRules(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("UserValidationRules validation mismatch (-want +got):\n%s", d)
 			}
@@ -2458,7 +2454,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errList := ValidateAuthorizationConfiguration(nil, &test.configuration, test.knownTypes, test.repeatableTypes)
+			errList := ValidateAuthorizationConfiguration(authorizationcel.NewDefaultCompiler(), nil, &test.configuration, test.knownTypes, test.repeatableTypes)
 			if len(errList) != len(test.expectedErrList) {
 				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
 			}
@@ -2568,7 +2564,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)
-			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
+			celMatcher, errList := ValidateAndCompileMatchConditions(authorizationcel.NewDefaultCompiler(), tt.matchConditions)
 			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
 				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")
 			}

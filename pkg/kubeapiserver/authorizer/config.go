@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
@@ -82,6 +83,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		apiServerID:      serverID,
 		lastLoadedConfig: config.AuthorizationConfiguration,
 		reloadInterval:   time.Minute,
+		compiler:         authorizationcel.NewDefaultCompiler(),
 	}
 
 	seenTypes := sets.New[authzconfig.AuthorizerType]()
@@ -172,7 +174,7 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 	}
 
 	// validate the file and return any error
-	if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
+	if errors := validation.ValidateAuthorizationConfiguration(authorizationcel.NewDefaultCompiler(), nil, authorizationConfiguration,
 		sets.NewString(modes.AuthorizationModeChoices...),
 		sets.NewString(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
