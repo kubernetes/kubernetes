@@ -50,19 +50,20 @@ import (
 // the CI job definitions to see how many GPU(s) are available in the environment
 // Currently the CI jobs have 2 nodes each with 4 Nvidia T4's across both GCE and AWS harness(es).
 
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity test using nvidia-smi", func() {
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Nvidia based tests", func() {
 
-	f := framework.NewDefaultFramework("nvidia-gpu1")
+	f := framework.NewDefaultFramework("nvidia-gpu")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
+	var closeFn func()
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeAll(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		podClient = e2epod.NewPodClient(f)
+		closeFn = SetupEnvironmentAndSkipIfNeeded(context.Background(), f, f.ClientSet)
 	})
 
 	f.It("should run nvidia-smi and cuda-demo-suite", func(ctx context.Context) {
-		SetupEnvironmentAndSkipIfNeeded(ctx, f, f.ClientSet)
 		pod := testNvidiaCLIPod()
 
 		ginkgo.By("Creating a pod that runs nvidia-smi")
@@ -76,18 +77,6 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 		gomega.Expect(log).To(gomega.ContainSubstring("NVIDIA-SMI"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Driver Version:"))
 		gomega.Expect(log).To(gomega.ContainSubstring("CUDA Version:"))
-	})
-})
-
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Pod", func() {
-
-	f := framework.NewDefaultFramework("nvidia-gpu2")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	var podClient *e2epod.PodClient
-
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
-		podClient = e2epod.NewPodClient(f)
 	})
 
 	f.It("should run gpu based matrix multiplication", func(ctx context.Context) {
@@ -107,16 +96,6 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		gomega.Expect(log).To(gomega.ContainSubstring("TensorFlow version"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Matrix multiplication result:"))
 		gomega.Expect(log).To(gomega.ContainSubstring("Time taken for 5000x5000 matrix multiplication"))
-	})
-})
-
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Job", func() {
-
-	f := framework.NewDefaultFramework("nvidia-gpu2")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 	})
 
 	f.It("should run gpu based jobs", func(ctx context.Context) {
@@ -147,6 +126,12 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during node recreation: %v", job.Status.Failed)
 
 		VerifyJobNCompletions(ctx, f, completions)
+	})
+
+	ginkgo.AfterAll(func() {
+		if closeFn != nil {
+			closeFn()
+		}
 	})
 })
 
@@ -261,17 +246,18 @@ print(f"Time taken for {n}x{n} matrix multiplication: {end_time - start_time:.2f
 	return &pod
 }
 
-func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework, clientSet clientset.Interface) {
+func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework, clientSet clientset.Interface) func() {
+	var closeFn func()
 	if framework.ProviderIs("gce") {
 		rsgather := SetupNVIDIAGPUNode(ctx, f)
-		defer func() {
+		closeFn = func() {
 			framework.Logf("Stopping ResourceUsageGather")
 			constraints := make(map[string]e2edebug.ResourceConstraint)
 			// For now, just gets summary. Can pass valid constraints in the future.
 			summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
 			f.TestSummaries = append(f.TestSummaries, summary)
 			framework.ExpectNoError(err, "getting resource usage summary")
-		}()
+		}
 	}
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
 	framework.ExpectNoError(err)
@@ -295,6 +281,7 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 	if allocatable == 0 {
 		e2eskipper.Skipf("%d ready nodes do not have any allocatable Nvidia GPU(s). Skipping...", len(nodes.Items))
 	}
+	return closeFn
 }
 
 func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) bool {
