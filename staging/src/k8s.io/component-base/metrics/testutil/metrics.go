@@ -433,3 +433,47 @@ func LabelsMatch(metric *dto.Metric, labelFilter map[string]string) bool {
 
 	return true
 }
+
+// GetCounterVecFromGatherer collects a counter that matches the given name
+// from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// It returns all counter values that had a label with a certain name in a map
+// that uses the label value as keys.
+//
+// Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
+func GetCounterValuesFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string, labelName string) (map[string]float64, error) {
+	m, err := gatherer.Gather()
+	if err != nil {
+		return nil, err
+	}
+
+	metricFamily := findMetric(m, metricName)
+	if metricFamily == nil {
+		return nil, fmt.Errorf("metric %q not found", metricName)
+	}
+	if len(metricFamily.GetMetric()) == 0 {
+		return nil, fmt.Errorf("metric %q is empty", metricName)
+	}
+
+	values := make(map[string]float64)
+	for _, metric := range metricFamily.GetMetric() {
+		if LabelsMatch(metric, lvMap) {
+			if counter := metric.GetCounter(); counter != nil {
+				for _, labelPair := range metric.Label {
+					if labelPair.GetName() == labelName {
+						values[labelPair.GetValue()] = counter.GetValue()
+					}
+				}
+			}
+		}
+	}
+	return values, nil
+}
+
+func findMetric(metricFamilies []*dto.MetricFamily, metricName string) *dto.MetricFamily {
+	for _, mFamily := range metricFamilies {
+		if mFamily.GetName() == metricName {
+			return mFamily
+		}
+	}
+	return nil
+}

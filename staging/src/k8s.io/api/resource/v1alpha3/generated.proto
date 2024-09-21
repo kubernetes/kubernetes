@@ -481,6 +481,14 @@ message DeviceRequestAllocationResult {
   //
   // +required
   optional string device = 4;
+
+  // AdminAccess indicates that administrative access to the device(s)
+  // was requested. A device where the only allocation is for
+  // administrative access is still available for other allocations.
+  //
+  // +optional
+  // +default=false
+  optional bool adminAccess = 5;
 }
 
 // DeviceSelector must have exactly one field set.

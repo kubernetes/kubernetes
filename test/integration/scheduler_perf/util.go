@@ -26,6 +26,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -45,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -59,6 +62,8 @@ const (
 )
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
+
+var runID = time.Now().Format(dateFormat)
 
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
@@ -177,12 +182,24 @@ type DataItem struct {
 	Unit string `json:"unit"`
 	// Labels is the labels of the data item.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// progress contains number of scheduled pods over time.
+	progress []podScheduling
+	start    time.Time
 }
 
 // DataItems is the data point set. It is the struct that perf dashboard expects.
 type DataItems struct {
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+}
+
+type podScheduling struct {
+	ts            time.Time
+	attempts      int
+	completed     int
+	observedTotal int
+	observedRate  float64
 }
 
 // makeBasePod creates a Pod object to be used as a template.
@@ -236,6 +253,17 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		return fmt.Errorf("indenting error: %v", err)
 	}
 	return os.WriteFile(destFile, formatted.Bytes(), 0644)
+}
+
+func dataFilename(destFile string) (string, error) {
+	if *dataItemsDir != "" {
+		// Ensure the "dataItemsDir" path is valid.
+		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
+			return "", fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %w", *dataItemsDir, err)
+		}
+		destFile = path.Join(*dataItemsDir, destFile)
+	}
+	return destFile, nil
 }
 
 type labelValues struct {
@@ -378,15 +406,18 @@ type throughputCollector struct {
 	podInformer           coreinformers.PodInformer
 	schedulingThroughputs []float64
 	labels                map[string]string
-	namespaces            []string
+	namespaces            sets.Set[string]
 	errorMargin           float64
+
+	progress []podScheduling
+	start    time.Time
 }
 
 func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
 	return &throughputCollector{
 		podInformer: podInformer,
 		labels:      labels,
-		namespaces:  namespaces,
+		namespaces:  sets.New(namespaces...),
 		errorMargin: errorMargin,
 	}
 }
@@ -396,11 +427,75 @@ func (tc *throughputCollector) init() error {
 }
 
 func (tc *throughputCollector) run(tCtx ktesting.TContext) {
-	podsScheduled, _, err := getScheduledPods(tc.podInformer, tc.namespaces...)
-	if err != nil {
-		klog.Fatalf("%v", err)
+	// The collector is based on informer cache events instead of periodically listing pods because:
+	// - polling causes more overhead
+	// - it does not work when pods get created, scheduled and deleted quickly
+	//
+	// Normally, informers cannot be used to observe state changes reliably.
+	// They only guarantee that the *some* updates get reported, but not *all*.
+	// But in scheduler_perf, the scheduler and the test share the same informer,
+	// therefore we are guaranteed to see a new pod without NodeName (because
+	// that is what the scheduler needs to see to schedule it) and then the updated
+	// pod with NodeName (because nothing makes further changes to it).
+	var mutex sync.Mutex
+	scheduledPods := 0
+	getScheduledPods := func() int {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return scheduledPods
 	}
-	lastScheduledCount := len(podsScheduled)
+	onPodChange := func(oldObj, newObj any) {
+		oldPod, newPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
+		if err != nil {
+			tCtx.Errorf("unexpected pod events: %v", err)
+			return
+		}
+
+		if !tc.namespaces.Has(newPod.Namespace) {
+			return
+		}
+
+		mutex.Lock()
+		defer mutex.Unlock()
+		if (oldPod == nil || oldPod.Spec.NodeName == "") && newPod.Spec.NodeName != "" {
+			// Got scheduled.
+			scheduledPods++
+		}
+	}
+	handle, err := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			onPodChange(nil, obj)
+		},
+		UpdateFunc: func(oldObj, newObj any) {
+			onPodChange(oldObj, newObj)
+		},
+	})
+	if err != nil {
+		tCtx.Fatalf("register pod event handler: %v", err)
+	}
+	defer func() {
+		tCtx.ExpectNoError(tc.podInformer.Informer().RemoveEventHandler(handle), "remove event handler")
+	}()
+
+	// Waiting for the initial sync didn't work, `handle.HasSynced` always returned
+	// false - perhaps because the event handlers get added to a running informer.
+	// That's okay(ish), throughput is typically measured within an empty namespace.
+	//
+	// syncTicker := time.NewTicker(time.Millisecond)
+	// defer syncTicker.Stop()
+	// for {
+	// 	select {
+	// 	case <-syncTicker.C:
+	// 		if handle.HasSynced() {
+	// 			break
+	// 		}
+	// 	case <-tCtx.Done():
+	// 		return
+	// 	}
+	// }
+	tCtx.Logf("Started pod throughput collector for namespace(s) %s, %d pods scheduled so far", sets.List(tc.namespaces), getScheduledPods())
+
+	lastScheduledCount := getScheduledPods()
 	ticker := time.NewTicker(throughputSampleInterval)
 	defer ticker.Stop()
 	lastSampleTime := time.Now()
@@ -413,12 +508,8 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			podsScheduled, _, err := getScheduledPods(tc.podInformer, tc.namespaces...)
-			if err != nil {
-				klog.Fatalf("%v", err)
-			}
 
-			scheduled := len(podsScheduled)
+			scheduled := getScheduledPods()
 			// Only do sampling if number of scheduled pods is greater than zero.
 			if scheduled == 0 {
 				continue
@@ -429,6 +520,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 				// sampling and creating pods get started independently.
 				lastScheduledCount = scheduled
 				lastSampleTime = now
+				tc.start = now
 				continue
 			}
 
@@ -461,6 +553,20 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			for i := 0; i <= skipped; i++ {
 				tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
 			}
+
+			// Record the metric sample.
+			counters, err := testutil.GetCounterValuesFromGatherer(legacyregistry.DefaultGatherer, "scheduler_schedule_attempts_total", map[string]string{"profile": "default-scheduler"}, "result")
+			if err != nil {
+				klog.Error(err)
+			}
+			tc.progress = append(tc.progress, podScheduling{
+				ts:            now,
+				attempts:      int(counters["unschedulable"] + counters["error"] + counters["scheduled"]),
+				completed:     int(counters["scheduled"]),
+				observedTotal: scheduled,
+				observedRate:  throughput,
+			})
+
 			lastScheduledCount = scheduled
 			klog.Infof("%d pods have been scheduled successfully", lastScheduledCount)
 			skipped = 0
@@ -470,7 +576,11 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 }
 
 func (tc *throughputCollector) collect() []DataItem {
-	throughputSummary := DataItem{Labels: tc.labels}
+	throughputSummary := DataItem{
+		Labels:   tc.labels,
+		progress: tc.progress,
+		start:    tc.start,
+	}
 	if length := len(tc.schedulingThroughputs); length > 0 {
 		sort.Float64s(tc.schedulingThroughputs)
 		sum := 0.0

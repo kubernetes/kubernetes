@@ -538,6 +538,11 @@
       "io.k8s.api.resource.v1alpha3.DeviceRequestAllocationResult": {
         "description": "DeviceRequestAllocationResult contains the allocation result for one request.",
         "properties": {
+          "adminAccess": {
+            "default": false,
+            "description": "AdminAccess indicates that administrative access to the device(s) was requested. A device where the only allocation is for administrative access is still available for other allocations.",
+            "type": "boolean"
+          },
           "device": {
             "default": "",
             "description": "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",

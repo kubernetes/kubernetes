@@ -233,7 +233,10 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 	logger.V(6).Info("pod with resource claims changed", "pod", klog.KObj(pod), "deleted", deleted)
 
 	// Release reservations of a deleted or completed pod?
-	if needsClaims, reason := podNeedsClaims(pod, deleted); !needsClaims {
+	needsClaims, reason := podNeedsClaims(pod, deleted)
+	if needsClaims {
+		logger.V(6).Info("Not touching claims", "pod", klog.KObj(pod), "reason", reason)
+	} else {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			claimName, _, err := resourceclaim.Name(pod, &podClaim)
 			switch {
@@ -241,14 +244,14 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 				// Either the claim was not created (nothing to do here) or
 				// the API changed. The later will also get reported elsewhere,
 				// so here it's just a debug message.
-				logger.V(6).Info("Nothing to do for claim during pod change", "err", err, "reason", reason)
+				logger.V(6).Info("Nothing to do for claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "err", err, "reason", reason)
 			case claimName != nil:
 				key := claimKeyPrefix + pod.Namespace + "/" + *claimName
-				logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "key", key, "reason", reason)
+				logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, *claimName), "key", key, "reason", reason)
 				ec.queue.Add(key)
 			default:
 				// Nothing to do, claim wasn't generated.
-				logger.V(6).Info("Nothing to do for skipped claim during pod change", "reason", reason)
+				logger.V(6).Info("Nothing to do for skipped claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "reason", reason)
 			}
 		}
 	}
@@ -382,7 +385,7 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, obj interface{}, 
 		return
 	}
 	if len(objs) == 0 {
-		logger.V(6).Info("claim got deleted while not needed by any pod, nothing to do", "claim", klog.KObj(claim))
+		logger.V(6).Info("unrelated to any known pod", "claim", klog.KObj(claim))
 		return
 	}
 	for _, obj := range objs {

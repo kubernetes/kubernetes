@@ -31,6 +31,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +97,7 @@ type stateData struct {
 	informationsForClaim []informationForClaim
 
 	// nodeAllocations caches the result of Filter for the nodes.
-	nodeAllocations map[string][]*resourceapi.AllocationResult
+	nodeAllocations map[string][]resourceapi.AllocationResult
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -279,6 +280,8 @@ type dynamicResources struct {
 	classLister                resourcelisters.DeviceClassLister
 	podSchedulingContextLister resourcelisters.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
 	sliceLister                resourcelisters.ResourceSliceLister
+	celCache                   *structured.CELCache
+	allocatedDevices           *allocatedDevices
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -343,6 +346,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	pl := &dynamicResources{
 		enabled:                       true,
 		controlPlaneControllerEnabled: fts.EnableDRAControlPlaneController,
@@ -353,10 +357,21 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
 		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
+
+		// This is a LRU cache for compiled CEL expressions. The most
+		// recent 10 of them get reused across different scheduling
+		// cycles.
+		celCache: structured.NewCELCache(10),
+
+		allocatedDevices: newAllocatedDevices(logger),
 	}
 	if pl.controlPlaneControllerEnabled {
 		pl.podSchedulingContextLister = fh.SharedInformerFactory().Resource().V1alpha3().PodSchedulingContexts().Lister()
 	}
+
+	// Reacting to events is more efficient than iterating over the list
+	// repeatedly in PreFilter.
+	pl.claimAssumeCache.AddEventHandler(pl.allocatedDevices.handlers())
 
 	return pl, nil
 }
@@ -399,6 +414,8 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.DeviceClass, ActionType: framework.Add | framework.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
@@ -450,7 +467,10 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
-		logger.V(6).Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			owner := metav1.GetControllerOf(modifiedClaim)
+			loggerV.Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "claimOwner", owner, "reason", err.Error())
+		}
 		return framework.QueueSkip, nil
 	}
 
@@ -493,6 +513,33 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	return framework.Queue, nil
+}
+
+// isSchedulableAfterPodChange is invoked for update pod events reported by
+// an informer. It checks whether that change adds the ResourceClaim(s) that the
+// pod has been waiting for.
+func (pl *dynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](nil, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+	}
+
+	if pod.UID != modifiedPod.UID {
+		logger.V(7).Info("pod is not schedulable after change in other pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+		return framework.QueueSkip, nil
+	}
+
+	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
+		// This is not an unexpected error: we know that
+		// foreachPodResourceClaim only returns errors for "not
+		// schedulable".
+		logger.Info("pod is not schedulable after being updated", "pod", klog.KObj(pod))
+		return framework.QueueSkip, nil
+	}
+
+	logger.V(4).Info("pod got updated and is schedulable", "pod", klog.KObj(pod))
 	return framework.Queue, nil
 }
 
@@ -842,38 +889,45 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// persistently.
 		//
 		// Claims are treated as "allocated" if they are in the assume cache
-		// or currently their allocation is in-flight.
-		allocator, err := structured.NewAllocator(ctx, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
+		// or currently their allocation is in-flight. This does not change
+		// during filtering, so we can determine that once.
+		allocatedDevices := pl.listAllAllocatedDevices(logger)
+		slices, err := pl.sliceLister.List(labels.Everything())
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		allocator, err := structured.NewAllocator(ctx, allocateClaims, allocatedDevices, pl.classLister, slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string][]*resourceapi.AllocationResult)
+		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
 	s.claims = claims
 	return nil, nil
 }
 
-type claimListerForAssumeCache struct {
-	assumeCache         *assumecache.AssumeCache
-	inFlightAllocations *sync.Map
-}
+func (pl *dynamicResources) listAllAllocatedDevices(logger klog.Logger) sets.Set[structured.DeviceID] {
+	// Start with a fresh set that matches the current known state of the
+	// world according to the informers.
+	allocated := pl.allocatedDevices.Get()
 
-func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	// Probably not worth adding an index for?
-	objs := cl.assumeCache.List(nil)
-	allocated := make([]*resourceapi.ResourceClaim, 0, len(objs))
-	for _, obj := range objs {
-		claim := obj.(*resourceapi.ResourceClaim)
-		if obj, ok := cl.inFlightAllocations.Load(claim.UID); ok {
-			claim = obj.(*resourceapi.ResourceClaim)
+	// Whatever is in flight also has to be checked.
+	pl.inFlightAllocations.Range(func(key, value any) bool {
+		claim := value.(*resourceapi.ResourceClaim)
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.AdminAccess {
+				// Is not considered as allocated.
+				continue
+			}
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
+			allocated.Insert(deviceID)
 		}
-		if claim.Status.Allocation != nil {
-			allocated = append(allocated, claim)
-		}
-	}
-	return allocated, nil
+		return true
+	})
+	return allocated
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -954,7 +1008,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	}
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
-	var allocations []*resourceapi.AllocationResult
+	var allocations []resourceapi.AllocationResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -1241,7 +1295,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			if index < 0 {
 				return statusError(logger, fmt.Errorf("internal error, claim %s with allocation not found", claim.Name))
 			}
-			allocation := allocations[i]
+			allocation := &allocations[i]
 			state.informationsForClaim[index].allocation = allocation
 
 			// Strictly speaking, we don't need to store the full modified object.
