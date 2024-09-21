@@ -46,7 +46,7 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool, cpuExperimentalManagerPolicyStatic bool) *ResourceConfig {
 	return nil
 }
 
