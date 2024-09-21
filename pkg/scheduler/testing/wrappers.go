@@ -983,6 +983,12 @@ func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.Allocati
 	return wrapper
 }
 
+// Deleting sets the deletion timestamp of the inner object.
+func (wrapper *ResourceClaimWrapper) Deleting(time metav1.Time) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.DeletionTimestamp = &time
+	return wrapper
+}
+
 // Structured turns a "normal" claim into one which was allocated via structured parameters.
 // The only difference is that there is no controller name and the special finalizer
 // gets added.
@@ -1007,7 +1013,7 @@ func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourceapi.Resour
 	return wrapper
 }
 
-// ReservedFor sets that field of the inner object given information about one pod.
+// ReservedForPod sets that field of the inner object given information about one pod.
 func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types.UID) *ResourceClaimWrapper {
 	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
@@ -1105,10 +1111,16 @@ func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	return wrapper
 }
 
+// FromResourceSlice creates a ResourceSlice wrapper from some existing object.
+func FromResourceSlice(other *resourceapi.ResourceSlice) *ResourceSliceWrapper {
+	return &ResourceSliceWrapper{*other.DeepCopy()}
+}
+
 func (wrapper *ResourceSliceWrapper) Obj() *resourceapi.ResourceSlice {
 	return &wrapper.ResourceSlice
 }
 
+// Devices sets the devices field of the inner object.
 func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrapper {
 	for _, name := range names {
 		wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name})
@@ -1116,6 +1128,7 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
+// Device sets the devices field of the inner object.
 func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
 	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{Attributes: attrs}})
 	return wrapper
