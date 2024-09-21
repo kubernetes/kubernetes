@@ -154,7 +154,7 @@ func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient
 	pod = podClient.Create(ctx, pod)
 
 	ginkgo.By("Watching for error events or started pod")
-	ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
+	ev, err := podClient.WaitForErrorEventOrSuccessWithTimeout(ctx, pod, framework.PodStartTimeout*3)
 	framework.ExpectNoError(err)
 	gomega.Expect(ev).To(gomega.BeNil())
 
