@@ -864,7 +864,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC is added",
+			name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is added",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 			initialPVs: []*v1.PersistentVolume{
 				st.MakePersistentVolume().
@@ -914,7 +914,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC is updated",
+			name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is updated",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 			initialPVs: []*v1.PersistentVolume{
 				st.MakePersistentVolume().
@@ -1018,7 +1018,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name:         "Pod rejected with node by the VolumeZone plugin is not requeued when the unrelated label of PV is updated",
+			name:         "Pod rejected with node by the VolumeZone plugin is not requeued when the unrelated PVC is added",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 			initialPVs: []*v1.PersistentVolume{
 				st.MakePersistentVolume().
@@ -1058,13 +1058,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
-				pv2 := st.MakePersistentVolume().Name("pv2").Labels(map[string]string{v1.LabelTopologyZone: "us-east1"}).
-					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
-					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+				pvc3 := st.MakePersistentVolumeClaim().
+					Name("pvc3").
+					Annotation(volume.AnnBindCompleted, "true").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 					Obj()
-				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv2, metav1.UpdateOptions{}); err != nil {
-					return fmt.Errorf("failed to update pv2: %w", err)
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc3, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create pvc3: %w", err)
 				}
 				return nil
 			},
