@@ -212,11 +212,24 @@ func verifyFeatureDeletionOnly(newFeatureList []featureInfo, oldFeatureList []fe
 		if !found {
 			newFeatures = append(newFeatures, f.Name)
 		} else if !reflect.DeepEqual(*oldSpecs, f) {
-			return fmt.Errorf("feature %s changed with diff: %s", f.Name, cmp.Diff(*oldSpecs, f))
+			return fmt.Errorf(
+				"feature %s has been modified in the unversioned feature list.\n"+
+					"Only feature deletion is allowed for unversioned features.\n"+
+					"All feature updates should be migrated to versioned feature gates.\n"+
+					"Please remove this feature from staging/src/k8s.io/apiserver/pkg/features/kube_features.go\n"+
+					"and ensure it is properly migrated to the versioned feature gate.\n"+
+					"For more information, see: https://github.com/kubernetes/kubernetes/issues/125031\n\n"+
+					"Diff: %s", f.Name, cmp.Diff(*oldSpecs, f))
 		}
 	}
 	if len(newFeatures) > 0 {
-		return fmt.Errorf("new features added to FeatureSpec map! %v\nPlease add new features through VersionedSpecs map ONLY! ", newFeatures)
+		return fmt.Errorf(
+			"new features added to unversioned FeatureSpec map: %v\n"+
+				"Only feature deletion is allowed for unversioned features.\n"+
+				"Please add new features through VersionedSpecs map ONLY.\n"+
+				"Remove these features from staging/src/k8s.io/apiserver/pkg/features/kube_features.go\n"+
+				"and ensure they are properly added to the versioned feature gate.\n"+
+				"For more information, see: https://github.com/kubernetes/kubernetes/issues/125031", newFeatures)
 	}
 	return nil
 }
