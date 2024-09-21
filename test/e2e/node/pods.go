@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -210,7 +211,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 
 		ginkgo.It("should never report success for a pending container", func(ctx context.Context) {
-			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
+			ginkgo.By("creating pods that should always exit 1 and terminating the pod after container created")
 			createAndTestPodRepeatedly(ctx,
 				3, 15,
 				podFastDeleteScenario{client: podClient.PodInterface, waitCreated: true},
@@ -218,10 +219,18 @@ var _ = SIGDescribe("Pods Extended", func() {
 			)
 		})
 		ginkgo.It("should never report container start when an init container fails", func(ctx context.Context) {
-			ginkgo.By("creating pods with an init container that always exit 1 and terminating the pod after a random delay")
+			ginkgo.By("creating pods with an init container that always exit 1 and terminating the pod after container created")
 			createAndTestPodRepeatedly(ctx,
 				3, 15,
 				podFastDeleteScenario{client: podClient.PodInterface, waitCreated: true, initContainer: true},
+				podClient.PodInterface,
+			)
+		})
+		ginkgo.It("should report StartError for pod removal", func(ctx context.Context) {
+			ginkgo.By("creating pods that should always report context cancel and terminating the pod after a random delay")
+			createAndTestPodRepeatedly(ctx,
+				3, 15,
+				podFastDeleteScenario{client: podClient.PodInterface, waitCreated: false, delayMs: 2000},
 				podClient.PodInterface,
 			)
 		})
@@ -867,7 +876,8 @@ type podScenarioVerifier interface {
 }
 
 type podFastDeleteScenario struct {
-	client v1core.PodInterface
+	client  v1core.PodInterface
+	delayMs int
 
 	waitCreated   bool
 	initContainer bool
@@ -885,8 +895,9 @@ func (s podFastDeleteScenario) IsLastEvent(event watch.Event) bool {
 }
 
 func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScenarioVerifier, string, error) {
-	t := time.Now()
+	var scenario string
 	if s.waitCreated {
+		t := time.Now()
 		if err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
 			pod, err := s.client.Get(ctx, pod.Name, metav1.GetOptions{})
 			if err != nil {
@@ -901,9 +912,15 @@ func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScen
 		}).WithPolling(50 * time.Millisecond).WithTimeout(30 * time.Second).Should(gomega.Succeed()); err != nil {
 			return nil, "", err
 		}
+		scenario = fmt.Sprintf("t=%s", time.Since(t))
 	}
-	scenario := fmt.Sprintf("t=%s", time.Since(t))
-	return &podStartVerifier{pod: pod}, scenario, s.client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+
+	if s.delayMs != 0 {
+		t := time.Duration(rand.Intn(s.delayMs)) * time.Millisecond
+		scenario = fmt.Sprintf("t=%s", t)
+		time.Sleep(t)
+	}
+	return &podStartVerifier{pod: pod, waitCreated: s.waitCreated}, scenario, s.client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 }
 
 func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
@@ -989,6 +1006,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 // transitions. It assumes one container running to completion.
 type podStartVerifier struct {
 	pod                  *v1.Pod
+	waitCreated          bool
 	hasInitContainers    bool
 	hasContainers        bool
 	hasTerminated        bool
@@ -1064,7 +1082,8 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 	v.hasRunningContainers = status.State.Waiting == nil && status.State.Terminated == nil
 	if t != nil {
 		if !t.FinishedAt.Time.IsZero() {
-			if t.StartedAt.IsZero() {
+			// If the pod is deleted while being created, its creation time is the starting point of Unix time.
+			if t.StartedAt.IsZero() || t.StartedAt.Time == time.Unix(0, 0) {
 				hasNoStartTime = true
 			} else {
 				v.duration = t.FinishedAt.Sub(t.StartedAt.Time)
@@ -1081,6 +1100,9 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 			// pod volume teardown races with container start in CRI, which reports a failure
 			framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
+		case !v.waitCreated && t.ExitCode == 128 && t.Reason == "StartError" && isContextCanceled(t.Message):
+			// pod is not actually created, so verify is aborted.
+			return nil
 		default:
 			data, _ := json.MarshalIndent(pod.Status, "", "  ")
 			framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
@@ -1118,7 +1140,8 @@ func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v
 		switch {
 		case len(names) > 0:
 			errs = append(errs, fmt.Errorf("pod %s on node %s did not reach a terminal phase before being deleted but had running containers: phase=%s, running-containers=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, strings.Join(names, ",")))
-		case pod.Status.Phase != v1.PodPending:
+			// If we don't wait for the container to be created, so don't need to verify it here.
+		case pod.Status.Phase != v1.PodPending && v.waitCreated:
 			errs = append(errs, fmt.Errorf("pod %s on node %s was not Pending but has no running containers: phase=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase))
 		}
 	}
@@ -1129,4 +1152,12 @@ func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v
 
 	framework.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
 	return pod, errs
+}
+
+// isContextCanceled verifies whether pod creation failed due to context cancel,
+// if pod is deleted during the creation process,
+// The CRI will verify that the context is cancelled and returns context canceled.
+// If the command execution phase has been reached, then the Go standard library will return `signal: killed`.
+func isContextCanceled(message string) bool {
+	return strings.Contains(message, "context canceled") || strings.Contains(message, "signal: killed")
 }
