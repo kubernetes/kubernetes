@@ -118,7 +118,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, cpuExperimentalManagerPolicyStatic bool) *ResourceConfig {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
@@ -167,6 +167,12 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	// determine the qos class
 	qosClass := v1qos.GetPodQOS(pod)
 
+	// quota is not capped if cpu manager policy is static
+	// and pod meets qualifications for static assignment
+	if cpuExperimentalManagerPolicyStatic && qosClass == v1.PodQOSGuaranteed && cpuRequests % MilliCPUToCPU == 0 {
+		cpuQuota = int64(-1)
+	}
+	
 	// build the result
 	result := &ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
