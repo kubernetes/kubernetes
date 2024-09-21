@@ -35,7 +35,7 @@ func TestCacheNotInitialized(t *testing.T) {
 	cache := newTestCache()
 	// If the global timestamp is not set, always return nil.
 	d := cache.getIfNewerThan(types.UID("1234"), time.Time{})
-	assert.True(t, d == nil, "should return nil since cache is not initialized")
+	assert.Nil(t, d, "should return nil since cache is not initialized")
 }
 
 func getTestPodIDAndStatus(numContainers int) (types.UID, *PodStatus) {
@@ -178,9 +178,9 @@ func TestDelete(t *testing.T) {
 
 func verifyNotification(t *testing.T, ch chan *data, expectNotification bool) {
 	if expectNotification {
-		assert.True(t, len(ch) > 0, "Did not receive notification")
+		assert.NotEmpty(t, ch, "Did not receive notification")
 	} else {
-		assert.True(t, len(ch) < 1, "Should not have triggered the notification")
+		assert.Empty(t, ch, "Should not have triggered the notification")
 	}
 	// Drain the channel.
 	for i := 0; i < len(ch); i++ {
