@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -214,7 +213,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(ctx,
 				3, 15,
-				podFastDeleteScenario{client: podClient.PodInterface, delayMs: 2000},
+				podFastDeleteScenario{client: podClient.PodInterface, waitCreated: true},
 				podClient.PodInterface,
 			)
 		})
@@ -222,7 +221,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("creating pods with an init container that always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(ctx,
 				3, 15,
-				podFastDeleteScenario{client: podClient.PodInterface, delayMs: 2000, initContainer: true},
+				podFastDeleteScenario{client: podClient.PodInterface, waitCreated: true, initContainer: true},
 				podClient.PodInterface,
 			)
 		})
@@ -868,9 +867,9 @@ type podScenarioVerifier interface {
 }
 
 type podFastDeleteScenario struct {
-	client  v1core.PodInterface
-	delayMs int
+	client v1core.PodInterface
 
+	waitCreated   bool
 	initContainer bool
 }
 
@@ -886,9 +885,24 @@ func (s podFastDeleteScenario) IsLastEvent(event watch.Event) bool {
 }
 
 func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScenarioVerifier, string, error) {
-	t := time.Duration(rand.Intn(s.delayMs)) * time.Millisecond
-	scenario := fmt.Sprintf("t=%s", t)
-	time.Sleep(t)
+	t := time.Now()
+	if s.waitCreated {
+		if err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			pod, err := s.client.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if pod.Status.Phase != v1.PodPending {
+				return nil
+			}
+
+			return fmt.Errorf("pod %s on node %s has been created but is still in the Creating state", pod.Name, pod.Spec.NodeName)
+		}).WithPolling(50 * time.Millisecond).WithTimeout(30 * time.Second).Should(gomega.Succeed()); err != nil {
+			return nil, "", err
+		}
+	}
+	scenario := fmt.Sprintf("t=%s", time.Since(t))
 	return &podStartVerifier{pod: pod}, scenario, s.client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 }
 
