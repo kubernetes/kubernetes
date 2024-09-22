@@ -724,7 +724,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted",
+			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
 			initialNodes: []*v1.Node{
 				st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
 				st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
@@ -748,6 +748,32 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 			wantRequeuedPods:          sets.New("pod4"),
 			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: disabled)",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
+				st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node1").Obj(),
+				st.MakePod().Name("pod2").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - Pod3 and Pod4 will be rejected by the PodTopologySpread plugin.
+				st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an NodeTaint delete event.
+				// It should requeue both pod3 and pod4 only because PodTopologySpread subscribes to Node/delete events.
+				if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node2", metav1.DeleteOptions{}); err != nil {
+					return fmt.Errorf("failed to update node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod3", "pod4"),
+			enableSchedulingQueueHint: []bool{false},
 		},
 		{
 			name: "Pods with PodTopologySpread should be requeued when a NodeTaint of a Node with a topology label has been updated",
