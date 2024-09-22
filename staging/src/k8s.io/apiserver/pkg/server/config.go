@@ -995,13 +995,28 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 	return DefaultBuildHandlerChain(handler, c)
 }
 
+// DefaultBuildHandlerChain builds the default handler chain for the API server.
+// Is is split in 2 parts - before and after authorization.
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := apiHandler
+	handler := InternalBuildHandlerChainFromAuthz(apiHandler, c)
+	handler = InternalBuildHandlerChainBeforeAuthz(handler, c)
+	return handler
+}
 
+// InternalBuildHandlerChainFromAuthz builds the handler chain from authorization onwards.
+// This should not be used without a good reason. If you not sure, use DefaultBuildHandlerChain.
+func InternalBuildHandlerChainFromAuthz(apiHandler http.Handler, c *Config) http.Handler {
+	handler := apiHandler
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
+	return handler
+}
 
+// InternalBuildHandlerChainBeforeAuthz builds the handler chain before authorization is done.
+// This should not be used without a good reason. If you not sure, use DefaultBuildHandlerChain.
+func InternalBuildHandlerChainBeforeAuthz(apiHandler http.Handler, c *Config) http.Handler {
+	handler := apiHandler
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
