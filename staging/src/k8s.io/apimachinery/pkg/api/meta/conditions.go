@@ -70,13 +70,14 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 // RemoveStatusCondition removes the corresponding conditionType from conditions if present. Returns
 // true if it was present and got removed.
 // conditions must be non-nil.
-func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) (removed bool) {
+func RemoveStatusCondition[T ~string](conditions *[]metav1.Condition, conditionType T) (removed bool) {
 	if conditions == nil || len(*conditions) == 0 {
 		return false
 	}
+	condTypeStr := string(conditionType)
 	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)
 	for _, condition := range *conditions {
-		if condition.Type != conditionType {
+		if condition.Type != condTypeStr {
 			newConditions = append(newConditions, condition)
 		}
 	}
@@ -88,9 +89,10 @@ func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string)
 }
 
 // FindStatusCondition finds the conditionType in conditions.
-func FindStatusCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
+func FindStatusCondition[T ~string](conditions []metav1.Condition, conditionType T) *metav1.Condition {
+	condTypeStr := string(conditionType)
 	for i := range conditions {
-		if conditions[i].Type == conditionType {
+		if conditions[i].Type == condTypeStr {
 			return &conditions[i]
 		}
 	}
@@ -99,19 +101,20 @@ func FindStatusCondition(conditions []metav1.Condition, conditionType string) *m
 }
 
 // IsStatusConditionTrue returns true when the conditionType is present and set to `metav1.ConditionTrue`
-func IsStatusConditionTrue(conditions []metav1.Condition, conditionType string) bool {
-	return IsStatusConditionPresentAndEqual(conditions, conditionType, metav1.ConditionTrue)
+func IsStatusConditionTrue[T ~string](conditions []metav1.Condition, conditionType T) bool {
+	return IsStatusConditionPresentAndEqual[T](conditions, conditionType, metav1.ConditionTrue)
 }
 
 // IsStatusConditionFalse returns true when the conditionType is present and set to `metav1.ConditionFalse`
-func IsStatusConditionFalse(conditions []metav1.Condition, conditionType string) bool {
-	return IsStatusConditionPresentAndEqual(conditions, conditionType, metav1.ConditionFalse)
+func IsStatusConditionFalse[T ~string](conditions []metav1.Condition, conditionType T) bool {
+	return IsStatusConditionPresentAndEqual[T](conditions, conditionType, metav1.ConditionFalse)
 }
 
 // IsStatusConditionPresentAndEqual returns true when conditionType is present and equal to status.
-func IsStatusConditionPresentAndEqual(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus) bool {
+func IsStatusConditionPresentAndEqual[T ~string](conditions []metav1.Condition, conditionType T, status metav1.ConditionStatus) bool {
+	condTypeStr := string(conditionType)
 	for _, condition := range conditions {
-		if condition.Type == conditionType {
+		if condition.Type == condTypeStr {
 			return condition.Status == status
 		}
 	}

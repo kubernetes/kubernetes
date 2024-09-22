@@ -18,10 +18,19 @@ package meta
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type customConditionType string
+
+const (
+	conditionType1 customConditionType = "CustomConditionType1"
+	conditionType2 customConditionType = "CustomConditionType2"
+	conditionType3 customConditionType = "CustomConditionType3"
 )
 
 func TestSetStatusCondition(t *testing.T) {
@@ -163,6 +172,19 @@ func TestRemoveStatusCondition(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("generic condition", func(t *testing.T) {
+		conditionToRemove := metav1.Condition{Type: string(conditionType1)}
+		conditions := []metav1.Condition{
+			{Type: string(conditionType2)},
+			{Type: string(conditionType3)},
+			conditionToRemove,
+		}
+		removed := RemoveStatusCondition(&conditions, conditionType1)
+		if !removed || slices.Contains(conditions, conditionToRemove) {
+			t.Error(conditions)
+		}
+	})
 }
 
 func TestFindStatusCondition(t *testing.T) {
@@ -199,6 +221,19 @@ func TestFindStatusCondition(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("generic condition", func(t *testing.T) {
+		conditionToFind := metav1.Condition{Type: string(conditionType1)}
+		conditions := []metav1.Condition{
+			{Type: string(conditionType2)},
+			{Type: string(conditionType3)},
+			conditionToFind,
+		}
+		actual := FindStatusCondition(conditions, conditionType1)
+		if !reflect.DeepEqual(actual, &conditionToFind) {
+			t.Error(actual)
+		}
+	})
 }
 
 func TestIsStatusConditionPresentAndEqual(t *testing.T) {
@@ -247,4 +282,16 @@ func TestIsStatusConditionPresentAndEqual(t *testing.T) {
 
 		})
 	}
+
+	t.Run("generic condition", func(t *testing.T) {
+		conditionToFind := metav1.Condition{
+			Type:   string(conditionType1),
+			Status: metav1.ConditionTrue,
+		}
+		conditions := []metav1.Condition{conditionToFind}
+		found := IsStatusConditionPresentAndEqual(conditions, conditionType1, conditionToFind.Status)
+		if !found {
+			t.Errorf("%#v not found", conditionToFind)
+		}
+	})
 }
