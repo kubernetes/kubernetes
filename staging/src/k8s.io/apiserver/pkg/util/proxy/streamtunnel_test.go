@@ -19,7 +19,6 @@ package proxy
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -304,7 +303,7 @@ func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
 	trw.hijacked = true
 	_, err = trw.Write(expectedWrite)
 	assert.Error(t, err, "Writing to ResponseWriter after Hijack() is an error")
-	assert.True(t, errors.Is(err, http.ErrHijacked), "Hijacked error returned if writing after hijacked")
+	require.ErrorIs(t, err, http.ErrHijacked, "Hijacked error returned if writing after hijacked")
 	// Validate WriteHeader().
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{}}
 	expectedStatusCode := 201
