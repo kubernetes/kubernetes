@@ -1333,7 +1333,13 @@
     # Create pods that will be gradually deleted after being scheduled.
   - opcode: createPods
     countParam: $deletingPods
+    # Delete scheduled pods, which will generate many AssignedPodDelete events.
+    # Each of them will be processed by the scheduling queue.
+    # But, the scheduling throughput should only be minimally impacted by the number of gated Pods.
+  - opcode: deletePods
+    namespace: namespace-3
     deletePodsPerSecond: 50
+    skipWaitToCompletion: true
   - opcode: createPods
     countParam: $measurePods
     collectMetrics: true
@@ -1402,7 +1408,10 @@
     countParam: $deletingPods
     podTemplatePath: config/templates/pod-with-finalizer.yaml
     skipWaitToCompletion: true
+  - opcode: deletePods
+    namespace: namespace-1
     deletePodsPerSecond: 100
+    skipWaitToCompletion: true
   - opcode: createPods
     countParam: $measurePods
     collectMetrics: true
