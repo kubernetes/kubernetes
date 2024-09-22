@@ -85,6 +85,10 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 
 // Complete modifies authorization options
 func (o *BuiltInAuthorizationOptions) Complete() []error {
+	if o == nil {
+		return nil
+	}
+
 	if len(o.AuthorizationConfigurationFile) == 0 && len(o.Modes) == 0 {
 		o.Modes = []string{authzmodes.ModeAlwaysAllow}
 	}
