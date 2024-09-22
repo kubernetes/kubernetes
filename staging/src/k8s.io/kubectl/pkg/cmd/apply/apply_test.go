@@ -1143,7 +1143,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 	for testCaseName, tc := range testCases {
 		for _, testingOpenAPISchema := range testingOpenAPISchemas {
 			t.Run(testCaseName, func(t *testing.T) {
-				tf := cmdtesting.NewTestFactory().WithNamespace("test")
+				tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
 				defer tf.Cleanup()
 
 				tf.UnstructuredClient = &fake.RESTClient{
@@ -1178,7 +1178,6 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("prune", "true")
-				cmd.Flags().Set("namespace", tc.namespace)
 				cmd.Flags().Set("all", "true")
 				for _, allow := range tc.pruneAllowlist {
 					cmd.Flags().Set("prune-allowlist", allow)
