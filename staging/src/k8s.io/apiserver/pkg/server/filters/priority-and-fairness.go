@@ -27,7 +27,6 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -181,10 +180,10 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		// Tracks the forked goroutine that waits for time to dispatch the WATCH.
-		// Due to the time taken to initialize the WATCH, this can terminate noticeably after the decision is made.
-		var waitGroup sync.WaitGroup
-		waitGroup.Add(1)
+		// Used to relay the report from the wait goroutine about its panic, if any.
+		// The code in that goroutine is not trivial, so the possibility of a panic
+		// in there is not ignored.
+		relayCh := make(chan string, 1)
 
 		watchInitializationSignal := newInitializationSignal()
 		// This wraps the request passed to handler.ServeHTTP(),
@@ -225,16 +224,10 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 			defer func() {
 				err := recover()
 				closeDecided() // needed in case request is rejected (`execute` not called)
-				waitGroup.Done()
 				if err != nil {
-					// This should never happen.
-					// All the code involved is part of the API Priority and Fairness feature.
-					flowSchemaName := "(not yet classified)"
-					if classification != nil {
-						flowSchemaName = classification.FlowSchemaName
-					}
-					utilruntime.HandleErrorWithContext(ctx, nil, "APF waiting for WATCH dispatch panicked", "recoveredValue", err, "verb", requestInfo.Verb, "resource", requestInfo.Resource, "flowSchema", flowSchemaName)
+					relayCh <- controlflow.FormatValueWithStack(err)
 				}
+				close(relayCh)
 			}()
 
 			// We create handleCtx with an adjusted deadline, for two reasons.
@@ -264,6 +257,7 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 				h.handler.ServeHTTP(w, watchReq)
 			}
 		}, func() {
+			recoveredFromWatch := recover()
 			// Protect from the situation when request will not reach storage layer
 			// and the initialization signal will not be send.
 			if watchInitializationSignal != nil {
@@ -276,8 +270,18 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 			if forgetWatch != nil {
 				forgetWatch()
 			}
-			// Make sure that return happens after everything in `execute`.
-			waitGroup.Wait()
+			waitReport, waitPanicked := <-relayCh
+			if recoveredFromWatch != nil {
+				if waitPanicked {
+					combined := fmt.Sprintf("wait and watch both panicked.\nwait: %s\n\nwatch: %v", waitReport, recoveredFromWatch)
+					panic(combined)
+				} else {
+					// Experiment shows that this preserves the stack, so faithfully that both panics show up.
+					panic(recoveredFromWatch)
+				}
+			} else if waitPanicked {
+				panic("APF wait goroutine panicked: " + waitReport)
+			}
 		})
 	} else {
 		execute := func() {

@@ -559,19 +559,16 @@ func TestApfWatchHandlePanic(t *testing.T) {
 	postExecutePanicingFilter.postExecutePanic = true
 
 	testCases := []struct {
-		name               string
-		filter             *fakeWatchApfFilter
-		expectedHTTPStatus int
+		name   string
+		filter *fakeWatchApfFilter
 	}{
 		{
-			name:               "pre-execute panic",
-			filter:             preExecutePanicingFilter,
-			expectedHTTPStatus: http.StatusTooManyRequests,
+			name:   "pre-execute panic",
+			filter: preExecutePanicingFilter,
 		},
 		{
-			name:               "post-execute panic",
-			filter:             postExecutePanicingFilter,
-			expectedHTTPStatus: http.StatusOK,
+			name:   "post-execute panic",
+			filter: postExecutePanicingFilter,
 		},
 	}
 
@@ -583,10 +580,24 @@ func TestApfWatchHandlePanic(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
-			server := httptest.NewServer(apfHandler)
+			handler := func(w http.ResponseWriter, r *http.Request) {
+				defer func() {
+					if err := recover(); err == nil {
+						t.Errorf("expected panic, got %v", err)
+					} else if errStr, isStr := err.(string); !isStr {
+						t.Errorf("Expected to recover a string, but got %#v (type %T)", err, err)
+					} else if !strings.HasPrefix(errStr, "APF wait goroutine panicked") {
+						t.Errorf("Recovered string has unexpected content: %q", errStr)
+					} else {
+						w.WriteHeader(http.StatusOK)
+					}
+				}()
+				apfHandler.ServeHTTP(w, r)
+			}
+			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
 
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), test.expectedHTTPStatus); err != nil {
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
