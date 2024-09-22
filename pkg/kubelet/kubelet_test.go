@@ -527,7 +527,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// done within a goroutine and can get called multiple times, so the
 	// Destroy() count in not deterministic on the actual number.
 	// https://github.com/kubernetes/kubernetes/blob/29fdbb065b5e0d195299eb2d260b975cbc554673/pkg/kubelet/kubelet_pods.go#L2006
-	assert.True(t, destroyCount >= 1, "Expect 1 or more destroys")
+	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
