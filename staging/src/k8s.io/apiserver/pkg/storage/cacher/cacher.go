@@ -426,6 +426,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// since the watch-list is provided by the watch cache instruct
 	// the reflector to issue a regular LIST against the store
 	reflector.UseWatchList = ptr.To(false)
+	reflector.DisableReflectorConsistencyCheckEvenIfRequested = true
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
