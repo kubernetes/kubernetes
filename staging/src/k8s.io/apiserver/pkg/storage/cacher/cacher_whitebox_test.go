@@ -2605,7 +2605,7 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getBookMarkFn, err := cacher.getBookmarkAfterResourceVersionLockedFunc(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
+			getBookMarkFn, err := cacher.getBookmarkAfterResourceVersionLockedFunc(context.TODO(), uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
 			require.NoError(t, err)
 			cacher.watchCache.RLock()
 			defer cacher.watchCache.RUnlock()
