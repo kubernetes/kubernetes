@@ -170,7 +170,7 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 		// Handshake fails.
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		require.Error(t, err, "handshake should have returned an error")
-		assert.True(t, strings.Contains(err.Error(), "unable to negotiate protocol"))
+		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer spdyServer.Close()
@@ -279,12 +279,12 @@ func TestTunnelingResponseWriter_Hijack(t *testing.T) {
 	trw = &tunnelingResponseWriter{written: true}
 	_, _, err = trw.Hijack()
 	assert.Error(t, err, "Hijack after writing to response writer is error")
-	assert.True(t, strings.Contains(err.Error(), "connection has already been written to"))
+	assert.ErrorContains(t, err, "connection has already been written to")
 	// Hijacking after already hijacked is an error.
 	trw = &tunnelingResponseWriter{hijacked: true}
 	_, _, err = trw.Hijack()
 	assert.Error(t, err, "Hijack after writing to response writer is error")
-	assert.True(t, strings.Contains(err.Error(), "connection has already been hijacked"))
+	assert.ErrorContains(t, err, "connection has already been hijacked")
 }
 
 func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
