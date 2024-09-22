@@ -2011,7 +2011,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 		{ID: "dev2", Health: pluginapi.Unhealthy},
 	})
 	// update chan no data
-	assert.Empty(t, len(testManager.update), 0)
+	assert.Empty(t, testManager.update)
 
 	// update chan receive pod1
 	var wg sync.WaitGroup
