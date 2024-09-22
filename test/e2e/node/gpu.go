@@ -130,7 +130,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		framework.ExpectNoError(err)
 
 		// make sure job is running by waiting for its first pod to start running
-		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1)
+		err = e2ejob.WaitForJobPodsRunningWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1, e2ejob.JobTimeout*2)
 		framework.ExpectNoError(err)
 
 		numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
@@ -139,7 +139,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for gpu job to finish")
-		err = e2ejob.WaitForJobFinish(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFinishWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, e2ejob.JobTimeout*2)
 		framework.ExpectNoError(err)
 		ginkgo.By("Done with gpu job")
 
