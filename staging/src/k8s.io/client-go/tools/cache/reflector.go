@@ -120,6 +120,8 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+
+	DisableReflectorConsistencyCheckEvenIfRequested bool
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -456,7 +458,12 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		reflectorConsistencyCheckerTicker := newReflectorConsistencyTicker(r.name, r.clock, r.LastSyncResourceVersion, r.listerWatcher.List)
+		var reflectorConsistencyCheckerTicker *reflectorConsistencyTicker
+		if r.DisableReflectorConsistencyCheckEvenIfRequested {
+			reflectorConsistencyCheckerTicker = newNoOpReflectorConsistencyTicker()
+		} else {
+			reflectorConsistencyCheckerTicker = newReflectorConsistencyTicker(r.name, r.clock, r.LastSyncResourceVersion, r.listerWatcher.List)
+		}
 		err = handleWatch(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
 			r.clock, resyncerrc, stopCh, reflectorConsistencyCheckerTicker)
 		// Ensure that watch will not be reused across iterations.
