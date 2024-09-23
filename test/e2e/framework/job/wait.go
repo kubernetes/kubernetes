@@ -42,17 +42,23 @@ type JobState func(job *batchv1.Job) string
 // WaitForJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
 // when pods will run for a long time, or it will be racy.
 func WaitForJobPodsRunning(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32) error {
-	return waitForJobPodsInPhase(ctx, c, ns, jobName, expectedCount, v1.PodRunning)
+	return waitForJobPodsInPhase(ctx, c, ns, jobName, expectedCount, v1.PodRunning, JobTimeout)
+}
+
+// WaitForJobPodsRunningWithTimeout wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
+// when pods will run for a long time, or it will be racy. same as WaitForJobPodsRunning but with an additional timeout parameter
+func WaitForJobPodsRunningWithTimeout(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32, timeout time.Duration) error {
+	return waitForJobPodsInPhase(ctx, c, ns, jobName, expectedCount, v1.PodRunning, timeout)
 }
 
 // WaitForJobPodsSucceeded wait for all pods for the Job named JobName in namespace ns to become Succeeded.
 func WaitForJobPodsSucceeded(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32) error {
-	return waitForJobPodsInPhase(ctx, c, ns, jobName, expectedCount, v1.PodSucceeded)
+	return waitForJobPodsInPhase(ctx, c, ns, jobName, expectedCount, v1.PodSucceeded, JobTimeout)
 }
 
 // waitForJobPodsInPhase wait for all pods for the Job named JobName in namespace ns to be in a given phase.
-func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32, phase v1.PodPhase) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
+func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32, phase v1.PodPhase, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		pods, err := GetJobPods(ctx, c, ns, jobName)
 		if err != nil {
 			return false, err
@@ -157,7 +163,12 @@ func isJobFailed(j *batchv1.Job) bool {
 
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
 func WaitForJobFinish(ctx context.Context, c clientset.Interface, ns, jobName string) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, true, func(ctx context.Context) (bool, error) {
+	return WaitForJobFinishWithTimeout(ctx, c, ns, jobName, JobTimeout)
+}
+
+// WaitForJobFinishWithTimeout uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
+func WaitForJobFinishWithTimeout(ctx context.Context, c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

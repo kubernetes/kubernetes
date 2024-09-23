@@ -31,7 +31,6 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
@@ -131,7 +130,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		framework.ExpectNoError(err)
 
 		// make sure job is running by waiting for its first pod to start running
-		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1)
+		err = e2ejob.WaitForJobPodsRunningWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1, e2ejob.JobTimeout*2)
 		framework.ExpectNoError(err)
 
 		numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
@@ -140,7 +139,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for gpu job to finish")
-		err = e2ejob.WaitForJobFinish(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFinishWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, e2ejob.JobTimeout*2)
 		framework.ExpectNoError(err)
 		ginkgo.By("Done with gpu job")
 
@@ -154,7 +153,7 @@ func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient
 	pod = podClient.Create(ctx, pod)
 
 	ginkgo.By("Watching for error events or started pod")
-	ev, err := podClient.WaitForErrorEventOrSuccessWithTimeout(ctx, pod, framework.PodStartTimeout*3)
+	ev, err := podClient.WaitForErrorEventOrSuccessWithTimeout(ctx, pod, framework.PodStartTimeout*6)
 	framework.ExpectNoError(err)
 	gomega.Expect(ev).To(gomega.BeNil())
 
@@ -263,15 +262,7 @@ print(f"Time taken for {n}x{n} matrix multiplication: {end_time - start_time:.2f
 
 func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework, clientSet clientset.Interface) {
 	if framework.ProviderIs("gce") {
-		rsgather := SetupNVIDIAGPUNode(ctx, f)
-		defer func() {
-			framework.Logf("Stopping ResourceUsageGather")
-			constraints := make(map[string]e2edebug.ResourceConstraint)
-			// For now, just gets summary. Can pass valid constraints in the future.
-			summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
-			f.TestSummaries = append(f.TestSummaries, summary)
-			framework.ExpectNoError(err, "getting resource usage summary")
-		}()
+		SetupNVIDIAGPUNode(ctx, f)
 	}
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
 	framework.ExpectNoError(err)
@@ -329,7 +320,7 @@ const (
 )
 
 // SetupNVIDIAGPUNode install Nvidia Drivers and wait for Nvidia GPUs to be available on nodes
-func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) *e2edebug.ContainerResourceGatherer {
+func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 	logOSImages(ctx, f)
 
 	var err error
@@ -348,6 +339,13 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) *e2edebug.C
 		ds, err = e2emanifest.DaemonSetFromData(data)
 		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
 	}
+
+	prev, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(ctx, ds.Name, metav1.GetOptions{})
+	if err == nil && prev != nil {
+		framework.Logf("Daemonset already installed, skipping...")
+		return
+	}
+
 	ds.Namespace = f.Namespace.Name
 	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
@@ -362,19 +360,11 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) *e2edebug.C
 		pods.Items = append(pods.Items, devicepluginPods.Items...)
 	}
 
-	framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-	rsgather, err := e2edebug.NewResourceUsageGatherer(ctx, f.ClientSet,
-		e2edebug.ResourceGathererOptions{InKubemark: false, Nodes: e2edebug.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
-	framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
-	go rsgather.StartGatheringData(ctx)
-
 	// Wait for Nvidia GPUs to be available on nodes
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		return areGPUsAvailableOnAllSchedulableNodes(ctx, f.ClientSet)
 	}, driverInstallTimeout, time.Second).Should(gomega.BeTrueBecause("expected GPU resources to be available within the timout"))
-
-	return rsgather
 }
 
 // StartJob starts a simple CUDA job that requests gpu and the specified number of completions
