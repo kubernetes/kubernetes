@@ -479,7 +479,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	if originalClaim == nil {
-		logger.V(4).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+		logger.V(5).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 		return framework.Queue, nil
 	}
 
@@ -497,7 +497,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		return framework.QueueSkip, nil
 	}
 
-	logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	logger.V(5).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 	return framework.Queue, nil
 }
 
@@ -569,7 +569,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// Deleted? That can happen because we ourselves delete the PodSchedulingContext while
 	// working on the pod. This can be ignored.
 	if oldObj != nil && newObj == nil {
-		logger.V(4).Info("PodSchedulingContext got deleted")
+		logger.V(5).Info("PodSchedulingContext got deleted")
 		return framework.QueueSkip, nil
 	}
 
@@ -600,7 +600,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
-		logger.V(4).Info("pod is not schedulable, keep waiting", "pod", klog.KObj(pod), "reason", err.Error())
+		logger.V(5).Info("pod is not schedulable, keep waiting", "pod", klog.KObj(pod), "reason", err.Error())
 		return framework.QueueSkip, nil
 	}
 
@@ -621,7 +621,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	if oldPodScheduling == nil /* create */ ||
 		len(oldPodScheduling.Status.ResourceClaims) < len(podScheduling.Status.ResourceClaims) /* new information and not incomplete (checked above) */ {
 		// This definitely is new information for the scheduler. Try again immediately.
-		logger.V(4).Info("PodSchedulingContext for pod has all required information, schedule immediately", "pod", klog.KObj(pod))
+		logger.V(5).Info("PodSchedulingContext for pod has all required information, schedule immediately", "pod", klog.KObj(pod))
 		return framework.Queue, nil
 	}
 
