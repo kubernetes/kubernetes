@@ -584,7 +584,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			wg.Done()
 		}()
 	}
@@ -596,7 +596,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			wg.Done()
 		}()
 	}

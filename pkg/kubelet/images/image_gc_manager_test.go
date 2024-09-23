@@ -644,7 +644,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(&statsapi.FsStats{}, &statsapi.FsStats{}, fmt.Errorf("error"))
-	assert.NotNil(t, manager.GarbageCollect(ctx, time.Now()))
+	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
@@ -689,7 +689,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		makeImage(0, 50),
 	}
 
-	assert.NotNil(t, manager.GarbageCollect(ctx, time.Now()))
+	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {

@@ -961,7 +961,7 @@ func TestVolumeHealthDisable(t *testing.T) {
 			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false, true, false)
 			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if tc.success {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			if metrics == nil {
