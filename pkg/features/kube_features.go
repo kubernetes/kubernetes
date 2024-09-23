@@ -1003,8 +1003,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
-
 	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
