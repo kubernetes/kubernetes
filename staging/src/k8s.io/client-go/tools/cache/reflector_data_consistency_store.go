@@ -16,9 +16,18 @@ limitations under the License.
 
 package cache
 
+import (
+	"fmt"
+	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
 type consistencyStore struct {
 	destinationStore Store
 	backingStore     Store
+
+	lock sync.Mutex
 }
 
 var _ Store = &consistencyStore{}
@@ -28,50 +37,98 @@ func newConsistencyStore(destinationStore, backingStore Store) *consistencyStore
 }
 
 func (c *consistencyStore) Add(obj interface{}) error {
-	//TODO lock ?
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	runtimeObject, ok := obj.(runtime.Object)
+	if !ok {
+		panic(fmt.Sprintf("obj = %T doesn't not implement runtime.Object", obj))
+	}
+	copiedObj := runtimeObject.DeepCopyObject()
+
 	if err := c.destinationStore.Add(obj); err != nil {
 		return err
 	}
-	return c.backingStore.Add(obj)
+	return c.backingStore.Add(copiedObj)
 }
 
 func (c *consistencyStore) Update(obj interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	runtimeObject, ok := obj.(runtime.Object)
+	if !ok {
+		panic(fmt.Sprintf("obj = %T doesn't not implement runtime.Object", obj))
+	}
+	copiedObj := runtimeObject.DeepCopyObject()
+
 	if err := c.destinationStore.Update(obj); err != nil {
 		return err
 	}
-	return c.backingStore.Update(obj)
+	return c.backingStore.Update(copiedObj)
 }
 
 func (c *consistencyStore) Delete(obj interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	runtimeObject, ok := obj.(runtime.Object)
+	if !ok {
+		panic(fmt.Sprintf("obj = %T doesn't not implement runtime.Object", obj))
+	}
+	copiedObj := runtimeObject.DeepCopyObject()
+
 	if err := c.destinationStore.Delete(obj); err != nil {
 		return err
 	}
-	return c.backingStore.Delete(obj)
+	return c.backingStore.Delete(copiedObj)
 }
 
 func (c *consistencyStore) List() []interface{} {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.destinationStore.List()
 }
 
 func (c *consistencyStore) ListKeys() []string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.destinationStore.ListKeys()
 }
 
 func (c *consistencyStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.destinationStore.Get(obj)
 }
 
 func (c *consistencyStore) GetByKey(key string) (item interface{}, exists bool, err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.destinationStore.GetByKey(key)
 }
 
 func (c *consistencyStore) Replace(items []interface{}, rv string) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	var itemsCopy []interface{}
+	for _, item := range items {
+		runtimeObject, ok := item.(runtime.Object)
+		if !ok {
+			panic(fmt.Sprintf("obj = %T doesn't not implement runtime.Object", item))
+		}
+		itemsCopy = append(itemsCopy, runtimeObject.DeepCopyObject())
+	}
+
 	if err := c.destinationStore.Replace(items, rv); err != nil {
 		return err
 	}
-	return c.backingStore.Replace(items, rv)
+	return c.backingStore.Replace(itemsCopy, rv)
 }
 
 func (c *consistencyStore) Resync() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.destinationStore.Resync()
 }
