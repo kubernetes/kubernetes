@@ -51,7 +51,19 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runt
 	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = req.Cpu()
 	}
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory())
+
+	lcr := m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory())
+	// cfs quota for container is not capped if
+	// 1. cpu manager policy is static
+	// 2. pod has quos PodQOSGuaranteed
+	// 3. container has integer cpu request
+	if m.containerManager.cpuExperimentalManagerPolicyStatic &&
+		kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed &&
+		cpuRequest.MilliValue() % MilliCPUToCPU == 0 {
+		lcr.Resources.CpuQuota = int64(-1)
+	}
+
+	return lcr
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
