@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
+	"k8s.io/utils/ptr"
 )
 
 // DeleteResource returns a function that will handle a resource deletion
@@ -265,6 +267,16 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			scope.err(err, w, req)
 			return
 		}
+
+		if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, true) {
+			fieldErrList := field.ErrorList{
+				field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is not allowed with DELETECOLLECTION, try again after removing the option"),
+			}
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", fieldErrList)
+			scope.err(err, w, req)
+			return
+		}
+
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
 
 		admit = admission.WithAudit(admit)
