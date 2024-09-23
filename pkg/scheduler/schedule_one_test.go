@@ -1825,8 +1825,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 		name               string
 		registerPlugins    []tf.RegisterPluginFunc
 		extenders          []tf.FakeExtender
-		nodes              []string
+		nodes              []*v1.Node
 		pvcs               []v1.PersistentVolumeClaim
+		pvs                []v1.PersistentVolume
 		pod                *v1.Pod
 		pods               []*v1.Pod
 		wantNodes          sets.Set[string]
@@ -1839,9 +1840,12 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("FalseFilter", tf.NewFalseFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
-			pod:   st.MakePod().Name("2").UID("2").Obj(),
-			name:  "test 1",
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
+			pod:  st.MakePod().Name("2").UID("2").Obj(),
+			name: "test 1",
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 2,
@@ -1861,7 +1865,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"node1", "node2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
 			wantNodes: sets.New("node1", "node2"),
 			name:      "test 2",
@@ -1874,7 +1881,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("MatchFilter", tf.NewMatchFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"node1", "node2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
 			pod:       st.MakePod().Name("node2").UID("node2").Obj(),
 			wantNodes: sets.New("node2"),
 			name:      "test 3",
@@ -1887,7 +1897,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"3", "2", "1"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+			},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
 			wantNodes: sets.New("3"),
 			name:      "test 4",
@@ -1900,7 +1914,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"3", "2", "1"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+			},
 			pod:       st.MakePod().Name("2").UID("2").Obj(),
 			wantNodes: sets.New("2"),
 			name:      "test 5",
@@ -1914,7 +1932,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"3", "2", "1"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+			},
 			pod:       st.MakePod().Name("2").UID("2").Obj(),
 			wantNodes: sets.New("1"),
 			name:      "test 6",
@@ -1928,9 +1950,13 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"3", "2", "1"},
-			pod:   st.MakePod().Name("2").UID("2").Obj(),
-			name:  "test 7",
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+			},
+			pod:  st.MakePod().Name("2").UID("2").Obj(),
+			name: "test 7",
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 3,
@@ -1955,9 +1981,12 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("2").UID("2").Node("2").Phase(v1.PodRunning).Obj(),
 			},
-			pod:   st.MakePod().Name("2").UID("2").Obj(),
-			nodes: []string{"1", "2"},
-			name:  "test 8",
+			pod: st.MakePod().Name("2").UID("2").Obj(),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+			},
+			name: "test 8",
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 2,
@@ -1979,12 +2008,18 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
 			pvcs: []v1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
 					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
 				},
+			},
+			pvs: []v1.PersistentVolume{
+				{ObjectMeta: metav1.ObjectMeta{Name: "existingPV"}},
 			},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 			wantNodes: sets.New("node1", "node2"),
@@ -1999,9 +2034,12 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
-			pod:   st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
-			name:  "unknown PVC",
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
+			pod:  st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
+			name: "unknown PVC",
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
 				NumAllNodes: 2,
@@ -2020,10 +2058,13 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
-			pod:   st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
-			name:  "deleted PVC",
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
+			pvcs: []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
+			pod:  st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
+			name: "deleted PVC",
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 				NumAllNodes: 2,
@@ -2042,10 +2083,13 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("TrueMap", newTrueMapPlugin(), 2),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"2", "1"},
-			pod:   st.MakePod().Name("2").Obj(),
-			name:  "test error with priority map",
-			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+			},
+			pod:  st.MakePod().Name("2").Obj(),
+			name: "test error with priority map",
+			wErr: fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
 		},
 		{
 			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
@@ -2059,8 +2103,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
-			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(1, "hostname", v1.DoNotSchedule, &metav1.LabelSelector{
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
+			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(1, "kubernetes.io/hostname", v1.DoNotSchedule, &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "foo",
@@ -2087,8 +2134,12 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2", "node3"},
-			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(2, "hostname", v1.DoNotSchedule, &metav1.LabelSelector{
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
+			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(2, "kubernetes.io/hostname", v1.DoNotSchedule, &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "foo",
@@ -2115,7 +2166,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+			},
 			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
@@ -2146,7 +2199,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
 				},
 			},
-			nodes:     []string{"1", "2", "3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+			},
 			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
@@ -2173,7 +2230,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "3", Labels: map[string]string{"kubernetes.io/hostname": "3"}}},
+			},
 			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
@@ -2198,7 +2257,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"1", "2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+			},
 			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr:      nil,
@@ -2213,7 +2275,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"1", "2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+			},
 			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
@@ -2236,7 +2301,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"1", "2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+			},
 			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: nil,
 			wErr:      fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
@@ -2259,7 +2327,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"node1", "node2", "node3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
 			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: sets.New("node2"),
 			// since this case has no score plugin, we'll only try to find one node in Filter stage
@@ -2283,8 +2355,12 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2", "node3"},
-			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
+			pod: st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 3,
@@ -2309,8 +2385,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1"},
-			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+			},
+			pod: st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 1,
@@ -2335,8 +2413,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"node1", "node2"},
-			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
+			pod: st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wErr: &framework.FitError{
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 2,
@@ -2381,7 +2462,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:              []string{"node1", "node2", "node3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2", "node3"),
 			wantEvaluatedNodes: ptr.To[int32](3),
@@ -2397,7 +2482,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore"),
 				), "PreScore", "Score"),
 			},
-			nodes:     []string{"node1", "node2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+			},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
 			wantNodes: sets.New("node1", "node2"),
 		},
@@ -2408,7 +2496,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:              []string{"node1", "node2", "node3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
 			pod:                st.MakePod().Name("pod1").UID("pod1").Obj(),
 			wantNodes:          sets.New("node1", "node2", "node3"),
 			wantEvaluatedNodes: ptr.To[int32](1),
@@ -2423,7 +2515,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"node1", "node2", "node3"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "node1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"kubernetes.io/hostname": "node2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"kubernetes.io/hostname": "node3"}}},
+			},
 			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: sets.New("node1", "node2"),
 			// since this case has no score plugin, we'll only try to find one node in Filter stage
@@ -2442,7 +2538,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"1", "2"},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "1", Labels: map[string]string{"kubernetes.io/hostname": "1"}}}, {ObjectMeta: metav1.ObjectMeta{Name: "2", Labels: map[string]string{"kubernetes.io/hostname": "2"}}},
+			},
 			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
@@ -2453,6 +2551,50 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					UnschedulablePlugins: sets.New("FakePreFilter"),
 				},
 			},
+		},
+		{
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPreFilterPlugin(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New)),
+				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"kubernetes.io/hostname": "host1"}}},
+			},
+			pvcs: []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "PVC1", UID: types.UID("PVC1"), Namespace: v1.NamespaceDefault},
+					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "PV1"},
+				},
+			},
+			pvs: []v1.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "PV1", UID: types.UID("PV1")},
+					Spec: v1.PersistentVolumeSpec{
+						NodeAffinity: &v1.VolumeNodeAffinity{
+							Required: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/hostname",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"host1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pod:       st.MakePod().Name("pod1").UID("pod1").Namespace(v1.NamespaceDefault).PVC("PVC1").Obj(),
+			wantNodes: sets.New("node1"),
+			name:      "hostname and nodename of the node do not match",
+			wErr:      nil,
 		},
 	}
 	for _, test := range tests {
@@ -2466,8 +2608,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				cache.AddPod(logger, pod)
 			}
 			var nodes []*v1.Node
-			for _, name := range test.nodes {
-				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
+			for _, node := range test.nodes {
 				nodes = append(nodes, node)
 				cache.AddNode(logger, node)
 			}
@@ -2477,10 +2618,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			for _, pvc := range test.pvcs {
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnBindCompleted, "true")
 				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
-				if pvName := pvc.Spec.VolumeName; pvName != "" {
-					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
-					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
-				}
+			}
+			for _, pv := range test.pvs {
+				_, _ = cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := tf.NewFramework(
