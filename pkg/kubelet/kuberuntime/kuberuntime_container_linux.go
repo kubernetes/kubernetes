@@ -157,6 +157,16 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		}
 	}
 
+	// cfs quota for container is not capped if
+	// 1. cpu manager policy is static
+	// 2. pod has quos PodQOSGuaranteed
+	// 3. container has integer cpu request
+	if m.containerManager.cpuExperimentalManagerPolicyStatic &&
+		kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed &&
+		container.Resources.Requests.Cpu().MilliValue() % MilliCPUToCPU == 0 {
+		lcr.Resources.CpuQuota = int64(-1)
+	}
+
 	return lcr
 }
 
