@@ -2,6 +2,7 @@ apiVersion: v1
 dryRun:
 - dryRunValue
 gracePeriodSeconds: 1
+ignoreStoreReadErrorWithClusterBreakingPotential: true
 kind: DeleteOptions
 orphanDependents: true
 preconditions:
