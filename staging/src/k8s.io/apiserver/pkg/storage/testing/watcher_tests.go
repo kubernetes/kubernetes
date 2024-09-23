@@ -1460,6 +1460,21 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 				createdPods = append(createdPods, out)
 			}
 
+			if len(createdPods) > 0 {
+				// this list call ensures that the cache has seen the created pods.
+				// this makes the watch request below deterministic.
+				listObject := &example.PodList{}
+				opts := storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      createdPods[len(createdPods)-1].ResourceVersion,
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				}
+				err := store.GetList(ctx, fmt.Sprintf("/pods/%s", ns), opts, listObject)
+				require.NoError(t, err)
+				require.Len(t, listObject.Items, len(createdPods))
+			}
+
 			if scenario.useCurrentRV {
 				currentStorageRV, err := storage.GetCurrentResourceVersionFromStorage(ctx, store, func() runtime.Object { return &example.PodList{} }, "/pods", "")
 				require.NoError(t, err)
