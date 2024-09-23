@@ -17,7 +17,10 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +28,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -221,4 +227,164 @@ func TestWatchEncoderIdentifier(t *testing.T) {
 		t.Error("  - watchEncoder::doEncode method when creating outEvent")
 		t.Error("  - watchEncoder::typeIdentifier to capture all relevant fields in identifier")
 	}
+}
+
+func TestWatchListEncoder(t *testing.T) {
+	scenarios := []struct {
+		name       string
+		rawEncoder *fakeJsonEncoder
+		objEncoder *fakeJsonEncoder
+
+		actualObject        runtime.Object
+		actualListBlueprint runtime.Object
+
+		targetGVK *schema.GroupVersionKind
+
+		validate func(t *testing.T, rawEncoder, objEncoder *fakeJsonEncoder, encodedObj []byte)
+	}{
+		{
+			name:         "pass through, an obj without the annotation received",
+			actualObject: makePod("1"),
+			objEncoder:   &fakeJsonEncoder{},
+			validate: func(t *testing.T, rawEncoder, objEncoder *fakeJsonEncoder, encodedObj []byte) {
+				if rawEncoder != nil {
+					t.Fatal("rawEncoder should be nil")
+				}
+				if objEncoder.encodeCounter != 1 {
+					t.Fatalf("expected the objEncoder to be called exactly 1, not %v", objEncoder.encodeCounter)
+				}
+				out := &v1.Pod{}
+				if err := json.Unmarshal(encodedObj, out); err != nil {
+					t.Fatal(err)
+				}
+				cmp.Equal(out, makePod("1"))
+			},
+		},
+		{
+			name:                "encodes the initialEventsListBlueprint if an obj with the annotation is passed",
+			actualObject:        makePodWithInitialEventsAnnotation("1"),
+			actualListBlueprint: makePodList("100"),
+			rawEncoder:          &fakeJsonEncoder{},
+			objEncoder:          &fakeJsonEncoder{},
+			validate: func(t *testing.T, rawEncoder, objEncoder *fakeJsonEncoder, encodedObj []byte) {
+				if rawEncoder.encodeCounter != 1 {
+					t.Fatalf("expected the rawEncoder to be called exactly 1, not %v", objEncoder.encodeCounter)
+				}
+				if objEncoder.encodeCounter != 1 {
+					t.Fatalf("expected the objEncoder to be called exactly 1, not %v", objEncoder.encodeCounter)
+				}
+				out := &v1.Pod{}
+				if err := json.Unmarshal(encodedObj, out); err != nil {
+					t.Fatal(err)
+				}
+				cmp.Equal(out, makePod("1"))
+
+				base64ListBlueprint, ok := out.Annotations[metav1.InitialEventsListBlueprintAnnotationKey]
+				if !ok {
+					t.Fatalf("the encoded obj doesn't have %q", metav1.InitialEventsListBlueprintAnnotationKey)
+				}
+				rawListBlueprint, err := base64.StdEncoding.DecodeString(base64ListBlueprint)
+				if err != nil {
+					t.Fatal(err)
+				}
+				outList := &v1.PodList{}
+				if err := json.Unmarshal(rawListBlueprint, outList); err != nil {
+					t.Fatal(err)
+				}
+				cmp.Equal(outList, makePodList("100"))
+			},
+		},
+		{
+			name:                "encodes the initialEventsListBlueprint as PartialObjectMetadata when requested",
+			targetGVK:           &schema.GroupVersionKind{Group: "meta.k8s.io", Version: "v1", Kind: "PartialObjectMetadata"},
+			actualObject:        makePodWithInitialEventsAnnotation("2"),
+			actualListBlueprint: makePodList("101"),
+			rawEncoder:          &fakeJsonEncoder{},
+			objEncoder:          &fakeJsonEncoder{},
+			validate: func(t *testing.T, rawEncoder, objEncoder *fakeJsonEncoder, encodedObj []byte) {
+				if rawEncoder.encodeCounter != 1 {
+					t.Fatalf("expected the rawEncoder to be called exactly 1, not %v", objEncoder.encodeCounter)
+				}
+				if objEncoder.encodeCounter != 1 {
+					t.Fatalf("expected the objEncoder to be called exactly 1, not %v", objEncoder.encodeCounter)
+				}
+				out := &v1.Pod{}
+				if err := json.Unmarshal(encodedObj, out); err != nil {
+					t.Fatal(err)
+				}
+				cmp.Equal(out, makePod("2"))
+
+				base64ListBlueprint, ok := out.Annotations[metav1.InitialEventsListBlueprintAnnotationKey]
+				if !ok {
+					t.Fatalf("the encoded obj doesn't have %q", metav1.InitialEventsListBlueprintAnnotationKey)
+				}
+				rawListBlueprint, err := base64.StdEncoding.DecodeString(base64ListBlueprint)
+				if err != nil {
+					t.Fatal(err)
+				}
+				outPartialList := &metav1.PartialObjectMetadataList{
+					ListMeta: metav1.ListMeta{ResourceVersion: "101"},
+				}
+				if err := json.Unmarshal(rawListBlueprint, outPartialList); err != nil {
+					t.Fatal(err)
+				}
+				cmp.Equal(outPartialList, makePodList("100"))
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			target := newWatchListEncoder(scenario.actualListBlueprint, scenario.targetGVK, scenario.rawEncoder, scenario.objEncoder)
+			var buf bytes.Buffer
+			err := target.Encode(scenario.actualObject, &buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			scenario.validate(t, scenario.rawEncoder, scenario.objEncoder, buf.Bytes())
+		})
+	}
+}
+
+func makePodList(rv string) *v1.PodList {
+	return &v1.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: rv,
+		},
+		Items: nil,
+	}
+}
+
+func makePod(name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   "ns",
+			Annotations: map[string]string{},
+		},
+	}
+}
+
+func makePodWithInitialEventsAnnotation(name string) *v1.Pod {
+	p := makePod(name)
+	p.Annotations[metav1.InitialEventsAnnotationKey] = "true"
+	return p
+}
+
+type fakeJsonEncoder struct {
+	encodeCounter int
+}
+
+func (e *fakeJsonEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	rawObj, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(rawObj)
+	e.encodeCounter++
+	return err
+}
+
+func (e *fakeJsonEncoder) Identifier() runtime.Identifier {
+	return "fake json encoder"
 }
