@@ -290,6 +290,11 @@ func (in *DeleteOptions) DeepCopyInto(out *DeleteOptions) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IgnoreStoreReadErrorWithClusterBreakingPotential != nil {
+		in, out := &in.IgnoreStoreReadErrorWithClusterBreakingPotential, &out.IgnoreStoreReadErrorWithClusterBreakingPotential
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
