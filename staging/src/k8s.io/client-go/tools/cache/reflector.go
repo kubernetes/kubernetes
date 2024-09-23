@@ -121,7 +121,9 @@ type Reflector struct {
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
 
-	DisableReflectorConsistencyCheckEvenIfRequested bool
+	disableReflectorConsistencyCheckEvenIfRequested bool
+
+	consistencyDetectorBackingStore Store
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -205,6 +207,8 @@ type ReflectorOptions struct {
 
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
+
+	DisableReflectorConsistencyCheckEvenIfRequested bool
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -226,6 +230,12 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	if options.MinWatchTimeout > defaultMinWatchTimeout {
 		minWatchTimeout = options.MinWatchTimeout
 	}
+
+	var consistencyDetectorBackingStore Store
+	if !options.DisableReflectorConsistencyCheckEvenIfRequested && consistencydetector.IsDataConsistencyDetectionForReflectorEnabled() {
+		consistencyDetectorBackingStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		store = newConsistencyStore(store, consistencyDetectorBackingStore)
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
@@ -240,6 +250,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		clock:             reflectorClock,
 		watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
 		expectedType:      reflect.TypeOf(expectedType),
+
+		disableReflectorConsistencyCheckEvenIfRequested: options.DisableReflectorConsistencyCheckEvenIfRequested,
+		consistencyDetectorBackingStore:                 consistencyDetectorBackingStore,
 	}
 
 	if r.name == "" {
@@ -458,12 +471,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		var reflectorConsistencyCheckerTicker *reflectorConsistencyTicker
-		if r.DisableReflectorConsistencyCheckEvenIfRequested {
-			reflectorConsistencyCheckerTicker = newNoOpReflectorConsistencyTicker()
-		} else {
-			reflectorConsistencyCheckerTicker = newReflectorConsistencyTicker(r.name, r.clock, r.LastSyncResourceVersion, r.listerWatcher.List)
-		}
+		reflectorConsistencyCheckerTicker := newReflectorConsistencyTicker(r.name, r.clock, r.LastSyncResourceVersion, r.listerWatcher.List, r.disableReflectorConsistencyCheckEvenIfRequested, r.consistencyDetectorBackingStore)
 		err = handleWatch(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
 			r.clock, resyncerrc, stopCh, reflectorConsistencyCheckerTicker)
 		// Ensure that watch will not be reused across iterations.
@@ -663,6 +671,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		resourceVersion = ""
 		lastKnownRV := r.rewatchResourceVersion()
 		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
@@ -875,7 +884,7 @@ loop:
 		case <-initialEventsEndBookmarkWarningTicker.C():
 			initialEventsEndBookmarkWarningTicker.warnIfExpired()
 		case <-reflectorConsistencyCheckerTicker.C():
-			reflectorConsistencyCheckerTicker.check(wait.ContextForChannel(stopCh), store)
+			reflectorConsistencyCheckerTicker.check(wait.ContextForChannel(stopCh))
 		}
 	}
 
@@ -1086,6 +1095,8 @@ type reflectorConsistencyTicker struct {
 
 	getLastSyncResourceVersion func() string
 	listFn                     ListFunc
+
+	consistencyDetectorBackingStore Store
 }
 
 func newNoOpReflectorConsistencyTicker() *reflectorConsistencyTicker {
@@ -1094,30 +1105,30 @@ func newNoOpReflectorConsistencyTicker() *reflectorConsistencyTicker {
 	}
 }
 
-func newReflectorConsistencyTicker(name string, c clock.Clock, getLastSyncResourceVersion func() string, listFn ListFunc) *reflectorConsistencyTicker {
+func newReflectorConsistencyTicker(name string, c clock.Clock, getLastSyncResourceVersion func() string, listFn ListFunc, disableReflectorConsistencyCheckEvenIfRequested bool, consistencyDetectorBackingStore Store) *reflectorConsistencyTicker {
+	if disableReflectorConsistencyCheckEvenIfRequested {
+		return newNoOpReflectorConsistencyTicker()
+	}
 	clockWithTicker, ok := c.(clock.WithTicker)
 	if !ok {
 		klog.Warningf("clock does not support WithTicker interface but checking reflector consistency was requested")
-		return &reflectorConsistencyTicker{
-			Ticker: &noopTicker{},
-		}
+		return newNoOpReflectorConsistencyTicker()
 	}
 	if !consistencydetector.IsDataConsistencyDetectionForReflectorEnabled() {
-		return &reflectorConsistencyTicker{
-			Ticker: &noopTicker{},
-		}
+		return newNoOpReflectorConsistencyTicker()
 	}
 
 	return &reflectorConsistencyTicker{
-		Ticker:                     clockWithTicker.NewTicker(30 * time.Second),
-		name:                       name,
-		getLastSyncResourceVersion: getLastSyncResourceVersion,
-		listFn:                     listFn,
+		Ticker:                          clockWithTicker.NewTicker(30 * time.Second),
+		name:                            name,
+		getLastSyncResourceVersion:      getLastSyncResourceVersion,
+		listFn:                          listFn,
+		consistencyDetectorBackingStore: consistencyDetectorBackingStore,
 	}
 }
 
-func (c *reflectorConsistencyTicker) check(ctx context.Context, store Store) {
-	checkReflectorDataConsistency(ctx, c.name, c.getLastSyncResourceVersion(), wrapListFuncWithContext(c.listFn), store.List)
+func (c *reflectorConsistencyTicker) check(ctx context.Context) {
+	checkReflectorDataConsistency(ctx, c.name, c.getLastSyncResourceVersion(), wrapListFuncWithContext(c.listFn), c.consistencyDetectorBackingStore.List)
 }
 
 var _ clock.Ticker = &noopTicker{}
