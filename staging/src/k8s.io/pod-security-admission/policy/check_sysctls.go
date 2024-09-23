@@ -90,30 +90,19 @@ var (
 		"net.ipv4.ping_group_range",
 		"net.ipv4.ip_unprivileged_port_start",
 	)
-	sysctlsAllowedV1Dot27 = sets.NewString(
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_syncookies",
-		"net.ipv4.ping_group_range",
-		"net.ipv4.ip_unprivileged_port_start",
+	sysctlsAllowedV1Dot27 = sysctlsAllowedV1Dot0.Union(sets.NewString(
 		"net.ipv4.ip_local_reserved_ports",
-	)
-	sysctlsAllowedV1Dot29 = sets.NewString(
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_syncookies",
-		"net.ipv4.ping_group_range",
-		"net.ipv4.ip_unprivileged_port_start",
-		"net.ipv4.ip_local_reserved_ports",
+	))
+	sysctlsAllowedV1Dot29 = sysctlsAllowedV1Dot27.Union(sets.NewString(
 		"net.ipv4.tcp_keepalive_time",
 		"net.ipv4.tcp_fin_timeout",
 		"net.ipv4.tcp_keepalive_intvl",
 		"net.ipv4.tcp_keepalive_probes",
-	)
-	sysctlsAllowedV1Dot32 = sets.NewString(
+	))
+	sysctlsAllowedV1Dot32 = sysctlsAllowedV1Dot29.Union(sets.NewString(
 		"net.ipv4.tcp_rmem",
 		"net.ipv4.tcp_wmem",
-	)
+	))
 )
 
 func sysctlsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
