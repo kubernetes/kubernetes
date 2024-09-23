@@ -731,6 +731,13 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 							},
 						},
 					},
+					"ignoreStoreReadErrorWithClusterBreakingPotential": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
