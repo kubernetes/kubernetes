@@ -23,8 +23,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"time"
+
+	"github.com/coreos/go-systemd/v22/daemon"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -46,6 +53,55 @@ func (kl *Kubelet) cgroupVersionCheck() error {
 		}
 	default:
 		return fmt.Errorf("unsupported cgroup version: %d", cgroupVersion)
+	}
+	return nil
+}
+
+func (kl *Kubelet) startHealthCheck() error {
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("systemd watchdog can only be used on linux")
+	}
+
+	watchdogVal, err := daemon.SdWatchdogEnabled(false)
+	if err != nil {
+		return fmt.Errorf("could not check if systemd watchdog information: %v", err)
+	}
+	if watchdogVal == 0 {
+		return fmt.Errorf("no watchdog interval is configured")
+	}
+
+	// Periodically perform health checks and notify systemd.
+	kl.checkAndNotify(watchdogVal / 2)
+	return nil
+}
+
+func (kl *Kubelet) checkAndNotify(interval time.Duration) {
+	// The checks performed are the same as those for /healthz.
+	// see: server.InstallDefaultHandlers()
+	checkers := []healthz.HealthChecker{
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", kl.SyncLoopHealthCheck),
+	}
+
+	go wait.Forever(func() {
+		if err := doCheck(checkers); err != nil {
+			klog.ErrorS(err, "Stopping to notify watchdog")
+		} else {
+			ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
+			if err != nil {
+				klog.ErrorS(err, "notify watchdog failed")
+			}
+			klog.V(5).InfoS("watchdog plugin notification", "notified", ack, "state", daemon.SdNotifyWatchdog)
+		}
+	}, interval)
+}
+
+func doCheck(checkers []healthz.HealthChecker) error {
+	for _, hc := range checkers {
+		if err := hc.Check(nil); err != nil {
+			return err
+		}
 	}
 	return nil
 }
