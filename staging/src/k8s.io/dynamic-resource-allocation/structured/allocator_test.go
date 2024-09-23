@@ -619,6 +619,41 @@ func TestAllocator(t *testing.T) {
 			expectResults: nil,
 			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently being updated")),
 		},
+		"all-devices-plus-another": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classB,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: objects(
+				sliceWithOneDevice(slice1, node1, pool1, driverA),
+				sliceWithOneDevice(slice1, node1, pool1, driverB),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverB, pool1, device1),
+				),
+			},
+		},
 		"network-attached-device": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
