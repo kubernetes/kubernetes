@@ -176,10 +176,15 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(logger, oldPod, newPod)
 
-	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
-
-	// TODO: remove IsPodUpdated when QHint hits GA?
-	if !isSchedulingQueueHintEnabled && !queue.IsPodUpdated(oldPod, newPod) {
+	// If a plugin registers for Pod/Update events or UnscheduledPod/Update events,
+	// Updates to a pod's status when a scheduling attempt fails
+	// will trigger the MoveAllToActiveOrBackoffQueue function below.
+	// which could cause the scheduler to enter an infinite loop.
+	// Therefore, we need to use IsPodUpdated here to filter out such meaningless updates.
+	// This check will be removed once the feature gate SchedulerQueueingHints reaches GA.
+	// Developers should use refined QHint functions for Pod/Update and UnscheduledPod/Update events
+	// to prevent the scheduler from entering unnecessary loops.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) && !queue.IsPodUpdated(oldPod, newPod) {
 		return
 	}
 

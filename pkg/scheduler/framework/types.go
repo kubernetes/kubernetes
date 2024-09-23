@@ -96,32 +96,26 @@ type GVK string
 // and consume less memory as less events will be cached at scheduler.
 const (
 	// There are a couple of notes about how the scheduler notifies the events of Pods:
-	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
+	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is just scheduled to a Node.
 	// - Delete: delete events could be triggered by:
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
 	//
-	// Note that the Pod event type includes the events for the unscheduled Pod itself.
-	// i.e., when unscheduled Pods are updated,
-	// the scheduling queue checks with
-	// 1. PodItself/Update QueueingHint(s) whether the update may make the updated pod schedulable,
-	// 2. UnscheduledPod/Update QueueingHint(s) whether the update may make other unscheduled pods schedulable,
-	// and requeues them to activeQ/backoffQ when at least one QueueingHint(s) return Queue.
-	// Plugins **have to** implement a QueueingHint for PodItself/Update event
-	// if the rejection from them could be resolved by updating unscheduled Pods themselves.
-	// Example: Pods that require excessive resources may be rejected by the noderesources plugin,
-	// if this unscheduled pod is updated to require fewer resources,
-	// the previous rejection from noderesources plugin can be resolved.
-	// this plugin would implement QueueingHint for PodItself/Update event
-	// that returns Queue when such request changes are made in unscheduled Pods.
-	// When a plugin registers an event using the pod GVK,
-	// it will be treated as if the plugin separately registered the same event using the UnscheduledPod, AssignedPod, and PodItself.
-	// Therefore, developers are advised to use specific pod GVK to improve the scheduler's performance.
-	Pod            GVK = "Pod"
+	// We have three specific Pod GVKs (PodItself, UnscheduledPod, and AssignedPod) and one general one (Pod).
+	// The scheduler triggers QHint for Pod GVK for any events to any Pods.
+	// i.e., registering QHint with Pod equals registering it with PodItself, UnscheduledPod, and AssignedPod.
+	// Note that it's better to try to register specific Pod GVKs, rather than just using Pod,
+	// in order to make the event handling performant.
+	Pod GVK = "Pod"
+	// PodItself event is triggered when the unscheduled Pod itself is updated.
+	// e.g., Let's say pod-a is unschedulable. When pod-a is updated, QHint for PodItself/Update event is triggered.
+	PodItself GVK = "PodItself"
+	// UnscheduledPod event is triggered when the unscheduled Pod **except the unscheduled Pod itself** is updated.
+	// e.g., Let's say pod-a is unschedulable. QHint for UnscheduledPod/Update is triggered with any updates to any unscheduled Pods except pod-a.
 	UnscheduledPod GVK = "UnscheduledPod"
-	AssignedPod    GVK = "AssignedPod"
-	PodItself      GVK = "PodItself"
+	// AssignedPod event is triggered with any updates to any scheduled Pods.
+	AssignedPod GVK = "AssignedPod"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
 	// It's definitely not something expected for plugin developers,

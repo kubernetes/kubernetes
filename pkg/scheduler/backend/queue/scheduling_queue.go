@@ -878,11 +878,15 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// When unscheduled Pods are updated, we check with QueueingHint
-	// whether the update may make the pods schedulable.
-	// Plugins have to implement a QueueingHint for Pod/Update event
-	// if the rejection from them could be resolved by updating unscheduled Pods itself.
-	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
+	start := time.Now()
+	events := []framework.ClusterEvent{}
+	if p.isSchedulingQueueHintEnabled {
+		// When unscheduled Pods are updated, we check with QueueingHint
+		// whether the update may make the pods schedulable.
+		// Plugins have to implement a QueueingHint for Pod/Update event
+		// if the rejection from them could be resolved by updating unscheduled Pods itself.
+		events = framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
+	}
 
 	if p.isSchedulingQueueHintEnabled {
 		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
@@ -896,32 +900,34 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 		}
 	}
 
-	if oldPod != nil {
-		oldPodInfo := newQueuedPodInfoForLookup(oldPod)
-		// If the pod is already in the active queue, just update it there.
-		if pInfo := p.activeQ.update(newPod, oldPodInfo); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-			return
-		}
+	oldPodInfo := newQueuedPodInfoForLookup(oldPod)
+	// If the pod is already in the active queue, just update it there.
+	if pInfo := p.activeQ.update(newPod, oldPodInfo); pInfo != nil {
+		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		return
+	}
 
-		// If the pod is in the backoff queue, update it there.
-		if pInfo, exists := p.podBackoffQ.Get(oldPodInfo); exists {
-			_ = pInfo.Update(newPod)
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-			p.podBackoffQ.AddOrUpdate(pInfo)
-			return
-		}
+	// If the pod is in the backoff queue, update it there.
+	if pInfo, exists := p.podBackoffQ.Get(oldPodInfo); exists {
+		_ = pInfo.Update(newPod)
+		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		p.podBackoffQ.AddOrUpdate(pInfo)
+		return
 	}
 
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
 	if pInfo := p.unschedulablePods.get(newPod); pInfo != nil {
 		_ = pInfo.Update(newPod)
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		updatingDuration := metrics.SinceInSeconds(start)
 		gated := pInfo.Gated
 		if p.isSchedulingQueueHintEnabled {
 			for _, evt := range events {
+				startMoving := time.Now()
 				hint := p.isPodWorthRequeuing(logger, pInfo, evt, oldPod, newPod)
 				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, framework.PodItselfUpdate.Label)
+				movingDuration := metrics.SinceInSeconds(startMoving)
+				metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(updatingDuration + movingDuration)
 				if queue != unschedulablePods {
 					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", framework.PodUpdate, "queue", queue)
 					p.unschedulablePods.delete(pInfo.Pod, gated)
