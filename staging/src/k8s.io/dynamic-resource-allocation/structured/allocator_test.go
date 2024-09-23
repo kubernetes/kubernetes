@@ -582,11 +582,10 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: nil,
 		},
-		"all-devices": {
+		"all-devices-single": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
 				Name:            req0,
 				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				Count:           1,
 				DeviceClassName: classA,
 			})),
 			classes: objects(class(classA, driverA)),
@@ -596,6 +595,25 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1),
+			)},
+		},
+		"all-devices-many": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name:            req0,
+				AllocationMode:  resourceapi.DeviceAllocationModeAll,
+				DeviceClassName: classA,
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: objects(
+				sliceWithOneDevice(slice1, node1, pool1, driverA),
+				sliceWithOneDevice(slice1, node1, pool2, driverA),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool2, device1),
 			)},
 		},
 		"all-devices-of-the-incomplete-pool": {
@@ -653,6 +671,165 @@ func TestAllocator(t *testing.T) {
 					deviceAllocationResult(req0, driverB, pool1, device1),
 				),
 			},
+		},
+		"all-devices-plus-another-reversed": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classB,
+				}),
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: objects(
+				sliceWithOneDevice(slice1, node1, pool1, driverA),
+				sliceWithOneDevice(slice1, node1, pool1, driverB),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverB, pool1, device1),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1),
+				),
+			},
+		},
+		"all-devices-many-plus-another": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classB,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+				),
+				sliceWithOneDevice(slice1, node1, pool1, driverB),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device2),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverB, pool1, device1),
+				),
+			},
+		},
+		"all-devices-many-plus-another-reversed": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classB,
+				}),
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+				),
+				sliceWithOneDevice(slice1, node1, pool1, driverB),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverB, pool1, device1),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device2),
+				),
+			},
+		},
+		"all-devices-no-solution": {
+			// One device, two claims both trying to allocate it.
+			claimsToAllocate: objects(
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classA,
+				}),
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+			),
+			slices: objects(
+				sliceWithOneDevice(slice1, node1, pool1, driverA),
+			),
+			node: node(node1, region1),
+		},
+		"all-devices-no-solution-reversed": {
+			// One device, two claims both trying to allocate it.
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				}),
+				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
+					Name:            req0,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					Count:           1,
+					DeviceClassName: classA,
+				}),
+			),
+			classes: objects(
+				class(classA, driverA),
+			),
+			slices: objects(
+				sliceWithOneDevice(slice1, node1, pool1, driverA),
+			),
+			node: node(node1, region1),
 		},
 		"network-attached-device": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
