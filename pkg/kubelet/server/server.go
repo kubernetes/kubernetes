@@ -265,9 +265,8 @@ type HostInterface interface {
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
-	ResyncInterval() time.Duration
 	GetHostname() string
-	LatestLoopEntryTime() time.Time
+	SyncLoopHealthCheck(req *http.Request) error
 	GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
@@ -396,7 +395,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
+		healthz.NamedCheck("syncloop", s.host.SyncLoopHealthCheck),
 	)
 
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
@@ -676,20 +675,6 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 	if enableContentionProfiling {
 		goruntime.SetBlockProfileRate(1)
 	}
-}
-
-// Checks if kubelet's sync loop  that updates containers is working.
-func (s *Server) syncLoopHealthCheck(req *http.Request) error {
-	duration := s.host.ResyncInterval() * 2
-	minDuration := time.Minute * 5
-	if duration < minDuration {
-		duration = minDuration
-	}
-	enterLoopTime := s.host.LatestLoopEntryTime()
-	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
-		return fmt.Errorf("sync Loop took longer than expected")
-	}
-	return nil
 }
 
 // getContainerLogs handles containerLogs request against the Kubelet
