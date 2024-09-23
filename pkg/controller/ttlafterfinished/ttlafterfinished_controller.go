@@ -51,6 +51,7 @@ import (
 // This is implemented outside of Job controller for separation of concerns, and
 // because it will be extended to handle other finishable resource types.
 type Controller struct {
+	name     string
 	client   clientset.Interface
 	recorder record.EventRecorder
 
@@ -69,7 +70,7 @@ type Controller struct {
 }
 
 // New creates an instance of Controller
-func New(ctx context.Context, jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
+func New(ctx context.Context, jobInformer batchinformers.JobInformer, client clientset.Interface, controllerName string) *Controller {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -77,8 +78,9 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	metrics.Register()
 
 	tc := &Controller{
+		name:     controllerName,
 		client:   client,
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
+		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttl_jobs_to_delete"},
@@ -109,10 +111,10 @@ func (tc *Controller) Run(ctx context.Context, workers int) {
 	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting TTL after finished controller")
-	defer logger.Info("Shutting down TTL after finished controller")
+	logger.Info("Starting", "controller", tc.name)
+	defer logger.Info("Shutting down controller", "controller", tc.name)
 
-	if !cache.WaitForNamedCacheSync("TTL after finished", ctx.Done(), tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSync(tc.name, ctx.Done(), tc.jListerSynced) {
 		return
 	}
 

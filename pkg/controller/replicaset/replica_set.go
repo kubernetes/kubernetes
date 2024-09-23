@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,6 +82,7 @@ type ReplicaSetController struct {
 	// For example, this struct can be used (with adapters) to handle ReplicationController.
 	schema.GroupVersionKind
 
+	name       string
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
@@ -115,7 +115,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int, controllerName string) *ReplicaSetController {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	if err := metrics.Register(legacyregistry.Register); err != nil {
@@ -130,16 +130,18 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
 		eventBroadcaster,
+		controllerName,
 	)
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerName string) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
+		name:             controllerName,
 		kubeClient:       kubeClient,
 		podControl:       podControl,
 		eventBroadcaster: eventBroadcaster,
@@ -212,12 +214,11 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 
 	defer rsc.queue.ShutDown()
 
-	controllerName := strings.ToLower(rsc.Kind)
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "name", controllerName)
-	defer logger.Info("Shutting down controller", "name", controllerName)
+	logger.Info("Starting", "controller", rsc.name)
+	defer logger.Info("Shutting down controller", "controller", rsc.name)
 
-	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSync(rsc.name, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 

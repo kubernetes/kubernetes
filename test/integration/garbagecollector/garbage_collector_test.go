@@ -284,6 +284,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		garbagecollector.DefaultIgnoredResources(),
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		alwaysStarted,
+		"garbage-collector-controller",
 	)
 	if err != nil {
 		t.Fatalf("failed to create garbage collector: %v", err)

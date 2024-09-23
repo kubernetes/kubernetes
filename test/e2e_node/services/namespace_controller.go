@@ -81,6 +81,7 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 		discoverResourcesFn,
 		informerFactory.Core().V1().Namespaces(),
 		ncResyncPeriod, v1.FinalizerKubernetes,
+		"namespace-controller",
 	)
 	informerFactory.Start(n.stopCh)
 	go nc.Run(ctx, ncConcurrency)

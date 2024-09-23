@@ -66,6 +66,7 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 type DeploymentController struct {
 	// rsControl is used for adopting/releasing replica sets.
 	rsControl controller.RSControlInterface
+	name      string
 	client    clientset.Interface
 
 	eventBroadcaster record.EventBroadcaster
@@ -98,13 +99,14 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface, controllerName string) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
+		name:             controllerName,
 		client:           client,
 		eventBroadcaster: eventBroadcaster,
-		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -170,10 +172,10 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer dc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "controller", "deployment")
-	defer logger.Info("Shutting down controller", "controller", "deployment")
+	logger.Info("Starting controller", "controller", dc.name)
+	defer logger.Info("Shutting down controller", "controller", dc.name)
 
-	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSync(dc.name, ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 

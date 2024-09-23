@@ -147,7 +147,7 @@ func TestController_DiscoveryError(t *testing.T) {
 			}
 		}
 		_, _, err := startModifiedNamespaceController(
-			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"), "namespace-controller")
 		if test.expectedErr != (err != nil) {
 			t.Errorf("Namespace Controller test failed for use case: %v", name)
 		}

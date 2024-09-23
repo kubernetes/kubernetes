@@ -39,6 +39,7 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultSignerOptions(),
+		controllerName,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)
@@ -60,6 +61,7 @@ func startTokenCleanerController(ctx context.Context, controllerContext Controll
 		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
+		controllerName,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)

@@ -397,6 +397,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Apps().V1().ControllerRevisions(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
+		"statefulset-controller",
 	)
 
 	ns := framework.CreateNamespaceOrDie(c, "test-pod-fail", t)

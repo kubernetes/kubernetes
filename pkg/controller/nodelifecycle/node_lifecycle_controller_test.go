@@ -153,6 +153,7 @@ func newNodeLifecycleControllerFromClient(
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
+		"node-lifecycle-controller",
 	)
 	if err != nil {
 		return nil, err

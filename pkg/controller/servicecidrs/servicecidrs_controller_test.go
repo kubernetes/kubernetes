@@ -69,7 +69,8 @@ func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1be
 		ctx,
 		serviceCIDRInformer,
 		ipAddressInformer,
-		client)
+		client,
+		"service-cidr-controller")
 
 	var alwaysReady = func() bool { return true }
 	controller.serviceCIDRsSynced = alwaysReady

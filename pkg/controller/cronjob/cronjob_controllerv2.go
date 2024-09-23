@@ -63,6 +63,7 @@ var (
 type ControllerV2 struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	name        string
 	kubeClient  clientset.Interface
 	recorder    record.EventRecorder
 	broadcaster record.EventBroadcaster
@@ -81,7 +82,7 @@ type ControllerV2 struct {
 }
 
 // NewControllerV2 creates and initializes a new Controller.
-func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
+func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface, controllerName string) (*ControllerV2, error) {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
@@ -92,9 +93,10 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 				Name: "cronjob",
 			},
 		),
+		name:        controllerName,
 		kubeClient:  kubeClient,
 		broadcaster: eventBroadcaster,
-		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
+		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName}),
 
 		jobControl:     realJobControl{KubeClient: kubeClient},
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
@@ -142,10 +144,10 @@ func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	defer jm.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting cronjob controller v2")
-	defer logger.Info("Shutting down cronjob controller v2")
+	logger.Info("Starting", "controller", jm.name)
+	defer logger.Info("Shutting down controller", "controller", jm.name)
 
-	if !cache.WaitForNamedCacheSync("cronjob", ctx.Done(), jm.jobListerSynced, jm.cronJobListerSynced) {
+	if !cache.WaitForNamedCacheSync(jm.name, ctx.Done(), jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
 	}
 

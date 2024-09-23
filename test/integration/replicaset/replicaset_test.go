@@ -137,6 +137,7 @@ func rmSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
+		"replicaset-controller",
 	)
 
 	newTeardown := func() {

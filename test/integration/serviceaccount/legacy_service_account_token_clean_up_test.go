@@ -351,7 +351,8 @@ func startLegacyServiceAccountTokenCleaner(ctx context.Context, client clientset
 		serviceaccountcontroller.LegacySATokenCleanerOptions{
 			SyncInterval:  syncInterval,
 			CleanUpPeriod: cleanUpPeriod,
-		})
+		},
+		"legacy-serviceaccount-token-cleaner-controller")
 	go legacySATokenCleaner.Run(ctx)
 }
 

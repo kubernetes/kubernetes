@@ -183,6 +183,7 @@ func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Apps().V1().ControllerRevisions(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
+		"statefulset-controller",
 	)
 
 	teardown := func() {

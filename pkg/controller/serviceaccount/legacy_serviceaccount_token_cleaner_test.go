@@ -386,7 +386,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 				SyncInterval:  30 * time.Second,
 				CleanUpPeriod: tc.LegacyTokenCleanUpPeriod,
 			}
-			cleaner, _ := NewLegacySATokenCleaner(saInformer, secretInformer, podInformer, client, testingclock.NewFakeClock(time.Now().UTC()), options)
+			cleaner, _ := NewLegacySATokenCleaner(saInformer, secretInformer, podInformer, client, testingclock.NewFakeClock(time.Now().UTC()), options, "legacy-serviceaccount-token-cleaner-controller")
 
 			if tc.ExistingServiceAccount != nil {
 				serviceAccounts.Add(tc.ExistingServiceAccount)

@@ -109,6 +109,7 @@ func setup(ctx context.Context, t *testing.T) (*kubeapiservertesting.TestServer,
 		client.Discovery(),
 		clock.RealClock{},
 		stalePodDisruptionTimeout,
+		"disruption-controller",
 	)
 	return server, pdbc, informers, clientSet, apiExtensionClient, dynamicClient
 }

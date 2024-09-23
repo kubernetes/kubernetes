@@ -54,6 +54,8 @@ var podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
+	// controller name
+	name string
 	// client interface
 	kubeClient clientset.Interface
 	// control returns an interface capable of syncing a stateful set.
@@ -87,11 +89,13 @@ func NewStatefulSetController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
+	controllerName string,
 ) *StatefulSetController {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	ssc := &StatefulSetController{
+		name:       controllerName,
 		kubeClient: kubeClient,
 		control: NewDefaultStatefulSetControl(
 			NewStatefulPodControl(
@@ -163,10 +167,10 @@ func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	defer ssc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting stateful set controller")
-	defer logger.Info("Shutting down statefulset controller")
+	logger.Info("Starting", "controller", ssc.name)
+	defer logger.Info("Shutting down controller", "controller", ssc.name)
 
-	if !cache.WaitForNamedCacheSync("stateful set", ctx.Done(), ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSync(ssc.name, ctx.Done(), ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 

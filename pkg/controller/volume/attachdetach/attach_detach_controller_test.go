@@ -64,6 +64,7 @@ func createADC(t testing.TB, tCtx ktesting.TContext, fakeKubeClient *fake.Client
 		1*time.Second,
 		false,
 		DefaultTimerConfig,
+		"persistentvolume-attach-detach-controller",
 	)
 
 	if err != nil {
@@ -305,6 +306,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		1*time.Second,
 		false,
 		DefaultTimerConfig,
+		"persistentvolume-attach-detach-controller",
 	)
 
 	if err != nil {

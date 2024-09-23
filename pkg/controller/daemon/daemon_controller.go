@@ -83,6 +83,7 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
+	name       string
 	kubeClient clientset.Interface
 
 	eventBroadcaster record.EventBroadcaster
@@ -137,16 +138,18 @@ func NewDaemonSetsController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
+	controllerName string,
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dsc := &DaemonSetsController{
+		name:             controllerName,
 		kubeClient:       kubeClient,
 		eventBroadcaster: eventBroadcaster,
-		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
@@ -291,10 +294,10 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer dsc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting daemon sets controller")
-	defer logger.Info("Shutting down daemon sets controller")
+	logger.Info("Starting", "controller", dsc.name)
+	defer logger.Info("Shutting down controller", "controller", dsc.name)
 
-	if !cache.WaitForNamedCacheSync("daemon sets", ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSync(dsc.name, ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 

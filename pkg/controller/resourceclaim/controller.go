@@ -71,6 +71,8 @@ const (
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
+	// name is the name of the controller
+	name string
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
 	kubeClient clientset.Interface
@@ -125,6 +127,7 @@ const (
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
+	controllerName string,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	podSchedulingInformer resourceinformers.PodSchedulingContextInformer,
@@ -132,6 +135,7 @@ func NewController(
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
+		name:                controllerName,
 		kubeClient:          kubeClient,
 		podLister:           podInformer.Lister(),
 		podIndexer:          podInformer.Informer().GetIndexer(),
@@ -395,16 +399,16 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting resource claim controller")
-	defer logger.Info("Shutting down resource claim controller")
+	logger.Info("Starting", "controller", ec.name)
+	defer logger.Info("Shutting down controller", ec.name)
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ec.kubeClient.CoreV1().Events("")})
-	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
+	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ec.name})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
+	if !cache.WaitForNamedCacheSync(ec.name, ctx.Done(), ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 

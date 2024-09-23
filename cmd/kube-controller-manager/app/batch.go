@@ -43,6 +43,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+		controllerName,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("creating Job controller: %v", err)
@@ -63,6 +64,7 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
+		controllerName,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("creating CronJob controller V2: %v", err)

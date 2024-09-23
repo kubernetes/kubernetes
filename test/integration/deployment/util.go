@@ -119,6 +119,7 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-controller")),
+		"deployment-controller",
 	)
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
@@ -129,6 +130,7 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
+		"replicaset-controller",
 	)
 	return server.TearDownFn, rm, dc, informers, clientSet
 }

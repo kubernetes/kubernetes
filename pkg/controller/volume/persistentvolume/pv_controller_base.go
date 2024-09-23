@@ -61,6 +61,7 @@ import (
 // ControllerParameters contains arguments for creation of a new
 // PersistentVolume controller.
 type ControllerParameters struct {
+	Name                      string
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
 	VolumePlugins             []vol.VolumePlugin
@@ -75,9 +76,10 @@ type ControllerParameters struct {
 // NewController creates a new PersistentVolume controller
 func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolumeController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: p.Name})
 
 	controller := &PersistentVolumeController{
+		name:                          p.Name,
 		volumes:                       newPersistentVolumeOrderedIndex(),
 		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    p.KubeClient,
@@ -305,10 +307,10 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer ctrl.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting persistent volume controller")
-	defer logger.Info("Shutting down persistent volume controller")
+	logger.Info("Starting", "controller", ctrl.name)
+	defer logger.Info("Shutting down controller", "controller", ctrl.name)
 
-	if !cache.WaitForNamedCacheSync("persistent volume", ctx.Done(), ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+	if !cache.WaitForNamedCacheSync(ctrl.name, ctx.Done(), ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 

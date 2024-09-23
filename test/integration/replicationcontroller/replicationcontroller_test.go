@@ -130,6 +130,7 @@ func rmSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 		informers.Core().V1().ReplicationControllers(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replication-controller")),
 		replication.BurstReplicas,
+		"replicationcontroller-controller",
 	)
 	newTeardown := func() {
 		tCtx.Cancel("tearing down controller")

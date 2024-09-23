@@ -219,6 +219,7 @@ type podUpdateItem struct {
 type Controller struct {
 	taintManager *tainteviction.Controller
 
+	name              string
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
 	kubeClient        clientset.Interface
@@ -318,6 +319,7 @@ func NewNodeLifecycleController(
 	secondaryEvictionLimiterQPS float32,
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
+	controllerName string,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
@@ -326,9 +328,10 @@ func NewNodeLifecycleController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	nc := &Controller{
+		name:                        controllerName,
 		kubeClient:                  kubeClient,
 		now:                         metav1.Now,
 		knownNodeSet:                make(map[string]*v1.Node),
@@ -474,10 +477,10 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer nc.nodeUpdateQueue.ShutDown()
 	defer nc.podUpdateQueue.ShutDown()
 
-	logger.Info("Starting node controller")
-	defer logger.Info("Shutting down node controller")
+	logger.Info("Starting", "controller", nc.name)
+	defer logger.Info("Shutting down controller", "controller", nc.name)
 
-	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSync(nc.name, ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 

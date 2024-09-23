@@ -782,6 +782,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		"horizontal-pod-autoscaler-controller",
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -5274,6 +5275,7 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		"horizontal-pod-autoscaler-controller",
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap

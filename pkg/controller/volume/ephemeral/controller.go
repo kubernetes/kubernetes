@@ -48,6 +48,8 @@ type Controller interface {
 }
 
 type ephemeralController struct {
+	// name is the name of the controller
+	name string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -79,9 +81,11 @@ func NewController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	controllerName string) (Controller, error) {
 
 	ec := &ephemeralController{
+		name:       controllerName,
 		kubeClient: kubeClient,
 		podLister:  podInformer.Lister(),
 		podIndexer: podInformer.Informer().GetIndexer(),
@@ -99,7 +103,7 @@ func NewController(
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
+	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: ec.enqueuePod,
@@ -170,10 +174,10 @@ func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+	logger.Info("Starting", "controller", ec.name)
+	defer logger.Info("Shutting down controller", "controller", ec.name)
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
+	if !cache.WaitForNamedCacheSync(ec.name, ctx.Done(), ec.podSynced, ec.pvcsSynced) {
 		return
 	}
 

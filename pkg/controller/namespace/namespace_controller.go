@@ -52,6 +52,8 @@ const (
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
+	// name is the name of the controller
+	name string
 	// lister that can list namespaces from a shared cache
 	lister corelisters.NamespaceLister
 	// returns true when the namespace cache is ready
@@ -70,7 +72,8 @@ func NewNamespaceController(
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
-	finalizerToken v1.FinalizerName) *NamespaceController {
+	finalizerToken v1.FinalizerName,
+	controllerName string) *NamespaceController {
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
@@ -199,10 +202,10 @@ func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting namespace controller")
-	defer logger.Info("Shutting down namespace controller")
+	logger.Info("Starting", "controller", nm.name)
+	defer logger.Info("Shutting down controller", nm.name)
 
-	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync(nm.name, ctx.Done(), nm.listerSynced) {
 		return
 	}
 

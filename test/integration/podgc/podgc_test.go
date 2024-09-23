@@ -384,7 +384,8 @@ func setup(t *testing.T, name string) *testutils.TestContext {
 		externalInformers.Core().V1().Nodes(),
 		0,
 		500*time.Millisecond,
-		time.Second)
+		time.Second,
+		"pod-garbage-collector-controller")
 
 	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())

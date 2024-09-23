@@ -228,7 +228,7 @@ func newController(ctx context.Context, url string, batchPeriod time.Duration) *
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(ctx, informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
-		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
+		informerFactory.Core().V1().Endpoints(), client, batchPeriod, "endpoint-controller")
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
 	endpoints.endpointsSynced = alwaysReady
@@ -250,7 +250,8 @@ func newFakeController(ctx context.Context, batchPeriod time.Duration) (*fake.Cl
 		informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(),
 		client,
-		batchPeriod)
+		batchPeriod,
+		"endpoint-controller")
 
 	eController.podsSynced = alwaysReady
 	eController.servicesSynced = alwaysReady

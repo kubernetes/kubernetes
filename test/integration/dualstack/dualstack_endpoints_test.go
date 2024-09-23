@@ -95,7 +95,8 @@ func TestDualStackEndpoints(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		1*time.Second)
+		1*time.Second,
+		"endpoint-controller")
 
 	epsController := endpointslice.NewController(
 		tCtx,
@@ -105,7 +106,8 @@ func TestDualStackEndpoints(t *testing.T) {
 		informers.Discovery().V1().EndpointSlices(),
 		int32(100),
 		client,
-		1*time.Second)
+		1*time.Second,
+		"endpointslice-controller")
 
 	// Start informer and controllers
 	informers.Start(tCtx.Done())
