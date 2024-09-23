@@ -560,6 +560,23 @@ type DeleteOptions struct {
 	// +optional
 	// +listType=atomic
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+
+	// IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true will
+	// make an attempt to perform the normal deletion flow, but if either of
+	// the below occurs:
+	// a) the data (associated with the resource being deleted) retrieved
+	// from the storage failed to transform properly (eg. decryption failure)
+	// b) the data (associated with the resource being deleted) failed to
+	// decode properly (eg. corrupt data)
+	// it will disregard these errors, bypass the finalzer constraints,
+	// deletion hook(s) and go ahead with the deletion flow.
+	// WARNING: This will break the cluster if the resource has dependencies
+	// Use only if you REALLY know what you are doing.
+	// WARNING: Vendor(s) will most likely consider using this option to be
+	// in violation of the support of their product.
+	// The default value is false, and the user must opt in to enable it.
+	// +optional
+	IgnoreStoreReadErrorWithClusterBreakingPotential *bool `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty" protobuf:"varint,6,opt,name=ignoreStoreReadErrorWithClusterBreakingPotential"`
 }
 
 const (
