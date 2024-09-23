@@ -78,9 +78,6 @@ var (
 	LSCIQuotaMonitoring = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	MaxParallelImagePull = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("MaxParallelImagePull"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAllocatable = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
