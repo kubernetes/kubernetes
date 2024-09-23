@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -172,6 +173,13 @@ func TestDiscoveryOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	// Check if internal groups listers returns the same group.
+	groups, err := handler.Groups(context.TODO(), &http.Request{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Len(t, groups, 6)
 
 	assert.Len(t, groupList.Groups, 6)
 	assert.Equal(t, "x", groupList.Groups[0].Name)
