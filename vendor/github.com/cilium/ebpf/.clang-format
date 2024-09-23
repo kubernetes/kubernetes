@@ -14,4 +14,6 @@ KeepEmptyLinesAtTheStartOfBlocks: false
 TabWidth:        4
 UseTab:          ForContinuationAndIndentation
 ColumnLimit:     1000
+# Go compiler comments need to stay unindented.
+CommentPragmas: '^go:.*'
 ...

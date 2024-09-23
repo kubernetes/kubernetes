@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 import (
@@ -12,14 +14,14 @@ import (
 // path, including that layer's containing folder, if any.
 func DestroyLayer(ctx context.Context, path string) (err error) {
 	title := "hcsshim::DestroyLayer"
-	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	ctx, span := oc.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))
 
 	err = destroyLayer(&stdDriverInfo, path)
 	if err != nil {
-		return hcserror.New(err, title+" - failed", "")
+		return hcserror.New(err, title, "")
 	}
 	return nil
 }

@@ -1,8 +1,9 @@
+//go:build windows
+
 package wclayer
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -19,7 +20,7 @@ import (
 // perform the export.
 func ExportLayer(ctx context.Context, path string, exportFolderPath string, parentLayerPaths []string) (err error) {
 	title := "hcsshim::ExportLayer"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := oc.StartSpan(ctx, title)
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -35,14 +36,21 @@ func ExportLayer(ctx context.Context, path string, exportFolderPath string, pare
 
 	err = exportLayer(&stdDriverInfo, path, exportFolderPath, layers)
 	if err != nil {
-		return hcserror.New(err, title+" - failed", "")
+		return hcserror.New(err, title, "")
 	}
 	return nil
 }
 
+// LayerReader is an interface that supports reading an existing container image layer.
 type LayerReader interface {
+	// Next advances to the next file and returns the name, size, and file info
 	Next() (string, int64, *winio.FileBasicInfo, error)
+	// LinkInfo returns the number of links and the file identifier for the current file.
+	LinkInfo() (uint32, *winio.FileIDInfo, error)
+	// Read reads data from the current file, in the format of a Win32 backup stream, and
+	// returns the number of bytes read.
 	Read(b []byte) (int, error)
+	// Close finishes the layer reading process and releases any resources.
 	Close() error
 }
 
@@ -50,7 +58,7 @@ type LayerReader interface {
 // The caller must have taken the SeBackupPrivilege privilege
 // to call this and any methods on the resulting LayerReader.
 func NewLayerReader(ctx context.Context, path string, parentLayerPaths []string) (_ LayerReader, err error) {
-	ctx, span := trace.StartSpan(ctx, "hcsshim::NewLayerReader")
+	ctx, span := oc.StartSpan(ctx, "hcsshim::NewLayerReader")
 	defer func() {
 		if err != nil {
 			oc.SetSpanStatus(span, err)
@@ -61,7 +69,12 @@ func NewLayerReader(ctx context.Context, path string, parentLayerPaths []string)
 		trace.StringAttribute("path", path),
 		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
-	exportPath, err := ioutil.TempDir("", "hcs")
+	if len(parentLayerPaths) == 0 {
+		// This is a base layer. It gets exported differently.
+		return newBaseLayerReader(path, span), nil
+	}
+
+	exportPath, err := os.MkdirTemp("", "hcs")
 	if err != nil {
 		return nil, err
 	}

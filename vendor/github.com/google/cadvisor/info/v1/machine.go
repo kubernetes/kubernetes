@@ -53,6 +53,8 @@ type Core struct {
 	Caches       []Cache `json:"caches"`
 	UncoreCaches []Cache `json:"uncore_caches"`
 	SocketID     int     `json:"socket_id"`
+	BookID       string  `json:"book_id,omitempty"`
+	DrawerID     string  `json:"drawer_id,omitempty"`
 }
 
 type Cache struct {

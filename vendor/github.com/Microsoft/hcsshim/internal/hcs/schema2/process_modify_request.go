@@ -9,9 +9,11 @@
 
 package hcsschema
 
-//  Passed to HcsRpc_ModifyProcess
+import "github.com/Microsoft/hcsshim/internal/protocol/guestrequest"
+
+// Passed to HcsRpc_ModifyProcess
 type ProcessModifyRequest struct {
-	Operation string `json:"Operation,omitempty"`
+	Operation guestrequest.ProcessModifyOperation `json:"Operation,omitempty"` // NOTE: Swagger generated as string. Locally updated.
 
 	ConsoleSize *ConsoleSize `json:"ConsoleSize,omitempty"`
 

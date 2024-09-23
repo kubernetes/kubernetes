@@ -32,9 +32,6 @@ import (
 // The namespace under which crio aliases are unique.
 const CrioNamespace = "crio"
 
-// The namespace suffix under which crio aliases are unique.
-const CrioNamespaceSuffix = ".scope"
-
 // The namespace systemd runs components under.
 const SystemdNamespace = "system-systemd"
 
@@ -117,20 +114,15 @@ func (f *crioFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 		// TODO(runcom): should we include crio-conmon cgroups?
 		return false, false, nil
 	}
-	if strings.HasPrefix(path.Base(name), SystemdNamespace) {
-		return true, false, nil
-	}
 	if !strings.HasPrefix(path.Base(name), CrioNamespace) {
 		return false, false, nil
+	}
+	if strings.HasPrefix(path.Base(name), SystemdNamespace) {
+		return true, false, nil
 	}
 	// if the container is not associated with CRI-O, we can't handle it or accept it.
 	if !isContainerName(name) {
 		return false, false, nil
-	}
-
-	if !strings.HasSuffix(path.Base(name), CrioNamespaceSuffix) {
-		// this mean it's a sandbox container
-		return true, false, nil
 	}
 	return true, true, nil
 }

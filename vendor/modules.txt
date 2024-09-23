@@ -2,7 +2,7 @@
 # bitbucket.org/bertimus9/systemstat v0.5.0
 ## explicit; go 1.17
 bitbucket.org/bertimus9/systemstat
-# github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
+# github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
@@ -12,15 +12,16 @@ github.com/JeffAshton/win_pdh
 # github.com/MakeNowJust/heredoc v1.0.0
 ## explicit; go 1.12
 github.com/MakeNowJust/heredoc
-# github.com/Microsoft/go-winio v0.6.0
-## explicit; go 1.17
+# github.com/Microsoft/go-winio v0.6.2
+## explicit; go 1.21
 github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
+github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
-github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.8.26
-## explicit; go 1.13
+# github.com/Microsoft/hcsshim v0.12.6
+## explicit; go 1.21
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/computestorage
 github.com/Microsoft/hcsshim/hcn
@@ -32,14 +33,19 @@ github.com/Microsoft/hcsshim/internal/hcs/schema2
 github.com/Microsoft/hcsshim/internal/hcserror
 github.com/Microsoft/hcsshim/internal/hns
 github.com/Microsoft/hcsshim/internal/interop
+github.com/Microsoft/hcsshim/internal/jobobject
 github.com/Microsoft/hcsshim/internal/log
 github.com/Microsoft/hcsshim/internal/logfields
 github.com/Microsoft/hcsshim/internal/longpath
+github.com/Microsoft/hcsshim/internal/memory
 github.com/Microsoft/hcsshim/internal/mergemaps
 github.com/Microsoft/hcsshim/internal/oc
+github.com/Microsoft/hcsshim/internal/protocol/guestrequest
+github.com/Microsoft/hcsshim/internal/queue
 github.com/Microsoft/hcsshim/internal/regstate
 github.com/Microsoft/hcsshim/internal/runhcs
 github.com/Microsoft/hcsshim/internal/safefile
+github.com/Microsoft/hcsshim/internal/security
 github.com/Microsoft/hcsshim/internal/timeout
 github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
@@ -82,13 +88,15 @@ github.com/chai2010/gettext-go/po
 ## explicit; go 1.13
 github.com/checkpoint-restore/go-criu/v5
 github.com/checkpoint-restore/go-criu/v5/rpc
-# github.com/cilium/ebpf v0.9.1
-## explicit; go 1.17
+# github.com/cilium/ebpf v0.11.0
+## explicit; go 1.19
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/btf
 github.com/cilium/ebpf/internal
+github.com/cilium/ebpf/internal/kconfig
 github.com/cilium/ebpf/internal/sys
+github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 # github.com/container-storage-interface/spec v1.9.0
@@ -98,11 +106,27 @@ github.com/container-storage-interface/spec/lib/go/csi
 ## explicit; go 1.17
 github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.3
+# github.com/containerd/cgroups/v3 v3.0.3
+## explicit; go 1.18
+github.com/containerd/cgroups/v3/cgroup1/stats
+# github.com/containerd/console v1.0.4
 ## explicit; go 1.13
 github.com/containerd/console
-# github.com/containerd/ttrpc v1.2.2
-## explicit; go 1.13
+# github.com/containerd/containerd/api v1.7.19
+## explicit; go 1.21
+github.com/containerd/containerd/api/services/containers/v1
+github.com/containerd/containerd/api/services/tasks/v1
+github.com/containerd/containerd/api/services/version/v1
+github.com/containerd/containerd/api/types
+github.com/containerd/containerd/api/types/task
+# github.com/containerd/errdefs v0.1.0
+## explicit; go 1.20
+github.com/containerd/errdefs
+# github.com/containerd/log v0.1.0
+## explicit; go 1.20
+github.com/containerd/log
+# github.com/containerd/ttrpc v1.2.5
+## explicit; go 1.19
 github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
@@ -136,7 +160,7 @@ github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v1.0.0
 ## explicit; go 1.14
 github.com/daviddengcn/go-colortext
-# github.com/distribution/reference v0.5.0
+# github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
 # github.com/docker/go-units v0.5.0
@@ -223,7 +247,6 @@ github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap
 github.com/gogo/protobuf/protoc-gen-gogo/grpc
 github.com/gogo/protobuf/protoc-gen-gogo/plugin
 github.com/gogo/protobuf/sortkeys
-github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
 # github.com/golang-jwt/jwt/v4 v4.5.0
@@ -246,8 +269,8 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
-# github.com/google/cadvisor v0.49.0
-## explicit; go 1.19
+# github.com/google/cadvisor v0.50.0
+## explicit; go 1.21
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
 github.com/google/cadvisor/collector
@@ -255,7 +278,6 @@ github.com/google/cadvisor/container
 github.com/google/cadvisor/container/common
 github.com/google/cadvisor/container/containerd
 github.com/google/cadvisor/container/containerd/containers
-github.com/google/cadvisor/container/containerd/errdefs
 github.com/google/cadvisor/container/containerd/identifiers
 github.com/google/cadvisor/container/containerd/install
 github.com/google/cadvisor/container/containerd/namespaces
@@ -280,11 +302,6 @@ github.com/google/cadvisor/resctrl
 github.com/google/cadvisor/stats
 github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
-github.com/google/cadvisor/third_party/containerd/api/services/containers/v1
-github.com/google/cadvisor/third_party/containerd/api/services/tasks/v1
-github.com/google/cadvisor/third_party/containerd/api/services/version/v1
-github.com/google/cadvisor/third_party/containerd/api/types
-github.com/google/cadvisor/third_party/containerd/api/types/task
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
 github.com/google/cadvisor/utils/cpuload
@@ -523,7 +540,7 @@ github.com/opencontainers/runc/libcontainer/user
 github.com/opencontainers/runc/libcontainer/userns
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78
+# github.com/opencontainers/runtime-spec v1.2.0
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.11.0
@@ -844,6 +861,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 # golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 ## explicit; go 1.20
 golang.org/x/exp/constraints
+golang.org/x/exp/maps
 golang.org/x/exp/slices
 # golang.org/x/mod v0.20.0
 ## explicit; go 1.18
@@ -924,7 +942,6 @@ golang.org/x/time/rate
 # golang.org/x/tools v0.24.0
 ## explicit; go 1.19
 golang.org/x/tools/benchmark/parse
-golang.org/x/tools/cmd/stringer
 golang.org/x/tools/container/intsets
 golang.org/x/tools/cover
 golang.org/x/tools/go/ast/astutil
@@ -948,7 +965,7 @@ golang.org/x/tools/internal/stdlib
 golang.org/x/tools/internal/tokeninternal
 golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
-# google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d
+# google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80
 ## explicit; go 1.19
 google.golang.org/genproto/protobuf/field_mask
 # google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157

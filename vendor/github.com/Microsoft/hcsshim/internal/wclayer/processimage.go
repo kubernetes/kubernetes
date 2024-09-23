@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 import (
@@ -12,7 +14,7 @@ import (
 // The files should have been extracted to <path>\Files.
 func ProcessBaseLayer(ctx context.Context, path string) (err error) {
 	title := "hcsshim::ProcessBaseLayer"
-	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	ctx, span := oc.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))
@@ -28,7 +30,7 @@ func ProcessBaseLayer(ctx context.Context, path string) (err error) {
 // The files should have been extracted to <path>\Files.
 func ProcessUtilityVMImage(ctx context.Context, path string) (err error) {
 	title := "hcsshim::ProcessUtilityVMImage"
-	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	ctx, span := oc.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))

@@ -27,4 +27,10 @@ type Attachment struct {
 	CaptureIoAttributionContext bool `json:"CaptureIoAttributionContext,omitempty"`
 
 	ReadOnly bool `json:"ReadOnly,omitempty"`
+
+	SupportCompressedVolumes bool `json:"SupportCompressedVolumes,omitempty"`
+
+	AlwaysAllowSparseFiles bool `json:"AlwaysAllowSparseFiles,omitempty"`
+
+	ExtensibleVirtualDiskType string `json:"ExtensibleVirtualDiskType,omitempty"`
 }
