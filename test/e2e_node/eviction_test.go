@@ -248,6 +248,44 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 	})
 })
 
+var _ = SIGDescribe("LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodSeconds", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+	f := framework.NewDefaultFramework("localstorage-eviction-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	pressureTimeout := 10 * time.Minute
+	expectedNodeCondition := v1.NodeDiskPressure
+	expectedStarvedResource := v1.ResourceEphemeralStorage
+
+	evictionMaxPodGracePeriod := 30
+	evictionSoftGracePeriod := 30
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			diskConsumed := resource.MustParse("4Gi")
+			summary := eventuallyGetSummary(ctx)
+			availableBytes := *(summary.Node.Fs.AvailableBytes)
+			if availableBytes <= uint64(diskConsumed.Value()) {
+				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
+			}
+			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "30s"}
+			// Defer to the pod default grace period
+			initialConfig.EvictionMaxPodGracePeriod = int32(evictionMaxPodGracePeriod)
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			// Ensure that pods are not evicted because of the eviction-hard threshold
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+		})
+
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
+			{
+				evictionMaxPodGracePeriod: evictionSoftGracePeriod,
+				evictionSoftGracePeriod:   evictionMaxPodGracePeriod,
+				evictionPriority:          1,
+				pod:                       diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
+			},
+		})
+	})
+})
+
 // This test validates that in-memory EmptyDir's are evicted when the Kubelet does
 // not have Sized Memory Volumes enabled. When Sized volumes are enabled, it's
 // not possible to exhaust the quota.
@@ -551,6 +589,9 @@ type podEvictSpec struct {
 	evictionPriority           int
 	pod                        *v1.Pod
 	wantPodDisruptionCondition *v1.PodConditionType
+
+	evictionMaxPodGracePeriod int
+	evictionSoftGracePeriod   int
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -589,16 +630,21 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			}, pressureTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			ginkgo.By("Waiting for evictions to occur")
+			nodeUnreadyTime := time.Now()
+
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				if expectedNodeCondition != noPressure {
 					if hasNodeCondition(ctx, f, expectedNodeCondition) {
 						framework.Logf("Node has %s", expectedNodeCondition)
 					} else {
 						framework.Logf("Node does NOT have %s", expectedNodeCondition)
+						nodeUnreadyTime = time.Now()
 					}
 				}
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
 				logFunc(ctx)
+
+				verifyEvictionPeriod(ctx, f, testSpecs, nodeUnreadyTime)
 				return verifyEvictionOrdering(ctx, f, testSpecs)
 			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
 
@@ -768,6 +814,28 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 		return nil
 	}
 	return fmt.Errorf("pods that should be evicted are still running: %#v", pendingPods)
+}
+
+func verifyEvictionPeriod(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec, nodeUnreadyTime time.Time) {
+	for i, spec := range testSpecs {
+		if spec.evictionMaxPodGracePeriod == 0 && spec.evictionSoftGracePeriod == 0 {
+			continue
+		}
+		softEvictionPeriod := spec.evictionMaxPodGracePeriod + spec.evictionSoftGracePeriod
+
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, spec.pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
+
+		minSoftEvictionPeriod := min(float64(softEvictionPeriod), float64(*spec.pod.Spec.TerminationGracePeriodSeconds+int64(spec.evictionSoftGracePeriod)))
+		if pod.Status.Phase == v1.PodFailed {
+			if time.Since(nodeUnreadyTime).Seconds() > minSoftEvictionPeriod+15 {
+				framework.Failf("pod %s should be evicted within %f seconds, but it has not been evicted for %f seconds.", pod.Name, minSoftEvictionPeriod, time.Since(nodeUnreadyTime).Seconds())
+			} else {
+				testSpecs[i].evictionMaxPodGracePeriod = 0
+				testSpecs[i].evictionSoftGracePeriod = 0
+			}
+		}
+	}
 }
 
 func verifyPodConditions(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec) {

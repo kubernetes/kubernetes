@@ -33,6 +33,9 @@ import (
 //
 // Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AllowOverwriteTerminationGracePeriodSeconds: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
+	},
 	AnyVolumeDataSource: {
 		{Version: version.MustParse("1.18"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},

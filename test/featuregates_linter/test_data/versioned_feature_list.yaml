@@ -1,3 +1,9 @@
+- name: AllowOverwriteTerminationGracePeriodSeconds
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.32"
 - name: AnonymousAuthConfigurableEndpoints
   versionedSpecs:
   - default: false
