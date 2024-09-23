@@ -792,6 +792,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "ignoreStoreReadErrorWithClusterBreakingPotential": {
+            "description": "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+            "type": "boolean"
+          },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
             "type": "string"
@@ -1954,6 +1958,15 @@
             }
           },
           {
+            "description": "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "in": "query",
             "name": "labelSelector",
@@ -2359,6 +2372,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -3044,6 +3066,15 @@
             }
           },
           {
+            "description": "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "in": "query",
             "name": "labelSelector",
@@ -3449,6 +3480,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true, will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage because of a) its data can not be transformed successfully, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalzer constraints, skips precondition checks, or any post deletion hooks and removes the object from the storage. WARNING: This will break the cluster if the resource has any dependencies. Use only if you REALLY know what you are doing. WARNING: Vendor(s) will most likely consider enablement of this option to be in violation of the support of their product. The default value is nil, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
