@@ -169,9 +169,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				return nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, request.DeviceClassName, err)
 			}
 
+			// Start collecting information about the request.
+			// The class must be set and stored before calling isSelectable.
 			requestData := requestData{
 				class: class,
 			}
+			requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
+			alloc.requestData[requestKey] = requestData
 
 			switch request.AllocationMode {
 			case resourceapi.DeviceAllocationModeExactCount:
@@ -190,7 +194,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 					for _, slice := range pool.Slices {
 						for deviceIndex := range slice.Spec.Devices {
-							selectable, err := alloc.isSelectable(requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}, slice, deviceIndex)
+							selectable, err := alloc.isSelectable(requestKey, slice, deviceIndex)
 							if err != nil {
 								return nil, err
 							}
@@ -205,7 +209,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			default:
 				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.AllocationMode)
 			}
-			alloc.requestData[requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}] = requestData
+			alloc.requestData[requestKey] = requestData
 			numDevices += requestData.numDevices
 		}
 		alloc.logger.V(6).Info("Checked claim", "claim", klog.KObj(claim), "numDevices", numDevices)
