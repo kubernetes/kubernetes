@@ -68,7 +68,7 @@ func NewAllocator(ctx context.Context,
 	}, nil
 }
 
-// ClaimsToAllocate returns the claims that the allocated was created for.
+// ClaimsToAllocate returns the claims that the allocator was created for.
 func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 	return a.claimsToAllocate
 }
@@ -354,7 +354,6 @@ type allocator struct {
 	constraints          [][]constraint                 // one list of constraints per claim
 	requestData          map[requestIndices]requestData // one entry per request
 	allocated            map[DeviceID]bool
-	skippedUnknownDevice bool
 	result               []*resourceapi.AllocationResult
 }
 
@@ -620,9 +619,6 @@ func (alloc *allocator) isSelectable(r requestIndices, slice *resourceapi.Resour
 	device := slice.Spec.Devices[deviceIndex].Basic
 	if device == nil {
 		// Must be some future, unknown device type. We cannot select it.
-		// If we don't find anything else, then this will get reported
-		// in the final result, so remember that we skipped some device.
-		alloc.skippedUnknownDevice = true
 		return false, nil
 	}
 
