@@ -294,10 +294,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// All errors get created such that they can be returned by Allocate
 	// without further wrapping.
 	done, err := alloc.allocateOne(deviceIndices{})
+	if errors.Is(err, errStop) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	if errors.Is(err, errStop) || !done {
+	if !done {
 		return nil, nil
 	}
 
@@ -538,20 +541,23 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 		// For "all" devices we already know which ones we need. We
 		// just need to check whether we can use them.
 		deviceWithID := requestData.allDevices[r.deviceIndex]
-		_, _, err := alloc.allocateDevice(r, deviceWithID.device, deviceWithID.DeviceID, true)
+		success, _, err := alloc.allocateDevice(r, deviceWithID.device, deviceWithID.DeviceID, true)
 		if err != nil {
 			return false, err
+		}
+		if !success {
+			// The order in which we allocate "all" devices doesn't matter,
+			// so we only try with the one which was up next. If we couldn't
+			// get all of them, then there is no solution and we have to stop.
+			return false, errStop
 		}
 		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1})
 		if err != nil {
 			return false, err
 		}
-
-		// The order in which we allocate "all" devices doesn't matter,
-		// so we only try with the one which was up next. If we couldn't
-		// get all of them, then there is no solution and we have to stop.
 		if !done {
-			return false, errStop
+			// Backtrack.
+			return false, nil
 		}
 		return done, nil
 	}
