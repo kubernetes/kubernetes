@@ -159,7 +159,7 @@ kube::etcd::install() {
 
     cd "${KUBE_ROOT}/third_party" || return 1
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
-      V=3 kube::log::info "etcd v${ETCD_VERSION} is already installed"
+      V=4 kube::log::info "etcd v${ETCD_VERSION} is already installed"
       return 0 # already installed
     fi
 
