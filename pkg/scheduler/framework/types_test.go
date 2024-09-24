@@ -41,12 +41,12 @@ func TestNewResource(t *testing.T) {
 	tests := []struct {
 		name         string
 		resourceList v1.ResourceList
-		expected     *Resource
+		expected     *ComputeResource
 	}{
 		{
 			name:         "empty resource",
 			resourceList: map[v1.ResourceName]resource.Quantity{},
-			expected:     &Resource{},
+			expected:     &ComputeResource{},
 		},
 		{
 			name: "complex resource",
@@ -58,7 +58,7 @@ func TestNewResource(t *testing.T) {
 				"scalar.test/" + "scalar1":          *resource.NewQuantity(1, resource.DecimalSI),
 				v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(2, resource.BinarySI),
 			},
-			expected: &Resource{
+			expected: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
@@ -80,22 +80,22 @@ func TestNewResource(t *testing.T) {
 
 func TestResourceClone(t *testing.T) {
 	tests := []struct {
-		resource *Resource
-		expected *Resource
+		resource *ComputeResource
+		expected *ComputeResource
 	}{
 		{
-			resource: &Resource{},
-			expected: &Resource{},
+			resource: &ComputeResource{},
+			expected: &ComputeResource{},
 		},
 		{
-			resource: &Resource{
+			resource: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
 			},
-			expected: &Resource{
+			expected: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
@@ -119,21 +119,21 @@ func TestResourceClone(t *testing.T) {
 
 func TestResourceAddScalar(t *testing.T) {
 	tests := []struct {
-		resource       *Resource
+		resource       *ComputeResource
 		scalarName     v1.ResourceName
 		scalarQuantity int64
-		expected       *Resource
+		expected       *ComputeResource
 	}{
 		{
-			resource:       &Resource{},
+			resource:       &ComputeResource{},
 			scalarName:     "scalar1",
 			scalarQuantity: 100,
-			expected: &Resource{
+			expected: &ComputeResource{
 				ScalarResources: map[v1.ResourceName]int64{"scalar1": 100},
 			},
 		},
 		{
-			resource: &Resource{
+			resource: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
@@ -142,7 +142,7 @@ func TestResourceAddScalar(t *testing.T) {
 			},
 			scalarName:     "scalar2",
 			scalarQuantity: 200,
-			expected: &Resource{
+			expected: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
@@ -164,25 +164,25 @@ func TestResourceAddScalar(t *testing.T) {
 
 func TestSetMaxResource(t *testing.T) {
 	tests := []struct {
-		resource     *Resource
+		resource     *ComputeResource
 		resourceList v1.ResourceList
-		expected     *Resource
+		expected     *ComputeResource
 	}{
 		{
-			resource: &Resource{},
+			resource: &ComputeResource{},
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:           *resource.NewQuantity(2000, resource.BinarySI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
-			expected: &Resource{
+			expected: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           2000,
 				EphemeralStorage: 5000,
 			},
 		},
 		{
-			resource: &Resource{
+			resource: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           4000,
 				EphemeralStorage: 5000,
@@ -195,7 +195,7 @@ func TestSetMaxResource(t *testing.T) {
 				"scalar.test/scalar1":               *resource.NewQuantity(4, resource.DecimalSI),
 				v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(5, resource.BinarySI),
 			},
-			expected: &Resource{
+			expected: &ComputeResource{
 				MilliCPU:         4,
 				Memory:           4000,
 				EphemeralStorage: 7000,
@@ -241,21 +241,21 @@ func TestNewNodeInfo(t *testing.T) {
 	}
 
 	expected := &NodeInfo{
-		Requested: &Resource{
+		Requested: &ComputeResource{
 			MilliCPU:         300,
 			Memory:           1524,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		NonZeroRequested: &Resource{
+		NonZeroRequested: &ComputeResource{
 			MilliCPU:         300,
 			Memory:           1524,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		Allocatable: &Resource{},
+		Allocatable: &ComputeResource{},
 		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
@@ -346,9 +346,9 @@ func TestNodeInfoClone(t *testing.T) {
 	}{
 		{
 			nodeInfo: &NodeInfo{
-				Requested:        &Resource{},
-				NonZeroRequested: &Resource{},
-				Allocatable:      &Resource{},
+				Requested:        &ComputeResource{},
+				NonZeroRequested: &ComputeResource{},
+				Allocatable:      &ComputeResource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
@@ -420,9 +420,9 @@ func TestNodeInfoClone(t *testing.T) {
 				},
 			},
 			expected: &NodeInfo{
-				Requested:        &Resource{},
-				NonZeroRequested: &Resource{},
-				Allocatable:      &Resource{},
+				Requested:        &ComputeResource{},
+				NonZeroRequested: &ComputeResource{},
+				Allocatable:      &ComputeResource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
@@ -646,21 +646,21 @@ func TestNodeInfoAddPod(t *testing.T) {
 				Name: "test-node",
 			},
 		},
-		Requested: &Resource{
+		Requested: &ComputeResource{
 			MilliCPU:         2300,
 			Memory:           209716700, //1500 + 200MB in initContainers
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		NonZeroRequested: &Resource{
+		NonZeroRequested: &ComputeResource{
 			MilliCPU:         2300,
 			Memory:           419431900, //200MB(initContainers) + 200MB(default memory value) + 1500 specified in requests/overhead
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		Allocatable: &Resource{},
+		Allocatable: &ComputeResource{},
 		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
@@ -872,21 +872,21 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						Name: "test-node",
 					},
 				},
-				Requested: &Resource{
+				Requested: &ComputeResource{
 					MilliCPU:         1300,
 					Memory:           2524,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				NonZeroRequested: &Resource{
+				NonZeroRequested: &ComputeResource{
 					MilliCPU:         1300,
 					Memory:           2524,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				Allocatable: &Resource{},
+				Allocatable: &ComputeResource{},
 				Generation:  2,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
@@ -1023,21 +1023,21 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						Name: "test-node",
 					},
 				},
-				Requested: &Resource{
+				Requested: &ComputeResource{
 					MilliCPU:         700,
 					Memory:           1524,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				NonZeroRequested: &Resource{
+				NonZeroRequested: &ComputeResource{
 					MilliCPU:         700,
 					Memory:           1524,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				Allocatable: &Resource{},
+				Allocatable: &ComputeResource{},
 				Generation:  3,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
@@ -1549,7 +1549,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		requests           v1.ResourceList
 		allocatedResources v1.ResourceList
 		resizeStatus       v1.PodResizeStatus
-		expectedResource   Resource
+		expectedResource   ComputeResource
 		expectedNon0CPU    int64
 		expectedNon0Mem    int64
 	}{
@@ -1558,7 +1558,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       "",
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedResource:   ComputeResource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
 			expectedNon0Mem:    mem500M.Value(),
 		},
@@ -1567,7 +1567,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInProgress,
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedResource:   ComputeResource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
 			expectedNon0Mem:    mem500M.Value(),
 		},
@@ -1576,7 +1576,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusDeferred,
-			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedResource:   ComputeResource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
 			expectedNon0CPU:    cpu700m.MilliValue(),
 			expectedNon0Mem:    mem800M.Value(),
 		},
@@ -1585,7 +1585,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInfeasible,
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedResource:   ComputeResource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
 			expectedNon0Mem:    mem500M.Value(),
 		},

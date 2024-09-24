@@ -374,7 +374,7 @@ func New(ctx context.Context,
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
 
-	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, unionedGVKs(queueingHintsPerProfile)); err != nil {
+	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, unionedResources(queueingHintsPerProfile)); err != nil {
 		return nil, fmt.Errorf("adding event handlers: %w", err)
 	}
 
@@ -555,18 +555,18 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.GVK]framework.ActionType {
-	gvkMap := make(map[framework.GVK]framework.ActionType)
+func unionedResources(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.Resource]framework.ActionType {
+	resourceMap := make(map[framework.Resource]framework.ActionType)
 	for _, queueingHints := range queueingHintsPerProfile {
 		for evt := range queueingHints {
-			if _, ok := gvkMap[evt.Resource]; ok {
-				gvkMap[evt.Resource] |= evt.ActionType
+			if _, ok := resourceMap[evt.Resource]; ok {
+				resourceMap[evt.Resource] |= evt.ActionType
 			} else {
-				gvkMap[evt.Resource] = evt.ActionType
+				resourceMap[evt.Resource] = evt.ActionType
 			}
 		}
 	}
-	return gvkMap
+	return resourceMap
 }
 
 // newPodInformer creates a shared index informer that returns only non-terminal pods.

@@ -241,15 +241,15 @@ func TestPreCheckForNode(t *testing.T) {
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
 		name                   string
-		gvkMap                 map[framework.GVK]framework.ActionType
+		resourceMap            map[framework.Resource]framework.ActionType
 		enableDRA              bool
 		enableClassicDRA       bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
 		{
-			name:   "default handlers in framework",
-			gvkMap: map[framework.GVK]framework.ActionType{},
+			name:        "default handlers in framework",
+			resourceMap: map[framework.Resource]framework.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
 				reflect.TypeOf(&v1.Node{}):      true,
@@ -259,7 +259,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "DRA events disabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			resourceMap: map[framework.Resource]framework.ActionType{
 				framework.PodSchedulingContext: framework.Add,
 				framework.ResourceClaim:        framework.Add,
 				framework.ResourceSlice:        framework.Add,
@@ -274,7 +274,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "some DRA events enabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			resourceMap: map[framework.Resource]framework.ActionType{
 				framework.PodSchedulingContext: framework.Add,
 				framework.ResourceClaim:        framework.Add,
 				framework.ResourceSlice:        framework.Add,
@@ -293,7 +293,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "all DRA events enabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			resourceMap: map[framework.Resource]framework.ActionType{
 				framework.PodSchedulingContext: framework.Add,
 				framework.ResourceClaim:        framework.Add,
 				framework.ResourceSlice:        framework.Add,
@@ -313,8 +313,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "add GVKs handlers defined in framework dynamically",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			name: "add Resources handlers defined in framework dynamically",
+			resourceMap: map[framework.Resource]framework.ActionType{
 				"Pod":                               framework.Add | framework.Delete,
 				"PersistentVolume":                  framework.Delete,
 				"storage.k8s.io/CSIStorageCapacity": framework.Update,
@@ -329,8 +329,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "add GVKs handlers defined in plugins dynamically",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			name: "add Resources handlers defined in plugins dynamically",
+			resourceMap: map[framework.Resource]framework.ActionType{
 				"daemonsets.v1.apps": framework.Add | framework.Delete,
 				"cronjobs.v1.batch":  framework.Delete,
 			},
@@ -345,8 +345,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 			},
 		},
 		{
-			name: "add GVKs handlers defined in plugins dynamically, with one illegal GVK form",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			name: "add Resources handlers defined in plugins dynamically, with one illegal Resource form",
+			resourceMap: map[framework.Resource]framework.ActionType{
 				"daemonsets.v1.apps":    framework.Add | framework.Delete,
 				"custommetrics.v1beta1": framework.Update,
 			},
@@ -392,7 +392,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, tt.resourceMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 

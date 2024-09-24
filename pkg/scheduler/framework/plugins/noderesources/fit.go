@@ -100,7 +100,7 @@ func (f *Fit) ScoreExtensions() framework.ScoreExtensions {
 
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
-	framework.Resource
+	framework.ComputeResource
 }
 
 // Clone the prefilter state.
@@ -337,7 +337,7 @@ func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod
 	}
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
-	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
+	originalMaxResourceReq, modifiedMaxResourceReq := &framework.ComputeResource{}, &framework.ComputeResource{}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
 

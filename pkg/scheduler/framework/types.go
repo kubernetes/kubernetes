@@ -85,10 +85,10 @@ const (
 	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodTolerations | UpdatePodSchedulingGatesEliminated | updatePodOther
 )
 
-// GVK is short for group/version/kind, which can uniquely represent a particular API resource.
-type GVK string
+// Resource can uniquely represent a particular API resource.
+type Resource string
 
-// Constants for GVKs.
+// Constants for Resources.
 //
 // Note:
 // - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
@@ -102,20 +102,20 @@ const (
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
 	//
-	// We have three specific Pod GVKs (PodItself, UnscheduledPod, and AssignedPod) and one general one (Pod).
-	// The scheduler triggers QHint for Pod GVK for any events to any Pods.
+	// We have three specific Pod Resources (PodItself, UnscheduledPod, and AssignedPod) and one general one (Pod).
+	// The scheduler triggers QHint for Pod Resource for any events to any Pods.
 	// i.e., registering QHint with Pod equals registering it with PodItself, UnscheduledPod, and AssignedPod.
-	// Note that it's better to try to register specific Pod GVKs, rather than just using Pod,
+	// Note that it's better to try to register specific Pod Resources, rather than just using Pod,
 	// in order to make the event handling performant.
-	Pod GVK = "Pod"
+	Pod Resource = "Pod"
 	// PodItself event is triggered when the unscheduled Pod itself is updated.
 	// e.g., Let's say pod-a is unschedulable. When pod-a is updated, QHint for PodItself/Update event is triggered.
-	PodItself GVK = "PodItself"
+	PodItself Resource = "PodItself"
 	// UnscheduledPod event is triggered when the unscheduled Pod **except the unscheduled Pod itself** is updated.
 	// e.g., Let's say pod-a is unschedulable. QHint for UnscheduledPod/Update is triggered with any updates to any unscheduled Pods except pod-a.
-	UnscheduledPod GVK = "UnscheduledPod"
+	UnscheduledPod Resource = "UnscheduledPod"
 	// AssignedPod event is triggered with any updates to any scheduled Pods.
-	AssignedPod GVK = "AssignedPod"
+	AssignedPod Resource = "AssignedPod"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
 	// It's definitely not something expected for plugin developers,
@@ -125,26 +125,26 @@ const (
 	// unschedulable pod pool.
 	// This behavior will be removed when we remove the preCheck feature.
 	// See: https://github.com/kubernetes/kubernetes/issues/110175
-	Node                  GVK = "Node"
-	PersistentVolume      GVK = "PersistentVolume"
-	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
-	CSINode               GVK = "storage.k8s.io/CSINode"
-	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
-	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
-	StorageClass          GVK = "storage.k8s.io/StorageClass"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
-	ResourceClaim         GVK = "ResourceClaim"
-	ResourceSlice         GVK = "ResourceSlice"
-	DeviceClass           GVK = "DeviceClass"
+	Node                  Resource = "Node"
+	PersistentVolume      Resource = "PersistentVolume"
+	PersistentVolumeClaim Resource = "PersistentVolumeClaim"
+	CSINode               Resource = "storage.k8s.io/CSINode"
+	CSIDriver             Resource = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    Resource = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass          Resource = "storage.k8s.io/StorageClass"
+	PodSchedulingContext  Resource = "PodSchedulingContext"
+	ResourceClaim         Resource = "ResourceClaim"
+	ResourceSlice         Resource = "ResourceSlice"
+	DeviceClass           Resource = "DeviceClass"
 
-	// WildCard is a special GVK to match all resources.
+	// WildCard is a special Resource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
 	// all coming clusterEvents will be admitted. Be careful to register it, it will
 	// increase the computing pressure in requeueing unless you really need it.
 	//
 	// Meanwhile, if the coming clusterEvent is a wildcard one, all pods
 	// will be moved from unschedulablePod pool to activeQ/backoffQ forcibly.
-	WildCard GVK = "*"
+	WildCard Resource = "*"
 )
 
 type ClusterEventWithHint struct {
@@ -195,7 +195,7 @@ func (s QueueingHint) String() string {
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
 type ClusterEvent struct {
-	Resource   GVK
+	Resource   Resource
 	ActionType ActionType
 	// Label describes this cluster event, only used in logging and metrics.
 	Label string
@@ -633,15 +633,15 @@ type NodeInfo struct {
 
 	// Total requested resources of all pods on this node. This includes assumed
 	// pods, which scheduler has sent for binding, but may not be scheduled yet.
-	Requested *Resource
+	Requested *ComputeResource
 	// Total requested resources of all pods on this node with a minimum value
 	// applied to each container's CPU and memory requests. This does not reflect
 	// the actual resource requests for this node, but is used to avoid scheduling
 	// many zero-request pods onto one node.
-	NonZeroRequested *Resource
+	NonZeroRequested *ComputeResource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
-	Allocatable *Resource
+	Allocatable *ComputeResource
 
 	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
@@ -680,8 +680,8 @@ func nextGeneration() int64 {
 	return atomic.AddInt64(&generation, 1)
 }
 
-// Resource is a collection of compute resource.
-type Resource struct {
+// ComputeResource is a collection of compute resource.
+type ComputeResource struct {
 	MilliCPU         int64
 	Memory           int64
 	EphemeralStorage int64
@@ -693,14 +693,14 @@ type Resource struct {
 }
 
 // NewResource creates a Resource from ResourceList
-func NewResource(rl v1.ResourceList) *Resource {
-	r := &Resource{}
+func NewResource(rl v1.ResourceList) *ComputeResource {
+	r := &ComputeResource{}
 	r.Add(rl)
 	return r
 }
 
 // Add adds ResourceList into Resource.
-func (r *Resource) Add(rl v1.ResourceList) {
+func (r *ComputeResource) Add(rl v1.ResourceList) {
 	if r == nil {
 		return
 	}
@@ -724,8 +724,8 @@ func (r *Resource) Add(rl v1.ResourceList) {
 }
 
 // Clone returns a copy of this resource.
-func (r *Resource) Clone() *Resource {
-	res := &Resource{
+func (r *ComputeResource) Clone() *ComputeResource {
+	res := &ComputeResource{
 		MilliCPU:         r.MilliCPU,
 		Memory:           r.Memory,
 		AllowedPodNumber: r.AllowedPodNumber,
@@ -741,12 +741,12 @@ func (r *Resource) Clone() *Resource {
 }
 
 // AddScalar adds a resource by a scalar value of this resource.
-func (r *Resource) AddScalar(name v1.ResourceName, quantity int64) {
+func (r *ComputeResource) AddScalar(name v1.ResourceName, quantity int64) {
 	r.SetScalar(name, r.ScalarResources[name]+quantity)
 }
 
 // SetScalar sets a resource by a scalar value of this resource.
-func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
+func (r *ComputeResource) SetScalar(name v1.ResourceName, quantity int64) {
 	// Lazily allocate scalar resource map.
 	if r.ScalarResources == nil {
 		r.ScalarResources = map[v1.ResourceName]int64{}
@@ -755,7 +755,7 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 }
 
 // SetMaxResource compares with ResourceList and takes max value for each Resource.
-func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+func (r *ComputeResource) SetMaxResource(rl v1.ResourceList) {
 	if r == nil {
 		return
 	}
@@ -781,9 +781,9 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		Requested:        &Resource{},
-		NonZeroRequested: &Resource{},
-		Allocatable:      &Resource{},
+		Requested:        &ComputeResource{},
+		NonZeroRequested: &ComputeResource{},
+		Allocatable:      &ComputeResource{},
 		Generation:       nextGeneration(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
@@ -956,7 +956,7 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.Generation = nextGeneration()
 }
 
-func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
+func calculateResource(pod *v1.Pod) (ComputeResource, int64, int64) {
 	var non0InitCPU, non0InitMem int64
 	var non0CPU, non0Mem int64
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
@@ -988,7 +988,7 @@ func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 			non0Mem += pod.Spec.Overhead.Memory().Value()
 		}
 	}
-	var res Resource
+	var res ComputeResource
 	res.Add(requests)
 	return res, non0CPU, non0Mem
 }

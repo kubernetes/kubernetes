@@ -374,7 +374,7 @@ func addAllEventHandlers(
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	resourceClaimCache *assumecache.AssumeCache,
-	gvkMap map[framework.GVK]framework.ActionType,
+	resourceMap map[framework.Resource]framework.ActionType,
 ) error {
 	var (
 		handlerRegistration cache.ResourceEventHandlerRegistration
@@ -455,11 +455,11 @@ func addAllEventHandlers(
 	handlers = append(handlers, handlerRegistration)
 
 	logger := sched.logger
-	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string) cache.ResourceEventHandlerFuncs {
+	buildEvtResHandler := func(at framework.ActionType, resource framework.Resource, shortResource string) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&framework.Add != 0 {
-			label := fmt.Sprintf("%vAdd", shortGVK)
-			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Add, Label: label}
+			label := fmt.Sprintf("%vAdd", shortResource)
+			evt := framework.ClusterEvent{Resource: resource, ActionType: framework.Add, Label: label}
 			funcs.AddFunc = func(obj interface{}) {
 				start := time.Now()
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, obj, nil)
@@ -467,8 +467,8 @@ func addAllEventHandlers(
 			}
 		}
 		if at&framework.Update != 0 {
-			label := fmt.Sprintf("%vUpdate", shortGVK)
-			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Update, Label: label}
+			label := fmt.Sprintf("%vUpdate", shortResource)
+			evt := framework.ClusterEvent{Resource: resource, ActionType: framework.Update, Label: label}
 			funcs.UpdateFunc = func(old, obj interface{}) {
 				start := time.Now()
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, old, obj, nil)
@@ -476,8 +476,8 @@ func addAllEventHandlers(
 			}
 		}
 		if at&framework.Delete != 0 {
-			label := fmt.Sprintf("%vDelete", shortGVK)
-			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Delete, Label: label}
+			label := fmt.Sprintf("%vDelete", shortResource)
+			evt := framework.ClusterEvent{Resource: resource, ActionType: framework.Delete, Label: label}
 			funcs.DeleteFunc = func(obj interface{}) {
 				start := time.Now()
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, obj, nil, nil)
@@ -487,8 +487,8 @@ func addAllEventHandlers(
 		return funcs
 	}
 
-	for gvk, at := range gvkMap {
-		switch gvk {
+	for resource, at := range resourceMap {
+		switch resource {
 		case framework.Node, framework.Pod, framework.AssignedPod, framework.UnscheduledPod, framework.PodItself:
 			// Do nothing.
 		case framework.CSINode:
@@ -604,7 +604,7 @@ func addAllEventHandlers(
 			if dynInformerFactory == nil {
 				continue
 			}
-			// GVK is expected to be at least 3-folded, separated by dots.
+			// Resource is expected to be at least 3-folded, separated by dots.
 			// <kind in plural>.<version>.<group>
 			// Valid examples:
 			// - foos.v1.example.com
@@ -612,15 +612,15 @@ func addAllEventHandlers(
 			// Invalid examples:
 			// - foos.v1 (2 sections)
 			// - foo.v1.example.com (the first section should be plural)
-			if strings.Count(string(gvk), ".") < 2 {
-				logger.Error(nil, "incorrect event registration", "gvk", gvk)
+			if strings.Count(string(resource), ".") < 2 {
+				logger.Error(nil, "incorrect event registration", "resource", resource)
 				continue
 			}
 			// Fall back to try dynamic informers.
-			gvr, _ := schema.ParseResourceArg(string(gvk))
+			gvr, _ := schema.ParseResourceArg(string(resource))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
 			if handlerRegistration, err = dynInformer.AddEventHandler(
-				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
+				buildEvtResHandler(at, resource, strings.Title(gvr.Resource)),
 			); err != nil {
 				return err
 			}

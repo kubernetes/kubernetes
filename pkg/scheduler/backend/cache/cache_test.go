@@ -83,8 +83,8 @@ func (b *hostPortInfoBuilder) build() framework.HostPortInfo {
 	return res
 }
 
-func newNodeInfo(requestedResource *framework.Resource,
-	nonzeroRequest *framework.Resource,
+func newNodeInfo(requestedResource *framework.ComputeResource,
+	nonzeroRequest *framework.ComputeResource,
 	pods []*v1.Pod,
 	usedPorts framework.HostPortInfo,
 	imageStates map[string]*framework.ImageStateSummary,
@@ -120,11 +120,11 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "assumed one pod with resource request and used ports",
 		pods: []*v1.Pod{testPods[0]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -136,11 +136,11 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "node requested resource are equal to the sum of the assumed pods requested resource, node contains host ports defined by pods",
 		pods: []*v1.Pod{testPods[1], testPods[2]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
@@ -152,11 +152,11 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "assumed pod without resource request",
 		pods: []*v1.Pod{testPods[3]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 0,
 				Memory:   0,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: schedutil.DefaultMilliCPURequest,
 				Memory:   schedutil.DefaultMemoryRequest,
 			},
@@ -168,12 +168,12 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "assumed one pod with extended resource",
 		pods: []*v1.Pod{testPods[4]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU:        100,
 				Memory:          500,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -185,12 +185,12 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "assumed two pods with extended resources",
 		pods: []*v1.Pod{testPods[4], testPods[5]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU:        300,
 				Memory:          1524,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
@@ -202,11 +202,11 @@ func TestAssumePodScheduled(t *testing.T) {
 		name: "assumed pod with random invalid extended resource key",
 		pods: []*v1.Pod{testPods[6]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -299,11 +299,11 @@ func TestExpirePod(t *testing.T) {
 			},
 			cleanupTime: now.Add(2 * defaultTTL),
 			wNodeInfo: newNodeInfo(
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 400,
 					Memory:   2048,
 				},
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 400,
 					Memory:   2048,
 				},
@@ -321,11 +321,11 @@ func TestExpirePod(t *testing.T) {
 			},
 			cleanupTime: now.Add(3 * defaultTTL),
 			wNodeInfo: newNodeInfo(
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 100,
 					Memory:   500,
 				},
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 100,
 					Memory:   500,
 				},
@@ -386,11 +386,11 @@ func TestAddPodWillConfirm(t *testing.T) {
 		podsToAssume: []*v1.Pod{testPods[0], testPods[1]},
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -499,11 +499,11 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 		podsToAddAfterAssume: []*v1.Pod{p2},
 		nodeInfo: map[string]*framework.NodeInfo{
 			"node1": newNodeInfo(
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 100,
 					Memory:   500,
 				},
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 100,
 					Memory:   500,
 				},
@@ -555,11 +555,11 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 		wNodeInfo: map[string]*framework.NodeInfo{
 			"assumed-node": nil,
 			"actual-node": newNodeInfo(
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
-				&framework.Resource{
+				&framework.ComputeResource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
@@ -608,11 +608,11 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	}{
 		pod: basePod,
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -662,11 +662,11 @@ func TestUpdatePod(t *testing.T) {
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
 		wNodeInfo: []*framework.NodeInfo{newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
@@ -674,11 +674,11 @@ func TestUpdatePod(t *testing.T) {
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
 		), newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -806,11 +806,11 @@ func TestExpireAddUpdatePod(t *testing.T) {
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
 		wNodeInfo: []*framework.NodeInfo{newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
@@ -818,11 +818,11 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
 		), newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -882,10 +882,10 @@ func TestEphemeralStorageResource(t *testing.T) {
 	}{
 		pod: podE,
 		wNodeInfo: newNodeInfo(
-			&framework.Resource{
+			&framework.ComputeResource{
 				EphemeralStorage: 500,
 			},
-			&framework.Resource{
+			&framework.ComputeResource{
 				MilliCPU: schedutil.DefaultMilliCPURequest,
 				Memory:   schedutil.DefaultMemoryRequest,
 			},
@@ -926,11 +926,11 @@ func TestRemovePod(t *testing.T) {
 		},
 	}
 	wNodeInfo := newNodeInfo(
-		&framework.Resource{
+		&framework.ComputeResource{
 			MilliCPU: 100,
 			Memory:   500,
 		},
-		&framework.Resource{
+		&framework.ComputeResource{
 			MilliCPU: 100,
 			Memory:   500,
 		},
