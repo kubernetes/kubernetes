@@ -1,3 +1,5 @@
+# This is a generated file. Do not edit directly.
+# Run hack/update-featuregates.sh to update it.
 - name: AdmissionWebhookMatchConditions
   versionedSpecs:
   - default: true

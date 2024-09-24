@@ -28,3 +28,5 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 go run test/featuregates_linter/main.go feature-gates update
+sed -i '1i\# This is a generated file. Do not edit directly.\n# Run hack/update-featuregates.sh to update it.' test/featuregates_linter/test_data/versioned_feature_list.yaml
+sed -i '1i\# This is a generated file. Do not edit directly.\n# Run hack/update-featuregates.sh to update it.' test/featuregates_linter/test_data/unversioned_feature_list.yaml

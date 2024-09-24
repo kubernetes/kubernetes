@@ -168,9 +168,9 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, update, version
 
 	if diff := cmp.Diff(featureList, baseFeatureList); diff != "" {
 		if versioned {
-			return fmt.Errorf("detected diff in versioned feature list (%s), diff: \n%s", versionedFeatureListFile, diff)
+			return fmt.Errorf("detected diff in versioned feature list (%s), please run hack/update-featuregates.sh to update list, diff: \n%s", versionedFeatureListFile, diff)
 		} else {
-			return fmt.Errorf("detected diff in unversioned feature list (%s), diff: \n%s", unversionedFeatureListFile, diff)
+			return fmt.Errorf("detected diff in unversioned feature list (%s), please run hack/update-featuregates.sh to update list, diff: \n%s", unversionedFeatureListFile, diff)
 		}
 	}
 	return nil
