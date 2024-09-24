@@ -343,8 +343,28 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		defer cli.Close()
 
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		defer cancel()
+
+		// List members and quickly return if the member does not exist.
+		listResp, err := cli.MemberList(ctx)
+		if err != nil {
+			klog.V(5).Infof("Failed to check whether the member %s exists: %v", strconv.FormatUint(id, 16), err)
+			lastError = err
+			return false, nil
+		}
+		found := false
+		for _, member := range listResp.Members {
+			if member.GetID() == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			klog.V(5).Infof("Member %s was not found; assuming it was already removed", strconv.FormatUint(id, 16))
+			return true, nil
+		}
+
 		resp, err = cli.MemberRemove(ctx, id)
-		cancel()
 		if err == nil {
 			return true, nil
 		}
@@ -409,6 +429,27 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
+
+		// List members and quickly return if the member already exists.
+		listResp, err := cli.MemberList(ctx)
+		if err != nil {
+			klog.V(5).Infof("Failed to check whether the member %q exists: %v", peerAddrs, err)
+			lastError = err
+			return false, nil
+		}
+		found := false
+		for _, member := range listResp.Members {
+			if member.GetPeerURLs()[0] == peerAddrs {
+				found = true
+				break
+			}
+		}
+		if found {
+			klog.V(5).Infof("The peer URL %q for the added etcd member already exists. Skipping etcd member addition", peerAddrs)
+			respMembers = listResp.Members
+			return true, nil
+		}
+
 		if isLearner {
 			klog.V(1).Infof("[etcd] Adding etcd member %q as learner", peerAddrs)
 			resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
