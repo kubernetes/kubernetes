@@ -132,3 +132,14 @@ func (c *consistencyStore) Resync() error {
 	defer c.lock.Unlock()
 	return c.destinationStore.Resync()
 }
+
+func (c *consistencyStore) UpdateResourceVersion(resourceVersion string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if rvu, ok := c.destinationStore.(ResourceVersionUpdater); ok {
+		rvu.UpdateResourceVersion(resourceVersion)
+	}
+	if rvu, ok := c.backingStore.(ResourceVersionUpdater); ok {
+		rvu.UpdateResourceVersion(resourceVersion)
+	}
+}
