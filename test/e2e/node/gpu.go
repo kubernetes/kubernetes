@@ -300,6 +300,9 @@ func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet client
 		if node.Spec.Unschedulable {
 			continue
 		}
+		if _, ok := node.Labels[framework.ControlPlaneLabel]; ok {
+			continue
+		}
 		framework.Logf("gpuResourceName %s", e2egpu.NVIDIAGPUResourceName)
 		if val, ok := node.Status.Capacity[e2egpu.NVIDIAGPUResourceName]; !ok || val.Value() == 0 {
 			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
