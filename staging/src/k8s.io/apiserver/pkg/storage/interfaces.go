@@ -264,6 +264,18 @@ type Interface interface {
 	RequestWatchProgress(ctx context.Context) error
 }
 
+// Decoder is used by the storage implementation to decode transformed
+// data from the storage into an object
+type Decoder interface {
+	// Decode decodes value of bytes into object. It will also
+	// set the object resource version to rev.
+	// On success, objPtr would be set to the object.
+	Decode(codec runtime.Codec, versioner Versioner, value []byte, objPtr runtime.Object, rev int64) error
+
+	// DecodeListItem decodes bytes value in array into object.
+	DecodeListItem(ctx context.Context, data []byte, rev uint64, codec runtime.Codec, versioner Versioner, newItemFunc func() runtime.Object) (runtime.Object, error)
+}
+
 // GetOptions provides the options that may be provided for storage get operations.
 type GetOptions struct {
 	// IgnoreNotFound determines what is returned if the requested object is not found. If
