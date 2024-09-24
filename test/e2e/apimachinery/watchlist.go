@@ -117,14 +117,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []unstructured.Unstructured
-		for i := 1; i <= 5; i++ {
-			unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
-			framework.ExpectNoError(err)
-			secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedDynamicClient, err := dynamic.NewForConfig(clientConfig)
@@ -228,6 +221,20 @@ func addWellKnownSecrets(ctx context.Context, f *framework.Framework) []v1.Secre
 	var secrets []v1.Secret
 	for i := 1; i <= 5; i++ {
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		secrets = append(secrets, *secret)
+	}
+	return secrets
+}
+
+// addWellKnownUnstructuredSecrets exists because secrets from addWellKnownSecrets
+// don't have type info and cannot be converted.
+func addWellKnownUnstructuredSecrets(ctx context.Context, f *framework.Framework) []unstructured.Unstructured {
+	var secrets []unstructured.Unstructured
+	for i := 1; i <= 5; i++ {
+		unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
+		framework.ExpectNoError(err)
+		secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		secrets = append(secrets, *secret)
 	}
