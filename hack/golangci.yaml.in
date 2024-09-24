@@ -210,8 +210,8 @@ linters-settings: # please keep this alphabetized
   {{- end}}
   testifylint:
     enable-all: true
-    {{- if .Base}}
     disable:  # TODO: remove each disabled rule and fix it
+    {{- if .Base}}
       - compares
       - error-is-as
       - error-nil
@@ -219,5 +219,5 @@ linters-settings: # please keep this alphabetized
       - float-compare
       - go-require
       - nil-compare
-      - require-error
     {{- end}}
+      - require-error
