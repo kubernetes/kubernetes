@@ -878,7 +878,6 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	start := time.Now()
 	events := []framework.ClusterEvent{}
 	if p.isSchedulingQueueHintEnabled {
 		// When unscheduled Pods are updated, we check with QueueingHint
@@ -886,9 +885,6 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 		// Plugins have to implement a QueueingHint for Pod/Update event
 		// if the rejection from them could be resolved by updating unscheduled Pods itself.
 		events = framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
-	}
-
-	if p.isSchedulingQueueHintEnabled {
 		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
 		// Record this update as Pod/Update because
 		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
@@ -919,15 +915,11 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	if pInfo := p.unschedulablePods.get(newPod); pInfo != nil {
 		_ = pInfo.Update(newPod)
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-		updatingDuration := metrics.SinceInSeconds(start)
 		gated := pInfo.Gated
 		if p.isSchedulingQueueHintEnabled {
 			for _, evt := range events {
-				startMoving := time.Now()
 				hint := p.isPodWorthRequeuing(logger, pInfo, evt, oldPod, newPod)
 				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, framework.PodItselfUpdate.Label)
-				movingDuration := metrics.SinceInSeconds(startMoving)
-				metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(updatingDuration + movingDuration)
 				if queue != unschedulablePods {
 					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", framework.PodUpdate, "queue", queue)
 					p.unschedulablePods.delete(pInfo.Pod, gated)

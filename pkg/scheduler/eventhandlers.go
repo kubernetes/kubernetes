@@ -175,6 +175,8 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(logger, oldPod, newPod)
+	// Save the time it takes to update the pod in the schedulingQueue.
+	updatingDuration := metrics.SinceInSeconds(start)
 
 	// If a plugin registers for Pod/Update events or UnscheduledPod/Update events,
 	// Updates to a pod's status when a scheduling attempt fails
@@ -192,9 +194,12 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	// and hence we have to exclude the Pod from this requeueing process.
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, false)
 	for _, evt := range events {
+		startMoving := time.Now()
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPod, newPod, func(p *v1.Pod) bool {
 			return p.UID != newPod.UID
 		})
+		movingDuration := metrics.SinceInSeconds(startMoving)
+		metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(updatingDuration + movingDuration)
 	}
 }
 

@@ -974,7 +974,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 	for _, tt := range tests {
 		if len(tt.wantRequeuedPodsByQHint) == 0 {
-			t.Fatalf("case[%s] didn't set expect result properly", tt.name)
+			t.Fatalf("case[%s]: wantRequeuedPodsByQHint must be set", tt.name)
 		}
 		for featureEnabled, wantedPods := range tt.wantRequeuedPodsByQHint {
 			t.Run(fmt.Sprintf("%s [SchedulerQueueingHints enabled: %v]", tt.name, featureEnabled), func(t *testing.T) {
