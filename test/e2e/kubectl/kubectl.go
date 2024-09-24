@@ -1235,7 +1235,7 @@ metadata:
 
 		ginkgo.It("should detect unknown metadata fields in both the root and embedded object of a CR", func(ctx context.Context) {
 			ginkgo.By("prepare CRD with x-kubernetes-embedded-resource: true")
-			opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
+			testCRD, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
 				if err := yaml.Unmarshal(schemaFooEmbedded, props); err != nil {
 					framework.Failf("failed to unmarshal schema: %v", err)
@@ -1250,10 +1250,7 @@ metadata:
 						},
 					},
 				}
-			}
-
-			group := fmt.Sprintf("%s.example.com", f.BaseName)
-			testCRD, err := crd.CreateMultiVersionTestCRD(f, group, opt)
+			})
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
