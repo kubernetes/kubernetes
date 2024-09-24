@@ -255,6 +255,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 		memLim        *resource.Quantity
 		expected      *runtimeapi.LinuxContainerResources
 		cgroupVersion CgroupVersion
+		podQos				v1.PodQOSClass
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -268,6 +269,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 134217728,
 			},
 			cgroupVersion: cgroupV1,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNoMemory",
@@ -281,6 +283,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNilCPU",
@@ -293,6 +296,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestZeroCPU",
@@ -306,6 +310,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "Request128MBLimit256MB",
@@ -320,6 +325,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNoMemory",
@@ -334,6 +340,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNilCPU",
@@ -347,6 +354,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestZeroCPU",
@@ -361,11 +369,12 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
+			podQos: 			 v1.PodQOSBurstable,
 		},
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
-		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, test.podQos)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }
