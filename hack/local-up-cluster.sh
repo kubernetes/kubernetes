@@ -802,12 +802,14 @@ function wait_coredns_available(){
     exit 1
   fi
 
-  # bump log level
-  echo "6" | sudo tee /proc/sys/kernel/printk
+  if [[ "${ENABLE_DAEMON}" = false ]]; then
+    # bump log level
+    echo "6" | sudo tee /proc/sys/kernel/printk
 
-  # loop through and grab all things in dmesg
-  dmesg > "${LOG_DIR}/dmesg.log"
-  dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    # loop through and grab all things in dmesg
+    dmesg > "${LOG_DIR}/dmesg.log"
+    dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+  fi
 }
 
 function start_kubelet {
