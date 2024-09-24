@@ -263,7 +263,11 @@ print(f"Time taken for {n}x{n} matrix multiplication: {end_time - start_time:.2f
 func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework, clientSet clientset.Interface) {
 	if framework.ProviderIs("gce") {
 		SetupNVIDIAGPUNode(ctx, f)
+	} else if framework.ProviderIs("aws") {
+		// see nvidia-device-plugin.yml in https://github.com/NVIDIA/k8s-device-plugin/tree/main/deployments/static
+		waitForGPUs(ctx, f, "kube-system", "nvidia-device-plugin-daemonset")
 	}
+
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
 	framework.ExpectNoError(err)
 	capacity := 0
@@ -281,10 +285,10 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 		allocatable += int(val.Value())
 	}
 	if capacity == 0 {
-		e2eskipper.Skipf("%d ready nodes do not have any Nvidia GPU(s). Skipping...", len(nodes.Items))
+		framework.Failf("%d ready nodes do not have any Nvidia GPU(s). Bailing out...", len(nodes.Items))
 	}
 	if allocatable == 0 {
-		e2eskipper.Skipf("%d ready nodes do not have any allocatable Nvidia GPU(s). Skipping...", len(nodes.Items))
+		framework.Failf("%d ready nodes do not have any allocatable Nvidia GPU(s). Bailing out...", len(nodes.Items))
 	}
 }
 
@@ -294,6 +298,9 @@ func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet client
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
 		if node.Spec.Unschedulable {
+			continue
+		}
+		if _, ok := node.Labels[framework.ControlPlaneLabel]; ok {
 			continue
 		}
 		framework.Logf("gpuResourceName %s", e2egpu.NVIDIAGPUResourceName)
@@ -351,7 +358,11 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
-	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, ds.Namespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
+	waitForGPUs(ctx, f, ds.Namespace, ds.Name)
+}
+
+func waitForGPUs(ctx context.Context, f *framework.Framework, namespace, name string) {
+	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, namespace, name, extensionsinternal.Kind("DaemonSet"))
 	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
 
 	devicepluginPods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
