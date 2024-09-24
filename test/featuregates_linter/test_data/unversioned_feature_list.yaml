@@ -1,15 +1,3 @@
-- name: AdmissionWebhookMatchConditions
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: AggregatedDiscoveryEndpoint
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
 - name: AllowDNSOnlyNodeCSR
   versionedSpecs:
   - default: false
@@ -21,42 +9,6 @@
   - default: false
     lockToDefault: false
     preRelease: Deprecated
-    version: ""
-- name: APIListChunking
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: APIResponseCompression
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: APIServerIdentity
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: APIServerTracing
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: APIServingWithRoutine
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: AuthorizeWithSelectors
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: ""
 - name: CloudControllerManagerWebhook
   versionedSpecs:
@@ -70,29 +22,11 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: ConcurrentWatchObjectDecode
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: ConsistentListFromCache
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: ContextualLogging
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: CoordinatedLeaderElection
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: ""
 - name: CRDValidationRatcheting
   versionedSpecs:
@@ -111,12 +45,6 @@
   - default: false
     lockToDefault: false
     preRelease: Deprecated
-    version: ""
-- name: EfficientWatchResumption
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: ""
 - name: HPAScaleToZero
   versionedSpecs:
@@ -148,37 +76,7 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: MutatingAdmissionPolicy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: OpenAPIEnums
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: RecursiveReadOnlyMounts
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: RemainingItemCount
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: ResilientWatchCacheInitialization
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: SeparateCacheWatchRPC
   versionedSpecs:
   - default: true
     lockToDefault: false
@@ -189,76 +87,4 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: ""
-- name: StorageVersionAPI
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: StorageVersionHash
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StrictCostEnforcementForVAP
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StrictCostEnforcementForWebhooks
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StructuredAuthenticationConfiguration
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StructuredAuthorizationConfiguration
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: UnauthenticatedHTTP2DOSMitigation
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: WatchBookmark
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: ""
-- name: WatchCacheInitializationPostStartHook
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: WatchFromStorageWithoutResourceVersion
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: WatchList
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: ZeroLimitedNominalConcurrencyShares
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: ""

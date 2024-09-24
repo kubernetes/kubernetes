@@ -1,3 +1,31 @@
+- name: AdmissionWebhookMatchConditions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
+- name: AggregatedDiscoveryEndpoint
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
 - name: AllowOverwriteTerminationGracePeriodSeconds
   versionedSpecs:
   - default: false
@@ -24,6 +52,56 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: APIListChunking
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.8"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.9"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.29"
+- name: APIResponseCompression
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.8"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.16"
+- name: APIServerIdentity
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.26"
+- name: APIServerTracing
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: APIServingWithRoutine
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
 - name: AppArmor
   versionedSpecs:
   - default: true
@@ -50,6 +128,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: AuthorizeWithSelectors
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
 - name: ClusterTrustBundle
   versionedSpecs:
   - default: false
@@ -62,6 +146,22 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.29"
+- name: ConcurrentWatchObjectDecode
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: ConsistentListFromCache
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
 - name: ContainerCheckpoint
   versionedSpecs:
   - default: false
@@ -72,6 +172,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: CoordinatedLeaderElection
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.31"
 - name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
@@ -190,6 +296,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.31"
 - name: DRAControlPlaneController
   versionedSpecs:
   - default: false
@@ -201,7 +311,21 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.29"
+    version: "1.26"
+- name: EfficientWatchResumption
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.21"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.24"
 - name: ElasticIndexedJob
   versionedSpecs:
   - default: true
@@ -217,7 +341,7 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.25"
+    version: "1.26"
 - name: ExecProbeTimeout
   versionedSpecs:
   - default: true
@@ -494,6 +618,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+- name: MutatingAdmissionPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
 - name: NFTablesProxyMode
   versionedSpecs:
   - default: false
@@ -538,6 +668,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: OpenAPIEnums
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.23"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.24"
 - name: PDBUnhealthyPodEvictionPolicy
   versionedSpecs:
   - default: false
@@ -700,6 +840,26 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+- name: RemainingItemCount
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.15"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.16"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.29"
+- name: ResilientWatchCacheInitialization
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
 - name: ResourceHealthStatus
   versionedSpecs:
   - default: false
@@ -738,10 +898,6 @@
     version: "1.29"
 - name: SchedulerQueueingHints
   versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.27"
   - default: false
     lockToDefault: false
     preRelease: Beta
@@ -762,6 +918,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.27"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.28"
+- name: SeparateCacheWatchRPC
+  versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
@@ -866,11 +1028,59 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: StorageVersionAPI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.20"
+- name: StorageVersionHash
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.14"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.15"
 - name: StorageVersionMigrator
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
+    version: "1.30"
+- name: StrictCostEnforcementForVAP
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: StrictCostEnforcementForWebhooks
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: StructuredAuthenticationConfiguration
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: StructuredAuthorizationConfiguration
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
     version: "1.30"
 - name: SupplementalGroupsPolicy
   versionedSpecs:
@@ -910,10 +1120,14 @@
     version: "1.28"
 - name: TopologyManagerPolicyOptions
   versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.26"
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.26"
+    version: "1.28"
 - name: TranslateStreamCloseWebsocketRequests
   versionedSpecs:
   - default: false
@@ -924,6 +1138,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: UnauthenticatedHTTP2DOSMitigation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.25"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
 - name: UnknownVersionInteroperabilityProxy
   versionedSpecs:
   - default: false
@@ -962,6 +1186,38 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.21"
+- name: WatchBookmark
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.15"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.16"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.17"
+- name: WatchCacheInitializationPostStartHook
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+- name: WatchFromStorageWithoutResourceVersion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.27"
+- name: WatchList
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
 - name: WindowsHostNetwork
   versionedSpecs:
   - default: true
@@ -984,3 +1240,13 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.20"
+- name: ZeroLimitedNominalConcurrencyShares
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.30"
