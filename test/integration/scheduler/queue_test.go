@@ -685,7 +685,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(2)), nil, nil, nil).Container("image").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
-				// Trigger an assigned Node add event.
+				// Trigger an Node add event.
 				// It should requeue pod3 only because this node only has node label, and doesn't have zone label that pod4's topologyspread requires.
 				node := st.MakeNode().Name("fake-node3").Label("node", "fake-node").Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
@@ -712,7 +712,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
-				// Trigger an assigned Node update event.
+				// Trigger an Node update event.
 				// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
 				node := st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
@@ -722,6 +722,58 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 			wantRequeuedPods:          sets.New("pod4"),
 			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
+				st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node1").Obj(),
+				st.MakePod().Name("pod2").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - Pod3 and Pod4 will be rejected by the PodTopologySpread plugin.
+				st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an NodeTaint delete event.
+				// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
+				if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node2", metav1.DeleteOptions{}); err != nil {
+					return fmt.Errorf("failed to update node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod4"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: disabled)",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
+				st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node1").Obj(),
+				st.MakePod().Name("pod2").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				// - Pod3 and Pod4 will be rejected by the PodTopologySpread plugin.
+				st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an NodeTaint delete event.
+				// It should requeue both pod3 and pod4 only because PodTopologySpread subscribes to Node/delete events.
+				if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node2", metav1.DeleteOptions{}); err != nil {
+					return fmt.Errorf("failed to update node: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod3", "pod4"),
+			enableSchedulingQueueHint: []bool{false},
 		},
 		{
 			name: "Pods with PodTopologySpread should be requeued when a NodeTaint of a Node with a topology label has been updated",
@@ -740,7 +792,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Toleration("aaa").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) error {
-				// Trigger an assigned NodeTaint update event.
+				// Trigger an NodeTaint update event.
 				// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
 				node := st.MakeNode().Name("fake-node3").Label("zone", "fake-node").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {

@@ -134,6 +134,8 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		return
 	}
 
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.NodeDelete, node, nil, nil)
+
 	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
 	if err := sched.Cache.RemoveNode(logger, node); err != nil {
 		logger.Error(err, "Scheduler cache RemoveNode failed")
