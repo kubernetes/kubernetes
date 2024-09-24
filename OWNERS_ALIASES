@@ -289,7 +289,6 @@ aliases:
     - smarterclayton
     - atiratree
   sig-apps-reviewers:
-    - alculquicondor
     - atiratree
     - janetkuo
     - kow3ns
@@ -428,7 +427,6 @@ aliases:
     - janetkuo
     - kow3ns
     - soltysh
-    - alculquicondor
   sig-auth-api-reviewers:
     - enj
     - mikedanese
