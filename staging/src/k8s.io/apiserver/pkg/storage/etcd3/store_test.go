@@ -566,6 +566,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 	if setupOpts.recorderEnabled {
 		client.KV = &clientRecorder{KV: client.KV}
 	}
+	versioner := storage.APIObjectVersioner{}
 	store := newStore(
 		client,
 		setupOpts.codec,
@@ -576,6 +577,8 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		setupOpts.groupResource,
 		setupOpts.transformer,
 		setupOpts.leaseConfig,
+		NewDefaultDecoder(setupOpts.codec, versioner),
+		versioner,
 	)
 	ctx := context.Background()
 	return ctx, store, client
