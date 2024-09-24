@@ -35,7 +35,7 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
-		resources = m.calculateLinuxResources(cpu, cpu, memory)
+		resources = m.calculateLinuxResources(cpu, cpu, memory, v1.GetPodQOS(pod))
 	}
 
 	return resources
@@ -52,18 +52,7 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runt
 		cpuRequest = req.Cpu()
 	}
 
-	lcr := m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory())
-	// cfs quota for container is not capped if
-	// 1. cpu manager policy is static
-	// 2. pod has quos PodQOSGuaranteed
-	// 3. container has integer cpu request
-	if m.containerManager.cpuExperimentalManagerPolicyStatic &&
-		kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed &&
-		cpuRequest.MilliValue() % MilliCPUToCPU == 0 {
-		lcr.Resources.CpuQuota = int64(-1)
-	}
-
-	return lcr
+	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), v1.GetPodQOS(pod))
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
