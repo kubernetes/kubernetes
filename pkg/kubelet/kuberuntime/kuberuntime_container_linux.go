@@ -39,6 +39,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -100,7 +101,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory(), v1.GetPodQOS(pod))
+	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory(), kubeapiqos.GetPodQOS(pod))
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -250,9 +251,9 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		// 2. pod has quos PodQOSGuaranteed
 		// 3. container has integer cpu request
 		// TODO: put behind FeatureGate
-		if m.cpuExperimentalManagerPolicyStatic &&
-			qosClass == v1.PodQOSGuaranteed &&
-			cpuRequest.MilliValue() % MilliCPUToCPU == 0 {
+		if m.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
+			podQos == v1.PodQOSGuaranteed &&
+			cpuRequest.MilliValue() % cm.MilliCPUToCPU == 0 {
 				resources.CpuQuota = int64(-1)
 			}
 	}

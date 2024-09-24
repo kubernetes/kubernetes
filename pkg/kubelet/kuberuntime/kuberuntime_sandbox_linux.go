@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-
+	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
@@ -35,7 +35,7 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
-		resources = m.calculateLinuxResources(cpu, cpu, memory, v1.GetPodQOS(pod))
+		resources = m.calculateLinuxResources(cpu, cpu, memory, kubeapiqos.GetPodQOS(pod))
 	}
 
 	return resources
@@ -52,7 +52,7 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runt
 		cpuRequest = req.Cpu()
 	}
 
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), v1.GetPodQOS(pod))
+	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), kubeapiqos.GetPodQOS(pod))
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
