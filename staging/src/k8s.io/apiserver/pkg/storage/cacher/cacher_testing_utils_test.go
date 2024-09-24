@@ -66,7 +66,8 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 		"/pods",
 		schema.GroupResource{Resource: "pods"},
 		identity.NewEncryptCheckTransformer(),
-		etcd3.NewDefaultLeaseManagerConfig())
+		etcd3.NewDefaultLeaseManagerConfig(),
+		etcd3.NewDefaultDecoder())
 	return server, storage
 }
 
