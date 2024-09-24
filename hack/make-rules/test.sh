@@ -23,6 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 kube::golang::setup_gomaxprocs
+kube::util::require-jq
 
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
@@ -32,28 +33,26 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
-kube::test::find_dirs() {
+kube::test::find_go_packages() {
   (
     cd "${KUBE_ROOT}"
-    find -L . -not \( \
-        \( \
-          -path './_artifacts/*' \
-          -o -path './_output/*' \
-          -o -path './cmd/kubeadm/test/*' \
-          -o -path './contrib/podex/*' \
-          -o -path './release/*' \
-          -o -path './target/*' \
-          -o -path './test/e2e/e2e_test.go' \
-          -o -path './test/e2e_node/*' \
-          -o -path './test/e2e_kubeadm/*' \
-          -o -path './test/integration/*' \
-          -o -path './third_party/*' \
-          -o -path './staging/*' \
-          -o -path './vendor/*' \
-        \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
 
-    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
+    # Get a list of all the modules in this workspace.
+    local -a workspace_module_patterns
+    kube::util::read-array workspace_module_patterns < <(go list -m -json | jq -r '.Path + "/..."')
+
+    # Get a list of all packages which have test files, but filter out ones
+    # that we don't want to run by default (i.e. are not unit-tests).
+    go list -find \
+        -f '{{if or (gt (len .TestGoFiles) 0) (gt (len .XTestGoFiles) 0)}}{{.ImportPath}}{{end}}' \
+        "${workspace_module_patterns[@]}" \
+        | grep -vE \
+            -e '^k8s.io/kubernetes/third_party(/.*)?$' \
+            -e '^k8s.io/kubernetes/cmd/kubeadm/test(/.*)?$' \
+            -e '^k8s.io/kubernetes/test/e2e$' \
+            -e '^k8s.io/kubernetes/test/e2e_node(/.*)?$' \
+            -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
+            -e '^k8s.io/.*/test/integration(/.*)?$'
   )
 }
 
@@ -155,7 +154,13 @@ for arg; do
   fi
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
-  kube::util::read-array testcases < <(kube::test::find_dirs)
+  # If the user passed no targets in, we want ~everything.
+  kube::util::read-array testcases < <(kube::test::find_go_packages)
+else
+  # If the user passed targets, we should normalize them.
+  # This can be slow!
+  kube::log::status "Normalizing Go targets"
+  kube::util::read-array testcases < <(kube::golang::normalize_go_targets "${testcases[@]}")
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
@@ -189,11 +194,6 @@ runTests() {
   junit_filename_prefix=$(junitFilenamePrefix)
 
   installTools
-
-  # Try to normalize input names. This is slow!
-  local -a targets
-  kube::log::status "Normalizing Go targets"
-  kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
 
   # Enable coverage data collection?
   local cover_msg
@@ -229,7 +229,7 @@ runTests() {
             go test -json \
             "${goflags[@]:+${goflags[@]}}" \
             "${KUBE_TIMEOUT}" \
-            "${targets[@]}" \
+            "$@" \
             "${testargs[@]:+${testargs[@]}}" \
     && rc=$? || rc=$?
 
