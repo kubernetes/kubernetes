@@ -242,7 +242,7 @@ func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldP
 	if len(config.Parameters.Raw) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
 	} else if err := json.Unmarshal(config.Parameters.Raw, &v); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
 	} else if v == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
 	} else if _, isObject := v.(map[string]any); !isObject {
@@ -468,7 +468,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		if len(spec.NodeSelector.NodeSelectorTerms) != 1 {
 			// This additional constraint simplifies merging of different selectors
 			// when devices are allocated from different slices.
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), spec.NodeSelector.NodeSelectorTerms, "must have exactly one selector term"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), spec.NodeSelector.NodeSelectorTerms, "must have exactly one node selector term"))
 		}
 	}
 	if spec.AllNodes {
@@ -479,7 +479,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
 	case 1:
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, spec, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
 	}
 
 	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices, validateDevice,
@@ -577,7 +577,7 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 	case 1:
 		// Okay.
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one field must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified"))
 	}
 	return allErrs
 }
@@ -600,12 +600,12 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)
 	case 2:
 		if len(parts[0]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the prefix must not be empty"))
+			allErrs = append(allErrs, field.Required(fldPath, "the domain must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateDriverName(parts[0], fldPath)...)
 		}
 		if len(parts[1]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the name must not be empty"))
+			allErrs = append(allErrs, field.Required(fldPath, "the C identifier must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
@@ -615,8 +615,10 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 
 func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
 	allErrs := validateQualifiedName(resource.QualifiedName(name), fldPath)
-	if !strings.Contains(string(name), "/") {
-		allErrs = append(allErrs, field.Required(fldPath.Child("domain"), "must include a prefix"))
+	// validateQualifiedName checks that the name isn't empty and both parts are valid.
+	// What we need to enforce here is that there really is a domain.
+	if name != "" && !strings.Contains(string(name), "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, "must include a domain"))
 	}
 	return allErrs
 }
@@ -684,8 +686,9 @@ func validateMap[K ~string, T any](m map[K]T, maxSize int, validateKey func(K, *
 		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(m), maxSize))
 	}
 	for key, item := range m {
-		allErrs = append(allErrs, validateKey(key, fldPath)...)
-		allErrs = append(allErrs, validateItem(item, fldPath.Key(string(key)))...)
+		keyPath := fldPath.Key(string(key))
+		allErrs = append(allErrs, validateKey(key, keyPath)...)
+		allErrs = append(allErrs, validateItem(item, keyPath)...)
 	}
 	return allErrs
 }

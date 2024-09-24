@@ -244,6 +244,9 @@ type QualifiedName string
 // FullyQualifiedName is a QualifiedName where the domain is set.
 type FullyQualifiedName string
 
+// DeviceMaxDomainLength is the maximum length of the domain prefix in a fully-qualified name.
+const DeviceMaxDomainLength = 63
+
 // DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
 const DeviceMaxIDLength = 32
 
