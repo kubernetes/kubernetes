@@ -244,6 +244,17 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
 		resources.CpuPeriod = cpuPeriod
+
+		// cfs quota for container is not capped if
+		// 1. cpu manager policy is static
+		// 2. pod has quos PodQOSGuaranteed
+		// 3. container has integer cpu request
+		// TODO: put behind FeatureGate
+		if m.cpuExperimentalManagerPolicyStatic &&
+			qosClass == v1.PodQOSGuaranteed &&
+			cpuRequest.MilliValue() % MilliCPUToCPU == 0 {
+				resources.CpuQuota = int64(-1)
+			}
 	}
 
 	// runc requires cgroupv2 for unified mode
