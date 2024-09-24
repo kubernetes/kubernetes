@@ -189,7 +189,7 @@ func makeGuaranteedCPUExclusiveSleeperPod(name string, cpus int) *v1.Pod {
 							v1.ResourceMemory: resource.MustParse("64Mi"),
 						},
 					},
-					Command: []string{"sh", "-c", "sleep", "1d"},
+					Command: []string{"sh", "-c", "sleep 1d"},
 				},
 			},
 		},
