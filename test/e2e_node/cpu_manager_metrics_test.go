@@ -91,6 +91,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if testPod != nil {
 				deletePodSyncByName(ctx, f, testPod.Name)
+				waitForContainerRemoval(ctx, testPod.Spec.Containers[0].Name, testPod.Name, testPod.Namespace)
 			}
 			updateKubeletConfig(ctx, f, oldCfg, true)
 		})
