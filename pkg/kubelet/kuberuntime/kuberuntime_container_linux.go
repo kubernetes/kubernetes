@@ -100,7 +100,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory(), v1.GetPodQOS(pod))
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -157,16 +157,6 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		}
 	}
 
-	// cfs quota for container is not capped if
-	// 1. cpu manager policy is static
-	// 2. pod has quos PodQOSGuaranteed
-	// 3. container has integer cpu request
-	if m.containerManager.cpuExperimentalManagerPolicyStatic &&
-		kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed &&
-		container.Resources.Requests.Cpu().MilliValue() % MilliCPUToCPU == 0 {
-		lcr.Resources.CpuQuota = int64(-1)
-	}
-
 	return lcr
 }
 
@@ -221,7 +211,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, podQos v1.PodQOSClass) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
 	var cpuShares int64
 
