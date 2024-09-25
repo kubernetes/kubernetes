@@ -219,7 +219,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 		go wait.Until(func() {
 			restMapper.Reset()
 		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, 1)
+		go gc.Run(ctx, 1, syncPeriod)
 		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
 	}
 	return startGC

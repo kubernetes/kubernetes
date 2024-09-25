@@ -698,11 +698,12 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 
 	// Start the garbage collector.
 	workers := int(controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
-	go garbageCollector.Run(ctx, workers)
+	const syncPeriod = 30 * time.Second
+	go garbageCollector.Run(ctx, workers, syncPeriod)
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(ctx, discoveryClient, 30*time.Second)
+	go garbageCollector.Sync(ctx, discoveryClient, syncPeriod)
 
 	return garbageCollector, true, nil
 }
