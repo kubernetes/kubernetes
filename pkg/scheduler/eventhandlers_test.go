@@ -60,7 +60,6 @@ import (
 )
 
 func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
-	metrics.Register()
 	highPriorityPod :=
 		st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority).SchedulerName(testSchedulerName).Obj()
 
@@ -210,7 +209,6 @@ func newDefaultQueueSort() framework.LessFunc {
 func TestUpdatePodInCache(t *testing.T) {
 	ttl := 10 * time.Second
 	nodeName := "node"
-	metrics.Register()
 
 	tests := []struct {
 		name   string

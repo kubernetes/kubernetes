@@ -98,6 +98,10 @@ var (
 	epochTime6 = metav1.NewTime(time.Unix(0, 6))
 )
 
+func init() {
+	metrics.Register()
+}
+
 func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 	v1dpa := &kubeschedulerconfigv1.DefaultPreemptionArgs{}
 	configv1.SetDefaults_DefaultPreemptionArgs(v1dpa)
@@ -155,7 +159,6 @@ const (
 )
 
 func TestPostFilter(t *testing.T) {
-	metrics.Register()
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
 	tests := []struct {
@@ -471,7 +474,6 @@ type candidate struct {
 }
 
 func TestDryRunPreemption(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name                    string
 		args                    *config.DefaultPreemptionArgs
