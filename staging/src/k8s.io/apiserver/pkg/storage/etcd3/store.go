@@ -785,19 +785,19 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			lastKey = kv.Key
 
-			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-			if skipToNext, err := s.handleReadError(failedKeys, string(kv.Key), err); err != nil {
-				return err
-			} else if skipToNext {
-				continue
-			}
-
-			// Check if the request has already timed out before decode object
+			// Check if the request has already timed out before the object transform
 			select {
 			case <-ctx.Done():
 				// parent context is canceled or timed out, no point in continuing
 				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
 			default:
+			}
+
+			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
+			if skipToNext, err := s.handleReadError(failedKeys, string(kv.Key), err); err != nil {
+				return err
+			} else if skipToNext {
+				continue
 			}
 
 			obj, err := decodeListItem(ctx, data, uint64(kv.ModRevision), s.codec, s.versioner, newItemFunc)
