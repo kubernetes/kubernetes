@@ -234,6 +234,14 @@ var _ = SIGDescribe("Pods Extended", func() {
 				podClient.PodInterface,
 			)
 		})
+		ginkgo.It("should not return an error when any health probe fails", func(ctx context.Context) {
+			ginkgo.By("creating pods pod with container that restarts if health probe fails")
+			createAndTestPodRepeatedly(ctx,
+				3, 15,
+				podDelayDeleteScenario{client: podClient.PodInterface, waitRestarted: true},
+				podClient.PodInterface,
+			)
+		})
 	})
 
 	ginkgo.Describe("Pod Container lifecycle", func() {
@@ -883,15 +891,18 @@ type podFastDeleteScenario struct {
 	initContainer bool
 }
 
+type podDelayDeleteScenario struct {
+	client v1core.PodInterface
+
+	waitRestarted bool
+}
+
 func (s podFastDeleteScenario) Verifier(pod *v1.Pod) podScenarioVerifier {
 	return &podStartVerifier{}
 }
 
 func (s podFastDeleteScenario) IsLastEvent(event watch.Event) bool {
-	if event.Type == watch.Deleted {
-		return true
-	}
-	return false
+	return event.Type == watch.Deleted
 }
 
 func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScenarioVerifier, string, error) {
@@ -909,7 +920,7 @@ func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScen
 			}
 
 			return fmt.Errorf("pod %s on node %s has been created but is still in the Creating state", pod.Name, pod.Spec.NodeName)
-		}).WithPolling(50 * time.Millisecond).WithTimeout(30 * time.Second).Should(gomega.Succeed()); err != nil {
+		}).WithPolling(50 * time.Millisecond).WithTimeout(1 * time.Minute).Should(gomega.Succeed()); err != nil {
 			return nil, "", err
 		}
 		scenario = fmt.Sprintf("t=%s", time.Since(t))
@@ -1000,6 +1011,79 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 			},
 		},
 	}
+}
+
+func (s podDelayDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScenarioVerifier, string, error) {
+	var scenario string
+	if s.waitRestarted {
+		t := time.Now()
+		if err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			pod, err := s.client.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if pod.Status.ContainerStatuses != nil && pod.Status.ContainerStatuses[0].RestartCount == 1 {
+				return nil
+			}
+
+			return fmt.Errorf("pod %s on node %s has been created but not restart", pod.Name, pod.Spec.NodeName)
+		}).WithPolling(100 * time.Millisecond).WithTimeout(3 * time.Minute).Should(gomega.Succeed()); err != nil {
+			return nil, "", err
+		}
+		scenario = fmt.Sprintf("t=%s", time.Since(t))
+	}
+
+	return &podDeleteVerifier{pod: pod, waitCreated: true}, scenario, s.client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+}
+
+func (s podDelayDeleteScenario) Pod(worker, attempt int) *v1.Pod {
+	name := fmt.Sprintf("pod-terminate-status-%d-%d", worker, attempt)
+	value := strconv.Itoa(time.Now().Nanosecond())
+	one := int64(1)
+	terminationGracePeriodSeconds := int64(1)
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": "foo",
+				"time": value,
+			},
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			TerminationGracePeriodSeconds: &one,
+			Containers: []v1.Container{
+				{
+					Name:  "normal",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{
+						"sleep", "1800",
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("5m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
+						},
+					},
+					StartupProbe: &v1.Probe{
+						ProbeHandler: v1.ProbeHandler{
+							Exec: &v1.ExecAction{
+								Command: []string{"/bin/false"},
+							},
+						},
+						FailureThreshold:              1,
+						PeriodSeconds:                 1,
+						TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+					},
+				},
+			},
+		},
+	}
+}
+
+func (s podDelayDeleteScenario) IsLastEvent(event watch.Event) bool {
+	return event.Type == watch.Deleted
 }
 
 // podStartVerifier checks events for a given pod and looks for unexpected
@@ -1128,28 +1212,7 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 }
 
 func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v1.Pod, []error) {
-	var errs []error
-	pod := v.pod
-	if !v.hasTerminalPhase {
-		var names []string
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.State.Running != nil {
-				names = append(names, status.Name)
-			}
-		}
-		switch {
-		case len(names) > 0:
-			errs = append(errs, fmt.Errorf("pod %s on node %s did not reach a terminal phase before being deleted but had running containers: phase=%s, running-containers=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, strings.Join(names, ",")))
-			// If we don't wait for the container to be created, so don't need to verify it here.
-		case pod.Status.Phase != v1.PodPending && v.waitCreated:
-			errs = append(errs, fmt.Errorf("pod %s on node %s was not Pending but has no running containers: phase=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase))
-		}
-	}
-	if v.hasRunningContainers {
-		data, _ := json.MarshalIndent(pod.Status.ContainerStatuses, "", "  ")
-		errs = append(errs, fmt.Errorf("pod %s on node %s had running or unknown container status before being deleted:\n%s", pod.Name, pod.Spec.NodeName, string(data)))
-	}
-
+	pod, errs := verifyFinal(v.pod, v.hasTerminalPhase, v.hasRunningContainers, v.waitCreated)
 	framework.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
 	return pod, errs
 }
@@ -1160,4 +1223,134 @@ func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v
 // If the command execution phase has been reached, then the Go standard library will return `signal: killed`.
 func isContextCanceled(message string) bool {
 	return strings.Contains(message, "context canceled") || strings.Contains(message, "signal: killed")
+}
+
+// podDeleteVerifier checks events for a given pod and looks for unexpected transitions.
+// It assumes that a running container was restarted due to any healthy probe.
+type podDeleteVerifier struct {
+	pod                  *v1.Pod
+	waitCreated          bool
+	hasContainers        bool
+	hasTerminated        bool
+	hasRunningContainers bool
+	hasTerminalPhase     bool
+	duration             time.Duration
+	completeDuration     time.Duration
+}
+
+// Verify takes successive watch events for a given pod and returns an error if the status is unexpected.
+// This verifier works for any pod which has 0 init containers and 1 regular container.
+func (v *podDeleteVerifier) Verify(event watch.Event) error {
+	var ok bool
+	pod, ok := event.Object.(*v1.Pod)
+	if !ok {
+		framework.Logf("Unexpected event object: %s %#v", event.Type, event.Object)
+		return nil
+	}
+	v.pod = pod
+
+	if len(pod.Status.ContainerStatuses) == 0 {
+		if v.hasContainers {
+			return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.ContainerStatuses)
+		}
+		return nil
+	}
+	v.hasContainers = true
+	if len(pod.Status.ContainerStatuses) != 1 {
+		return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.ContainerStatuses)
+	}
+
+	// If containerRuntime.SyncPod() returns an error,
+	// it is possible that the container state and the pod phase are inconsistent.
+	if !v.hasTerminated {
+		if status := e2epod.FindContainerStatusInPod(pod, "normal"); status != nil {
+			if status.State.Terminated != nil && pod.Status.Phase != v1.PodFailed {
+				return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status)
+			}
+		}
+	}
+
+	status := e2epod.FindContainerStatusInPod(pod, "normal")
+	if status == nil {
+		return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status)
+	}
+
+	t := status.State.Terminated
+	if v.hasTerminated {
+		if status.State.Waiting != nil || status.State.Running != nil {
+			return fmt.Errorf("pod %s on node %s was terminated and then changed state: %#v", pod.Name, pod.Spec.NodeName, status)
+		}
+		if t == nil {
+			return fmt.Errorf("pod %s on node %s was terminated and then had termination cleared: %#v", pod.Name, pod.Spec.NodeName, status)
+		}
+	}
+	var hasNoStartTime bool
+	v.hasRunningContainers = status.State.Waiting == nil && status.State.Terminated == nil
+	if t != nil {
+		if !t.FinishedAt.Time.IsZero() {
+			// If the pod is deleted while being created, its creation time is the starting point of Unix time.
+			if t.StartedAt.IsZero() || t.StartedAt.Time == time.Unix(0, 0) {
+				hasNoStartTime = true
+			} else {
+				v.duration = t.FinishedAt.Sub(t.StartedAt.Time)
+			}
+			v.completeDuration = t.FinishedAt.Sub(pod.CreationTimestamp.Time)
+		}
+
+		defer func() { v.hasTerminated = true }()
+		switch {
+		case pod.ObjectMeta.DeletionTimestamp != nil && t.ExitCode == 137 && t.Reason == "Error":
+			// expected, pod was force-killed after grace period
+		default:
+			data, _ := json.MarshalIndent(pod.Status, "", "  ")
+			framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
+			return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
+		}
+		switch {
+		case v.duration > time.Hour:
+			// problem with status reporting
+			return fmt.Errorf("pod %s container %s on node %s had very long duration %s: start=%s end=%s", pod.Name, status.Name, pod.Spec.NodeName, v.duration, t.StartedAt, t.FinishedAt)
+		case hasNoStartTime:
+			// should never happen
+			return fmt.Errorf("pod %s container %s on node %s had finish time but not start time: end=%s", pod.Name, status.Name, pod.Spec.NodeName, t.FinishedAt)
+		}
+	}
+
+	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+		v.hasTerminalPhase = true
+	} else if v.hasTerminalPhase {
+		return fmt.Errorf("pod %s on node %s was in a terminal phase and then reverted: %#v", pod.Name, pod.Spec.NodeName, pod.Status)
+	}
+	return nil
+}
+
+func (v *podDeleteVerifier) VerifyFinal(scenario string, total time.Duration) (*v1.Pod, []error) {
+	pod, errs := verifyFinal(v.pod, v.hasTerminalPhase, v.hasRunningContainers, v.waitCreated)
+	framework.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
+	return pod, errs
+}
+
+func verifyFinal(pod *v1.Pod, hasTerminalPhase, hasRunningContainers, waitCreated bool) (*v1.Pod, []error) {
+	var errs []error
+	if !hasTerminalPhase {
+		var names []string
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Running != nil {
+				names = append(names, status.Name)
+			}
+		}
+		switch {
+		case len(names) > 0:
+			errs = append(errs, fmt.Errorf("pod %s on node %s did not reach a terminal phase before being deleted but had running containers: phase=%s, running-containers=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, strings.Join(names, ",")))
+			// If we don't wait for the container to be created, so don't need to verify it here.
+		case pod.Status.Phase != v1.PodPending && waitCreated:
+			errs = append(errs, fmt.Errorf("pod %s on node %s was not Pending but has no running containers: phase=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase))
+		}
+	}
+	if hasRunningContainers {
+		data, _ := json.MarshalIndent(pod.Status.ContainerStatuses, "", "  ")
+		errs = append(errs, fmt.Errorf("pod %s on node %s had running or unknown container status before being deleted:\n%s", pod.Name, pod.Spec.NodeName, string(data)))
+	}
+
+	return pod, errs
 }
