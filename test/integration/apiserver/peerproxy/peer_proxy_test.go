@@ -48,7 +48,6 @@ import (
 )
 
 func TestPeerProxiedRequest(t *testing.T) {
-
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
@@ -109,7 +108,6 @@ func TestPeerProxiedRequest(t *testing.T) {
 }
 
 func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
-
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)

@@ -25,12 +25,17 @@ import (
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -311,10 +316,17 @@ func CreateConfig(
 		if err != nil {
 			return nil, nil, err
 		}
+
+		discoveryScheme := runtime.NewScheme()
+		utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
+		utilruntime.Must(apidiscoveryv2beta1.AddToScheme(discoveryScheme))
+		// Register conversion for apidiscovery
+		utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(discoveryScheme))
+
 		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
-			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
-				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer)
+			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.LoopbackClientConfig, opts.ProxyClientCertFile,
+				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer, serializer.NewCodecFactory(discoveryScheme))
 			if err != nil {
 				return nil, nil, err
 			}
