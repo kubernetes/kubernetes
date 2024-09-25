@@ -26,13 +26,8 @@ set -o xtrace
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-# Until all GOPATH references are removed from all build scripts as well,
-# explicitly disable module mode to avoid picking up user-set GO111MODULE preferences.
-# As individual scripts make use of go modules, they can explicitly set GO111MODULE=on
-export GO111MODULE=off
-
 # Install tools we need
-GO111MODULE=on go -C "./hack/tools" install gotest.tools/gotestsum
+go -C "./hack/tools" install gotest.tools/gotestsum
 
 # Disable coverage report
 export KUBE_COVER="n"
