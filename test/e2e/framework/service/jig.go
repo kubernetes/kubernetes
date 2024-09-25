@@ -129,7 +129,7 @@ func (s *staticPortRange) nextFreePort() (int, bool) {
 	start := rand.Intn(s.length)
 	for i := 0; i < s.length; i++ {
 		port := (start + i) % s.length
-		!s.reservedPorts.Has(port) {
+		if !s.reservedPorts.Has(port) {
 			return s.baseport + port, true
 		}
 	}
