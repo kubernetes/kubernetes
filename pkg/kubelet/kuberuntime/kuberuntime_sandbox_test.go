@@ -467,7 +467,7 @@ func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
 			wc, err := m.generatePodSandboxWindowsConfig(pod)
 
 			assert.Equal(t, testCase.expectedWindowsConfig, wc)
-			assert.Equal(t, nil, err)
+			assert.NoError(t, err)
 		})
 	}
 }

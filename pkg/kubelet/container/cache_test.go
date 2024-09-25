@@ -157,7 +157,7 @@ func TestCacheGetPodDoesNotExist(t *testing.T) {
 	// object with id filled.
 	actualStatus, actualErr := cache.Get(podID)
 	assert.Equal(t, status, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 }
 
 func TestDelete(t *testing.T) {
@@ -167,13 +167,13 @@ func TestDelete(t *testing.T) {
 	cache.Set(podID, status, nil, time.Time{})
 	actualStatus, actualErr := cache.Get(podID)
 	assert.Equal(t, status, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 	// Delete the pod from cache, and verify that we get an empty status.
 	cache.Delete(podID)
 	expectedStatus := &PodStatus{ID: podID}
 	actualStatus, actualErr = cache.Get(podID)
 	assert.Equal(t, expectedStatus, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 }
 
 func verifyNotification(t *testing.T, ch chan *data, expectNotification bool) {

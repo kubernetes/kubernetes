@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
@@ -420,7 +421,7 @@ func TestRemoveCacheEntry(t *testing.T) {
 	pleg.Relist()
 	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 }
 
 func TestHealthy(t *testing.T) {
@@ -479,7 +480,7 @@ func TestRelistWithReinspection(t *testing.T) {
 	actualEvents := getEventsFromChannel(ch)
 	actualStatus, actualErr := pleg.cache.Get(podID)
 	assert.Equal(t, goodStatus, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 	assert.Exactly(t, []*PodLifecycleEvent{goodEvent}, actualEvents)
 
 	// listing 2 - pretend runtime was in the middle of creating the non-infra container for the pod
@@ -513,7 +514,7 @@ func TestRelistWithReinspection(t *testing.T) {
 	actualEvents = getEventsFromChannel(ch)
 	actualStatus, actualErr = pleg.cache.Get(podID)
 	assert.Equal(t, goodStatus, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 	// no events are expected because relist #1 set the old pod record which has the infra container
 	// running. relist #2 had the inspection error and therefore didn't modify either old or new.
 	// relist #3 forced the reinspection of the pod to retrieve its status, but because the list of
@@ -633,7 +634,7 @@ func TestRelistIPChange(t *testing.T) {
 		actualEvents := getEventsFromChannel(ch)
 		actualStatus, actualErr := pleg.cache.Get(pod.ID)
 		assert.Equal(t, status, actualStatus, tc.name)
-		assert.Nil(t, actualErr, tc.name)
+		assert.NoError(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 
 		// Clear the IP address and mark the container terminated
@@ -658,7 +659,7 @@ func TestRelistIPChange(t *testing.T) {
 		statusCopy := *status
 		statusCopy.IPs = tc.podIPs
 		assert.Equal(t, &statusCopy, actualStatus, tc.name)
-		assert.Nil(t, actualErr, tc.name)
+		require.NoError(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 	}
 }

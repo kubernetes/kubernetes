@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,7 +69,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	as := assert.New(t)
 	for idx, tc := range cases {
 		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tc.pod, nil)
-		as.Nil(err, "failed to default pod limits: %v", err)
+		as.NoError(err, "failed to default pod limits: %v", err)
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
 			as.Fail("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)
 		}
