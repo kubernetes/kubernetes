@@ -119,7 +119,8 @@ func (s *staticPortRange) allocatePort(port int) bool {
 	return true
 }
 
-// nextFreePort allocates a free port from the range and returns its number and true
+// nextFreePort returns a free port from the range and returns its number and true
+// the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
 // if none is available then it returns -1 and false
 func (s *staticPortRange) nextFreePort() (int, bool) {
 	s.Lock()
@@ -128,7 +129,7 @@ func (s *staticPortRange) nextFreePort() (int, bool) {
 	start := rand.Intn(s.length)
 	for i := 0; i < s.length; i++ {
 		port := (start + i) % s.length
-		if port < s.length && port >= 0 && !s.reservedPorts.Has(port) {
+		!s.reservedPorts.Has(port) {
 			return s.baseport + port, true
 		}
 	}
