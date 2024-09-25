@@ -5683,7 +5683,6 @@ type Event struct {
 	metav1.ObjectMeta
 
 	// The object that this event is about. Mapped to events.Event.regarding
-	// +optional
 	InvolvedObject ObjectReference
 
 	// Optional; this should be a short, machine understandable string that gives the reason
