@@ -31,6 +31,7 @@ import (
 	conflicting "k8s.io/code-generator/examples/crd/informers/externalversions/conflicting"
 	example "k8s.io/code-generator/examples/crd/informers/externalversions/example"
 	example2 "k8s.io/code-generator/examples/crd/informers/externalversions/example2"
+	extensions "k8s.io/code-generator/examples/crd/informers/externalversions/extensions"
 	internalinterfaces "k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
 )
 
@@ -259,6 +260,7 @@ type SharedInformerFactory interface {
 	ConflictingExample() conflicting.Interface
 	Example() example.Interface
 	SecondExample() example2.Interface
+	ExtensionsExample() extensions.Interface
 }
 
 func (f *sharedInformerFactory) ConflictingExample() conflicting.Interface {
@@ -271,4 +273,8 @@ func (f *sharedInformerFactory) Example() example.Interface {
 
 func (f *sharedInformerFactory) SecondExample() example2.Interface {
 	return example2.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) ExtensionsExample() extensions.Interface {
+	return extensions.New(f, f.namespace, f.tweakListOptions)
 }

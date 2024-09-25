@@ -28,6 +28,7 @@ import (
 	conflictingexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1"
 	secondexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example2/v1"
+	extensionsexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/extensions/v1"
 )
 
 type Interface interface {
@@ -35,6 +36,7 @@ type Interface interface {
 	ConflictingExampleV1() conflictingexamplev1.ConflictingExampleV1Interface
 	ExampleV1() examplev1.ExampleV1Interface
 	SecondExampleV1() secondexamplev1.SecondExampleV1Interface
+	ExtensionsExampleV1() extensionsexamplev1.ExtensionsExampleV1Interface
 }
 
 // Clientset contains the clients for groups.
@@ -43,6 +45,7 @@ type Clientset struct {
 	conflictingExampleV1 *conflictingexamplev1.ConflictingExampleV1Client
 	exampleV1            *examplev1.ExampleV1Client
 	secondExampleV1      *secondexamplev1.SecondExampleV1Client
+	extensionsExampleV1  *extensionsexamplev1.ExtensionsExampleV1Client
 }
 
 // ConflictingExampleV1 retrieves the ConflictingExampleV1Client
@@ -58,6 +61,11 @@ func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
 // SecondExampleV1 retrieves the SecondExampleV1Client
 func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
 	return c.secondExampleV1
+}
+
+// ExtensionsExampleV1 retrieves the ExtensionsExampleV1Client
+func (c *Clientset) ExtensionsExampleV1() extensionsexamplev1.ExtensionsExampleV1Interface {
+	return c.extensionsExampleV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -116,6 +124,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.extensionsExampleV1, err = extensionsexamplev1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -140,6 +152,7 @@ func New(c rest.Interface) *Clientset {
 	cs.conflictingExampleV1 = conflictingexamplev1.New(c)
 	cs.exampleV1 = examplev1.New(c)
 	cs.secondExampleV1 = secondexamplev1.New(c)
+	cs.extensionsExampleV1 = extensionsexamplev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

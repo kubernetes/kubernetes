@@ -25,9 +25,11 @@ import (
 	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
+	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 	conflictingv1 "k8s.io/code-generator/examples/crd/applyconfiguration/conflicting/v1"
 	applyconfigurationexamplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 	applyconfigurationexample2v1 "k8s.io/code-generator/examples/crd/applyconfiguration/example2/v1"
+	applyconfigurationextensionsv1 "k8s.io/code-generator/examples/crd/applyconfiguration/extensions/v1"
 	internal "k8s.io/code-generator/examples/crd/applyconfiguration/internal"
 )
 
@@ -58,6 +60,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationexample2v1.TestTypeApplyConfiguration{}
 	case example2v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
 		return &applyconfigurationexample2v1.TestTypeStatusApplyConfiguration{}
+
+		// Group=extensions.test.crd.code-generator.k8s.io, Version=v1
+	case extensionsv1.SchemeGroupVersion.WithKind("TestSubresource"):
+		return &applyconfigurationextensionsv1.TestSubresourceApplyConfiguration{}
+	case extensionsv1.SchemeGroupVersion.WithKind("TestType"):
+		return &applyconfigurationextensionsv1.TestTypeApplyConfiguration{}
+	case extensionsv1.SchemeGroupVersion.WithKind("TestTypeStatus"):
+		return &applyconfigurationextensionsv1.TestTypeStatusApplyConfiguration{}
 
 	}
 	return nil

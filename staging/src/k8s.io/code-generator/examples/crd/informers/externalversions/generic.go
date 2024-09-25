@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
+	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -67,6 +68,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=example.test.crd.code-generator.k8s.io, Version=v1
 	case example2v1.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().V1().TestTypes().Informer()}, nil
+
+		// Group=extensions.test.crd.code-generator.k8s.io, Version=v1
+	case extensionsv1.SchemeGroupVersion.WithResource("testtypes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.ExtensionsExample().V1().TestTypes().Informer()}, nil
 
 	}
 

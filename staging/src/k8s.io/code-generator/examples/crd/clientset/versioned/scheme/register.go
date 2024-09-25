@@ -27,6 +27,7 @@ import (
 	conflictingexamplev1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	secondexamplev1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
+	extensionsexamplev1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 )
 
 var Scheme = runtime.NewScheme()
@@ -36,6 +37,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	conflictingexamplev1.AddToScheme,
 	examplev1.AddToScheme,
 	secondexamplev1.AddToScheme,
+	extensionsexamplev1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

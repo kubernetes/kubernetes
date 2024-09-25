@@ -140,7 +140,8 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 				"UpdateOptions": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
 				"ApplyOptions":  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
 				"PatchType":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
-				"jsonMarshal":   c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+				"PatchOptions":  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+				"jsonMarshal":   c.Universe.Function(types.Name{Package: "encoding/json", Name: "Marshal"}),
 				"context":       c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
 			},
 		}
@@ -173,9 +174,12 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"watchInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":              c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec":             c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
-		"jsonMarshal":                      c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
-		"fmtErrorf":                        c.Universe.Type(types.Name{Package: "fmt", Name: "Errorf"}),
+		"jsonMarshal":                      c.Universe.Function(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"fmtErrorf":                        c.Universe.Function(types.Name{Package: "fmt", Name: "Errorf"}),
+		"klogWarningf":                     c.Universe.Function(types.Name{Package: "k8s.io/klog/v2", Name: "Warningf"}),
 		"context":                          c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
+		"timeDuration":                     c.Universe.Type(types.Name{Package: "time", Name: "Duration"}),
+		"timeSecond":                       c.Universe.Type(types.Name{Package: "time", Name: "Second"}),
 		"resourceVersionMatchNotOlderThan": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ResourceVersionMatchNotOlderThan"}),
 		"CheckListFromCacheDataConsistencyIfRequested":      c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckListFromCacheDataConsistencyIfRequested"}),
 		"CheckWatchListFromCacheDataConsistencyIfRequested": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckWatchListFromCacheDataConsistencyIfRequested"}),
@@ -580,14 +584,14 @@ var listTemplate = `
 // $.verb$ takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
     if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr  := $.PrepareWatchListOptionsFromListOptions|raw$(opts); watchListOptionsErr  != nil {
-        klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr )
+        $.klogWarningf|raw$("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr )
     } else if hasWatchListOptionsPrepared {
         result, err := c.watchList(ctx, watchListOptions)
         if err == nil {
             $.CheckWatchListFromCacheDataConsistencyIfRequested|raw$(ctx, "watchlist request for $.type|resource$", c.list, opts, result)
             return result, nil
         }
-        klog.Warningf("The watchlist request for $.type|resource$ ended with an error, falling back to the standard LIST semantics, err = %v", err)
+        $.klogWarningf|raw$("The watchlist request for $.type|resource$ ended with an error, falling back to the standard LIST semantics, err = %v", err)
     }
     result, err := c.list(ctx, opts)
     if err == nil {
@@ -600,9 +604,9 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|r
 var privateListTemplate = `
 // list takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) list(ctx $.context|raw$, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	var timeout time.Duration
+	var timeout $.timeDuration|raw$
 	if opts.TimeoutSeconds != nil{
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
 	}
 	result = &$.resultType|raw$List{}
 	err = c.GetClient().Get().
@@ -619,9 +623,9 @@ func (c *$.type|privatePlural$) list(ctx $.context|raw$, opts $.ListOptions|raw$
 var listSubresourceTemplate = `
 // $.verb$ takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	var timeout time.Duration
+	var timeout $.timeDuration|raw$
 	if opts.TimeoutSeconds != nil{
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
 	}
 	result = &$.resultType|raw$List{}
 	err = c.GetClient().Get().
@@ -749,9 +753,9 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$
 var watchTemplate = `
 // $.verb$ returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
-	var timeout time.Duration
+	var timeout $.timeDuration|raw$
 	if opts.TimeoutSeconds != nil{
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
 	}
 	opts.Watch = true
 	return c.GetClient().Get().
@@ -765,13 +769,13 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|r
 var watchListTemplate = `
 // watchList establishes a watch stream with the server and returns the list of $.resultType|publicPlural$
 func (c *$.type|privatePlural$) watchList(ctx $.context|raw$, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	var timeout time.Duration
+	var timeout $.timeDuration|raw$
 	if opts.TimeoutSeconds != nil{
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
 	}
     result = &$.resultType|raw$List{}
-	err = c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
