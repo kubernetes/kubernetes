@@ -30,9 +30,9 @@ type testMetrics struct {
 	updateCalled chan<- struct{}
 }
 
-func (m *testMetrics) add(item t)            { m.added++ }
-func (m *testMetrics) get(item t)            { m.gotten++ }
-func (m *testMetrics) done(item t)           { m.finished++ }
+func (m *testMetrics) add(item any)          { m.added++ }
+func (m *testMetrics) get(item any)          { m.gotten++ }
+func (m *testMetrics) done(item any)         { m.finished++ }
 func (m *testMetrics) updateUnfinishedWork() { m.updateCalled <- struct{}{} }
 
 func TestMetricShutdown(t *testing.T) {
