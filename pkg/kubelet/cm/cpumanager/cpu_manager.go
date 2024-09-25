@@ -26,9 +26,9 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -37,6 +37,11 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
+)
+
+
+const (
+	MilliCPUToCPU = 1000
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -526,6 +531,17 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 		}
 	}
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
+}
+
+func StaticCpuPolicyConditionsSatisfied(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *apiresource.Quantity ) bool {
+			// returns true if
+			// 1. cpu manager policy is static
+			// 2. pod has quos PodQOSGuaranteed
+			// 3. container has integer cpu request
+			// TODO: put behind FeatureGate
+			return cpuManagerPolicyName == string(PolicyStatic) &&
+				podQos == v1.PodQOSGuaranteed &&
+				cpuRequest.MilliValue() % MilliCPUToCPU == 0 // todo - take into account precision? only if we care about "1" vs "1.0"
 }
 
 func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {

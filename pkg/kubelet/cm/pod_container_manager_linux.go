@@ -48,8 +48,6 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
-	// cpuExperimentalManagerPolicyStatic is true if cpu manager policy is static, setting per node
-	cpuExperimentalManagerPolicyStatic bool
 	// Maximum number of pids in a pod
 	podPidsLimit int64
 	// enforceCPULimits controls whether cfs quota is enforced or not
@@ -57,6 +55,8 @@ type podContainerManagerImpl struct {
 	// cpuCFSQuotaPeriod is the cfs period value, cfs_period_us, setting per
 	// node for all containers in usec
 	cpuCFSQuotaPeriod uint64
+	// cpuManagerPolicy is the cpu manager policy
+	cpuManagerPolicy string
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -84,7 +84,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.cpuExperimentalManagerPolicyStatic),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.cpuManagerPolicy),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit

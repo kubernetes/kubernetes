@@ -39,10 +39,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -246,16 +246,9 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		resources.CpuQuota = cpuQuota
 		resources.CpuPeriod = cpuPeriod
 
-		// cfs quota for container is not capped if
-		// 1. cpu manager policy is static
-		// 2. pod has quos PodQOSGuaranteed
-		// 3. container has integer cpu request
-		// TODO: put behind FeatureGate
-		if m.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
-			podQos == v1.PodQOSGuaranteed &&
-			cpuRequest.MilliValue() % cm.MilliCPUToCPU == 0 {
-				resources.CpuQuota = int64(-1)
-			}
+		if cpumanager.StaticCpuPolicyConditionsSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
+			resources.CpuQuota = int64(-1)
+		}
 	}
 
 	// runc requires cgroupv2 for unified mode
