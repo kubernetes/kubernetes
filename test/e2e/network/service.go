@@ -1687,10 +1687,10 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		err := retry.OnError(retry.DefaultRetry, func(e error) bool {
 			if e == nil {
-			      return false
-			 }
-			 if (strings.Contains(e.Error(), errAllocated.Error()) ||
-					strings.Contains(e.Error(), noNodePortAvailable.Error())) {
+				return false
+			}
+			if strings.Contains(e.Error(), errAllocated.Error()) ||
+				strings.Contains(e.Error(), noNodePortAvailable.Error()) {
 				return true
 			}
 			return false
@@ -3956,9 +3956,11 @@ var _ = common.SIGDescribe("Services", func() {
 		errAllocated := errors.New("provided port is already allocated")
 		noNodePortAvailable := errors.New("no available nodeport found")
 		err = retry.OnError(retry.DefaultRetry, func(err error) bool {
-			if err != nil &&
-				(strings.Contains(err.Error(), errAllocated.Error()) ||
-					strings.Contains(err.Error(), noNodePortAvailable.Error())) {
+			if err == nil {
+				return false
+			}
+			if strings.Contains(err.Error(), errAllocated.Error()) ||
+				strings.Contains(err.Error(), noNodePortAvailable.Error()) {
 				return true
 			}
 			return false

@@ -156,8 +156,7 @@ func ReserveStaticNodePort(port int) bool {
 	return staticPortAllocator.allocatePort(port)
 }
 
-// GetUnusedStaticNodePort reserves first free port in static range
-// and returns it and a boolean True value
+// GetUnusedStaticNodePort returns a free port in static range and a boolean True value
 // If no port in static range is available it returns -1 and a boolean value False
 func GetUnusedStaticNodePort() (int, bool) {
 	return staticPortAllocator.nextFreePort()
