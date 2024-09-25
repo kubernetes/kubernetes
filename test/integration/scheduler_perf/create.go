@@ -56,9 +56,6 @@ type createAny struct {
 var _ runnableOp = &createAny{}
 
 func (c *createAny) isValid(allowParameterization bool) error {
-	if c.Opcode != createAnyOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", c.Opcode, createAnyOpcode)
-	}
 	if c.TemplatePath == "" {
 		return fmt.Errorf("TemplatePath must be set")
 	}

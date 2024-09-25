@@ -175,3 +175,22 @@ the ci-benchmark-scheduler-perf periodic job will fail with an error log such as
 This allows to analyze which workload failed. Make sure that the failure is not an outlier 
 by checking multiple runs of the job. If the failures are not related to any regression, 
 but to an incorrect threshold setting, it is reasonable to decrease it.
+
+### Visualization
+
+Some support for visualizing progress over time is built into the
+benchmarks. The measurement operation which creates pods writes .dat files like
+this:
+
+     test/integration/scheduler_perf/SchedulingBasic_5000Nodes_2023-03-17T14:52:09Z.dat
+
+This file is in a text format that [gnuplot](http://www.gnuplot.info/) can
+read. A wrapper script selects some suitable parameters:
+
+     test/integration/scheduler_perf/gnuplot.sh test/integration/scheduler_perf/*.dat
+
+It plots in an interactive window by default. To write into a file, use
+
+    test/integration/scheduler_perf/gnuplot.sh \
+       -e 'set term png; set output "<output>.png"' \
+       test/integration/scheduler_perf/*.dat
