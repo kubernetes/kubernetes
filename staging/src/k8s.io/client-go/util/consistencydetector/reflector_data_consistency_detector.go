@@ -32,3 +32,7 @@ func init() {
 func IsDataConsistencyDetectionForReflectorEnabled() bool {
 	return dataConsistencyDetectionForReflectorEnabled
 }
+
+func ForceDataConsistencyDetectionForReflector() {
+	dataConsistencyDetectionForReflectorEnabled = true
+}
