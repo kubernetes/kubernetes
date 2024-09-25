@@ -35,8 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const (
@@ -119,6 +122,8 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 //  4. check that the original secrets now cannot be read, but the new ones still can
 //  5. check that the read error has the expected format
 func TestBrokenTransformations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, true)
+
 	test, err := newTransformTest(t, aesGCMConfigYAML, true, "", nil)
 	defer test.cleanUp()
 	if err != nil {

@@ -81,6 +81,7 @@ type store struct {
 	groupResource       schema.GroupResource
 	groupResourceString string
 	watcher             *watcher
+	handleReadError     func(errorMap map[string]error, key string, err error) (skipToNext bool, retErr error)
 	leaseManager        *leaseManager
 }
 
@@ -137,6 +138,22 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 		groupResourceString: groupResource.String(),
 		watcher:             w,
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
+		handleReadError: func(errMap map[string]error, _ string, err error) (bool, error) {
+			if err != nil {
+				return false, storage.NewInternalError(err.Error())
+			}
+			return false, nil
+		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		s.handleReadError = func(errMap map[string]error, key string, err error) (bool, error) {
+			if err != nil {
+				errMap[key] = err
+				return true, nil
+			}
+			return false, nil
+		}
 	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
@@ -145,6 +162,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
+
 	return s
 }
 
@@ -178,15 +196,21 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	kv := getResp.Kvs[0]
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
-	if err != nil {
-		return storage.NewCorruptedDataError(map[string]error{preparedKey: err})
+	errMap := make(map[string]error)
+	if skipToNext, err := s.handleReadError(errMap, string(kv.Key), err); err != nil {
+		return err
+	} else if skipToNext {
+		return storage.NewCorruptedDataError(errMap)
 	}
 
 	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
-	if err != nil {
-		recordDecodeError(s.groupResourceString, preparedKey)
+	recordDecodeError(s.groupResourceString, preparedKey)
+	if skipToNext, err := s.handleReadError(errMap, string(kv.Key), err); err != nil {
 		return err
+	} else if skipToNext {
+		return storage.NewCorruptedDataError(errMap)
 	}
+
 	return nil
 }
 
@@ -722,6 +746,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metricsOp = "list"
 	}
 
+	failedKeys := make(map[string]error)
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
@@ -753,7 +778,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
-		failedKeys := make(map[string]error)
 		for i, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= opts.Predicate.Limit {
 				hasMore = true
@@ -762,8 +786,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			lastKey = kv.Key
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-			if err != nil {
-				failedKeys[string(kv.Key)] = err
+			if skipToNext, err := s.handleReadError(failedKeys, string(kv.Key), err); err != nil {
+				return err
+			} else if skipToNext {
 				continue
 			}
 
@@ -791,10 +816,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
-		}
-		if len(failedKeys) > 0 {
-			return storage.NewCorruptedDataError(failedKeys)
-		}
+		} // for response.Kvs
 
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
@@ -815,6 +837,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			*limitOption = clientv3.WithLimit(limit)
 		}
 		preparedKey = string(lastKey) + "\x00"
+	} // for
+
+	if len(failedKeys) > 0 {
+		return storage.NewCorruptedDataError(failedKeys)
 	}
 
 	if v.IsNil() {
@@ -916,16 +942,21 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 		}
 	} else {
 		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
-		if err != nil {
-			return nil, storage.NewCorruptedDataError(map[string]error{key: err})
+		errMap := make(map[string]error)
+		if skipToNext, err := s.handleReadError(errMap, key, err); err != nil {
+			return nil, err
+		} else if skipToNext {
+			return nil, storage.NewCorruptedDataError(errMap)
 		}
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = data
 		state.stale = stale
-		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
-			recordDecodeError(s.groupResourceString, key)
+		err = decode(s.codec, s.versioner, state.data, state.obj, state.rev)
+		if skipToNext, err := s.handleReadError(errMap, string(key), err); err != nil {
 			return nil, err
+		} else if skipToNext {
+			return nil, storage.NewCorruptedDataError(errMap)
 		}
 	}
 	return state, nil

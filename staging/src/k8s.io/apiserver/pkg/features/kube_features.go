@@ -53,6 +53,15 @@ const (
 	// caching with ETags containing all APIResources known to the apiserver.
 	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
 
+	// owner: @stlaz
+	// alpha: v1.32
+	// kep: https://kep.k8s.io/3926
+	//
+	// Enables the ability to remove objects that cannot be read, either because of
+	// errors during transformation of the data read (usually decryption), or because
+	// the object failed to be deserialized.
+	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
+
 	// owner: @vinayakankugoyal
 	// kep: https://kep.k8s.io/4633
 	// alpha: v1.31
@@ -314,6 +323,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
 	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+
+	AllowUnsafeMalformedObjectDeletion: {Default: false, PreRelease: featuregate.Alpha},
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
