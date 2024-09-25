@@ -27,10 +27,14 @@ import (
 )
 
 var (
+	// validSelector is a valid label selector used to match a set of labels.
+	// This is used to create a valid PodTemplateSpec for testing.
 	validSelector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
 
+	// validPodTemplate defines a valid pod template specification used in test cases.
+	// It contains required fields for creating a pod, such as labels, restart policy, DNS policy, and container details.
 	validPodTemplate = core.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
@@ -38,30 +42,42 @@ var (
 		Spec: core.PodSpec{
 			RestartPolicy: core.RestartPolicyOnFailure,
 			DNSPolicy:     core.DNSClusterFirst,
-			Containers:    []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: core.TerminationMessageReadFile}},
+			Containers: []core.Container{
+				{
+					Name:                    "abc",
+					Image:                   "image",
+					ImagePullPolicy:         "IfNotPresent",
+					TerminationMessagePolicy: core.TerminationMessageReadFile,
+				},
+			},
 		},
 	}
 )
 
+// TestWarningsForJobSpec is a table-driven test that validates the warning system for different JobSpec configurations.
+// It checks the number of warnings generated based on the characteristics of the job, such as completion mode, parallelism, and pod template validity.
 func TestWarningsForJobSpec(t *testing.T) {
 	cases := map[string]struct {
-		spec              *batch.JobSpec
-		wantWarningsCount int
+		spec              *batch.JobSpec // JobSpec to be tested
+		wantWarningsCount int            // Expected number of warnings
 	}{
+		// "valid NonIndexed" tests a valid non-indexed completion mode job.
 		"valid NonIndexed": {
 			spec: &batch.JobSpec{
 				CompletionMode: ptr.To(batch.NonIndexedCompletion),
 				Template:       validPodTemplate,
 			},
 		},
+		// "NonIndexed with high completions and parallelism" tests a non-indexed job with extremely high completions and parallelism values.
 		"NondIndexed with high completions and parallelism": {
 			spec: &batch.JobSpec{
 				CompletionMode: ptr.To(batch.NonIndexedCompletion),
 				Template:       validPodTemplate,
-				Parallelism:    ptr.To[int32](1_000_000_000),
-				Completions:    ptr.To[int32](1_000_000_000),
+				Parallelism:    pointer.Int32(1_000_000_000),  // Unusually high parallelism
+				Completions:    pointer.Int32(1_000_000_000),  // Unusually high completions
 			},
 		},
+		// "invalid PodTemplate" tests a job with an invalid pod template, such as an empty image pull secret.
 		"invalid PodTemplate": {
 			spec: &batch.JobSpec{
 				CompletionMode: ptr.To(batch.NonIndexedCompletion),
@@ -69,8 +85,9 @@ func TestWarningsForJobSpec(t *testing.T) {
 					Spec: core.PodSpec{ImagePullSecrets: []core.LocalObjectReference{{Name: ""}}},
 				},
 			},
-			wantWarningsCount: 1,
+			wantWarningsCount: 1,  // Expecting 1 warning due to invalid pod template
 		},
+		// "valid Indexed low completions low parallelism" tests an indexed job with low completions and parallelism.
 		"valid Indexed low completions low parallelism": {
 			spec: &batch.JobSpec{
 				CompletionMode: ptr.To(batch.IndexedCompletion),
@@ -79,14 +96,16 @@ func TestWarningsForJobSpec(t *testing.T) {
 				Template:       validPodTemplate,
 			},
 		},
+		// "valid Indexed high completions low parallelism" tests an indexed job with high completions and relatively low parallelism.
 		"valid Indexed high completions low parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: ptr.To(batch.IndexedCompletion),
-				Completions:    ptr.To[int32](1000_000_000),
-				Parallelism:    ptr.To[int32](10_000),
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
+				Completions:    pointer.Int32(1000_000_000),
+				Parallelism:    pointer.Int32(10_000),
 				Template:       validPodTemplate,
 			},
 		},
+		// "valid Indexed medium completions medium parallelism" tests an indexed job with medium completions and medium parallelism.
 		"valid Indexed medium completions medium parallelism": {
 			spec: &batch.JobSpec{
 				CompletionMode: ptr.To(batch.IndexedCompletion),
@@ -95,23 +114,31 @@ func TestWarningsForJobSpec(t *testing.T) {
 				Template:       validPodTemplate,
 			},
 		},
+		// "invalid Indexed high completions high parallelism" tests an indexed job with completions and parallelism that exceed allowed thresholds.
 		"invalid Indexed high completions high parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: ptr.To(batch.IndexedCompletion),
-				Completions:    ptr.To[int32](100_001),
-				Parallelism:    ptr.To[int32](10_001),
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
+				Completions:    pointer.Int32(100_001),
+				Parallelism:    pointer.Int32(10_001),
 				Template:       validPodTemplate,
 			},
-			wantWarningsCount: 1,
+			wantWarningsCount: 1,  // Expecting 1 warning due to exceeding thresholds
 		},
 	}
+
+	// Iterate over test cases and run each one.
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			warnings := WarningsForJobSpec(ctx, nil, tc.spec, nil)
+			_, ctx := ktesting.NewTestContext(t)  // Create a new test context
+			warnings := WarningsForJobSpec(ctx, nil, tc.spec, nil)  // Call WarningsForJobSpec to get warnings for the job spec
 			if len(warnings) != tc.wantWarningsCount {
+				// If the number of warnings doesn't match the expected count, log an error
 				t.Errorf("Got %d warnings, want %d.\nWarnings: %v", len(warnings), tc.wantWarningsCount, warnings)
 			}
 		})
 	}
+}
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
 }
