@@ -552,6 +552,7 @@ ccflags="$@"
 		$2 !~ /^RTC_VL_(ACCURACY|BACKUP|DATA)/ &&
 		$2 ~ /^(NETLINK|NLM|NLMSG|NLA|IFA|IFAN|RT|RTC|RTCF|RTN|RTPROT|RTNH|ARPHRD|ETH_P|NETNSA)_/ ||
 		$2 ~ /^SOCK_|SK_DIAG_|SKNLGRP_$/ ||
+		$2 ~ /^(CONNECT|SAE)_/ ||
 		$2 ~ /^FIORDCHK$/ ||
 		$2 ~ /^SIOC/ ||
 		$2 ~ /^TIOC/ ||

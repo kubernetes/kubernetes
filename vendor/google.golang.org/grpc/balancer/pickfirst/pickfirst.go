@@ -155,7 +155,7 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		// Endpoints not set, process addresses until we migrate resolver
 		// emissions fully to Endpoints. The top channel does wrap emitted
 		// addresses with endpoints, however some balancers such as weighted
-		// target do not forwarrd the corresponding correct endpoints down/split
+		// target do not forward the corresponding correct endpoints down/split
 		// endpoints properly. Once all balancers correctly forward endpoints
 		// down, can delete this else conditional.
 		addrs = state.ResolverState.Addresses
