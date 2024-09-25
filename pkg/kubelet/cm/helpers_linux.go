@@ -25,10 +25,10 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -166,11 +166,11 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 
 	qosClass := v1qos.GetPodQOS(pod)
 
-	staticCpuPolicyConditionsSatisfied := cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicy, qosClass, &cpuRequestQuantity)
+	StaticCPUPolicyConditionsSatisfied := cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicy, qosClass, &cpuRequestQuantity)
 
 	// quota is not capped when cfs quota is disabled,
 	// or if static cpu policy conditions are satisfied
-	if !enforceCPULimits || staticCpuPolicyConditionsSatisfied {
+	if !enforceCPULimits || StaticCPUPolicyConditionsSatisfied {
 		cpuQuota = int64(-1)
 	}
 

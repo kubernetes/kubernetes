@@ -23,8 +23,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
