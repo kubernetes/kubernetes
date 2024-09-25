@@ -166,7 +166,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 
 	qosClass := v1qos.GetPodQOS(pod)
 
-	staticCpuPolicyConditionsSatisfied := cpumanager.StaticCpuPolicyConditionsSatisfied(cpuManagerPolicy, qosClass, &cpuRequestQuantity)
+	staticCpuPolicyConditionsSatisfied := cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicy, qosClass, &cpuRequestQuantity)
 
 	// quota is not capped when cfs quota is disabled,
 	// or if static cpu policy conditions are satisfied

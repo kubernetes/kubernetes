@@ -533,7 +533,7 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
 }
 
-func StaticCpuPolicyConditionsSatisfied(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *apiresource.Quantity ) bool {
+func StaticCPUPolicyConditionsSatisfied(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *apiresource.Quantity ) bool {
 			// returns true if
 			// 1. cpu manager policy is static
 			// 2. pod has quos PodQOSGuaranteed
