@@ -177,8 +177,8 @@ func LoadAndValidateData(data []byte, compiler authorizationcel.Compiler, requir
 
 	// validate the file and return any error
 	if errors := validation.ValidateAuthorizationConfiguration(compiler, nil, authorizationConfiguration,
-		sets.NewString(modes.AuthorizationModeChoices...),
-		sets.NewString(repeatableAuthorizerTypes...),
+		sets.New(modes.AuthorizationModeChoices...),
+		sets.New(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
 		return nil, errors.ToAggregate()
 	}
