@@ -412,6 +412,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: HPAScaleToZero
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.16"
 - name: ImageMaximumGCAge
   versionedSpecs:
   - default: false
@@ -842,6 +848,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.23"
+- name: RecursiveReadOnlyMounts
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
 - name: RelaxedDNSSearchValidation
   versionedSpecs:
   - default: false
@@ -1048,6 +1064,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: StorageNamespaceIndex
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
 - name: StorageVersionAPI
   versionedSpecs:
   - default: false

@@ -34,12 +34,6 @@
     lockToDefault: false
     preRelease: Deprecated
     version: ""
-- name: HPAScaleToZero
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
@@ -59,18 +53,6 @@
     preRelease: Alpha
     version: ""
 - name: LoggingBetaOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: RecursiveReadOnlyMounts
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StorageNamespaceIndex
   versionedSpecs:
   - default: true
     lockToDefault: false
