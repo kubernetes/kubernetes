@@ -123,7 +123,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	// determine pod resource allocation
 	// we use the same function for pod cgroup assignment to maintain consistent behavior
 	// NOTE: this could be nil on systems that do not support pod memory containment (i.e. windows)
-	podResourceConfig := cm.ResourceConfigForPod(pod, false, uint64(100000), false, false)
+	podResourceConfig := cm.ResourceConfigForPod(pod, false, uint64(100000), false, "none")
 	if podResourceConfig != nil && podResourceConfig.Memory != nil {
 		podMemoryLimit := resource.NewQuantity(*(podResourceConfig.Memory), resource.BinarySI)
 		// ensure 0 < value < size

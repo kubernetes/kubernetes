@@ -70,11 +70,10 @@ func TestResourceConfigForPod(t *testing.T) {
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := map[string]struct {
-		pod              			*v1.Pod
-		expected         			*ResourceConfig
-		enforceCPULimits 			bool
-		quotaPeriod      			uint64 // in microseconds
-		cpuExperimentalManagerPolicyStatic 	bool
+		pod              *v1.Pod
+		expected         *ResourceConfig
+		enforceCPULimits bool
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -86,10 +85,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &minShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &minShares},
 		},
 		"burstable-no-limits": {
 			pod: &v1.Pod{
@@ -101,10 +99,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -116,10 +113,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-with-limits-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -131,10 +127,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -149,10 +144,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
 		"burstable-with-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -164,10 +158,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -179,10 +172,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -197,10 +189,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -212,10 +203,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -227,10 +217,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -242,40 +231,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
-		},
-		"guaranteed-int-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("1", "100Mi"), getResourceList("1", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
-		},
-		"guaranteed-partial-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -287,10 +245,9 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"burstable-partial-limits-with-init-containers": {
 			pod: &v1.Pod{
@@ -313,16 +270,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
 	}
 
 	for testName, testCase := range testCases {
 
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, testCase.cpuExperimentalManagerPolicyStatic)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, "none")
 
 		if !reflect.DeepEqual(actual.CPUPeriod, testCase.expected.CPUPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.CPUPeriod, *actual.CPUPeriod)
@@ -359,11 +315,10 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := map[string]struct {
-		pod              	*v1.Pod
-		expected         	*ResourceConfig
-		enforceCPULimits 	bool
-		quotaPeriod      	uint64 // in microseconds
-		cpuExperimentalManagerPolicyStatic bool
+		pod              *v1.Pod
+		expected         *ResourceConfig
+		enforceCPULimits bool
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -375,10 +330,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &minShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &minShares},
 		},
 		"burstable-no-limits": {
 			pod: &v1.Pod{
@@ -390,10 +344,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -405,10 +358,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-with-limits-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -420,10 +372,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -438,10 +389,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
 		"burstable-with-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -453,10 +403,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &tunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &tunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -468,10 +417,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -486,10 +434,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -501,10 +448,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -516,10 +462,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -531,40 +476,9 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
-		},
-		"guaranteed-int-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("1", "100Mi"), getResourceList("1", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
-		},
-		"guaranteed-partial-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -576,16 +490,15 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 	}
 
 	for testName, testCase := range testCases {
 
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, testCase.cpuExperimentalManagerPolicyStatic)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, "none")
 
 		if !reflect.DeepEqual(actual.CPUPeriod, testCase.expected.CPUPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
@@ -744,7 +657,7 @@ func TestHugePageLimits(t *testing.T) {
 					},
 				},
 			}
-			resultValuePod := ResourceConfigForPod(&p, false, 0, false, false)
+			resultValuePod := ResourceConfigForPod(&p, false, 0, false, "none")
 			if !reflect.DeepEqual(testcase.expected, resultValuePod.HugePageLimit) {
 				t.Errorf("unexpected result for ResourceConfigForPod(), expected: %v, actual: %v", testcase.expected, resultValuePod)
 			}
@@ -769,11 +682,10 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := map[string]struct {
-		pod              			*v1.Pod
-		expected         			*ResourceConfig
-		enforceCPULimits 			bool
-		quotaPeriod      			uint64 // in microseconds
-		cpuExperimentalManagerPolicyStatic 	bool
+		pod              *v1.Pod
+		expected         *ResourceConfig
+		enforceCPULimits bool
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -785,10 +697,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &minShares},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &minShares},
 		},
 		"burstable-no-limits": {
 			pod: &v1.Pod{
@@ -800,10 +711,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -815,10 +725,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -830,10 +739,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -848,10 +756,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
 		},
 		"burstable-with-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -863,10 +770,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -878,10 +784,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"burstable-partial-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -896,10 +801,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -911,10 +815,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -926,10 +829,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: false,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -941,40 +843,9 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
-		},
-		"guaranteed-int-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("1", "100Mi"), getResourceList("1", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
-		},
-		"guaranteed-partial-cpu-with-static-cpu-policy": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
-						},
-					},
-				},
-			},
-			enforceCPULimits: 			true,
-			quotaPeriod:      			defaultQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic: 	true,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -986,16 +857,15 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 					},
 				},
 			},
-			enforceCPULimits: 			false,
-			quotaPeriod:      			tunedQuotaPeriod,
-			cpuExperimentalManagerPolicyStatic:	false,
-			expected:         			&ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 	}
 
 	for testName, testCase := range testCases {
 
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, testCase.cpuExperimentalManagerPolicyStatic)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, "none")
 
 		if !reflect.DeepEqual(actual.Unified, testCase.expected.Unified) {
 			t.Errorf("unexpected result, test: %v, unified not as expected", testName)
