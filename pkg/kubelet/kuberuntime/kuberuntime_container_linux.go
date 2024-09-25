@@ -246,7 +246,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		resources.CpuQuota = cpuQuota
 		resources.CpuPeriod = cpuPeriod
 
-		if cpumanager.StaticCpuPolicyConditionsSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
+		if cpumanager.StaticCPUPolicyConditionsSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
 			resources.CpuQuota = int64(-1)
 		}
 	}
