@@ -1470,3 +1470,93 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		}
 	}
 }
+
+func TestStaticCPUPolicyConditionsSatisfied(t *testing.T) {
+	cpuOneInteger := resource.MustParse("1")
+	cpuNonInteger := resource.MustParse("250m")
+	cpuOneDecimal := resource.MustParse("1.0")
+	qosGuaranteed := v1.PodQOSGuaranteed
+	qosBestEffort := v1.PodQOSBestEffort
+	nonePolicy := string(PolicyNone)
+	staticPolicy := string(PolicyStatic)
+
+	testCases := []struct {
+		description string
+		cpuRequest  *resource.Quantity
+		podQos      v1.PodQOSClass
+		policyName  string
+		expected    bool
+	}{
+		{
+			description: "non-int-cpu-best-effort-none-cpu-policy",
+			cpuRequest:  &cpuNonInteger,
+			podQos:      qosBestEffort,
+			policyName:  nonePolicy,
+			expected:    false,
+		},
+		{
+			description: "non-int-cpu-best-effort-static-cpu-policy",
+			cpuRequest:  &cpuNonInteger,
+			podQos:      qosBestEffort,
+			policyName:  staticPolicy,
+			expected:    false,
+		},
+		{
+			description: "non-int-cpu-guaranteed-none-cpu-policy",
+			cpuRequest:  &cpuNonInteger,
+			podQos:      qosGuaranteed,
+			policyName:  nonePolicy,
+			expected:    false,
+		},
+		{
+			description: "non-int-cpu-guaranteed-static-cpu-policy",
+			cpuRequest:  &cpuNonInteger,
+			podQos:      qosGuaranteed,
+			policyName:  staticPolicy,
+			expected:    false,
+		},
+		{
+			description: "int-cpu-best-effort-none-cpu-policy",
+			cpuRequest:  &cpuOneInteger,
+			podQos:      qosBestEffort,
+			policyName:  nonePolicy,
+			expected:    false,
+		},
+		{
+			description: "int-cpu-best-effort-static-cpu-policy",
+			cpuRequest:  &cpuOneInteger,
+			podQos:      qosBestEffort,
+			policyName:  staticPolicy,
+			expected:    false,
+		},
+		{
+			description: "int-cpu-guaranteed-none-cpu-policy",
+			cpuRequest:  &cpuOneInteger,
+			podQos:      qosGuaranteed,
+			policyName:  nonePolicy,
+			expected:    false,
+		},
+		{
+			description: "int-cpu-guaranteed-static-cpu-policy",
+			cpuRequest:  &cpuOneInteger,
+			podQos:      qosGuaranteed,
+			policyName:  staticPolicy,
+			expected:    true,
+		},
+		{
+			description: "one-decimal-cpu-guaranteed-static-cpu-policy",
+			cpuRequest:  &cpuOneDecimal,
+			podQos:      qosGuaranteed,
+			policyName:  staticPolicy,
+			expected:    true,
+		},
+	}
+	for _, testCase := range testCases {
+
+		res := StaticCPUPolicyConditionsSatisfied(testCase.policyName, testCase.podQos, testCase.cpuRequest)
+		if res != testCase.expected {
+			t.Errorf("StaticCPUPolicyConditionsSatisfied error (%v). expected %v but got %v",
+				testCase.description, testCase.expected, res)
+		}
+	}
+}

@@ -232,7 +232,7 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 			cmPolicy:         cpuPolicyStatic,
 		},
 		"guaranteed-non-integer-cpu-static-cpu-policy": {
@@ -247,7 +247,7 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 			cmPolicy:         cpuPolicyStatic,
 		},
 		"guaranteed-integer-cpu-none-cpu-policy": {
@@ -262,7 +262,22 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			cmPolicy:         cpuPolicyNone,
+		},
+		"guaranteed-non-integer-cpu-none-cpu-policy": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+						},
+					},
+				},
+			},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 			cmPolicy:         cpuPolicyNone,
 		},
 		"guaranteed-no-cpu-enforcement": {

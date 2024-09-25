@@ -43,6 +43,7 @@ type FakeContainerManager struct {
 	CalledFunctions                     []string
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
+	NodeConfig                          NodeConfig
 }
 
 var _ ContainerManager = &FakeContainerManager{}
@@ -71,7 +72,7 @@ func (cm *FakeContainerManager) GetNodeConfig() NodeConfig {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetNodeConfig")
-	return NodeConfig{}
+	return cm.NodeConfig
 }
 
 func (cm *FakeContainerManager) GetMountedSubsystems() *CgroupSubsystems {
