@@ -175,8 +175,8 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 
 	// validate the file and return any error
 	if errors := validation.ValidateAuthorizationConfiguration(authorizationcel.NewDefaultCompiler(), nil, authorizationConfiguration,
-		sets.NewString(modes.AuthorizationModeChoices...),
-		sets.NewString(repeatableAuthorizerTypes...),
+		sets.New(modes.AuthorizationModeChoices...),
+		sets.New(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
 		return nil, fmt.Errorf(errors.ToAggregate().Error())
 	}

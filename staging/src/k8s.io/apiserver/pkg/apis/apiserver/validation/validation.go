@@ -613,7 +613,7 @@ func compileUserCELExpression(compiler authenticationcel.Compiler, expression au
 }
 
 // ValidateAuthorizationConfiguration validates a given AuthorizationConfiguration.
-func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldPath *field.Path, c *api.AuthorizationConfiguration, knownTypes sets.String, repeatableTypes sets.String) field.ErrorList {
+func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldPath *field.Path, c *api.AuthorizationConfiguration, knownTypes sets.Set[string], repeatableTypes sets.Set[string]) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(c.Authorizers) == 0 {
@@ -630,7 +630,7 @@ func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldP
 			continue
 		}
 		if !knownTypes.Has(aType) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), aType, knownTypes.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), aType, sets.List(knownTypes)))
 			continue
 		}
 		if seenAuthorizerTypes.Has(aType) && !repeatableTypes.Has(aType) {
