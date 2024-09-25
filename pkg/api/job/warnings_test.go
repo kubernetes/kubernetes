@@ -100,7 +100,7 @@ func TestWarningsForJobSpec(t *testing.T) {
 		"valid Indexed high completions low parallelism": {
 			spec: &batch.JobSpec{
 				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(1000_000_000),
+				Completions:    pointer.Int32(1_000_000_000),
 				Parallelism:    pointer.Int32(10_000),
 				Template:       validPodTemplate,
 			},
@@ -118,8 +118,8 @@ func TestWarningsForJobSpec(t *testing.T) {
 		"invalid Indexed high completions high parallelism": {
 			spec: &batch.JobSpec{
 				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(100_001),
-				Parallelism:    pointer.Int32(10_001),
+				Completions:    pointer.Int32(100_001), // Exceeds allowed completions
+				Parallelism:    pointer.Int32(10_001),  // Exceeds allowed parallelism
 				Template:       validPodTemplate,
 			},
 			wantWarningsCount: 1,  // Expecting 1 warning due to exceeding thresholds
@@ -139,6 +139,8 @@ func TestWarningsForJobSpec(t *testing.T) {
 	}
 }
 
+// completionModePtr is a helper function that returns a pointer to the given completion mode.
+// This is used to easily create pointer-based values for completion modes.
 func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
 	return &m
 }
