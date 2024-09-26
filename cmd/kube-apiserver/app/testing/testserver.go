@@ -103,7 +103,7 @@ type TestServerInstanceOptions struct {
 	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
 	ProxyCA *ProxyCA
 	// Set the BinaryVersion of server effective version.
-	// If empty, binary version will be inferred from the build.
+	// If empty, effective version will default to version.DefaultKubeBinaryVersion.
 	BinaryVersion string
 	// Set the EmulationVersion of server effective version.
 	// If empty, emulation version will default to the effective version.
