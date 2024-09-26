@@ -149,6 +149,10 @@ func (c *updateAny) update(tCtx ktesting.TContext, env map[string]any) error {
 		if err != nil {
 			return fmt.Errorf("failed to update object in namespace %q: %w", c.Namespace, err)
 		}
+		_, err = resourceClient.Namespace(c.Namespace).UpdateStatus(tCtx, obj, options)
+		if err != nil {
+			return fmt.Errorf("failed to update object status in namespace %q: %w", c.Namespace, err)
+		}
 		return nil
 	}
 	if c.cachedMapping.Scope.Name() != meta.RESTScopeNameRoot {
@@ -157,6 +161,10 @@ func (c *updateAny) update(tCtx ktesting.TContext, env map[string]any) error {
 	_, err := resourceClient.Update(tCtx, obj, options)
 	if err != nil {
 		return fmt.Errorf("failed to update object: %w", err)
+	}
+	_, err = resourceClient.UpdateStatus(tCtx, obj, options)
+	if err != nil {
+		return fmt.Errorf("failed to update object status: %w", err)
 	}
 	return nil
 }
