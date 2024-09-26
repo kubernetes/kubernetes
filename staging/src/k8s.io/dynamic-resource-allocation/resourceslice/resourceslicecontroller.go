@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -355,6 +356,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	// are new driver resources that need to be stored) or they need to be deleted.
 	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
 
+	// record the number of ResourceSlices before the change
+	originalSliceNum := len(slices)
+
 	// Determine highest generation.
 	var generation int64
 	for _, slice := range slices {
@@ -383,16 +387,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		if pool.Generation > generation {
 			generation = pool.Generation
 		}
-
-		// Right now all devices get published in a single slice.
-		// We simply pick the first one, if there is one, and copy
-		// it in preparation for updating it.
-		//
-		// TODO: support splitting across slices, with unit tests.
-		if len(slices) > 0 {
-			obsoleteSlices = append(obsoleteSlices, slices[1:]...)
-			slices = []*resourceapi.ResourceSlice{slices[0].DeepCopy()}
-		} else {
+		// If there are no slices, create an empty one.
+		if len(slices) == 0 {
 			slices = []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -400,24 +396,114 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 					},
 				},
 			}
+			slice := slices[0]
+			slice.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: c.owner.APIVersion,
+				Kind:       c.owner.Kind,
+				Name:       c.owner.Name,
+				UID:        c.owner.UID,
+				Controller: ptr.To(true),
+			}}
+			slice.Spec.Driver = c.driver
+			slice.Spec.Pool.Name = poolName
+			slice.Spec.Pool.Generation = generation
+			slice.Spec.Pool.ResourceSliceCount = 1
+			slice.Spec.NodeName = nodeName
+			slice.Spec.NodeSelector = pool.NodeSelector
+			slice.Spec.AllNodes = pool.NodeSelector == nil && nodeName == ""
+			slice.Spec.Devices = pool.Devices
 		}
+		needToAdd, needToDelete := getDevicesToAddAndDelete(pool, slices)
+		slices = removeDevicesFromSlice(slices, needToDelete)
+		// Add new devices to slices.
+		for _, device := range needToAdd {
+			added := false
+			for i := 0; i < len(slices); i++ {
+				// If a slice is not full, it can be added to.
+				if len(slices[i].Spec.Devices) < resourceapi.ResourceSliceMaxDevices {
+					slices[i].Spec.Devices = append(slices[i].Spec.Devices, device)
+					added = true
+					break
+				}
+			}
+			if !added {
+				// If necessary, create a new slice.
+				newSlice := &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: c.owner.Name + "-" + c.driver + "-",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Driver: c.driver,
+						Pool: resourceapi.ResourcePool{
+							Name:       poolName,
+							Generation: 1,
+						},
+						NodeName:     nodeName,
+						NodeSelector: pool.NodeSelector,
+						AllNodes:     pool.NodeSelector == nil && nodeName == "",
+						Devices:      []resourceapi.Device{device},
+					},
+				}
+				slices = append(slices, newSlice)
+			}
+		}
+		mergedSlices, needToDeleteSlices := mergeSlices(slices, resourceapi.ResourceSliceMaxDevices)
+		obsoleteSlices = append(obsoleteSlices, needToDeleteSlices...)
 
-		slice := slices[0]
-		slice.OwnerReferences = []metav1.OwnerReference{{
-			APIVersion: c.owner.APIVersion,
-			Kind:       c.owner.Kind,
-			Name:       c.owner.Name,
-			UID:        c.owner.UID,
-			Controller: ptr.To(true),
-		}}
-		slice.Spec.Driver = c.driver
-		slice.Spec.Pool.Name = poolName
-		slice.Spec.Pool.Generation = generation
-		slice.Spec.Pool.ResourceSliceCount = 1
-		slice.Spec.NodeName = nodeName
-		slice.Spec.NodeSelector = pool.NodeSelector
-		slice.Spec.AllNodes = pool.NodeSelector == nil && nodeName == ""
-		slice.Spec.Devices = pool.Devices
+		// Ensure that each slice has no more than 128 devices.
+		for _, slice := range mergedSlices {
+			if len(slice.Spec.Devices) > resourceapi.ResourceSliceMaxDevices {
+				// Calculate the number of new slices needed
+				numNewSlices := int(math.Ceil(float64(len(slice.Spec.Devices)) / float64(resourceapi.ResourceSliceMaxDevices)))
+				// Create new slices for the excess devices
+				for k := 1; k < numNewSlices; k++ {
+					start := k * resourceapi.ResourceSliceMaxDevices
+					end := min(start+resourceapi.ResourceSliceMaxDevices, len(slice.Spec.Devices))
+
+					newSlice := &resourceapi.ResourceSlice{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: c.owner.Name + "-" + c.driver + "-",
+						},
+						Spec: resourceapi.ResourceSliceSpec{
+							Driver: c.driver,
+							Pool: resourceapi.ResourcePool{
+								Name:               poolName,
+								Generation:         generation,
+								ResourceSliceCount: 1,
+							},
+							NodeName:     nodeName,
+							NodeSelector: pool.NodeSelector,
+							AllNodes:     pool.NodeSelector == nil && nodeName == "",
+							Devices:      slice.Spec.Devices[start:end],
+						},
+					}
+					mergedSlices = append(mergedSlices, newSlice)
+				}
+				// Adjust the original slice to contain only the first resourceapi.ResourceSliceMaxDevices devices
+				slice.Spec.Devices = slice.Spec.Devices[:resourceapi.ResourceSliceMaxDevices]
+			}
+		}
+		mergedSlices = redistributeDevices(mergedSlices, resourceapi.ResourceSliceMaxDevices)
+		// updates the ResourceSliceCount and Generation of all ResourceSlices.
+		resourceSliceCount := int64(len(mergedSlices))
+		// updates the ResourceSlices generation, if the number of ResourceSlices has changed.
+		if len(mergedSlices) != originalSliceNum {
+			generation++
+		}
+		for _, slice := range mergedSlices {
+			slice.Spec.Pool.ResourceSliceCount = resourceSliceCount
+			if generation > slice.Spec.Pool.Generation {
+				slice.Spec.Pool.Generation = generation
+			}
+			slice.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: c.owner.APIVersion,
+				Kind:       c.owner.Kind,
+				Name:       c.owner.Name,
+				UID:        c.owner.UID,
+				Controller: ptr.To(true),
+			}}
+		}
+		slices = mergedSlices
 
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			// Dump entire resource information.
@@ -427,7 +513,6 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	} else if len(slices) > 0 {
 		// All are obsolete, pool does not exist anymore.
-
 		logger.V(5).Info("Removing resource slices after pool removal", "obsoleteSlices", klog.KObjSlice(obsoleteSlices), "slices", klog.KObjSlice(slices), "numDevices", len(pool.Devices))
 		obsoleteSlices = append(obsoleteSlices, slices...)
 		// No need to create or update the slices.
@@ -460,4 +545,151 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	}
 
 	return nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Helper function to create a set of Device instances.
+func createDeviceSet(devices []resourceapi.Device) map[string]struct{} {
+	deviceSet := make(map[string]struct{})
+	for _, device := range devices {
+		deviceSet[device.Name] = struct{}{}
+	}
+	return deviceSet
+}
+
+// getDevicesToAddAndDelete calculates the devices to add and delete from the pool.
+func getDevicesToAddAndDelete(pool Pool, slices []*resourceapi.ResourceSlice) ([]resourceapi.Device, []resourceapi.Device) {
+	existingDeviceSet := createDeviceSet(pool.Devices)
+	currentDeviceSet := make(map[string]struct{})
+	for _, slice := range slices {
+		for _, device := range slice.Spec.Devices {
+			currentDeviceSet[device.Name] = struct{}{}
+		}
+	}
+
+	needToAdd := []resourceapi.Device{}
+	needToDelete := []resourceapi.Device{}
+
+	for _, device := range pool.Devices {
+		if _, exists := currentDeviceSet[device.Name]; !exists {
+			needToAdd = append(needToAdd, device)
+		}
+	}
+
+	for _, slice := range slices {
+		for _, device := range slice.Spec.Devices {
+			if _, exists := existingDeviceSet[device.Name]; !exists {
+				needToDelete = append(needToDelete, device)
+			}
+		}
+	}
+
+	return needToAdd, needToDelete
+}
+
+// removeDevicesFromSlice removes the devices from the slice.
+func removeDevicesFromSlice(slices []*resourceapi.ResourceSlice, devicesToDelete []resourceapi.Device) []*resourceapi.ResourceSlice {
+	newSlices := make([]*resourceapi.ResourceSlice, len(slices))
+	for i, slice := range slices {
+		newDevices := make([]resourceapi.Device, 0, len(slice.Spec.Devices))
+		for _, device := range slice.Spec.Devices {
+			if !containsDevice(devicesToDelete, device) {
+				newDevices = append(newDevices, device)
+			}
+		}
+
+		newSlice := &resourceapi.ResourceSlice{
+			ObjectMeta: slice.ObjectMeta,
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver: slice.Spec.Driver,
+				Pool: resourceapi.ResourcePool{
+					Name:       slice.Spec.Pool.Name,
+					Generation: slice.Spec.Pool.Generation,
+				},
+				NodeName:     slice.Spec.NodeName,
+				NodeSelector: slice.Spec.NodeSelector,
+				AllNodes:     slice.Spec.AllNodes,
+				Devices:      newDevices,
+			},
+		}
+		newSlices[i] = newSlice
+	}
+	return newSlices
+}
+
+// mergeSlices merges the given ResourceSlice instances.
+// It returns the merged ResourceSlice instances and the ResourceSlice instances that need to be deleted.
+func mergeSlices(slices []*resourceapi.ResourceSlice, maxDevicesPerSlice int) ([]*resourceapi.ResourceSlice, []*resourceapi.ResourceSlice) {
+	var needToDeleteSlice []*resourceapi.ResourceSlice
+	for i := 0; i < len(slices); {
+		if len(slices[i].Spec.Devices) < maxDevicesPerSlice && i+1 < len(slices) {
+			if len(slices[i].Spec.Devices)+len(slices[i+1].Spec.Devices) <= maxDevicesPerSlice {
+				slices[i].Spec.Devices = append(slices[i].Spec.Devices, slices[i+1].Spec.Devices...)
+				needToDeleteSlice = append(needToDeleteSlice, slices[i+1])
+				slices = append(slices[:i+1], slices[i+2:]...)
+				continue
+			}
+		}
+		i++
+	}
+	return slices, needToDeleteSlice
+}
+
+// redistributeDevices reassigns devices to ResourceSlice
+// it decides how to reassign devices based on the number of devices in each ResourceSlice.
+// It first sorts all devices and then assigns devices to each ResourceSlice until it reaches the maximum device number limit.
+// If a ResourceSlice has reached the maximum device number limit, it will assign the remaining devices to the next ResourceSlice.
+func redistributeDevices(slices []*resourceapi.ResourceSlice, maxDevicesPerSlice int) []*resourceapi.ResourceSlice {
+	allDevices := make([]resourceapi.Device, 0)
+	for _, slice := range slices {
+		allDevices = append(allDevices, slice.Spec.Devices...)
+	}
+	sort.Slice(allDevices, func(i, j int) bool {
+		return allDevices[i].Name < allDevices[j].Name
+	})
+
+	newSlices := make([]*resourceapi.ResourceSlice, len(slices))
+	currentDeviceIndex := 0
+	for i := 0; i < len(slices); i++ {
+		start := currentDeviceIndex
+		end := start + maxDevicesPerSlice
+		if end > len(allDevices) {
+			end = len(allDevices)
+		}
+		newDevices := make([]resourceapi.Device, end-start)
+		copy(newDevices, allDevices[start:end])
+
+		newSlice := &resourceapi.ResourceSlice{
+			ObjectMeta: slices[i].ObjectMeta,
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver: slices[i].Spec.Driver,
+				Pool: resourceapi.ResourcePool{
+					Name:       slices[i].Spec.Pool.Name,
+					Generation: slices[i].Spec.Pool.Generation,
+				},
+				NodeName:     slices[i].Spec.NodeName,
+				NodeSelector: slices[i].Spec.NodeSelector,
+				AllNodes:     slices[i].Spec.AllNodes,
+				Devices:      newDevices,
+			},
+		}
+		newSlices[i] = newSlice
+		currentDeviceIndex = end
+	}
+	return newSlices
+}
+
+func containsDevice(deviceSet []resourceapi.Device, device resourceapi.Device) bool {
+	for _, d := range deviceSet {
+		if d.Name == device.Name {
+			return true
+		}
+	}
+	return false
 }
