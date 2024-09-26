@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/component-base/featuregate"
@@ -95,6 +96,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
+	// unintentionally on either side:
+	apiextensionsfeatures.CRDValidationRatcheting: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	CrossNamespaceVolumeDataSource: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -107,6 +115,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	CSIVolumeHealth: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
+	// unintentionally on either side:
+	apiextensionsfeatures.CustomResourceFieldSelectors: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	DevicePluginCDIDevices: {
