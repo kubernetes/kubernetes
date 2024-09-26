@@ -33,7 +33,7 @@ import (
 )
 
 type flexVolumeProber struct {
-	mutex          sync.Mutex
+	mutex          sync.RWMutex
 	pluginDir      string         // Flexvolume driver directory
 	runner         exec.Interface // Interface to use for execing flex calls
 	watcher        utilfs.FSWatcher
@@ -71,11 +71,20 @@ func (prober *flexVolumeProber) Init() error {
 // If probeAllNeeded is true, probe all pluginDir
 // else probe events in eventsMap
 func (prober *flexVolumeProber) Probe() (events []volume.ProbeEvent, err error) {
+	prober.mutex.RLock()
 	if prober.probeAllNeeded {
-		prober.testAndSetProbeAllNeeded(false)
-		return prober.probeAll()
+		prober.mutex.RUnlock()
+		prober.mutex.Lock()
+		// check again, if multiple readers got through the first if, only one should probeAll
+		if prober.probeAllNeeded {
+			events, err = prober.probeAll()
+			prober.probeAllNeeded = false
+			prober.mutex.Unlock()
+			return
+		}
+		prober.mutex.Unlock()
 	}
-
+	prober.mutex.RUnlock()
 	return prober.probeMap()
 }
 
