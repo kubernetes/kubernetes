@@ -17,6 +17,8 @@ limitations under the License.
 package resourceslice
 
 import (
+	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +43,7 @@ func TestControllerSyncPool(t *testing.T) {
 		poolName       = "pool"
 		poolName1      = "pool-1"
 		deviceName     = "device"
+		resourceSlice  = "resource-slice"
 		resourceSlice1 = "resource-slice-1"
 		resourceSlice2 = "resource-slice-2"
 		resourceSlice3 = "resource-slice-3"
@@ -182,6 +185,83 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: nil,
 		},
+		"single-resourceslice-with-more-than-128-devices-with-no-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				newResourceSlice(resourceSlice1, node, driveName, poolName, 1),
+			},
+			poolName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						// We need to synchronize a total of 128*3 + 10 devices
+						// The naming convention for the devices follows the pattern from "device-000000" to "device-000393"
+						Devices: generateDevices(0, resourceapi.ResourceSliceMaxDevices+10),
+					},
+				},
+			},
+			expectedResourceSlices: generateExpectedResourceSlices(resourceSlice, node, string(nodeUID), driveName, poolName, resourceapi.ResourceSliceMaxDevices+10, 1),
+		},
+		"multiple-resourceslices-with-more-than-128-devices-with-no-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				newResourceSlice(resourceSlice1, node, driveName, poolName, 1),
+				newResourceSlice(resourceSlice2, node, driveName, poolName, 1),
+			},
+			poolName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						// We need to synchronize a total of 128*3 + 10 devices
+						// The naming convention for the devices follows the pattern from "device-000000" to "device-000393"
+						Devices: generateDevices(0, resourceapi.ResourceSliceMaxDevices*2+10),
+					},
+				},
+			},
+			expectedResourceSlices: generateExpectedResourceSlices(resourceSlice, node, string(nodeUID), driveName, poolName, resourceapi.ResourceSliceMaxDevices*2+10, 2),
+		},
+		"multiple-resourceslices-with-more-than-128-devices-with-needed-device-and-noneeded-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				// 20 needed devices
+				newResourceSliceWithDevices(resourceSlice1, node, driveName, poolName, 1, generateDevices(10, 20)),
+				// 10 noneeded devices
+				newResourceSliceWithDevices(resourceSlice2, node, driveName, poolName, 1, generateDevices(300, 10)),
+			},
+			poolName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						// We need to synchronize a total of 128*3 + 10 devices
+						// The naming convention for the devices follows the pattern from "device-000000" to "device-000393"
+						Devices: generateDevices(0, resourceapi.ResourceSliceMaxDevices*2+10),
+					},
+				},
+			},
+			expectedResourceSlices: generateExpectedResourceSlices(resourceSlice, node, string(nodeUID), driveName, poolName, resourceapi.ResourceSliceMaxDevices*2+10, 2),
+		},
+		"multiple-resourceslices-with-more-than-128-devices-with-needed-device-and-noneeded-device-and-no-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				// 50 needed devices
+				newResourceSliceWithDevices(resourceSlice1, node, driveName, poolName, 1, generateDevices(10, 50)),
+				// 80 noneeded devices
+				newResourceSliceWithDevices(resourceSlice2, node, driveName, poolName, 1, generateDevices(300, 80)),
+				// no devices
+				newResourceSlice(resourceSlice3, node, driveName, poolName, 1),
+			},
+			poolName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						// We need to synchronize a total of 128*3 + 10 devices
+						// The naming convention for the devices follows the pattern from "device-000000" to "device-000393"
+						Devices: generateDevices(0, resourceapi.ResourceSliceMaxDevices*3+10),
+					},
+				},
+			},
+			expectedResourceSlices: generateExpectedResourceSlices(resourceSlice, node, string(nodeUID), driveName, poolName, resourceapi.ResourceSliceMaxDevices*3+10, 3),
+		},
 	}
 
 	for name, test := range testCases {
@@ -203,9 +283,21 @@ func TestControllerSyncPool(t *testing.T) {
 			// Check ResourceSlices
 			resourceSlices, err := kubeClient.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list resource slices")
-			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items, "unexpected ResourceSlices")
+
+			sortResourceSlices(test.expectedResourceSlices)
+			sortResourceSlices(resourceSlices.Items)
+			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items)
 		})
 	}
+}
+
+func sortResourceSlices(slices []resourceapi.ResourceSlice) {
+	sort.Slice(slices, func(i, j int) bool {
+		if len(slices[i].Name) == 0 && len(slices[j].Name) == 0 {
+			return slices[i].ObjectMeta.GenerateName < slices[j].ObjectMeta.GenerateName
+		}
+		return slices[i].Name < slices[j].Name
+	})
 }
 
 func newNode(name string, uid types.UID) *v1.Node {
@@ -267,4 +359,65 @@ func newExpectResourceSlice(name, nodeName, nodeUID, driveName, poolName, device
 		resourceSlice.ObjectMeta.UID = types.UID(name)
 	}
 	return resourceSlice
+}
+
+func generateExpectedResourceSlices(baseName, nodeName, nodeUID, driveName, poolName string, totalDevices int, initialSlices int) []resourceapi.ResourceSlice {
+	var slices []resourceapi.ResourceSlice
+	maxDevices := 128
+	resourceSliceCount := (totalDevices + maxDevices - 1) / maxDevices
+	// Initialize the slices array to ensure that its length is large enough
+	for i := 1; i <= initialSlices; i++ {
+		slices = append(slices, *newExpectResourceSlice(fmt.Sprintf("%s-%d", baseName, i), nodeName, nodeUID, driveName, poolName, "", false, 1))
+	}
+
+	// Add additional slices if needed
+	if resourceSliceCount > initialSlices {
+		for i := initialSlices; i < resourceSliceCount; i++ {
+			slices = append(slices, *newExpectResourceSlice(nodeName+"-"+driveName+"-", nodeName, nodeUID, driveName, poolName, "", true, 1))
+		}
+	}
+	// Generate a list of devices and ensure that the device names are consecutive
+	currentDeviceIndex := 0
+	for i := 0; i < resourceSliceCount; i++ {
+		start := i * maxDevices
+		end := start + maxDevices
+		if end > totalDevices {
+			end = totalDevices
+		}
+		devices := generateDevices(currentDeviceIndex, end-start)
+		slices[i].Spec.Devices = devices
+		slices[i].Spec.Pool.ResourceSliceCount = int64(resourceSliceCount)
+		slices[i].Spec.Pool.Generation = 1
+		currentDeviceIndex += end - start
+	}
+	return slices
+}
+
+func generateDevices(startIndex int, count int) []resourceapi.Device {
+	devices := make([]resourceapi.Device, count)
+	for i := 0; i < count; i++ {
+		// Generate a unique device name using the index
+		deviceName := fmt.Sprintf("device-%06d", startIndex+i)
+		devices[i] = resourceapi.Device{Name: deviceName}
+	}
+	return devices
+}
+
+func newResourceSliceWithDevices(name, nodeName, driveName, poolName string, poolGeneration int64, devices []resourceapi.Device) *resourceapi.ResourceSlice {
+	return &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			UID:  types.UID(name),
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodeName,
+			Driver:   driveName,
+			Pool: resourceapi.ResourcePool{
+				Name:               poolName,
+				ResourceSliceCount: 1,
+				Generation:         poolGeneration,
+			},
+			Devices: devices,
+		},
+	}
 }
