@@ -172,11 +172,17 @@ func NewInvalidError(errors field.ErrorList) InvalidError {
 // not from the underlying storage backend (e.g., etcd).
 type InternalError struct {
 	Reason string
+
+	// retain the inner error to maintain the error tree, so as to enable us
+	// to do proper error checking, but we also need to be backward compatible.
+	err error
 }
 
 func (e InternalError) Error() string {
 	return e.Reason
 }
+
+func (e InternalError) Unwrap() error { return e.err }
 
 // IsInternalError returns true if and only if err is an InternalError.
 func IsInternalError(err error) bool {
@@ -184,12 +190,8 @@ func IsInternalError(err error) bool {
 	return ok
 }
 
-func NewInternalError(reason string) InternalError {
-	return InternalError{reason}
-}
-
-func NewInternalErrorf(format string, a ...interface{}) InternalError {
-	return InternalError{fmt.Sprintf(format, a...)}
+func NewInternalError(err error) InternalError {
+	return InternalError{Reason: err.Error(), err: err}
 }
 
 var tooLargeResourceVersionCauseMsg = "Too large resource version"
