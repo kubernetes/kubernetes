@@ -62,6 +62,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -384,6 +385,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaimTemplates().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceslices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceSlices().Informer()}, nil
+
+		// Group=resource.k8s.io, Version=v1beta1
+	case resourcev1beta1.SchemeGroupVersion.WithResource("deviceclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1beta1().DeviceClasses().Informer()}, nil
+	case resourcev1beta1.SchemeGroupVersion.WithResource("resourceclaims"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1beta1().ResourceClaims().Informer()}, nil
+	case resourcev1beta1.SchemeGroupVersion.WithResource("resourceclaimtemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1beta1().ResourceClaimTemplates().Informer()}, nil
+	case resourcev1beta1.SchemeGroupVersion.WithResource("resourceslices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1beta1().ResourceSlices().Informer()}, nil
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithResource("priorityclasses"):
