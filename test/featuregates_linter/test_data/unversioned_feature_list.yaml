@@ -1,9 +1,3 @@
-- name: CloudControllerManagerWebhook
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: ComponentSLIs
   versionedSpecs:
   - default: true
