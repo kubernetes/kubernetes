@@ -60,7 +60,7 @@ message BasicDevice {
   // The maximum number of attributes and capacities combined is 32.
   //
   // +optional
-  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
+  map<string, DeviceCapacity> capacity = 2;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -202,6 +202,14 @@ message DeviceAttribute {
   // +optional
   // +oneOf=ValueType
   optional string version = 5;
+}
+
+// DeviceCapacity describes a quantity associated with a device.
+message DeviceCapacity {
+  // Quantity defines how much of a certain device capacity is available.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 1;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.

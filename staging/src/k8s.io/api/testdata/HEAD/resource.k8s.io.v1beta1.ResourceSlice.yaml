@@ -43,7 +43,8 @@ spec:
           string: stringValue
           version: versionValue
       capacity:
-        capacityKey: "0"
+        capacityKey:
+          quantity: "0"
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue

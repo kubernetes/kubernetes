@@ -938,6 +938,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.DeviceAllocationConfiguration":                                             schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAllocationResult":                                                    schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAttribute":                                                           schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref),
+		"k8s.io/api/resource/v1beta1.DeviceCapacity":                                                            schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref),
 		"k8s.io/api/resource/v1beta1.DeviceClaim":                                                               schema_k8sio_api_resource_v1beta1_DeviceClaim(ref),
 		"k8s.io/api/resource/v1beta1.DeviceClaimConfiguration":                                                  schema_k8sio_api_resource_v1beta1_DeviceClaimConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceClass":                                                               schema_k8sio_api_resource_v1beta1_DeviceClass(ref),
@@ -47673,7 +47674,8 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceCapacity"),
 									},
 								},
 							},
@@ -47683,7 +47685,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity"},
 	}
 }
 
@@ -47880,6 +47882,28 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCapacity describes a quantity associated with a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"quantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Quantity defines how much of a certain device capacity is available.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"quantity"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 

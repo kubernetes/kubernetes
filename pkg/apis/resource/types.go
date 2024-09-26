@@ -214,7 +214,18 @@ type BasicDevice struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	Capacity map[QualifiedName]resource.Quantity
+	Capacity map[QualifiedName]DeviceCapacity
+}
+
+// DeviceCapacity describes a quantity associated with a device.
+type DeviceCapacity struct {
+	// Quantity defines how much of a certain device capacity is available.
+	//
+	// +required
+	Quantity resource.Quantity
+
+	// potential future addition: fields which define how to "consume"
+	// capacity (= share a single device between different consumers).
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.

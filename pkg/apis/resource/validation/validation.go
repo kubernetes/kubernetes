@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -523,7 +522,7 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field
 	// field is too large, then so is the combination.
 	maxKeyLen := resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, maxKeyLen, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	allErrs = append(allErrs, validateMap(device.Capacity, -1, maxKeyLen, validateQualifiedName, validateQuantity, fldPath.Child("capacity"))...)
+	allErrs = append(allErrs, validateMap(device.Capacity, -1, maxKeyLen, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
 	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
 		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
 	}
@@ -587,7 +586,7 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 	return allErrs
 }
 
-func validateQuantity(quantity apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+func validateDeviceCapacity(capacity resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	// Any parsed quantity is valid.
 	return nil
 }

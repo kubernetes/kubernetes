@@ -89,7 +89,9 @@
             }
           },
           "capacity": {
-            "capacityKey": "0"
+            "capacityKey": {
+              "quantity": "0"
+            }
           }
         }
       }
