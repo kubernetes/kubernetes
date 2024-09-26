@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha3_test
+package v1beta1_test
 
 import (
 	"reflect"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	v1beta1 "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	// ensure types are installed
@@ -31,41 +31,41 @@ import (
 )
 
 func TestSetDefaultAllocationMode(t *testing.T) {
-	claim := &v1alpha3.ResourceClaim{
-		Spec: v1alpha3.ResourceClaimSpec{
-			Devices: v1alpha3.DeviceClaim{
-				Requests: []v1alpha3.DeviceRequest{{}},
+	claim := &v1beta1.ResourceClaim{
+		Spec: v1beta1.ResourceClaimSpec{
+			Devices: v1beta1.DeviceClaim{
+				Requests: []v1beta1.DeviceRequest{{}},
 			},
 		},
 	}
 
 	// fields should be defaulted
-	defaultMode := v1alpha3.DeviceAllocationModeExactCount
+	defaultMode := v1beta1.DeviceAllocationModeExactCount
 	defaultCount := int64(1)
-	output := roundTrip(t, runtime.Object(claim)).(*v1alpha3.ResourceClaim)
+	output := roundTrip(t, runtime.Object(claim)).(*v1beta1.ResourceClaim)
 	assert.Equal(t, defaultMode, output.Spec.Devices.Requests[0].AllocationMode)
 	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[0].Count)
 
 	// field should not change
-	nonDefaultMode := v1alpha3.DeviceAllocationModeExactCount
+	nonDefaultMode := v1beta1.DeviceAllocationModeExactCount
 	nonDefaultCount := int64(10)
-	claim = &v1alpha3.ResourceClaim{
-		Spec: v1alpha3.ResourceClaimSpec{
-			Devices: v1alpha3.DeviceClaim{
-				Requests: []v1alpha3.DeviceRequest{{
+	claim = &v1beta1.ResourceClaim{
+		Spec: v1beta1.ResourceClaimSpec{
+			Devices: v1beta1.DeviceClaim{
+				Requests: []v1beta1.DeviceRequest{{
 					AllocationMode: nonDefaultMode,
 					Count:          nonDefaultCount,
 				}},
 			},
 		},
 	}
-	output = roundTrip(t, runtime.Object(claim)).(*v1alpha3.ResourceClaim)
+	output = roundTrip(t, runtime.Object(claim)).(*v1beta1.ResourceClaim)
 	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[0].AllocationMode)
 	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[0].Count)
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	codec := legacyscheme.Codecs.LegacyCodec(v1alpha3.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
