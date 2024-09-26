@@ -49,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	k8smetrics "k8s.io/component-base/metrics"
@@ -1168,6 +1169,106 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 
 	for _, tc := range testCases {
 		testCacherSendBookmarkEvents(t, tc.allowWatchBookmarks, tc.expectedBookmarks)
+	}
+}
+
+func TestInitialEventsEndBookmark(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	forceRequestWatchProgressSupport(t)
+
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if err := cacher.ready.wait(context.Background()); err != nil {
+			t.Fatalf("unexpected error waiting for the cache to be ready")
+		}
+	}
+
+	makePod := func(index uint64) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", index),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%v", 100+index),
+			},
+		}
+	}
+
+	numberOfPods := 3
+	var expectedPodEvents []watch.Event
+	for i := 1; i <= numberOfPods; i++ {
+		pod := makePod(uint64(i))
+		if err := cacher.watchCache.Add(pod); err != nil {
+			t.Fatalf("failed to add a pod: %v", err)
+		}
+		expectedPodEvents = append(expectedPodEvents, watch.Event{Type: watch.Added, Object: pod})
+	}
+	var currentResourceVersion uint64 = 100 + 3
+
+	trueVal, falseVal := true, false
+
+	scenarios := []struct {
+		name                string
+		allowWatchBookmarks bool
+		sendInitialEvents   *bool
+	}{
+		{
+			name:                "allowWatchBookmarks=false, sendInitialEvents=false",
+			allowWatchBookmarks: false,
+			sendInitialEvents:   &falseVal,
+		},
+		{
+			name:                "allowWatchBookmarks=false, sendInitialEvents=true",
+			allowWatchBookmarks: false,
+			sendInitialEvents:   &trueVal,
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=true",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   &trueVal,
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   &falseVal,
+		},
+		{
+			name:                "allowWatchBookmarks=false, sendInitialEvents=nil",
+			allowWatchBookmarks: true,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			expectedWatchEvents := expectedPodEvents
+			if scenario.allowWatchBookmarks && scenario.sendInitialEvents != nil && *scenario.sendInitialEvents {
+				expectedWatchEvents = append(expectedWatchEvents, watch.Event{
+					Type: watch.Bookmark,
+					Object: &example.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							ResourceVersion: strconv.FormatUint(currentResourceVersion, 10),
+							Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+						},
+					},
+				})
+			}
+
+			pred := storage.Everything
+			pred.AllowWatchBookmarks = scenario.allowWatchBookmarks
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "100", SendInitialEvents: scenario.sendInitialEvents, Predicate: pred})
+			if err != nil {
+				t.Fatalf("Failed to create watch: %v", err)
+			}
+			storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
+			storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
+		})
 	}
 }
 

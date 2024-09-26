@@ -101,6 +101,9 @@ type watchCacheInterval struct {
 	// Given that indexer and indexValidator only read state, if
 	// possible, Locker obtained through RLocker() is provided.
 	lock sync.Locker
+
+	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
+	initialEventsEndBookmark *watchCacheEvent
 }
 
 type attrFunc func(runtime.Object) (labels.Set, fields.Set, error)

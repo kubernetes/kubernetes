@@ -1493,7 +1493,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			defer w.Stop()
 
 			// make sure we only get initial events
-			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
+			TestCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
 
 			// make sure that the actual bookmark has at least RV >= to the expected one
 			if scenario.expectedInitialEventsBookmarkWithMinimalRV != nil {
@@ -1527,8 +1527,9 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 				require.NoError(t, err, "failed to add a pod: %v")
 				createdPods = append(createdPods, out)
 			}
-			testCheckResultsInStrictOrder(t, w, scenario.expectedEventsAfterEstablishingWatch(createdPods))
-			testCheckNoMoreResults(t, w)
+			ignoreEventsFn := func(event watch.Event) bool { return event.Type == watch.Bookmark }
+			testCheckResultWithIgnoreFunc(t, w, scenario.expectedEventsAfterEstablishingWatch(createdPods), ignoreEventsFn)
+			TestCheckNoMoreResultsWithIgnoreFunc(t, w, ignoreEventsFn)
 		})
 	}
 }
@@ -1582,8 +1583,8 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 
 	// make sure we only get initial events from the first ns
 	// followed by the bookmark with the global RV
-	testCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(initialPods, otherNsPod.ResourceVersion))
-	testCheckNoMoreResults(t, w)
+	TestCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(initialPods, otherNsPod.ResourceVersion))
+	TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
 func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -1637,8 +1638,8 @@ func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.In
 
 	// make sure we only get a single pod matching the field selector
 	// followed by the bookmark with the global RV
-	testCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(expectedPod, lastAddedPod.ResourceVersion))
-	testCheckNoMoreResults(t, w)
+	TestCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(expectedPod, lastAddedPod.ResourceVersion))
+	TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
 func makePod(namePrefix string) *example.Pod {
