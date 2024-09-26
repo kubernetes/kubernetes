@@ -51,7 +51,7 @@ func (opts *CloudProviderOptions) Validate() []error {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableKubeletCloudCredentialProviders feature to true", opts.CloudProvider))
 		}
-	case cloudprovider.IsDeprecatedInternal(opts.CloudProvider):
+	case !cloudprovider.IsExternal(opts.CloudProvider):
 		if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableCloudProviders feature to false", opts.CloudProvider))

@@ -85,18 +85,6 @@ func IsExternal(name string) bool {
 	return name == externalCloudProvider
 }
 
-// IsDeprecatedInternal is responsible for preventing cloud.Interface
-// from being initialized in kubelet, kube-controller-manager or kube-api-server
-func IsDeprecatedInternal(name string) bool {
-	for _, provider := range deprecatedCloudProviders {
-		if provider.name == name {
-			return true
-		}
-	}
-
-	return false
-}
-
 // DisableWarningForProvider logs information about disabled cloud provider state
 func DisableWarningForProvider(providerName string) {
 	for _, provider := range deprecatedCloudProviders {

@@ -386,7 +386,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && !cloudprovider.IsExternal(cloudProvider) {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
 	}
