@@ -956,7 +956,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 				// Wait for the tt.pods to be present in the scheduling active queue.
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-					return len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.pods), nil
+					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+					return len(pendingPods) == len(tt.pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.pods), nil
 				}); err != nil {
 					t.Fatal(err)
 				}
