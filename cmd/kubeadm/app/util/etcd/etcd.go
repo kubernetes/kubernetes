@@ -333,17 +333,18 @@ func (c *Client) ListMembers() ([]Member, error) {
 
 // RemoveMember notifies an etcd cluster to remove an existing member
 func (c *Client) RemoveMember(id uint64) ([]Member, error) {
-	// Remove an existing member from the cluster
-	var lastError error
-	var resp *clientv3.MemberRemoveResponse
-	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := c.newEtcdClient(c.Endpoints)
-		if err != nil {
-			lastError = err
-			return false, nil
-		}
-		defer cli.Close()
+	cli, err := c.newEtcdClient(c.Endpoints)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cli.Close() }()
 
+	// Remove an existing member from the cluster
+	var (
+		lastError   error
+		respMembers []*etcdserverpb.Member
+	)
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
 
@@ -363,16 +364,22 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		}
 		if !found {
 			klog.V(5).Infof("Member %s was not found; assuming it was already removed", strconv.FormatUint(id, 16))
+			respMembers = listResp.Members
 			return true, nil
 		}
 
-		resp, err = cli.MemberRemove(ctx, id)
+		resp, err := cli.MemberRemove(ctx, id)
 		if err == nil {
+			respMembers = resp.Members
 			return true, nil
 		}
 		if errors.Is(rpctypes.ErrMemberNotFound, err) {
 			klog.V(5).Infof("Member was already removed, because member %s was not found", strconv.FormatUint(id, 16))
-			return true, nil
+			listResp, err = cli.MemberList(ctx)
+			if err == nil {
+				respMembers = listResp.Members
+				return true, nil
+			}
 		}
 		klog.V(5).Infof("Failed to remove etcd member: %v", err)
 		lastError = err
@@ -384,11 +391,8 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 
 	// Returns the updated list of etcd members
 	ret := []Member{}
-	if resp != nil {
-		for _, m := range resp.Members {
-			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
-		}
-
+	for _, m := range respMembers {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
 	}
 
 	return ret, nil
@@ -469,7 +473,6 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		// call out to MemberList to fetch all the members before returning.
 		if errors.Is(err, rpctypes.ErrPeerURLExist) {
 			klog.V(5).Info("The peer URL for the added etcd member already exists. Fetching the existing etcd members")
-			var listResp *clientv3.MemberListResponse
 			listResp, err = cli.MemberList(ctx)
 			if err == nil {
 				respMembers = listResp.Members
