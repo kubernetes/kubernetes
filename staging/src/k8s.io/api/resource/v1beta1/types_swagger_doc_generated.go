@@ -223,46 +223,6 @@ func (OpaqueDeviceConfiguration) SwaggerDoc() map[string]string {
 	return map_OpaqueDeviceConfiguration
 }
 
-var map_PodSchedulingContext = map[string]string{
-	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DRAControlPlaneController feature gate.",
-	"metadata": "Standard object metadata",
-	"spec":     "Spec describes where resources for the Pod are needed.",
-	"status":   "Status describes where resources for the Pod can be allocated.",
-}
-
-func (PodSchedulingContext) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContext
-}
-
-var map_PodSchedulingContextList = map[string]string{
-	"":         "PodSchedulingContextList is a collection of Pod scheduling objects.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of PodSchedulingContext objects.",
-}
-
-func (PodSchedulingContextList) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextList
-}
-
-var map_PodSchedulingContextSpec = map[string]string{
-	"":               "PodSchedulingContextSpec describes where resources for the Pod are needed.",
-	"selectedNode":   "SelectedNode is the node for which allocation of ResourceClaims that are referenced by the Pod and that use \"WaitForFirstConsumer\" allocation is to be attempted.",
-	"potentialNodes": "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
-}
-
-func (PodSchedulingContextSpec) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextSpec
-}
-
-var map_PodSchedulingContextStatus = map[string]string{
-	"":               "PodSchedulingContextStatus describes where resources for the Pod can be allocated.",
-	"resourceClaims": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
-}
-
-func (PodSchedulingContextStatus) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextStatus
-}
-
 var map_ResourceClaim = map[string]string{
 	"":         "ResourceClaim describes a request for access to resources in the cluster, for use by workloads. For example, if a workload needs an accelerator device with specific properties, this is how that request is expressed. The status stanza tracks whether this claim has been satisfied and what specific resources have been allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
@@ -294,16 +254,6 @@ var map_ResourceClaimList = map[string]string{
 
 func (ResourceClaimList) SwaggerDoc() map[string]string {
 	return map_ResourceClaimList
-}
-
-var map_ResourceClaimSchedulingStatus = map[string]string{
-	"":                "ResourceClaimSchedulingStatus contains information about one particular ResourceClaim with \"WaitForFirstConsumer\" allocation mode.",
-	"name":            "Name matches the pod.spec.resourceClaims[*].Name field.",
-	"unsuitableNodes": "UnsuitableNodes lists nodes that the ResourceClaim cannot be allocated for.\n\nThe size of this field is limited to 128, the same as for PodSchedulingSpec.PotentialNodes. This may get increased in the future, but not reduced.",
-}
-
-func (ResourceClaimSchedulingStatus) SwaggerDoc() map[string]string {
-	return map_ResourceClaimSchedulingStatus
 }
 
 var map_ResourceClaimSpec = map[string]string{
