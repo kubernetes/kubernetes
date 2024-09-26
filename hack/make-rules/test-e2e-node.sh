@@ -110,6 +110,8 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   gubernator=${GUBERNATOR:-"false"}
   instance_type=${INSTANCE_TYPE:-""}
   node_env="${NODE_ENV:-""}"
+  network="${NETWORK:-""}"
+  subnet="${SUBNET:-""}"
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
   use_dockerized_build=${USE_DOCKERIZED_BUILD:-"false"}
@@ -196,6 +198,12 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   if [[ -n ${instance_type} ]]; then
     echo "Instance Type: ${instance_type}"
   fi
+  if [[ -n ${network} ]]; then
+    echo "Network: ${network}"
+  fi
+  if [[ -n ${subnet} ]]; then
+    echo "Subnet: ${subnet}"
+  fi
   echo "Kubelet Config File: ${kubelet_config_file}"
 
   # Invoke the runner
@@ -206,6 +214,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
+    --network="${network}" --subnet="${subnet}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
     --image-config-dir="${image_config_dir}" --node-env="${node_env}" \
