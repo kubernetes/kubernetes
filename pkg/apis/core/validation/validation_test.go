@@ -24156,42 +24156,31 @@ func TestValidateSleepAction(t *testing.T) {
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: func() *int64 {
-				v := int64(30)
-				return &v
-			}(),
+			gracePeriod: ptr.To[int64](30),
 		},
 		{
 			name: "negative seconds",
 			action: &core.SleepAction{
 				Seconds: -1,
 			},
-			gracePeriod: func() *int64 {
-				v := int64(30)
-				return &v
-			}(),
-			expectErr: field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+			gracePeriod: ptr.To[int64](30),
+			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
 		},
 		{
 			name: "longer than gracePeriod",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: func() *int64 {
-				v := int64(3)
-				return &v
-			}(),
-			expectErr: field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+			gracePeriod: ptr.To[int64](3),
+			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
 		},
 		{
 			name: "gracePeriod is nil",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: func() *int64 {
-				return nil
-			}(),
-			expectErr: field.ErrorList{},
+			gracePeriod: nil,
+			expectErr:   field.ErrorList{},
 		},
 	}
 
