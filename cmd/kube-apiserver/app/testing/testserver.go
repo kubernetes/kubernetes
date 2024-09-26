@@ -106,7 +106,7 @@ type TestServerInstanceOptions struct {
 	// If empty, binary version will be inferred from the build.
 	BinaryVersion string
 	// Set the EmulationVersion of server effective version.
-	// If empty, emulation version will be inferred (equal to) from the binary version.
+	// If empty, emulation version will default to the effective version.
 	EmulationVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
