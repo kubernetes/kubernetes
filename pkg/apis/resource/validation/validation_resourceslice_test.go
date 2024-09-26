@@ -40,9 +40,9 @@ func testAttributes() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute 
 	}
 }
 
-func testCapacity() map[resourceapi.QualifiedName]resource.Quantity {
-	return map[resourceapi.QualifiedName]resource.Quantity{
-		"memory": resource.MustParse("1Gi"),
+func testCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	return map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		"memory": {Quantity: resource.MustParse("1Gi")},
 	}
 }
 
@@ -400,20 +400,21 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
 				slice.Spec.Devices[0].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
-				slice.Spec.Devices[0].Basic.Capacity = map[resourceapi.QualifiedName]resource.Quantity{}
+				slice.Spec.Devices[0].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
 					slice.Spec.Devices[0].Basic.Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
 				}
 				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
-				slice.Spec.Devices[1].Basic.Capacity = map[resourceapi.QualifiedName]resource.Quantity{}
+				slice.Spec.Devices[1].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				quantity := resource.MustParse("1Gi")
+				capacity := resourceapi.DeviceCapacity{Quantity: quantity}
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
-					slice.Spec.Devices[1].Basic.Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = quantity
+					slice.Spec.Devices[1].Basic.Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
 				}
 				// Too large together by one.
 				slice.Spec.Devices[2].Basic.Attributes = slice.Spec.Devices[0].Basic.Attributes
-				slice.Spec.Devices[2].Basic.Capacity = map[resourceapi.QualifiedName]resource.Quantity{
-					"cap": quantity,
+				slice.Spec.Devices[2].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
 				}
 				return slice
 			}(),

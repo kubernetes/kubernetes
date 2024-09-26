@@ -1638,6 +1638,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceAllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceAttribute"):
 		return &applyconfigurationsresourcev1beta1.DeviceAttributeApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCapacity"):
+		return &applyconfigurationsresourcev1beta1.DeviceCapacityApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceClaim"):
 		return &applyconfigurationsresourcev1beta1.DeviceClaimApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
