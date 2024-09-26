@@ -94,7 +94,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			assert.NoError(t, err)
 			err = saConfig.Run()
 			assert.NoError(t, err)
-			assert.Contains(t, buf.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
+			assert.Containsf(t, buf.String(), "serviceAccountName: "+serviceAccount, "serviceaccount not updated for %s", input.yaml)
 		})
 	}
 }
@@ -337,7 +337,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						assert.Contains(t, string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`, fmt.Sprintf("serviceaccount not updated for %#v", input.object))
+						assert.Containsf(t, string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`, "serviceaccount not updated for %#v", input.object)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "serviceaccount", req.Method, req.URL, req)
