@@ -835,22 +835,10 @@ func (bo barrierOp) patchParams(w *workload) (realOp, error) {
 type sleepOp struct {
 	// Must be "sleep".
 	Opcode operationCode
-	// duration of sleep.
-	Duration time.Duration
-}
-
-func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
-	var tmp struct {
-		Opcode   operationCode
-		Duration string
-	}
-	if err = json.Unmarshal(data, &tmp); err != nil {
-		return err
-	}
-
-	so.Opcode = tmp.Opcode
-	so.Duration, err = time.ParseDuration(tmp.Duration)
-	return err
+	// Duration of sleep.
+	Duration metav1.Duration
+	// Template parameter for Duration.
+	DurationParam string
 }
 
 func (so *sleepOp) isValid(_ bool) error {
@@ -861,7 +849,16 @@ func (so *sleepOp) collectsMetrics() bool {
 	return false
 }
 
-func (so sleepOp) patchParams(_ *workload) (realOp, error) {
+func (so sleepOp) patchParams(w *workload) (realOp, error) {
+	if so.DurationParam != "" {
+		durationStr, err := getParam[string](w.Params, so.DurationParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		if so.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
+			return nil, fmt.Errorf("invalid duration parameter %s: %w", so.DurationParam, err)
+		}
+	}
 	return &so, nil
 }
 
@@ -1580,7 +1577,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		case *sleepOp:
 			select {
 			case <-tCtx.Done():
-			case <-time.After(concreteOp.Duration):
+			case <-time.After(concreteOp.Duration.Duration):
 			}
 
 		case *startCollectingMetricsOp:

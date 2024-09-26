@@ -1450,7 +1450,7 @@
     skipWaitToCompletion: true
     # Wait to make sure gated pods are enqueued in scheduler.
   - opcode: sleep
-    duration: 5s
+    durationParam: $sleepDuration
     # Create pods that will be gradually deleted after being scheduled.
   - opcode: createPods
     countParam: $deletingPods
@@ -1471,6 +1471,7 @@
       gatedPods: 10
       deletingPods: 10
       measurePods: 10
+      sleepDuration: 1s
   - name: 1Node_10000GatedPods
     labels: [performance, short]
     threshold: 130
@@ -1478,6 +1479,7 @@
       gatedPods: 10000
       deletingPods: 20000
       measurePods: 20000
+      sleepDuration: 5s
 
 - name: SchedulingGatedPodsWithPodAffinityImpactForThroughput
   defaultPodTemplatePath: config/templates/pod-with-label.yaml
@@ -1491,7 +1493,7 @@
     skipWaitToCompletion: true
   - opcode: sleep
     # To produce a stable scheduler_perf result, here we make sure all gated Pods are stored in the scheduling queue.
-    duration: 5s
+    durationParam: $sleepDuration
   - opcode: createPods
     # The scheduling of those Pods will result in many cluster events (AssignedPodAdded)
     # and each of them will be processed by the scheduling queue.
@@ -1504,12 +1506,14 @@
     params:
       gatedPods: 10
       measurePods: 10
+      sleepDuration: 1s
   - name: 1Node_10000GatedPods
     labels: [performance, short]
     threshold: 110
     params:
       gatedPods: 10000
       measurePods: 20000
+      sleepDuration: 5s
 
 # This test case simulates the scheduling when pods selected to schedule have deletionTimestamp set.
 # There was a memory leak related to this path of code fixed in:
