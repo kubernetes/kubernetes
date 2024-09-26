@@ -69,6 +69,19 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// NondeterministicEncoder is implemented by Encoders that can serialize objects more efficiently in
+// cases where the output does not need to be deterministic.
+type NondeterministicEncoder interface {
+	Encoder
+
+	// EncodeNondeterministic writes an object to the stream. Unlike the Encode method of
+	// Encoder, EncodeNondeterministic does not guarantee that any two invocations will write
+	// the same sequence of bytes to the io.Writer. Any differences will not be significant to a
+	// generic decoder. For example, map entries and struct fields might be encoded in any
+	// order.
+	EncodeNondeterministic(Object, io.Writer) error
+}
+
 // MemoryAllocator is responsible for allocating memory.
 // By encapsulating memory allocation into its own interface, we can reuse the memory
 // across many operations in places we know it can significantly improve the performance.

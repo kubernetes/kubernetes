@@ -26,6 +26,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strconv"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -761,4 +762,99 @@ type stubMetaFactory struct {
 
 func (mf stubMetaFactory) Interpret([]byte) (*schema.GroupVersionKind, error) {
 	return mf.gvk, mf.err
+}
+
+type oneMapField struct {
+	metav1.TypeMeta `json:",inline"`
+	Map             map[string]interface{} `json:"map"`
+}
+
+func (o oneMapField) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func (o oneMapField) GetObjectKind() schema.ObjectKind {
+	panic("unimplemented")
+}
+
+type eightStringFields struct {
+	metav1.TypeMeta `json:",inline"`
+	A               string `json:"1"`
+	B               string `json:"2"`
+	C               string `json:"3"`
+	D               string `json:"4"`
+	E               string `json:"5"`
+	F               string `json:"6"`
+	G               string `json:"7"`
+	H               string `json:"8"`
+}
+
+func (o eightStringFields) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func (o eightStringFields) GetObjectKind() schema.ObjectKind {
+	panic("unimplemented")
+}
+
+// TestEncodeNondeterministic tests that repeated encodings of multi-field structs and maps do not
+// encode to precisely the same bytes when repeatedly encoded with EncodeNondeterministic. When
+// using EncodeNondeterministic, the order of items in CBOR maps should be intentionally shuffled to
+// prevent applications from inadvertently depending on encoding determinism. All permutations do
+// not necessarily have equal probability.
+func TestEncodeNondeterministic(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input runtime.Object
+	}{
+		{
+			name: "map",
+			input: func() runtime.Object {
+				m := map[string]interface{}{}
+				for i := 1; i <= 8; i++ {
+					m[strconv.Itoa(i)] = strconv.Itoa(i)
+
+				}
+				return oneMapField{Map: m}
+			}(),
+		},
+		{
+			name: "struct",
+			input: eightStringFields{
+				TypeMeta: metav1.TypeMeta{},
+				A:        "1",
+				B:        "2",
+				C:        "3",
+				D:        "4",
+				E:        "5",
+				F:        "6",
+				G:        "7",
+				H:        "8",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var b bytes.Buffer
+			e := NewSerializer(nil, nil)
+
+			if err := e.EncodeNondeterministic(tc.input, &b); err != nil {
+				t.Fatal(err)
+			}
+			first := b.String()
+
+			const Trials = 128
+			for trial := 0; trial < Trials; trial++ {
+				b.Reset()
+				if err := e.EncodeNondeterministic(tc.input, &b); err != nil {
+					t.Fatal(err)
+				}
+
+				if !bytes.Equal([]byte(first), b.Bytes()) {
+					return
+				}
+			}
+			t.Fatalf("nondeterministic encode produced the same bytes on %d consecutive calls: %s", Trials, first)
+		})
+	}
+
 }
