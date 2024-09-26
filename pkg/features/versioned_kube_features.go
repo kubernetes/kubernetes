@@ -296,10 +296,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.StrictCostEnforcementForVAP: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	genericfeatures.StrictCostEnforcementForWebhooks: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	genericfeatures.StructuredAuthenticationConfiguration: {
