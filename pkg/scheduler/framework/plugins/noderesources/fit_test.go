@@ -1276,14 +1276,37 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: framework.Queue,
 		},
-		// uncomment this case when the isSchedulableAfterNodeChange also check the
-		// original node's resources.
-		// "skip-queue-on-node-unrelated-changes": {
-		// 	pod:          &v1.Pod{},
-		// 	oldObj:       st.MakeNode().Obj(),
-		// 	newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-		// 	expectedHint: framework.QueueSkip,
-		// },
+		"skip-queue-on-node-unrelated-changes": {
+			pod: newResourcePod(framework.Resource{
+				Memory:          2,
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+				extendedResourceA: "2",
+			}).Obj(),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+				extendedResourceA: "1",
+				extendedResourceB: "2",
+			}).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-pod-requested-resources-increase": {
+			pod: newResourcePod(framework.Resource{
+				Memory:          2,
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+				extendedResourceA: "1",
+			}).Obj(),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+				extendedResourceA: "2",
+			}).Obj(),
+			expectedHint: framework.Queue,
+		},
 		"skip-queue-on-node-changes-from-suitable-to-unsuitable": {
 			pod: newResourcePod(framework.Resource{
 				Memory:          2,
@@ -1359,6 +1382,139 @@ func TestIsFit(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			if got := isFit(tc.pod, tc.node); got != tc.expected {
+				t.Errorf("expected: %v, got: %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
+	testCases := map[string]struct {
+		pod          *v1.Pod
+		originalNode *v1.Node
+		modifiedNode *v1.Node
+		expected     bool
+	}{
+		"no-requested-resources": {
+			pod: newResourcePod(framework.Resource{}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:             "1",
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "1",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:             "1",
+				v1.ResourceCPU:              "2",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "2",
+				extendedResourceA:           "2",
+			}).Obj(),
+			expected: false,
+		},
+		"no-requested-resources-pods-increased": {
+			pod: newResourcePod(framework.Resource{}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:             "1",
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "1",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:             "2",
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "1",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			expected: true,
+		},
+		"requested-resources-decreased": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU:         2,
+				Memory:           2,
+				EphemeralStorage: 2,
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			expected: false,
+		},
+		"requested-resources-increased": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU:         2,
+				Memory:           2,
+				EphemeralStorage: 2,
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "3",
+				v1.ResourceMemory:           "4",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			expected: true,
+		},
+		"non-requested-resources-decreased": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU: 2,
+				Memory:   2,
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			expected: false,
+		},
+		"non-requested-resources-increased": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU: 2,
+				Memory:   2,
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "5",
+				extendedResourceA:           "6",
+			}).Obj(),
+			expected: false,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
