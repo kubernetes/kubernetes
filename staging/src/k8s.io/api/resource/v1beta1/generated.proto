@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = "proto2";
 
-package k8s.io.api.resource.v1alpha3;
+package k8s.io.api.resource.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "k8s.io/api/resource/v1alpha3";
+option go_package = "k8s.io/api/resource/v1beta1";
 
 // AllocationResult contains attributes of an allocated resource.
 message AllocationResult {
