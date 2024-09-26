@@ -315,7 +315,7 @@ port: 123
 					require.NoError(t, err, "failed to merge kubelet drop-in configs")
 				} else {
 					require.Error(t, err)
-					require.Contains(t, err.Error(), test.expectMergeError)
+					require.ErrorContains(t, err, test.expectMergeError)
 				}
 			}
 

@@ -224,8 +224,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "could not restore state from checkpoint")
-				require.Contains(t, err.Error(), tc.expectedError)
+				require.ErrorContains(t, err, "could not restore state from checkpoint")
+				require.ErrorContains(t, err, tc.expectedError)
 				return
 			}
 

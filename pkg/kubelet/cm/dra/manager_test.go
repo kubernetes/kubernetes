@@ -597,7 +597,7 @@ func TestPrepareResources(t *testing.T) {
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return // PrepareResources returned an error so stopping the test case here
 			}
@@ -739,7 +739,7 @@ func TestUnprepareResources(t *testing.T) {
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return // PrepareResources returned an error so stopping the test case here
 			}
@@ -863,7 +863,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return
 			}

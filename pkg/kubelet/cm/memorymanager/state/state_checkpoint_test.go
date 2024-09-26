@@ -134,7 +134,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "could not restore state from checkpoint: "+tc.expectedError)
+				assert.ErrorContains(t, err, "could not restore state from checkpoint: "+tc.expectedError)
 			} else {
 				assert.NoError(t, err, "unexpected error while creating checkpointState")
 				// compare state after restoration with the one expected
