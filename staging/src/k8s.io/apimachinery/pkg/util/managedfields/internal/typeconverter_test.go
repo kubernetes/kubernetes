@@ -287,7 +287,7 @@ func TestIndexModels(t *testing.T) {
 		resultNames[k] = *v.TypeRef.NamedType
 	}
 
-	require.Equal(t, resultNames, map[schema.GroupVersionKind]string{
+	require.Equal(t, map[schema.GroupVersionKind]string{
 		{
 			Group:   "mygroup",
 			Version: "v1",
@@ -313,5 +313,5 @@ func TestIndexModels(t *testing.T) {
 			Version: "v3",
 			Kind:    "MyOtherKind",
 		}: "def3",
-	})
+	}, resultNames)
 }
