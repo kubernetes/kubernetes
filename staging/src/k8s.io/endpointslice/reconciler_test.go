@@ -580,7 +580,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 			if tc.existing != nil {
 				existingSlices = append(existingSlices, tc.existing)
 				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), tc.existing, metav1.CreateOptions{})
-				assert.Nil(t, createErr, "Expected no error creating endpoint slice")
+				assert.NoError(t, createErr, "Expected no error creating endpoint slice")
 			}
 
 			numActionsBefore := len(client.Actions())
