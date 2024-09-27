@@ -104,7 +104,7 @@ func (pl *NodeAffinity) EventsToRegister(_ context.Context) ([]framework.Cluster
 // isSchedulableAfterNodeChange is invoked whenever a node changed. It checks whether
 // that change made a previously unschedulable pod schedulable.
 func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
@@ -119,16 +119,27 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	if err != nil {
 		return framework.Queue, err
 	}
-	if isMatched {
-		logger.V(4).Info("node was created or updated, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	if !isMatched {
+		logger.V(5).Info("node was created or updated, but the pod's NodeAffinity doesn't match", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+	// Since the node was added and it matches the pod's affinity criteria, we can unblock it.
+	if originalNode == nil {
+		logger.V(5).Info("node was created, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return framework.Queue, nil
 	}
-
-	// TODO: also check if the original node meets the pod's requestments once preCheck is completely removed.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
-
-	logger.V(4).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-	return framework.QueueSkip, nil
+	// At this point we know the operation is update so we can narrow down the criteria to unmatch -> match changes only
+	// (necessary affinity label was added to the node in this case).
+	wasMatched, err := requiredNodeAffinity.Match(originalNode)
+	if err != nil {
+		return framework.Queue, err
+	}
+	if wasMatched {
+		logger.V(5).Info("node updated, but the pod's NodeAffinity hasn't changed", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+	logger.V(5).Info("node was updated and the pod's NodeAffinity changed to matched", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.Queue, nil
 }
 
 // PreFilter builds and writes cycle state used by Filter.
