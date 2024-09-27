@@ -1555,7 +1555,7 @@ func TestStaticCPUPolicyConditionsSatisfied(t *testing.T) {
 			cpuRequest:  &cpuOneDecimal,
 			podQos:      qosGuaranteed,
 			policyName:  staticPolicy,
-			expected:    true,
+			expected:    false,
 		},
 	}
 	for _, testCase := range testCases {
