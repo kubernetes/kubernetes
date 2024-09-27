@@ -19,12 +19,12 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -450,7 +450,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
-	assert.Nil(t, o.Add(node))
+	assert.NoError(t, o.Add(node))
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
@@ -466,7 +466,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
-	assert.Nil(t, o.Add(pod))
+	assert.NoError(t, o.Add(pod))
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")
