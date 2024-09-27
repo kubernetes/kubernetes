@@ -21,7 +21,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1008,21 +1009,21 @@ func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types
 
 // PodSchedulingWrapper wraps a PodSchedulingContext inside.
 type PodSchedulingWrapper struct {
-	resourceapi.PodSchedulingContext
+	resourcealpha.PodSchedulingContext
 }
 
 // MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
 func MakePodSchedulingContexts() *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{resourceapi.PodSchedulingContext{}}
+	return &PodSchedulingWrapper{resourcealpha.PodSchedulingContext{}}
 }
 
 // FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
-func FromPodSchedulingContexts(other *resourceapi.PodSchedulingContext) *PodSchedulingWrapper {
+func FromPodSchedulingContexts(other *resourcealpha.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner object.
-func (wrapper *PodSchedulingWrapper) Obj() *resourceapi.PodSchedulingContext {
+func (wrapper *PodSchedulingWrapper) Obj() *resourcealpha.PodSchedulingContext {
 	return &wrapper.PodSchedulingContext
 }
 
@@ -1081,7 +1082,7 @@ func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedul
 }
 
 // ResourceClaims sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourceapi.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
+func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcealpha.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
 	wrapper.Status.ResourceClaims = statuses
 	return wrapper
 }

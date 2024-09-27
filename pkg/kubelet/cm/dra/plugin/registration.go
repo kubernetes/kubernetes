@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -111,7 +111,7 @@ func (h *RegistrationHandler) wipeResourceSlices(driver string) {
 			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = h.kubeClient.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = h.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)

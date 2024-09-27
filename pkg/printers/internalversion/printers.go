@@ -41,7 +41,8 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -660,7 +661,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podSchedulingCtxColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SelectedNode", Type: "string", Description: resourceapi.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
+		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha3.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)

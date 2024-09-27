@@ -30,7 +30,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -689,7 +690,7 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 			Controller: "dra.example.com",
 		},
 	}
-	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
+	if _, err := testCtx.ClientSet.ResourceV1beta1().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create claim: %v", err)
 	}
 
@@ -706,7 +707,7 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 	}
 
 	// Check that the PodSchedulingContext exists and has a selected node.
-	var schedulingCtx *resourceapi.PodSchedulingContext
+	var schedulingCtx *resourcealpha.PodSchedulingContext
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, 30*time.Second, true,
 		func(context.Context) (bool, error) {
 			var err error
@@ -743,7 +744,7 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 
 	// Now force the scheduler to update the PodSchedulingContext by setting UnsuitableNodes so that
 	// the selected node is not suitable.
-	schedulingCtx.Status.ResourceClaims = []resourceapi.ResourceClaimSchedulingStatus{{
+	schedulingCtx.Status.ResourceClaims = []resourcealpha.ResourceClaimSchedulingStatus{{
 		Name:            podClaimName,
 		UnsuitableNodes: []string{schedulingCtx.Spec.SelectedNode},
 	}}

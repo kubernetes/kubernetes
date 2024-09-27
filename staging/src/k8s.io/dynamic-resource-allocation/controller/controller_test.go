@@ -26,7 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -58,7 +59,7 @@ func TestController(t *testing.T) {
 	otherNodeName := "worker-2"
 	unsuitableNodes := []string{otherNodeName}
 	potentialNodes := []string{nodeName, otherNodeName}
-	maxNodes := make([]string, resourceapi.PodSchedulingNodeListMaxSize)
+	maxNodes := make([]string, resourcealpha.PodSchedulingNodeListMaxSize)
 	for i := range maxNodes {
 		maxNodes[i] = fmt.Sprintf("node-%d", i)
 	}
@@ -93,27 +94,27 @@ func TestController(t *testing.T) {
 		claim.Status.DeallocationRequested = true
 		return claim
 	}
-	withSelectedNode := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
+	withSelectedNode := func(podSchedulingCtx *resourcealpha.PodSchedulingContext) *resourcealpha.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Spec.SelectedNode = nodeName
 		return podSchedulingCtx
 	}
-	withSpecificUnsuitableNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext, unsuitableNodes []string) *resourceapi.PodSchedulingContext {
+	withSpecificUnsuitableNodes := func(podSchedulingCtx *resourcealpha.PodSchedulingContext, unsuitableNodes []string) *resourcealpha.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Status.ResourceClaims = append(podSchedulingCtx.Status.ResourceClaims,
-			resourceapi.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
+			resourcealpha.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
 		)
 		return podSchedulingCtx
 	}
-	withUnsuitableNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
+	withUnsuitableNodes := func(podSchedulingCtx *resourcealpha.PodSchedulingContext) *resourcealpha.PodSchedulingContext {
 		return withSpecificUnsuitableNodes(podSchedulingCtx, unsuitableNodes)
 	}
-	withSpecificPotentialNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext, potentialNodes []string) *resourceapi.PodSchedulingContext {
+	withSpecificPotentialNodes := func(podSchedulingCtx *resourcealpha.PodSchedulingContext, potentialNodes []string) *resourcealpha.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Spec.PotentialNodes = potentialNodes
 		return podSchedulingCtx
 	}
-	withPotentialNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
+	withPotentialNodes := func(podSchedulingCtx *resourcealpha.PodSchedulingContext) *resourcealpha.PodSchedulingContext {
 		return withSpecificPotentialNodes(podSchedulingCtx, potentialNodes)
 	}
 
@@ -123,7 +124,7 @@ func TestController(t *testing.T) {
 		key                                  string
 		driver                               mockDriver
 		pod                                  *corev1.Pod
-		schedulingCtx, expectedSchedulingCtx *resourceapi.PodSchedulingContext
+		schedulingCtx, expectedSchedulingCtx *resourcealpha.PodSchedulingContext
 		claim, expectedClaim                 *resourceapi.ResourceClaim
 		expectedError                        string
 	}{
@@ -308,7 +309,7 @@ func TestController(t *testing.T) {
 				initialObjects = append(initialObjects, test.claim)
 			}
 			kubeClient, informerFactory := fakeK8s(initialObjects)
-			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
+			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
 			podInformer := informerFactory.Core().V1().Pods()
 			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 			// Order is important: on function exit, we first must
@@ -322,7 +323,7 @@ func TestController(t *testing.T) {
 					require.NoError(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
 				case *corev1.Pod:
 					require.NoError(t, podInformer.Informer().GetStore().Add(obj), "add pod")
-				case *resourceapi.PodSchedulingContext:
+				case *resourcealpha.PodSchedulingContext:
 					require.NoError(t, podSchedulingInformer.Informer().GetStore().Add(obj), "add pod scheduling")
 				default:
 					t.Fatalf("unknown initialObject type: %+v", obj)
@@ -335,7 +336,7 @@ func TestController(t *testing.T) {
 			ctrl := New(ctx, driverName, driver, kubeClient, informerFactory)
 			informerFactory.Start(ctx.Done())
 			if !cache.WaitForCacheSync(ctx.Done(),
-				informerFactory.Resource().V1alpha3().ResourceClaims().Informer().HasSynced,
+				informerFactory.Resource().V1beta1().ResourceClaims().Informer().HasSynced,
 				informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().HasSynced,
 			) {
 				t.Fatal("could not sync caches")
@@ -350,7 +351,7 @@ func TestController(t *testing.T) {
 			if err != nil && err.Error() != test.expectedError {
 				t.Fatalf("expected error %q, got %q", test.expectedError, err.Error())
 			}
-			claims, err := kubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := kubeClient.ResourceV1beta1().ResourceClaims("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list claims")
 			var expectedClaims []resourceapi.ResourceClaim
 			if test.expectedClaim != nil {
@@ -360,7 +361,7 @@ func TestController(t *testing.T) {
 
 			podSchedulings, err := kubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list pod schedulings")
-			var expectedPodSchedulings []resourceapi.PodSchedulingContext
+			var expectedPodSchedulings []resourcealpha.PodSchedulingContext
 			if test.expectedSchedulingCtx != nil {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
 			}
@@ -498,9 +499,9 @@ func createPod(podName, podNamespace string, claims map[string]string) *corev1.P
 	return pod
 }
 
-func createPodSchedulingContexts(pod *corev1.Pod) *resourceapi.PodSchedulingContext {
+func createPodSchedulingContexts(pod *corev1.Pod) *resourcealpha.PodSchedulingContext {
 	controller := true
-	return &resourceapi.PodSchedulingContext{
+	return &resourcealpha.PodSchedulingContext{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
