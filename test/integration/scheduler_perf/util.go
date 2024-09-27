@@ -148,28 +148,41 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	return informerFactory, tCtx
 }
 
-// Returns the list of scheduled and unscheduled pods in the specified namespaces.
+func isAttempted(pod *v1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == v1.PodScheduled {
+			return true
+		}
+	}
+	return false
+}
+
+// getScheduledPods returns the list of scheduled, attempted but unschedulable
+// and unattempted pods in the specified namespaces.
 // Note that no namespaces specified matches all namespaces.
-func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, []*v1.Pod, error) {
+func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, []*v1.Pod, []*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	s := sets.New(namespaces...)
 	scheduled := make([]*v1.Pod, 0, len(pods))
-	unscheduled := make([]*v1.Pod, 0, len(pods))
+	attempted := make([]*v1.Pod, 0, len(pods))
+	unattempted := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]
 		if len(s) == 0 || s.Has(pod.Namespace) {
 			if len(pod.Spec.NodeName) > 0 {
 				scheduled = append(scheduled, pod)
+			} else if isAttempted(pod) {
+				attempted = append(attempted, pod)
 			} else {
-				unscheduled = append(unscheduled, pod)
+				unattempted = append(unattempted, pod)
 			}
 		}
 	}
-	return scheduled, unscheduled, nil
+	return scheduled, attempted, unattempted, nil
 }
 
 // DataItem is the data point.
