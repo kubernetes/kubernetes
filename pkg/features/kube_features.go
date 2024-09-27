@@ -233,7 +233,9 @@ const (
 
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
-	// Deprecated: v1.29 (default off)
+	// alpha: v1.29
+	// Deprecated: v1.31 (default off)
+	//
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
@@ -975,12 +977,4 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
-	// features that enable backwards compatibility but are scheduled to be removed
-	// ...
-	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
-
-	AllowInsecureKubeletCertificateSigningRequests: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
-
-	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Deprecated}, // default on in 1.33
 }

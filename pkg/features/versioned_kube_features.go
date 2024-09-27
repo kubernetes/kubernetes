@@ -34,6 +34,14 @@ import (
 //
 // Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AllowDNSOnlyNodeCSR: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	AllowInsecureKubeletCertificateSigningRequests: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
 	AllowOverwriteTerminationGracePeriodSeconds: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
 	},
@@ -144,6 +152,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	DisableNodeKubeProxyVersion: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	DRAControlPlaneController: {

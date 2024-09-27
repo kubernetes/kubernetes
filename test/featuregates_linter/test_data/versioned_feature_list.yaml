@@ -26,6 +26,18 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: AllowDNSOnlyNodeCSR
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.31"
+- name: AllowInsecureKubeletCertificateSigningRequests
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.31"
 - name: AllowOverwriteTerminationGracePeriodSeconds
   versionedSpecs:
   - default: false
@@ -319,6 +331,16 @@
   - default: true
     lockToDefault: true
     preRelease: GA
+    version: "1.31"
+- name: DisableNodeKubeProxyVersion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
     version: "1.31"
 - name: DRAControlPlaneController
   versionedSpecs:
