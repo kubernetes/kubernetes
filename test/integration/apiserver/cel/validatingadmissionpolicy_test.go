@@ -2234,7 +2234,8 @@ func Test_CostLimitForValidation(t *testing.T) {
 func Test_CostLimitForValidationWithFeatureDisabled(t *testing.T) {
 	resetPolicyRefreshInterval := generic.SetPolicyRefreshIntervalForTests(policyRefreshInterval)
 	defer resetPolicyRefreshInterval()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForVAP, false)
+	server, err := apiservertesting.StartTestServer(t, &apiservertesting.TestServerInstanceOptions{EmulationVersion: "1.31"}, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
 	if err != nil {

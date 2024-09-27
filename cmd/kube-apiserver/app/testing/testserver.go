@@ -44,6 +44,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -102,8 +103,11 @@ type TestServerInstanceOptions struct {
 	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
 	ProxyCA *ProxyCA
 	// Set the BinaryVersion of server effective version.
-	// Default to 1.31
+	// If empty, effective version will default to version.DefaultKubeBinaryVersion.
 	BinaryVersion string
+	// Set the EmulationVersion of server effective version.
+	// If empty, emulation version will default to the effective version.
+	EmulationVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
 }
@@ -193,6 +197,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
 		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
+	}
+	if instanceOptions.EmulationVersion != "" {
+		effectiveVersion.SetEmulationVersion(version.MustParse(instanceOptions.EmulationVersion))
 	}
 	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
