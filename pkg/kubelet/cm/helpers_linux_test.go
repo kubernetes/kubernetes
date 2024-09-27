@@ -850,7 +850,6 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CPUShares: &guaranteedFullCpuShares, CPUQuota: &guaranteedFullCpuTunedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
-
 	}
 
 	for testName, testCase := range testCases {

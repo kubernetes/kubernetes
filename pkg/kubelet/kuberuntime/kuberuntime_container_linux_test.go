@@ -28,10 +28,6 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	cpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-
 	"github.com/google/go-cmp/cmp"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +39,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -256,7 +255,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 		memLim        *resource.Quantity
 		expected      *runtimeapi.LinuxContainerResources
 		cgroupVersion CgroupVersion
-		podQos        v1.PodQOSClass
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -270,7 +268,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 134217728,
 			},
 			cgroupVersion: cgroupV1,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNoMemory",
@@ -284,7 +281,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNilCPU",
@@ -297,7 +293,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestZeroCPU",
@@ -311,7 +306,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "Request128MBLimit256MB",
@@ -326,7 +320,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNoMemory",
@@ -341,7 +334,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestNilCPU",
@@ -355,7 +347,6 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
-			podQos:        v1.PodQOSBurstable,
 		},
 		{
 			name:   "RequestZeroCPU",
@@ -370,12 +361,11 @@ func TestCalculateLinuxResources(t *testing.T) {
 				Unified:            map[string]string{"memory.oom.group": "1"},
 			},
 			cgroupVersion: cgroupV2,
-			podQos:        v1.PodQOSBurstable,
 		},
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
-		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, test.podQos)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, v1.PodQOSBurstable)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }
