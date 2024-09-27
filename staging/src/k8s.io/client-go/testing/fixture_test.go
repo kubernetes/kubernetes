@@ -19,12 +19,12 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -297,7 +297,7 @@ func TestApplyCreate(t *testing.T) {
 		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
 }
 
 func TestApplyNoMeta(t *testing.T) {
