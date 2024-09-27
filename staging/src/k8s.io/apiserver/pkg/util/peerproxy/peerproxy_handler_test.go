@@ -285,7 +285,10 @@ func TestPeerProxy(t *testing.T) {
 			}
 			req.Header.Set(PeerProxiedHeader, tt.peerproxiedHeader)
 
-			resp, _ := requestGetter(req)
+			resp, err := requestGetter(req)
+			if err != nil {
+				t.Fatalf("unexpected error trying to get the request: %v", err)
+			}
 
 			// compare response
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
