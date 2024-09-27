@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -43,7 +44,8 @@ func TestNonePolicyAllocate(t *testing.T) {
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
 
 	container := &testPod.Spec.Containers[0]
-	err := policy.Allocate(st, testPod, container)
+	_, ctx := ktesting.NewTestContext(t)
+	err := policy.Allocate(ctx, st, testPod, container)
 	if err != nil {
 		t.Errorf("NonePolicy Allocate() error. expected no error but got: %v", err)
 	}

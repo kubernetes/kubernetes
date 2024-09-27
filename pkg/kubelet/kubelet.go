@@ -133,6 +133,9 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
+	// Max amount of time to admit a single Pod, mostly accounting for device plugin allocation.
+	maxSinglePodAdmissionTimeout = 30 * time.Second
+
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
@@ -222,7 +225,7 @@ func getContainerEtcHostsPath() string {
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
-	HandlePodAdditions(pods []*v1.Pod)
+	HandlePodAdditions(ctx context.Context, pods []*v1.Pod)
 	HandlePodUpdates(pods []*v1.Pod)
 	HandlePodRemoves(pods []*v1.Pod)
 	HandlePodReconcile(pods []*v1.Pod)
@@ -1948,7 +1951,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
 		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
-			pod = kl.handlePodResourcesResize(pod)
+			pod = kl.handlePodResourcesResize(ctx, pod)
 		}
 	}
 
@@ -2285,7 +2288,7 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (kl *Kubelet) canAdmitPod(ctx context.Context, pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
@@ -2303,7 +2306,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 		attrs.OtherPods = otherPods
 	}
 	for _, podAdmitHandler := range kl.admitHandlers {
-		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
 
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 
@@ -2411,7 +2414,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// ADD as if they are new pods. These pods will then go through the
 			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
-			handler.HandlePodAdditions(u.Pods)
+			handler.HandlePodAdditions(ctx, u.Pods)
 		case kubetypes.UPDATE:
 			klog.V(2).InfoS("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
@@ -2533,7 +2536,7 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
-func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
+func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
@@ -2581,8 +2584,13 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				podCopy := pod.DeepCopy()
 				kl.updateContainerResourceAllocation(podCopy)
 
+				ctxWithTimeout, cancel := context.WithTimeout(ctx, maxSinglePodAdmissionTimeout)
+
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+				ok, reason, message := kl.canAdmitPod(ctxWithTimeout, activePods, podCopy)
+				cancel()
+
+				if !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
@@ -2592,8 +2600,13 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
 			} else {
+				ctxWithTimeout, cancel := context.WithTimeout(ctx, maxSinglePodAdmissionTimeout)
+
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+				ok, reason, message := kl.canAdmitPod(ctxWithTimeout, activePods, pod)
+				cancel()
+
+				if !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
@@ -2767,7 +2780,7 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 	return false
 }
 
-func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus) {
+func (kl *Kubelet) canResizePod(ctx context.Context, pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus) {
 	var otherActivePods []*v1.Pod
 
 	node, err := kl.getNodeAnyWay()
@@ -2794,7 +2807,12 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		}
 	}
 
-	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, podCopy); !ok {
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, maxSinglePodAdmissionTimeout)
+
+	ok, failReason, failMessage := kl.canAdmitPod(ctxWithTimeout, otherActivePods, podCopy)
+	cancel()
+
+	if !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", podCopy.Name, "reason", failReason, "message", failMessage)
 		return false, podCopy, v1.PodResizeStatusDeferred
@@ -2811,7 +2829,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
+func (kl *Kubelet) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) *v1.Pod {
 	if pod.Status.Phase != v1.PodRunning {
 		return pod
 	}
@@ -2840,7 +2858,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
-	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
+	fit, updatedPod, resizeStatus := kl.canResizePod(ctx, pod)
 	if updatedPod == nil {
 		return pod
 	}
