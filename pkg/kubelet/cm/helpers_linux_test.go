@@ -836,7 +836,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &guaranteedOneCPUQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-decimal-one-cpu-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -850,7 +850,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &guaranteedOneCPUTunedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 	}
 
