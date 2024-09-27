@@ -28,18 +28,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: CRDValidationRatcheting
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: CustomResourceFieldSelectors
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
