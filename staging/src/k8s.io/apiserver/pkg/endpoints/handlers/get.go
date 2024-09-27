@@ -58,6 +58,7 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		ctx, span := tracing.Start(ctx, "Get", traceFields(req)...)
+		req = req.WithContext(ctx)
 		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
@@ -172,6 +173,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		ctx := req.Context()
 		// For performance tracking purposes.
 		ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
+		req = req.WithContext(ctx)
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
