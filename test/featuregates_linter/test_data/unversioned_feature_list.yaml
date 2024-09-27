@@ -10,18 +10,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: InPlacePodVerticalScaling
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: KMSv1
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
 - name: LoggingAlphaOptions
   versionedSpecs:
   - default: false
