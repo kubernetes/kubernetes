@@ -246,7 +246,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		resources.CpuQuota = cpuQuota
 		resources.CpuPeriod = cpuPeriod
 
-		if cpumanager.StaticCPUPolicyConditionsSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
+		if isStaticCPUPolicyConditionSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
 			resources.CpuQuota = int64(-1)
 		}
 	}
@@ -333,6 +333,12 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 		}
 	}
 	return cStatusResources
+}
+
+// Note: this function variable is being added here so it would be possible to mock
+// the cpu manager policy for unit tests by assigning a new mocked function into it.
+var isStaticCPUPolicyConditionSatisfied = func(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *resource.Quantity) bool {
+	return cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicyName, podQos, cpuRequest)
 }
 
 // Note: this function variable is being added here so it would be possible to mock
