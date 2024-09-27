@@ -20,9 +20,4 @@ const (
 	// NVIDIAGPUResourceName is the extended name of the GPU resource since v1.8
 	// this uses the device plugin mechanism
 	NVIDIAGPUResourceName = "nvidia.com/gpu"
-
-	// GPUDevicePluginDSYAML is the official Google Device Plugin Daemonset NVIDIA GPU manifest for GKE
-	// TODO: Parametrize it by making it a feature in TestFramework.
-	// so we can override the daemonset in other setups (non COS).
-	GPUDevicePluginDSYAML = "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/device-plugins/nvidia-gpu/daemonset.yaml"
 )
