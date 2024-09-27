@@ -203,7 +203,6 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 	apiservers.Range(func(key, value interface{}) bool {
 		apiserverKey := key.(string)
 		if apiserverKey == localAPIServerId {
-			response.errorFetchingAddressFromLease = true
 			response.locallyServiceable = true
 			// stop iteration
 			return false
@@ -221,11 +220,9 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 		if err != nil {
 			response.errorFetchingAddressFromLease = true
 			klog.Errorf("invalid address found for server %s", apiserverKey)
-			// continue with iteration
 			return true
 		}
 		peerServerEndpoints = append(peerServerEndpoints, hostPort)
-		// continue with iteration
 		return true
 	})
 
