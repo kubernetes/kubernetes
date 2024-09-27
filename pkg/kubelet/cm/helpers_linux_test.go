@@ -611,8 +611,6 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 	guaranteedQuota := MilliCPUToQuota(100, int64(defaultQuotaPeriod))
 	guaranteedTunedQuota := MilliCPUToQuota(100, int64(tunedQuotaPeriod))
 	guaranteedOneCPUShares := MilliCPUToShares(1000)
-	guaranteedOneCPUQuota := MilliCPUToQuota(1000, int64(defaultQuotaPeriod))
-	guaranteedOneCPUTunedQuota := MilliCPUToQuota(1000, int64(tunedQuotaPeriod))
 	memoryQuantity = resource.MustParse("100Mi")
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
