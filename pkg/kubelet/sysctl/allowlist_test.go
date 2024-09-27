@@ -86,12 +86,14 @@ func TestAllowlist(t *testing.T) {
 		t.Fatalf("failed to create allowlist: %v", err)
 	}
 
+	ctx := ktesting.Init(t)
+
 	for _, test := range valid {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err != nil {
 			t.Errorf("expected to be allowlisted: %+v, got: %v", test, err)
 		}
 		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
-		status := w.Admit(attrs)
+		status := w.Admit(ctx, attrs)
 		if !status.Admit {
 			t.Errorf("expected to be allowlisted: %+v, got: %+v", test, status)
 		}
@@ -104,7 +106,7 @@ func TestAllowlist(t *testing.T) {
 		pod.Spec.HostNetwork = test.hostNet
 		pod.Spec.HostIPC = test.hostIPC
 		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
-		status := w.Admit(attrs)
+		status := w.Admit(ctx, attrs)
 		if status.Admit {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
@@ -112,7 +114,7 @@ func TestAllowlist(t *testing.T) {
 
 	// test for: len(pod.Spec.SecurityContext.Sysctls) == 0
 	pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{}
-	status := w.Admit(attrs)
+	status := w.Admit(ctx, attrs)
 	if !status.Admit {
 		t.Errorf("expected to be allowlisted,got %+v", status)
 	}

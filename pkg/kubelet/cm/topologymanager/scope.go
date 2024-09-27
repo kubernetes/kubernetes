@@ -17,9 +17,10 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -41,7 +42,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
@@ -135,9 +136,9 @@ func (s *scope) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(ctx, pod, &container)
 		if err != nil {
 			return admission.GetPodAdmitResult(err)
 		}
@@ -147,9 +148,9 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track providers anymore
-func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
+func (s *scope) allocateAlignedResources(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
 	for _, provider := range s.hintProviders {
-		err := provider.Allocate(pod, container)
+		err := provider.Allocate(ctx, pod, container)
 		if err != nil {
 			return err
 		}

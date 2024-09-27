@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type policyMergeTestCase struct {
@@ -1276,7 +1277,8 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
 		for _, provider := range tc.hp {
-			hints := provider.GetTopologyHints(&v1.Pod{}, &v1.Container{})
+			ctx := ktesting.Init(t)
+			hints := provider.GetTopologyHints(ctx, &v1.Pod{}, &v1.Container{})
 			providersHints = append(providersHints, hints)
 		}
 

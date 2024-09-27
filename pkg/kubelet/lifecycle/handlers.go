@@ -214,7 +214,7 @@ type appArmorAdmitHandler struct {
 	apparmor.Validator
 }
 
-func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (a *appArmorAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	// If the pod is already running or terminated, no need to recheck AppArmor.
 	if attrs.Pod.Status.Phase != v1.PodPending {
 		return PodAdmitResult{Admit: true}

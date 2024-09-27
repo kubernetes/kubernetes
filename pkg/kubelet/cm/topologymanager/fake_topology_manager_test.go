@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFakeManager(t *testing.T) {
@@ -116,7 +117,8 @@ func TestFakeAdmit(t *testing.T) {
 		pod := v1.Pod{}
 		pod.Status.QOSClass = tc.qosClass
 		podAttr.Pod = &pod
-		actual := fm.Admit(&podAttr)
+		ctx := ktesting.Init(t)
+		actual := fm.Admit(ctx, &podAttr)
 		if reflect.DeepEqual(actual, tc.result) {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.result, actual.Admit)
 		}

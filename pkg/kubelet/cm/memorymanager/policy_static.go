@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -392,7 +393,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
@@ -420,7 +421,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}

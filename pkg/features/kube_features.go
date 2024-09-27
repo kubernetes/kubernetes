@@ -990,6 +990,16 @@ const (
 	// operation when scheduling a Pod by setting the `metadata.labels` field on the submitted Binding,
 	// similar to how `metadata.annotations` behaves.
 	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
+
+	// owner: @SergeyKanzhelev
+	// beta: v1.33
+	//
+	// Enables PodAdmissionTimeout, which limits individual pod admission to maxSinglePodAdmissionTimeout (default: 30s).
+	// If a device plugin's `Allocate` call hangs, kubelet will timeout after maxSinglePodAdmissionTimeout
+	// and reject the pod instead of waiting indefinitely and blocking other pod admissions.
+	//
+	// This feature gate will be locked to true and removed in v1.36 (+2 releases) if no bugs are reported.
+	PodAdmissionTimeout featuregate.Feature = "PodAdmissionTimeout"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1876,6 +1886,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	DisableCPUQuotaWithExclusiveCPUs: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+	PodAdmissionTimeout: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 }
 

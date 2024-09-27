@@ -829,7 +829,8 @@ func TestHandlePortConflicts(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	ctx := ktesting.Init(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -872,7 +873,8 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	ctx := ktesting.Init(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -914,7 +916,8 @@ func TestHandleNodeSelector(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	ctx := ktesting.Init(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -978,7 +981,8 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 
 			pod := podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: test.podSelector})
 
-			kl.HandlePodAdditions([]*v1.Pod{pod})
+			ctx := ktesting.Init(t)
+			kl.HandlePodAdditions(ctx, []*v1.Pod{pod})
 
 			// Check pod status stored in the status map.
 			checkPodStatus(t, kl, pod, test.podStatus)
@@ -1033,7 +1037,9 @@ func TestHandleMemExceeded(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	ctx := ktesting.Init(t)
+
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -1165,7 +1171,8 @@ func TestHandlePluginResources(t *testing.T) {
 	missingPod := podWithUIDNameNsSpec("3", "missingpod", "foo", missingPodSpec)
 	failedPod := podWithUIDNameNsSpec("4", "failedpod", "foo", failedPodSpec)
 
-	kl.HandlePodAdditions([]*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
+	ctx := ktesting.Init(t)
+	kl.HandlePodAdditions(ctx, []*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
@@ -1187,7 +1194,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	podToTest := pods[1]
 	// Run once to populate the status map.
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
 		t.Fatalf("expected to have status cached for pod2")
 	}
@@ -2344,7 +2351,7 @@ type testPodAdmitHandler struct {
 }
 
 // Admit rejects all pods in the podsToReject list with a matching UID.
-func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (a *testPodAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	for _, podToReject := range a.podsToReject {
 		if podToReject.UID == attrs.Pod.UID {
 			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}
@@ -2391,7 +2398,8 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	kl.admitHandlers.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
 
-	kl.HandlePodAdditions(pods)
+	ctx := ktesting.Init(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
@@ -2601,7 +2609,8 @@ func TestPodResourceAllocationReset(t *testing.T) {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
 			}
-			kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
+			ctx := ktesting.Init(t)
+			kubelet.HandlePodAdditions(ctx, []*v1.Pod{tc.pod})
 
 			allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(tc.pod.UID, tc.pod.Spec.Containers[0].Name)
 			if !found {
@@ -2770,7 +2779,8 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			for i, c := range originalPod.Spec.Containers {
 				setContainerStatus(podStatus, &c, i)
 			}
-			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+			ctx := ktesting.Init(t)
+			updatedPod, err := kubelet.handlePodResourcesResize(ctx, newPod, podStatus)
 			require.NoError(t, err)
 			updatedPodCtr := updatedPod.Spec.Containers[0]
 			assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
@@ -3187,8 +3197,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				// Put the container in backoff so we can confirm backoff is reset.
 				backoffKey := kuberuntime.GetStableKey(originalPod, originalCtr)
 				kubelet.crashLoopBackOff.Next(backoffKey, now)
-
-				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+				ctx := ktesting.Init(t)
+				updatedPod, err := kubelet.handlePodResourcesResize(ctx, newPod, podStatus)
 				require.NoError(t, err)
 
 				var updatedPodCtr v1.Container

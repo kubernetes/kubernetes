@@ -144,6 +144,9 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
+	// Max amount of time to admit a single Pod, mostly accounting for device plugin allocation.
+	maxSinglePodAdmissionTimeout = 30 * time.Second
+
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
@@ -273,7 +276,7 @@ func getContainerEtcHostsPath() string {
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
-	HandlePodAdditions(pods []*v1.Pod)
+	HandlePodAdditions(ctx context.Context, pods []*v1.Pod)
 	HandlePodUpdates(pods []*v1.Pod)
 	HandlePodRemoves(pods []*v1.Pod)
 	HandlePodReconcile(pods []*v1.Pod)
@@ -1928,7 +1931,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
-		pod, err = kl.handlePodResourcesResize(pod, podStatus)
+		pod, err = kl.handlePodResourcesResize(ctx, pod, podStatus)
 		if err != nil {
 			return false, err
 		}
@@ -2394,14 +2397,20 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (kl *Kubelet) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (kl *Kubelet) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+	var cancel context.CancelFunc
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodAdmissionTimeout) {
+		ctx, cancel = context.WithTimeout(ctx, maxSinglePodAdmissionTimeout)
+		defer cancel()
+	}
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range kl.admitHandlers {
-		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
+
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 
 			return false, result.Reason, result.Message
@@ -2524,7 +2533,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// ADD as if they are new pods. These pods will then go through the
 			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
-			handler.HandlePodAdditions(u.Pods)
+			handler.HandlePodAdditions(ctx, u.Pods)
 		case kubetypes.UPDATE:
 			klog.V(2).InfoS("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
@@ -2646,7 +2655,7 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
-func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
+func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
@@ -2695,7 +2704,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
 
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
+				if ok, reason, message := kl.canAdmitPod(ctx, allocatedPods, pod); !ok {
 					kl.rejectPod(pod, reason, message)
 					// We avoid recording the metric in canAdmitPod because it's called
 					// repeatedly during a resize, which would inflate the metric.
@@ -2710,8 +2719,9 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
 			} else {
+
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(allocatedPods, pod); !ok {
+				if ok, reason, message := kl.canAdmitPod(ctx, allocatedPods, pod); !ok {
 					kl.rejectPod(pod, reason, message)
 					// We avoid recording the metric in canAdmitPod because it's called
 					// repeatedly during a resize, which would inflate the metric.
@@ -2865,7 +2875,7 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
-func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
+func (kl *Kubelet) canResizePod(ctx context.Context, pod *v1.Pod) (bool, string, string) {
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
@@ -2909,7 +2919,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 	allocatedPods := kl.getAllocatedPods()
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
-	if ok, failReason, failMessage := kl.canAdmitPod(allocatedPods, pod); !ok {
+	if ok, failReason, failMessage := kl.canAdmitPod(ctx, allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
 		return false, v1.PodReasonDeferred, failMessage
@@ -2955,7 +2965,7 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (allocatedPod *v1.Pod, err error) {
+func (kl *Kubelet) handlePodResourcesResize(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (allocatedPod *v1.Pod, err error) {
 	// Always check whether a resize is in progress so we can set the PodResizeInProgressCondition
 	// accordingly.
 	defer func() {
@@ -2990,7 +3000,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := kl.canResizePod(pod)
+	fit, reason, message := kl.canResizePod(ctx, pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := kl.allocationManager.SetAllocatedResources(pod); err != nil {

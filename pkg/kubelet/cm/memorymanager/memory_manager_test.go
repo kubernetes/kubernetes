@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -106,11 +107,11 @@ func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Containe
 func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
 }
 
-func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
@@ -1405,7 +1406,8 @@ func TestAddContainer(t *testing.T) {
 			}
 			pod := testCase.podAllocate
 			container := &pod.Spec.Containers[0]
-			err := mgr.Allocate(pod, container)
+			ctx := ktesting.Init(t)
+			err := mgr.Allocate(ctx, pod, container)
 			if !reflect.DeepEqual(err, testCase.expectedAllocateError) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
@@ -2161,7 +2163,8 @@ func TestGetTopologyHints(t *testing.T) {
 
 			pod := getPod("fakePod1", "fakeContainer1", requirementsGuaranteed)
 			container := &pod.Spec.Containers[0]
-			hints := mgr.GetTopologyHints(pod, container)
+			ctx := ktesting.Init(t)
+			hints := mgr.GetTopologyHints(ctx, pod, container)
 			if !reflect.DeepEqual(hints, testCase.expectedHints) {
 				t.Errorf("Hints were not generated correctly. Hints generated: %+v, hints expected: %+v",
 					hints, testCase.expectedHints)
@@ -2321,6 +2324,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(testCase),
@@ -2338,7 +2342,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Allocates memory for init containers
 			for i := range testCase.podAllocate.Spec.InitContainers {
-				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i])
+				err := mgr.Allocate(ctx, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2346,7 +2350,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Allocates memory for apps containers
 			for i := range testCase.podAllocate.Spec.Containers {
-				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i])
+				err := mgr.Allocate(ctx, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}

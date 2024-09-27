@@ -143,7 +143,7 @@ func NewManager(
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	m.RLock()
 	defer m.RUnlock()
 	if len(m.nodeConditions) == 0 {
