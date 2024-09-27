@@ -158,7 +158,7 @@ if [[ ${#testcases[@]} -eq 0 ]]; then
   kube::util::read-array testcases < <(kube::test::find_go_packages)
 else
   # If the user passed targets, we should normalize them.
-  # This can be slow!
+  # This can be slow for large numbers of inputs.
   kube::log::status "Normalizing Go targets"
   kube::util::read-array testcases < <(kube::golang::normalize_go_targets "${testcases[@]}")
 fi
