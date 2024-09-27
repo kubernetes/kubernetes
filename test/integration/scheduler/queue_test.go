@@ -954,22 +954,27 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					}
 				}
 
-				// Wait for the tt.pods to be present in the scheduling queue.
+				// Wait for the tt.pods to be present in the scheduling active queue.
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
-					return len(pendingPods) == len(tt.pods), nil
+					return len(pendingPods) == len(tt.pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.pods), nil
 				}); err != nil {
 					t.Fatal(err)
 				}
 
 				t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
 
-				// Pop all pods out. They should be unschedulable.
+				// Pop all pods out. They should become unschedulable.
 				for i := 0; i < len(tt.pods); i++ {
 					testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 				}
-				// Wait for the tt.pods to be still present in the scheduling queue.
+				// Wait for the tt.pods to be still present in the scheduling (unschedulable) queue.
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
+					if activePodsCount > 0 {
+						return false, fmt.Errorf("Active queue was expected to be empty, but found %v Pods", activePodsCount)
+					}
+
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 					return len(pendingPods) == len(tt.pods), nil
 				}); err != nil {
