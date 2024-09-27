@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -111,10 +112,9 @@ func NewHollowKubelet(
 		HostUtil:                  hostutil.NewFakeHostUtil(nil),
 		PodStartupLatencyTracker:  kubeletutil.NewPodStartupLatencyTracker(),
 		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(),
-		TracerProvider:            noopoteltrace.NewTracerProvider(),
 		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}
-
+	otel.SetTracerProvider(noopoteltrace.NewTracerProvider())
 	return &HollowKubelet{
 		KubeletFlags:         flags,
 		KubeletConfiguration: config,

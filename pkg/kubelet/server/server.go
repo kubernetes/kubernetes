@@ -38,6 +38,7 @@ import (
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
+	"go.opentelemetry.io/otel"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -155,8 +156,7 @@ func ListenAndServeKubeletServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
-	auth AuthInterface,
-	tp oteltrace.TracerProvider) {
+	auth AuthInterface) {
 
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
@@ -164,7 +164,7 @@ func ListenAndServeKubeletServer(
 	handler := NewServer(host, resourceAnalyzer, auth, kubeCfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		handler.InstallTracingFilter(tp)
+		handler.InstallTracingFilter(otel.GetTracerProvider())
 	}
 
 	s := &http.Server{
@@ -196,13 +196,12 @@ func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	address net.IP,
-	port uint,
-	tp oteltrace.TracerProvider) {
+	port uint) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
 	s := NewServer(host, resourceAnalyzer, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
+		s.InstallTracingFilter(otel.GetTracerProvider(), otelrestful.WithPublicEndpoint())
 	}
 
 	server := &http.Server{

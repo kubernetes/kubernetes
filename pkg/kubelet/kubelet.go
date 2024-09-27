@@ -35,6 +35,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/selinux/go-selinux"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -238,8 +239,8 @@ type Bootstrap interface {
 	GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
-	ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider)
+	ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface)
+	ListenAndServeReadOnly(address net.IP, port uint)
 	ListenAndServePodResources()
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
@@ -268,7 +269,6 @@ type Dependencies struct {
 	ProbeManager              prober.Manager
 	Recorder                  record.EventRecorder
 	Subpather                 subpath.Interface
-	TracerProvider            trace.TracerProvider
 	VolumePlugins             []volume.VolumePlugin
 	DynamicPluginProber       volume.DynamicPluginProber
 	TLSOptions                *server.TLSOptions
@@ -327,7 +327,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration, 
 
 	var tp trace.TracerProvider
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		tp = kubeDeps.TracerProvider
+		tp = otel.GetTracerProvider()
 	}
 
 	logger := klog.Background()
@@ -525,7 +525,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		CheckRedirect: httpprobe.RedirectChecker(false),
 	}
 
-	tracer := kubeDeps.TracerProvider.Tracer(instrumentationScope)
+	tracer := otel.GetTracerProvider().Tracer(instrumentationScope)
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -690,7 +690,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeDeps.PodStartupLatencyTracker,
-		kubeDeps.TracerProvider,
+		otel.GetTracerProvider(),
 	)
 	if err != nil {
 		return nil, err
@@ -777,7 +777,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, otel.GetTracerProvider())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -2940,14 +2940,13 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
-	auth server.AuthInterface, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, kubeCfg, tlsOptions, auth, tp)
+func (kl *Kubelet) ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface) {
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, kubeCfg, tlsOptions, auth)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
-func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, tp)
+func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port)
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service

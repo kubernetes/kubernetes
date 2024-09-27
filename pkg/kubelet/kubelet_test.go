@@ -3046,7 +3046,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		MemoryThrottlingFactor:                    utilpointer.Float64(0),
 	}
 	var prober volume.DynamicPluginProber
-	tp := noopoteltrace.NewTracerProvider()
 	cadvisor := cadvisortest.NewMockInterface(t)
 	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
 	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
@@ -3073,7 +3072,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		KubeClient:           nil, // standalone mode
 		HeartbeatClient:      nil,
 		EventClient:          nil,
-		TracerProvider:       tp,
 		HostUtil:             hostutil.NewFakeHostUtil(nil),
 		Mounter:              mount.NewFakeMounter(nil),
 		Recorder:             fakeRecorder,
