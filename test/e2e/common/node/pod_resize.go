@@ -848,6 +848,37 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 			addExtendedResource: true,
 		},
+		{
+			name: "Burstable QoS pod, two containers - increase c1 memory requests only, decrease c2 memory requests only, (set RestartContainer but, not restarted)",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "200Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"150Mi"}}},
+						{"name":"c2", "resources":{"requests":{"memory":"150Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "150Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "150Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
@@ -888,7 +919,7 @@ func doPodResizeTests(f *framework.Framework) {
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources are as expected")
-			e2epod.VerifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, tc.containers))
 			ginkgo.By("verifying initial cgroup config are as expected")
 			framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
 
@@ -986,7 +1017,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
-			e2epod.VerifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, tc.containers))
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
