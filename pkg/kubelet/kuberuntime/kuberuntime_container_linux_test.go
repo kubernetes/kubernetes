@@ -558,7 +558,7 @@ func TestCalculateLinuxResourcesWithStaticCpuPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
-		setCpuPolicyDuringTest(test.cmPolicy)
+		setCPUPolicyDuringTest(test.cmPolicy)
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, test.podQos)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
@@ -1632,7 +1632,7 @@ const (
 	cgroupV2 CgroupVersion = "v2"
 )
 
-func setCpuPolicyDuringTest(cpuPolicy string) {
+func setCPUPolicyDuringTest(cpuPolicy string) {
 	isStaticCPUPolicyConditionSatisfied = func(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *resource.Quantity) bool {
 		return cpumanager.StaticCPUPolicyConditionsSatisfied(cpuPolicy, podQos, cpuRequest)
 	}
