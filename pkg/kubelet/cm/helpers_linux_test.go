@@ -66,6 +66,8 @@ func TestResourceConfigForPod(t *testing.T) {
 	burstableQuota := MilliCPUToQuota(200, int64(defaultQuotaPeriod))
 	guaranteedShares := MilliCPUToShares(100)
 	guaranteedQuota := MilliCPUToQuota(100, int64(defaultQuotaPeriod))
+	guaranteedOneCPUShares := MilliCPUToShares(1000)
+	guaranteedOneCPUQuota := MilliCPUToQuota(1000, int64(defaultQuotaPeriod))
 	guaranteedTunedQuota := MilliCPUToQuota(100, int64(tunedQuotaPeriod))
 	memoryQuantity = resource.MustParse("100Mi")
 	cpuNoLimit := int64(-1)
@@ -262,7 +264,7 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &guaranteedOneCPUQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 			cmPolicy:         cpuPolicyNone,
 		},
 		"guaranteed-non-integer-cpu-none-cpu-policy": {
@@ -608,9 +610,9 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 	guaranteedShares := MilliCPUToShares(100)
 	guaranteedQuota := MilliCPUToQuota(100, int64(defaultQuotaPeriod))
 	guaranteedTunedQuota := MilliCPUToQuota(100, int64(tunedQuotaPeriod))
-	guaranteedFullCpuShares := MilliCPUToShares(1000)
-	guaranteedFullCpuQuota := MilliCPUToQuota(1000, int64(defaultQuotaPeriod))
-	guaranteedFullCpuTunedQuota := MilliCPUToQuota(1000, int64(tunedQuotaPeriod))
+	guaranteedOneCPUShares := MilliCPUToShares(1000)
+	guaranteedOneCPUQuota := MilliCPUToQuota(1000, int64(defaultQuotaPeriod))
+	guaranteedOneCPUTunedQuota := MilliCPUToQuota(1000, int64(tunedQuotaPeriod))
 	memoryQuantity = resource.MustParse("100Mi")
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
@@ -806,7 +808,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedFullCpuShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-integer-cpu-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -820,7 +822,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedFullCpuShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-decimal-one-cpu": {
 			pod: &v1.Pod{
@@ -834,7 +836,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedFullCpuShares, CPUQuota: &guaranteedFullCpuQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &guaranteedOneCPUQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 		"guaranteed-decimal-one-cpu-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -848,7 +850,7 @@ func TestResourceConfigForPodWithStaticCpuPolicy(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &guaranteedFullCpuShares, CPUQuota: &guaranteedFullCpuTunedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+			expected:         &ResourceConfig{CPUShares: &guaranteedOneCPUShares, CPUQuota: &guaranteedOneCPUTunedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
 	}
 

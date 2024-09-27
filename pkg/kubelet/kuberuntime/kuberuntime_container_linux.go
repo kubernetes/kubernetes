@@ -337,9 +337,7 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 
 // Note: this function variable is being added here so it would be possible to mock
 // the cpu manager policy for unit tests by assigning a new mocked function into it.
-var isStaticCPUPolicyConditionSatisfied = func(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *resource.Quantity) bool {
-	return cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicyName, podQos, cpuRequest)
-}
+var isStaticCPUPolicyConditionSatisfied = cpumanager.StaticCPUPolicyConditionsSatisfied
 
 // Note: this function variable is being added here so it would be possible to mock
 // the cgroup version for unit tests by assigning a new mocked function into it. Without it,
