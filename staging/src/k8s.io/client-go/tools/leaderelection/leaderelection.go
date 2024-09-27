@@ -207,11 +207,11 @@ type LeaderElector struct {
 // stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
-	defer le.config.Callbacks.OnStoppedLeading()
 
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
+	defer le.config.Callbacks.OnStoppedLeading()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go le.config.Callbacks.OnStartedLeading(ctx)
