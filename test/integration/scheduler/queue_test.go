@@ -970,14 +970,15 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				// Wait for the tt.pods to be still present in the scheduling (unschedulable) queue.
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
+					if activePodsCount > 0 {
+						return false, fmt.Errorf("Active queue was expected to be empty, but found %v Pods", activePodsCount)
+					}
+
 					pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 					return len(pendingPods) == len(tt.pods), nil
 				}); err != nil {
 					t.Fatal(err)
-				}
-				activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
-				if activePodsCount > 0 {
-					t.Fatalf("Active queue was expected to be empty, but found %v Pods", activePodsCount)
 				}
 
 				t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
