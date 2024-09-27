@@ -341,7 +341,7 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 	} else {
 		// Using default local DaemonSet
 		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
-		data, err := e2etestfiles.Read("test/e2e/testing-manifests/scheduling/nvidia-driver-installer.yaml")
+		data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-driver-installer.yaml")
 		framework.ExpectNoError(err, "failed to read local manifest for nvidia-driver-installer daemonset")
 		ds, err = e2emanifest.DaemonSetFromData(data)
 		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
@@ -349,14 +349,27 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 
 	prev, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(ctx, ds.Name, metav1.GetOptions{})
 	if err == nil && prev != nil {
-		framework.Logf("Daemonset already installed, skipping...")
-		return
+		framework.Logf("nvidia-driver-installer Daemonset already installed, skipping...")
+	} else {
+		ds.Namespace = f.Namespace.Name
+		_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
+		framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 	}
 
-	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
-	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
+	data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-gpu-device-plugin.yaml")
+	framework.ExpectNoError(err, "failed to read local manifest for nvidia-gpu-device-plugin daemonset")
+	ds, err = e2emanifest.DaemonSetFromData(data)
+	framework.ExpectNoError(err, "failed to parse local manifest for nvidia-gpu-device-plugin daemonset")
+
+	prev, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
+	if err == nil && prev != nil {
+		framework.Logf("nvidia-gpu-device-plugin Daemonset already installed, skipping...")
+	} else {
+		_, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Create(ctx, ds, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create nvidia-gpu-device-plugin daemonset")
+		framework.Logf("Successfully created daemonset to install Nvidia device plugin.")
+	}
 
 	waitForGPUs(ctx, f, ds.Namespace, ds.Name)
 }
