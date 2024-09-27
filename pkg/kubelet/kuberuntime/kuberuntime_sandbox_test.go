@@ -91,7 +91,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, sandboxes, 1)
 	assert.Equal(t, sandboxes[0].Id, fmt.Sprintf("%s_%s_%s_1", pod.Name, pod.Namespace, pod.UID))
-	assert.Equal(t, sandboxes[0].State, runtimeapi.PodSandboxState_SANDBOX_READY)
+	assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandboxes[0].State)
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {

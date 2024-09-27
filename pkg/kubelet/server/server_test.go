@@ -918,9 +918,9 @@ func TestCheckpointContainer(t *testing.T) {
 			t.Errorf("Got error POSTing: %v", err)
 		}
 		defer resp.Body.Close()
-		assert.Equal(t, resp.StatusCode, 500)
+		assert.Equal(t, 500, resp.StatusCode)
 		body, _ := io.ReadAll(resp.Body)
-		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
+		assert.Equal(t, "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)", string(body))
 	})
 	// Now test a successful checkpoint succeeds
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
@@ -929,7 +929,7 @@ func TestCheckpointContainer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Got error POSTing: %v", err)
 		}
-		assert.Equal(t, resp.StatusCode, 200)
+		assert.Equal(t, 200, resp.StatusCode)
 	})
 
 	// Now test for 404 if checkpointing support is explicitly disabled.

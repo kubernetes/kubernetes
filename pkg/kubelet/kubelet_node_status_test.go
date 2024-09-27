@@ -323,7 +323,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			actions := kubeClient.Actions()
 			require.Len(t, actions, 2)
 			require.True(t, actions[1].Matches("patch", "nodes"))
-			require.Equal(t, actions[1].GetSubresource(), "status")
+			require.Equal(t, "status", actions[1].GetSubresource())
 
 			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 			assert.NoError(t, err)
@@ -719,7 +719,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		actions := kubeClient.Actions()
 		require.Len(t, actions, 2)
 		require.True(t, actions[1].Matches("patch", "nodes"))
-		require.Equal(t, actions[1].GetSubresource(), "status")
+		require.Equal(t, "status", actions[1].GetSubresource())
 
 		updatedNode, err := kubeClient.CoreV1().Nodes().Get(ctx, testKubeletHostname, metav1.GetOptions{})
 		require.NoError(t, err, "can't apply node status patch")
@@ -1642,7 +1642,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 1)
 	require.True(t, actions[0].Matches("patch", "nodes"))
-	require.Equal(t, actions[0].GetSubresource(), "status")
+	require.Equal(t, "status", actions[0].GetSubresource())
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[0].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
