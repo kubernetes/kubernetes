@@ -828,6 +828,18 @@ function kube::util::read-array {
   fi
 }
 
+# kube::util::run-in
+# Changes directory to "$1", runs the rest of the arguments, and restores the initial directory
+# Returns 1 if a directory change fails, the result of running the arguments otherwise
+function kube::util::run-in {
+  pushd "$1" > /dev/null || return 1
+  shift
+  "$@"
+  local result=$?
+  popd > /dev/null || return 1
+  return $result
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
