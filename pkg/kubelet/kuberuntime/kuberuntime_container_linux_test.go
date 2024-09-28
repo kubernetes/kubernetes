@@ -780,7 +780,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 			} else {
 				assert.NotEmpty(t, err, "Unexpected success")
 				assert.Empty(t, actual, "Unexpected non empty value")
-				assert.Contains(t, err.Error(), tc.expectedErrMsg, "Error for %s", tc.name)
+				assert.ErrorContainsf(t, err, tc.expectedErrMsg, "Error for %s", tc.name)
 			}
 		})
 	}

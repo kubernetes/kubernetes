@@ -933,7 +933,7 @@ profiles:
 			if err != nil {
 				if tc.expectedError != "" || tc.checkErrFn != nil {
 					if tc.expectedError != "" {
-						assert.Contains(t, err.Error(), tc.expectedError)
+						assert.ErrorContains(t, err, tc.expectedError)
 					}
 					if tc.checkErrFn != nil {
 						assert.True(t, tc.checkErrFn(err), "got error: %v", err)

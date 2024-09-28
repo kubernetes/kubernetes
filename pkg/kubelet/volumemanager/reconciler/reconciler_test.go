@@ -1142,7 +1142,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			err := oex.MountVolume(waitForAttachTimeout, volumeToMount, asw, false)
 			// Assert
 			if assert.Error(t, err) {
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			}
 		})
 	}
@@ -1184,7 +1184,7 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			err := oex.UnmountVolume(volumeToUnmount, asw, "" /* podsDir */)
 			// Assert
 			if assert.Error(t, err) {
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			}
 		})
 	}
@@ -1225,7 +1225,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 			err := oex.UnmountDevice(deviceToDetach, asw, hostutil)
 			// Assert
 			if assert.Error(t, err) {
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			}
 		})
 	}
