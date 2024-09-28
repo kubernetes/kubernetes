@@ -357,14 +357,14 @@ func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
 func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
 	tc := &tunnelingWebsocketUpgraderConn{conn: &mockConn{}}
 	expected := time.Now()
-	assert.Nil(t, tc.SetDeadline(expected), "SetDeadline does not return error")
+	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "SetDeadline() sets read deadline")
 	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "SetDeadline() sets write deadline")
 	expected = time.Now()
-	assert.Nil(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
+	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "Expected write deadline set")
 	expected = time.Now()
-	assert.Nil(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
+	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "Expected read deadline set")
 	expectedErr := fmt.Errorf("deadline error")
 	tc = &tunnelingWebsocketUpgraderConn{conn: &mockConn{deadlineErr: expectedErr}}
@@ -373,9 +373,9 @@ func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
 	assert.Equal(t, expectedErr, actualErr, "SetDeadline() expected error returned")
 	// Connection nil, returns nil error.
 	tc.conn = nil
-	assert.Nil(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
-	assert.Nil(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
-	assert.Nil(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
 }
 
 var expectedContentLengthHeaders = http.Header{
