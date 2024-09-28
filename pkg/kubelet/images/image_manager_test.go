@@ -635,7 +635,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: crierrors.ErrRegistryUnavailable,
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
-				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable")
+				assert.Equal(t, "image pull failed for test because the registry is unavailable", msg)
 			},
 		},
 		{
@@ -643,7 +643,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: fmt.Errorf("%v: foo", crierrors.ErrRegistryUnavailable),
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
-				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable: foo")
+				assert.Equal(t, "image pull failed for test because the registry is unavailable: foo", msg)
 			},
 		},
 		{
@@ -651,7 +651,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: crierrors.ErrSignatureValidationFailed,
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
-				assert.Equal(t, msg, "image pull failed for test because the signature validation failed")
+				assert.Equal(t, "image pull failed for test because the signature validation failed", msg)
 			},
 		},
 		{
@@ -659,7 +659,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: fmt.Errorf("%w: bar", crierrors.ErrSignatureValidationFailed),
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
-				assert.Equal(t, msg, "image pull failed for test because the signature validation failed: bar")
+				assert.Equal(t, "image pull failed for test because the signature validation failed: bar", msg)
 			},
 		},
 	} {

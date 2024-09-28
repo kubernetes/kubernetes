@@ -279,7 +279,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	}
 	apiVersions := metav1.APIVersions{}
 	assert.NoError(decodeResponse(resp, &apiVersions))
-	assert.Equal(apiVersions.APIVersion, "")
+	assert.Equal("", apiVersions.APIVersion)
 
 	// /api/v1 exists in release-1.1
 	resp, err = http.Get(server.URL + "/api/v1")
@@ -288,7 +288,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	}
 	resourceList := metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
-	assert.Equal(resourceList.APIVersion, "")
+	assert.Equal("", resourceList.APIVersion)
 
 	// /apis exists in release-1.1
 	resp, err = http.Get(server.URL + "/apis")
@@ -297,7 +297,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	}
 	groupList := metav1.APIGroupList{}
 	assert.NoError(decodeResponse(resp, &groupList))
-	assert.Equal(groupList.APIVersion, "")
+	assert.Equal("", groupList.APIVersion)
 
 	// /apis/autoscaling doesn't exist in release-1.1, so the APIVersion field
 	// should be non-empty in the results returned by the server.
@@ -307,7 +307,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	}
 	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
-	assert.Equal(group.APIVersion, "v1")
+	assert.Equal("v1", group.APIVersion)
 
 	// apis/autoscaling/v1 doesn't exist in release-1.1, so the APIVersion field
 	// should be non-empty in the results returned by the server.
@@ -318,7 +318,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	}
 	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
-	assert.Equal(resourceList.APIVersion, "v1")
+	assert.Equal("v1", resourceList.APIVersion)
 
 }
 

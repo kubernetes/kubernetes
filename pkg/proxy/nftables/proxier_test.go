@@ -4879,17 +4879,17 @@ func TestProxier_OnServiceCIDRsChanged(t *testing.T) {
 
 	proxier = &Proxier{ipFamily: v1.IPv4Protocol}
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "fd00:10:96::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "172.30.0.0/16")
+	assert.Equal(t, "172.30.0.0/16", proxier.serviceCIDRs)
 
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "172.30.0.0/16,172.50.0.0/16")
+	assert.Equal(t, "172.30.0.0/16,172.50.0.0/16", proxier.serviceCIDRs)
 
 	proxier = &Proxier{ipFamily: v1.IPv6Protocol}
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "fd00:10:96::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112")
+	assert.Equal(t, "fd00:10:96::/112", proxier.serviceCIDRs)
 
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112,fd00:172:30::/112")
+	assert.Equal(t, "fd00:10:96::/112,fd00:172:30::/112", proxier.serviceCIDRs)
 }
 
 // TestBadIPs tests that "bad" IPs and CIDRs in Services/Endpoints are rewritten to

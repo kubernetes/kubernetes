@@ -2397,12 +2397,12 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 		if vol.VolumeName == volumeName1 {
 			// devicePath + attachability must have been updated from node.status
 			assert.True(t, vol.PluginIsAttachable)
-			assert.Equal(t, vol.DevicePath, "fake/path")
+			assert.Equal(t, "fake/path", vol.DevicePath)
 		}
 		if vol.VolumeName == volumeName2 {
 			// only attachability was updated from node.status
 			assert.False(t, vol.PluginIsAttachable)
-			assert.Equal(t, vol.DevicePath, "/dev/reconstructed")
+			assert.Equal(t, "/dev/reconstructed", vol.DevicePath)
 		}
 	}
 }

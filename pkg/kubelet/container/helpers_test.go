@@ -905,7 +905,7 @@ func TestHasWindowsHostProcessContainer(t *testing.T) {
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 			result := HasWindowsHostProcessContainer(pod)
-			assert.Equal(t, result, testCase.expectedResult)
+			assert.Equal(t, testCase.expectedResult, result)
 		})
 	}
 }

@@ -615,7 +615,7 @@ func TestStaticPod(t *testing.T) {
 	assert.True(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Logf("Should sync pod because the corresponding mirror pod is created")
-	assert.Equal(t, m.syncBatch(true), 1)
+	assert.Equal(t, 1, m.syncBatch(true))
 	verifyActions(t, m, []core.Action{getAction(), patchAction()})
 
 	t.Logf("syncBatch should not sync any pods because nothing is changed.")
@@ -629,7 +629,7 @@ func TestStaticPod(t *testing.T) {
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)
 
 	t.Logf("Should not update to mirror pod, because UID has changed.")
-	assert.Equal(t, m.syncBatch(true), 1)
+	assert.Equal(t, 1, m.syncBatch(true))
 	verifyActions(t, m, []core.Action{getAction()})
 }
 
