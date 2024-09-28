@@ -23726,7 +23726,7 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Profile %s should be valid", test.profile)
 		} else {
-			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+			assert.Errorf(t, err, "Profile %s should not be valid", test.profile)
 		}
 	}
 }

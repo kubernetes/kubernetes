@@ -1316,21 +1316,21 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		podStatus := &v1.PodStatus{ContainerStatuses: tc.statuses}
 		_, err := kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
 		if !tc.success {
-			assert.Error(t, err, fmt.Sprintf("[case %d] error", i))
+			assert.Errorf(t, err, "[case %d] error", i)
 		} else {
-			assert.NoError(t, err, "[case %d] error", i)
+			assert.NoErrorf(t, err, "[case %d] error", i)
 		}
 		// Access the log of the previous, terminated container
 		previous = true
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
 		if !tc.pSuccess {
-			assert.Error(t, err, fmt.Sprintf("[case %d] error", i))
+			assert.Errorf(t, err, "[case %d] error", i)
 		} else {
-			assert.NoError(t, err, "[case %d] error", i)
+			assert.NoErrorf(t, err, "[case %d] error", i)
 		}
 		// Access the log of a container that's not in the pod
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
-		assert.Error(t, err, fmt.Sprintf("[case %d] invalid container name should cause an error", i))
+		assert.Errorf(t, err, "[case %d] invalid container name should cause an error", i)
 	}
 }
 
@@ -3267,10 +3267,10 @@ func TestSyncPodSpans(t *testing.T) {
 	assert.NotEmpty(t, runtimeServiceSpans, "syncPod trace should have runtime service spans")
 
 	for _, span := range imageServiceSpans {
-		assert.Equal(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), fmt.Sprintf("image service span %s %s should be child of root span", span.Name, span.Parent.SpanID()))
+		assert.Equalf(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), "image service span %s %s should be child of root span", span.Name, span.Parent.SpanID())
 	}
 
 	for _, span := range runtimeServiceSpans {
-		assert.Equal(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), fmt.Sprintf("runtime service span %s %s should be child of root span", span.Name, span.Parent.SpanID()))
+		assert.Equalf(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), "runtime service span %s %s should be child of root span", span.Name, span.Parent.SpanID())
 	}
 }
