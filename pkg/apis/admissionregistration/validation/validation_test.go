@@ -5596,7 +5596,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -5617,7 +5617,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5672,7 +5672,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -5698,7 +5698,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -5724,7 +5724,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -5750,7 +5750,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5777,7 +5777,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -5813,7 +5813,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5840,7 +5840,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5867,7 +5867,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -5903,7 +5903,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5930,7 +5930,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -5962,7 +5962,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 							"label": "value",
 						},
 					},
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 			},
 		},
@@ -5991,7 +5991,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.ParameterNotFoundActionType("invalid")),
+					ParameterNotFoundAction: ptr.To(admissionregistration.ParameterNotFoundActionType("invalid")),
 				},
 			},
 		},
@@ -6005,7 +6005,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 			},
 		},
@@ -6045,7 +6045,7 @@ func TestValidateMutatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -6079,7 +6079,7 @@ func TestValidateMutatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -6115,7 +6115,7 @@ func TestValidateMutatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
