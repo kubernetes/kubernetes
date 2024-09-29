@@ -1396,8 +1396,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
 	if options == nil {
-		// By default we should serve the request from etcd.
-		options = &metainternalversion.ListOptions{ResourceVersion: ""}
+		return nil, fmt.Errorf("options cannot be nil; please provide valid ListOptions")
 	}
 	if options.LabelSelector != nil {
 		label = options.LabelSelector
