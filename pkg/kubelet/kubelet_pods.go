@@ -44,7 +44,6 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -63,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -87,8 +87,6 @@ const (
 
 	kubeletUser = "kubelet"
 )
-
-const sysctlAllDisableIPv6 = "net/ipv6/conf/all/disable_ipv6"
 
 // parseGetSubIdsOutput parses the output from the `getsubids` tool, which is used to query subordinate user or group ID ranges for
 // a given user or group. getsubids produces a line for each mapping configured.
@@ -480,7 +478,7 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 			return err
 		}
 	} else {
-		isIPv6, err := isIPv6Supported()
+		isIPv6, err := util.IsIPv6Supported()
 		if err != nil {
 			return err
 		}
@@ -538,20 +536,6 @@ func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, 
 	}
 	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
 	return buffer.Bytes()
-}
-
-// isIPv6Supported determines whether the host supports ipv6 by check the global ipv6 support sysctl.
-// We use it to determine whether the pod should support ipv6.
-// But there are going to be edge cases we don't get right,
-// e.g. the user may have IPv6 enabled in the host netns,
-// but for some reason disable IPv6 in the pod netns.
-// But because kubelet cannot actually know about the loopback interface of the pod,
-// we cannot do something completely correct,
-// so we can only do simple and basically correct things.
-func isIPv6Supported() (bool, error) {
-	// TODO This should be injected by the caller.
-	val, err := utilsysctl.New().GetSysctl(sysctlAllDisableIPv6)
-	return val == 0, err
 }
 
 func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
