@@ -36,11 +36,8 @@ type NewRunner func() (func(ctx context.Context, workers int), error)
 // RunWithLeaderElection only returns when the context is done, or initial
 // leader election fails.
 func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn NewRunner) {
-	var cancel context.CancelFunc
-
 	callbacks := leaderelection.LeaderCallbacks{
 		OnStartedLeading: func(ctx context.Context) {
-			ctx, cancel = context.WithCancel(ctx)
 			var err error
 			run, err := newRunnerFn()
 			if err != nil {
@@ -50,7 +47,7 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 			run(ctx, 1)
 		},
 		OnStoppedLeading: func() {
-			cancel()
+			klog.Info("Stopped leading")
 		},
 	}
 
