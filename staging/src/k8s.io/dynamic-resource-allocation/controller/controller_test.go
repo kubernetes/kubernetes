@@ -30,10 +30,12 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 )
@@ -127,6 +129,11 @@ func TestController(t *testing.T) {
 		schedulingCtx, expectedSchedulingCtx *resourceapi.PodSchedulingContext
 		claim, expectedClaim                 *resourceapi.ResourceClaim
 		expectedWorkQueueState               Mock[string]
+		expectedError                        string
+		// expectedEvent is a slice of strings representing expected events.
+		// Each string in the slice should follow the format: "EventType Reason Message".
+		// - "Warning Failed processing failed"
+		expectedEvent []string
 	}{
 		"invalid-key": {
 			key: "claim:x/y/z",
@@ -164,6 +171,7 @@ func TestController(t *testing.T) {
 					claimKey: 1,
 				},
 			},
+			expectedEvent: []string{"Warning Failed deallocate: fake error"},
 		},
 
 		// deletion time stamp set, our finalizer set, not allocated  -> remove finalizer
@@ -184,6 +192,7 @@ func TestController(t *testing.T) {
 					claimKey: 1,
 				},
 			},
+			expectedEvent: []string{"Warning Failed stop allocation: fake error"},
 		},
 		// deletion time stamp set, other finalizer set, not allocated  -> do nothing
 		"deleted-finalizer-no-removal": {
@@ -209,6 +218,7 @@ func TestController(t *testing.T) {
 					claimKey: 1,
 				},
 			},
+			expectedEvent: []string{"Warning Failed deallocate: fake error"},
 		},
 		// deletion time stamp set, finalizer not set -> do nothing
 		"deleted-no-finalizer": {
@@ -401,6 +411,9 @@ func TestController(t *testing.T) {
 			}
 			var workQueueState Mock[string]
 			c := ctrl.(*controller)
+			// We need to mock the event recorder to test the controller's event.
+			fakeRecorder := record.NewFakeRecorder(100)
+			c.eventRecorder = fakeRecorder
 			workQueueState.SyncOne(test.key, c.sync)
 			assert.Equal(t, test.expectedWorkQueueState, workQueueState)
 
@@ -419,10 +432,8 @@ func TestController(t *testing.T) {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
 			}
 			assert.Equal(t, expectedPodSchedulings, podSchedulings.Items)
-
-			// TODO: add testing of events.
-			// Right now, client-go/tools/record/event.go:267 fails during unit testing with
-			// request namespace does not match object namespace, request: "" object: "default",
+			// Assert that the events are correct.
+			assertEqualEvents(t, test.expectedEvent, fakeRecorder.Events)
 		})
 	}
 }
@@ -581,4 +592,26 @@ func fakeK8s(objs []runtime.Object) (kubernetes.Interface, informers.SharedInfor
 	client := fake.NewSimpleClientset(objs...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return client, informerFactory
+}
+
+func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
+	t.Logf("Assert for events: %v", expected)
+	c := time.After(wait.ForeverTestTimeout)
+	for _, e := range expected {
+		select {
+		case a := <-actual:
+			assert.Equal(t, a, e)
+		case <-c:
+			t.Errorf("Expected event %q, got nothing", e)
+			// continue iterating to print all expected events
+		}
+	}
+	for {
+		select {
+		case a := <-actual:
+			t.Errorf("Unexpected event: %q", a)
+		default:
+			return // No more events, as expected.
+		}
+	}
 }
