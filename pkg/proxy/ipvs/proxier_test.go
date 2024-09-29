@@ -4811,7 +4811,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
 			assert.NoError(t, rsErr1, "Expected no error getting real servers")
 
-			assert.Len(t, realServers1, tc.expectLocalRealServerNum, fmt.Sprintf("Expected %d real servers", tc.expectLocalRealServerNum))
+			assert.Lenf(t, realServers1, tc.expectLocalRealServerNum, "Expected %d real servers", tc.expectLocalRealServerNum)
 			for i := 0; i < tc.expectLocalRealServerNum; i++ {
 				assert.Equal(t, realServers1[i].String(), tc.expectLocalRealServers[i])
 			}
