@@ -65,9 +65,9 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	}
 
 	// x/*
-	resourcesWithWildcardSubresources := sets.String{}
+	resourcesWithWildcardSubresources := sets.New[string]()
 	// */x
-	subResourcesWithWildcardResource := sets.String{}
+	subResourcesWithWildcardResource := sets.New[string]()
 	// */*
 	hasDoubleWildcard := false
 	// *
@@ -99,10 +99,10 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
 		}
 		if sub == "*" {
-			resourcesWithWildcardSubresources[res] = struct{}{}
+			resourcesWithWildcardSubresources.Insert(res)
 		}
 		if res == "*" {
-			subResourcesWithWildcardResource[sub] = struct{}{}
+			subResourcesWithWildcardResource.Insert(sub)
 		}
 	}
 	if len(resources) > 1 && hasDoubleWildcard {
