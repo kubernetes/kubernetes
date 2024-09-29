@@ -178,7 +178,7 @@ func TestSetNestedStringSlice(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, obj["x"], 3)
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
-	assert.Equal(t, obj["x"].(map[string]interface{})["z"].([]interface{})[0], "bar")
+	assert.Equal(t, "bar", obj["x"].(map[string]interface{})["z"].([]interface{})[0])
 }
 
 func TestSetNestedSlice(t *testing.T) {
@@ -193,7 +193,7 @@ func TestSetNestedSlice(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, obj["x"], 3)
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
-	assert.Equal(t, obj["x"].(map[string]interface{})["z"].([]interface{})[0], "bar")
+	assert.Equal(t, "bar", obj["x"].(map[string]interface{})["z"].([]interface{})[0])
 }
 
 func TestSetNestedStringMap(t *testing.T) {
@@ -208,7 +208,7 @@ func TestSetNestedStringMap(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, obj["x"], 3)
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
-	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
+	assert.Equal(t, "bar", obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"])
 }
 
 func TestSetNestedMap(t *testing.T) {
@@ -223,5 +223,5 @@ func TestSetNestedMap(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, obj["x"], 3)
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
-	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
+	assert.Equal(t, "bar", obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"])
 }
