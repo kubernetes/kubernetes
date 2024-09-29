@@ -297,7 +297,7 @@ func TestApplyCreate(t *testing.T) {
 		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
 }
 
 func TestApplyNoMeta(t *testing.T) {
