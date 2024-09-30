@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -310,6 +311,48 @@ func TestValidateClaim(t *testing.T) {
 						// Bad selector.
 						CEL: &resource.CELDeviceSelector{
 							Expression: `device.attributes[true].someBoolean`,
+						},
+					},
+				}
+				return claim
+			}(),
+		},
+		"CEL-length": {
+			wantFailures: field.ErrorList{
+				field.TooLongMaxLength(field.NewPath("spec", "devices", "requests").Index(1).Child("selectors").Index(1).Child("cel", "expression"), "<value omitted>", resource.CELSelectorExpressionMaxLength),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, claim.Spec.Devices.Requests[0])
+				claim.Spec.Devices.Requests[1].Name += "-2"
+				expression := `device.driver == ""`
+				claim.Spec.Devices.Requests[1].Selectors = []resource.DeviceSelector{
+					{
+						// Good selector.
+						CEL: &resource.CELDeviceSelector{
+							Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resource.CELSelectorExpressionMaxLength-len(expression))+`"`),
+						},
+					},
+					{
+						// Too long by one selector.
+						CEL: &resource.CELDeviceSelector{
+							Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resource.CELSelectorExpressionMaxLength-len(expression)+1)+`"`),
+						},
+					},
+				}
+				return claim
+			}(),
+		},
+		"CEL-cost": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("selectors").Index(0).Child("cel", "expression"), "too complex, exceeds cost limit"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Selectors = []resource.DeviceSelector{
+					{
+						CEL: &resource.CELDeviceSelector{
+							Expression: `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
 						},
 					},
 				}

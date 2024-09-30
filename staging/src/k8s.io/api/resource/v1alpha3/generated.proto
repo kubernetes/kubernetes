@@ -128,6 +128,13 @@ message CELDeviceSelector {
   //
   //     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
   //
+  // The length of the expression must be smaller or equal to 10 Ki. The
+  // cost of evaluating it is also limited based on the estimated number
+  // of logical steps. Validation against those limits happens only when
+  // setting an expression for the first time or when changing it. If the
+  // limits are changed in a future Kubernetes release, existing users
+  // are guaranteed that existing expressions will continue to be valid.
+  //
   // +required
   optional string expression = 1;
 }
