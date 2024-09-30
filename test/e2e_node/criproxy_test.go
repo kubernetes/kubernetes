@@ -22,7 +22,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -109,7 +108,7 @@ func getFailedToPullImageMsg(ctx context.Context, f *framework.Framework, podNam
 		}
 	}
 
-	return "", fmt.Errorf("no event found regarding the Pod: %s failing to pull the image", podName)
+	return "", fmt.Errorf("failed to find FailedToPullImage event for pod: %s", podName)
 }
 
 func getPodImagePullDuration(ctx context.Context, f *framework.Framework, podName string) (time.Duration, error) {
@@ -118,17 +117,23 @@ func getPodImagePullDuration(ctx context.Context, f *framework.Framework, podNam
 		return 0, err
 	}
 
+	var startTime, endTime time.Time
 	for _, event := range events.Items {
-		if event.Reason == kubeletevents.PulledImage && event.InvolvedObject.Name == podName {
-			re := regexp.MustCompile(`in (\d+m)?(\d+(\.\d+)?s)`)
-			matches := re.FindStringSubmatch(event.Message)
-			if len(matches) == 4 {
-				return time.ParseDuration(matches[1] + matches[2])
+		if event.InvolvedObject.Name == podName {
+			switch event.Reason {
+			case kubeletevents.PullingImage:
+				startTime = event.FirstTimestamp.Time
+			case kubeletevents.PulledImage:
+				endTime = event.FirstTimestamp.Time
 			}
 		}
 	}
 
-	return 0, fmt.Errorf("no event found regarding the Pod: %s finishing pulling the image", podName)
+	if startTime.IsZero() || endTime.IsZero() {
+		return 0, fmt.Errorf("failed to find both PullingImage and PulledImage events for pod: %s", podName)
+	}
+
+	return endTime.Sub(startTime), nil
 }
 
 func newPullImageAlwaysPod() *v1.Pod {
