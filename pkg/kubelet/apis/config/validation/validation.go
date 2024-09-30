@@ -190,17 +190,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority"))
 		}
 	}
-	if localFeatureGate.Enabled(features.NodeSwap) {
-		switch kc.MemorySwap.SwapBehavior {
-		case "":
-		case kubetypes.NoSwap:
-		case kubetypes.LimitedSwap:
-		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
-		}
-	}
-	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
+
+	switch kc.MemorySwap.SwapBehavior {
+	case "":
+	case kubetypes.NoSwap:
+	case kubetypes.LimitedSwap:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
 	}
 
 	uniqueEnforcements := sets.Set[string]{}
