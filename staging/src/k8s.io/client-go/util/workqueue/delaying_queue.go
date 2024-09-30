@@ -87,8 +87,8 @@ func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
 // TypedNewDelayingQueue exists for backwards compatibility only.
 //
 // Deprecated: use NewTypedDelayingQueueWithConfig instead.
-func TypedNewDelayingQueue[T comparable](config TypedDelayingQueueConfig[T]) TypedDelayingInterface[T] {
-	return NewTypedDelayingQueueWithConfig(config)
+func TypedNewDelayingQueue[T comparable]() TypedDelayingInterface[T] {
+	return NewTypedDelayingQueue[T]()
 }
 
 // NewTypedDelayingQueueWithConfig constructs a new workqueue with options to
