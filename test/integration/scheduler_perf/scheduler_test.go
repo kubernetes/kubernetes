@@ -47,11 +47,12 @@ func TestScheduling(t *testing.T) {
 					if !enabled(strings.Split(*testSchedulingLabelFilter, ","), append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 					}
-					informerFactory, tCtx := setupTestCase(t, tc, nil, nil)
+					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
+					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
 
 					runWorkload(tCtx, tc, w, informerFactory)
 
-					if tc.FeatureGates[features.SchedulerQueueingHints] {
+					if featureGates[features.SchedulerQueueingHints] {
 						// In any case, we should make sure InFlightEvents is empty after running the scenario.
 						if err = checkEmptyInFlightEvents(); err != nil {
 							tCtx.Errorf("%s: %s", w.Name, err)

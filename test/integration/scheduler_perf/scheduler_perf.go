@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"path"
@@ -287,6 +288,10 @@ type workload struct {
 	// If DefaultThresholdMetricSelector is nil, the metric is set to "SchedulingThroughput".
 	// Optional
 	ThresholdMetricSelector *thresholdMetricSelector
+	// Feature gates to set before running the workload.
+	// Explicitly setting a feature in this map overrides the test case settings.
+	// Optional
+	FeatureGates map[featuregate.Feature]bool
 }
 
 func (w *workload) isValid(mcc *metricsCollectorConfig) error {
@@ -968,7 +973,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(*useTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !*useTestingLog && doArtifacts {
@@ -1036,7 +1041,7 @@ func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePlugin
 	// a brand new etcd.
 	framework.StartEtcd(t, output, true)
 
-	for feature, flag := range tc.FeatureGates {
+	for feature, flag := range featureGates {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
 	}
 
@@ -1044,7 +1049,15 @@ func setupTestCase(t testing.TB, tc *testCase, output io.Writer, outOfTreePlugin
 	timeout := 30 * time.Minute
 	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
-	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, outOfTreePluginRegistry)
+}
+
+func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
+	result := maps.Clone(src)
+	for feature, enabled := range overrides {
+		result[feature] = enabled
+	}
+	return result
 }
 
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
@@ -1081,7 +1094,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 						b.Skipf("disabled by label filter %v", testcaseLabelSelectors)
 					}
 
-					informerFactory, tCtx := setupTestCase(b, tc, output, outOfTreePluginRegistry)
+					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
+					informerFactory, tCtx := setupTestCase(b, tc, featureGates, output, outOfTreePluginRegistry)
 
 					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
@@ -1109,7 +1123,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 						}
 					}
 
-					if tc.FeatureGates[features.SchedulerQueueingHints] {
+					if featureGates[features.SchedulerQueueingHints] {
 						// In any case, we should make sure InFlightEvents is empty after running the scenario.
 						if err = checkEmptyInFlightEvents(); err != nil {
 							tCtx.Errorf("%s: %s", w.Name, err)
