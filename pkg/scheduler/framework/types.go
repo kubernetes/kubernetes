@@ -74,6 +74,9 @@ const (
 	UpdatePodTolerations
 	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
 	UpdatePodSchedulingGatesEliminated
+	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
+	// Depends on the DynamicResourceAllocation feature gate.
+	UpdatePodGeneratedResourceClaim
 
 	// updatePodOther is a update for pod's other fields.
 	// It's used only for the internal event handling, and thus unexported.
@@ -82,7 +85,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodTolerations | UpdatePodSchedulingGatesEliminated | updatePodOther
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodTolerations | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.

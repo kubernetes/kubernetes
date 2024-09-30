@@ -25,7 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeAllocatableChange(t *testing.T) {
@@ -335,11 +339,20 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			},
 		},
 	}
+	claimStatusA := v1.PodResourceClaimStatus{
+		Name:              "my-claim",
+		ResourceClaimName: ptr.To("claim"),
+	}
+	claimStatusB := v1.PodResourceClaimStatus{
+		Name:              "my-claim-2",
+		ResourceClaimName: ptr.To("claim-2"),
+	}
 	tests := []struct {
-		name   string
-		newPod *v1.Pod
-		oldPod *v1.Pod
-		want   []ClusterEvent
+		name        string
+		newPod      *v1.Pod
+		oldPod      *v1.Pod
+		draDisabled bool
+		want        []ClusterEvent
 	}{
 		{
 			name:   "only label is updated",
@@ -389,9 +402,35 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			oldPod: st.MakePod().Toleration("key").Obj(),
 			want:   []ClusterEvent{PodTolerationChange},
 		},
+		{
+			name:        "pod claim statuses change, feature disabled",
+			draDisabled: true,
+			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
+			oldPod:      st.MakePod().Obj(),
+			want:        []ClusterEvent{assignedPodOtherUpdate},
+		},
+		{
+			name:   "pod claim statuses change, feature enabled",
+			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
+			oldPod: st.MakePod().Obj(),
+			want:   []ClusterEvent{PodGeneratedResourceClaimChange},
+		},
+		{
+			name:   "pod claim statuses swapped",
+			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA, claimStatusB).Obj(),
+			oldPod: st.MakePod().ResourceClaimStatuses(claimStatusB, claimStatusA).Obj(),
+			want:   []ClusterEvent{PodGeneratedResourceClaimChange},
+		},
+		{
+			name:   "pod claim statuses extended",
+			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA, claimStatusB).Obj(),
+			oldPod: st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
+			want:   []ClusterEvent{PodGeneratedResourceClaimChange},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tt.draDisabled)
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
