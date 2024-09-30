@@ -94,7 +94,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	}
 
 	// make 2 services , there will be 5 services now
-	for i := 2; i < 5; i++ {
+	for i := 2; i < 4; i++ {
 		if _, err := client2.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
@@ -125,8 +125,8 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	// make 2 services , there will be 7 services now
-	for i := 5; i < 7; i++ {
-		if _, err := client2.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
+	for i := 4; i < 6; i++ {
+		if _, err := client3.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
