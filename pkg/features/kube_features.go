@@ -18,7 +18,6 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
@@ -157,12 +156,6 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
-	// owner: @nckturner
-	// kep:  http://kep.k8s.io/2699
-	// alpha: v1.27
-	// Enable webhooks in cloud controller manager
-	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
-
 	// owner: @adrianreber
 	// kep: https://kep.k8s.io/2008
 	// alpha: v1.25
@@ -233,7 +226,9 @@ const (
 
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
-	// Deprecated: v1.29 (default off)
+	// alpha: v1.29
+	// Deprecated: v1.31 (default off)
+	//
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
@@ -615,6 +610,14 @@ const (
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 
+	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/3857
+	// alpha: v1.30
+	// beta: v1.31
+	//
+	// Allows recursive read-only mounts.
+	RecursiveReadOnlyMounts featuregate.Feature = "RecursiveReadOnlyMounts"
+
 	// owner: @adrianmoisey
 	// kep: https://kep.k8s.io/4427
 	// alpha: v1.32
@@ -758,6 +761,12 @@ const (
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
+
+	// owner: @ahutsunshine
+	// beta: v1.30
+	//
+	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
+	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
 
 	// owner: @nilekhc
 	// kep: https://kep.k8s.io/4192
@@ -909,26 +918,12 @@ const (
 	// releases.
 	UserNamespacesPodSecurityStandards featuregate.Feature = "UserNamespacesPodSecurityStandards"
 
-	// owner: @ahutsunshine
-	// beta: v1.30
-	//
-	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
-	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
-
 	// owner: @jsafrane
 	// kep: https://kep.k8s.io/1710
 	// alpha: v1.30
 	// Speed up container startup by mounting volumes with the correct SELinux label
 	// instead of changing each file on the volumes recursively.
 	SELinuxMount featuregate.Feature = "SELinuxMount"
-
-	// owner: @AkihiroSuda
-	// kep: https://kep.k8s.io/3857
-	// alpha: v1.30
-	// beta: v1.31
-	//
-	// Allows recursive read-only mounts.
-	RecursiveReadOnlyMounts featuregate.Feature = "RecursiveReadOnlyMounts"
 
 	// owner: @everpeace
 	// kep: https://kep.k8s.io/3619
@@ -964,29 +959,4 @@ func init() {
 //
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-
-	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
-
-	// features with duplicate definition in apiserver/controller-manager
-
-	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
-
-	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
-	// features that enable backwards compatibility but are scheduled to be removed
-	// ...
-	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
-
-	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
-
-	AllowInsecureKubeletCertificateSigningRequests: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
-
-	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Deprecated}, // default on in 1.33
-
-	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
-
-	RecursiveReadOnlyMounts: {Default: true, PreRelease: featuregate.Beta},
-}
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

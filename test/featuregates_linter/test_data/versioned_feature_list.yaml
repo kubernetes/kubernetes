@@ -26,6 +26,18 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: AllowDNSOnlyNodeCSR
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.31"
+- name: AllowInsecureKubeletCertificateSigningRequests
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.31"
 - name: AllowOverwriteTerminationGracePeriodSeconds
   versionedSpecs:
   - default: false
@@ -134,6 +146,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: CloudControllerManagerWebhook
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
 - name: ClusterTrustBundle
   versionedSpecs:
   - default: false
@@ -320,6 +338,16 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: DisableNodeKubeProxyVersion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.29"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.31"
 - name: DRAControlPlaneController
   versionedSpecs:
   - default: false
@@ -412,6 +440,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: HPAScaleToZero
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.16"
 - name: ImageMaximumGCAge
   versionedSpecs:
   - default: false
@@ -428,6 +462,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: InPlacePodVerticalScaling
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.27"
 - name: InTreePluginPortworxUnregister
   versionedSpecs:
   - default: false
@@ -484,6 +524,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+- name: KMSv1
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.28"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.29"
 - name: KubeletCgroupDriverFromCRI
   versionedSpecs:
   - default: false
@@ -842,6 +892,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.23"
+- name: RecursiveReadOnlyMounts
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
 - name: RelaxedDNSSearchValidation
   versionedSpecs:
   - default: false
@@ -1048,6 +1108,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: StorageNamespaceIndex
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
 - name: StorageVersionAPI
   versionedSpecs:
   - default: false

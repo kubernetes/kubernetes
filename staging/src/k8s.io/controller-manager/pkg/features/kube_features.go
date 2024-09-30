@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -39,12 +40,14 @@ const (
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 )
 
-func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
-	return featuregates.Add(cloudPublicFeatureGates)
+func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableVersionedFeatureGate) error {
+	return featuregates.AddVersioned(versionedCloudPublicFeatureGates)
 }
 
-// cloudPublicFeatureGates consists of cloud-specific feature keys.
-// To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
-var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
+// versionedCloudPublicFeatureGates consists of versioned cloud-specific feature keys.
+// To add a new feature, define a key for it above and add it here.
+var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	CloudControllerManagerWebhook: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
 }

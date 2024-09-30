@@ -363,6 +363,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	KMSv1: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
 	MutatingAdmissionPolicy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -448,9 +453,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
-}
+// defaultKubernetesFeatureGates consists of legacy unversioned Kubernetes-specific feature keys.
+// Please do not add to this struct and use defaultVersionedKubernetesFeatureGates instead.
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

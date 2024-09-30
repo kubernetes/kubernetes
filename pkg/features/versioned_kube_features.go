@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/component-base/featuregate"
+	kcmfeatures "k8s.io/controller-manager/pkg/features"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -34,6 +35,14 @@ import (
 //
 // Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AllowDNSOnlyNodeCSR: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	AllowInsecureKubeletCertificateSigningRequests: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
 	AllowOverwriteTerminationGracePeriodSeconds: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
 	},
@@ -54,6 +63,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AuthorizeNodeWithSelectors: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	kcmfeatures.CloudControllerManagerWebhook: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ClusterTrustBundle: {
@@ -146,6 +159,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	DisableNodeKubeProxyVersion: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
 	DRAControlPlaneController: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -232,6 +250,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	genericfeatures.KMSv1: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
 	genericfeatures.MutatingAdmissionPolicy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -249,6 +272,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.ResilientWatchCacheInitialization: {
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.RetryGenerateName: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 
 	genericfeatures.SeparateCacheWatchRPC: {
@@ -331,6 +360,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 	},
 
+	HPAScaleToZero: {
+		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ImageMaximumGCAge: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
@@ -338,6 +371,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ImageVolume: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	InPlacePodVerticalScaling: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	InTreePluginPortworxUnregister: {
@@ -541,6 +578,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	RecoverVolumeExpansionFailure: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
+	RecursiveReadOnlyMounts: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
 
 	RelaxedDNSSearchValidation: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
@@ -583,6 +624,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SeparateTaintEvictionController: {
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StorageNamespaceIndex: {
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ServiceAccountTokenJTI: {
@@ -697,10 +742,5 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WindowsHostNetwork: {
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Alpha},
-	},
-	genericfeatures.RetryGenerateName: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 }

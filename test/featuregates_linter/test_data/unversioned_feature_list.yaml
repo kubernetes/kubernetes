@@ -1,21 +1,3 @@
-- name: AllowDNSOnlyNodeCSR
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
-- name: AllowInsecureKubeletCertificateSigningRequests
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
-- name: CloudControllerManagerWebhook
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
 - name: ComponentSLIs
   versionedSpecs:
   - default: true
@@ -28,30 +10,6 @@
     lockToDefault: false
     preRelease: Beta
     version: ""
-- name: DisableNodeKubeProxyVersion
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
-- name: HPAScaleToZero
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: InPlacePodVerticalScaling
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: ""
-- name: KMSv1
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: ""
 - name: LoggingAlphaOptions
   versionedSpecs:
   - default: false
@@ -59,18 +17,6 @@
     preRelease: Alpha
     version: ""
 - name: LoggingBetaOptions
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: RecursiveReadOnlyMounts
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: ""
-- name: StorageNamespaceIndex
   versionedSpecs:
   - default: true
     lockToDefault: false
