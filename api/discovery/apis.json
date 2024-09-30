@@ -276,6 +276,23 @@
       ]
     },
     {
+      "name": "resource.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "resource.k8s.io/v1beta1",
+        "version": "v1beta1"
+      },
+      "versions": [
+        {
+          "groupVersion": "resource.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "resource.k8s.io/v1alpha3",
+          "version": "v1alpha3"
+        }
+      ]
+    },
+    {
       "name": "flowcontrol.apiserver.k8s.io",
       "preferredVersion": {
         "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
@@ -302,19 +319,6 @@
         {
           "groupVersion": "internal.apiserver.k8s.io/v1alpha1",
           "version": "v1alpha1"
-        }
-      ]
-    },
-    {
-      "name": "resource.k8s.io",
-      "preferredVersion": {
-        "groupVersion": "resource.k8s.io/v1alpha3",
-        "version": "v1alpha3"
-      },
-      "versions": [
-        {
-          "groupVersion": "resource.k8s.io/v1alpha3",
-          "version": "v1alpha3"
         }
       ]
     },

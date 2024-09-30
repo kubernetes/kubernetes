@@ -27,7 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,7 +80,7 @@ var (
 		return pod
 	}()
 
-	podSchedulingContext = resourceapi.PodSchedulingContext{
+	podSchedulingContext = resourcealpha.PodSchedulingContext{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
 			Namespace: testNamespace,
@@ -93,7 +94,7 @@ var (
 				},
 			},
 		},
-		Spec: resourceapi.PodSchedulingContextSpec{
+		Spec: resourcealpha.PodSchedulingContextSpec{
 			SelectedNode: nodeName,
 		},
 	}
@@ -113,7 +114,7 @@ func TestSyncHandler(t *testing.T) {
 		podsLater                     []*v1.Pod
 		templates                     []*resourceapi.ResourceClaimTemplate
 		expectedClaims                []resourceapi.ResourceClaim
-		expectedPodSchedulingContexts []resourceapi.PodSchedulingContext
+		expectedPodSchedulingContexts []resourcealpha.PodSchedulingContext
 		expectedStatuses              map[string][]v1.PodResourceClaimStatus
 		expectedError                 bool
 		expectedMetrics               expectedMetrics
@@ -393,7 +394,7 @@ func TestSyncHandler(t *testing.T) {
 					{Name: testPodWithNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
-			expectedPodSchedulingContexts: []resourceapi.PodSchedulingContext{podSchedulingContext},
+			expectedPodSchedulingContexts: []resourcealpha.PodSchedulingContext{podSchedulingContext},
 			expectedMetrics:               expectedMetrics{0, 0},
 		},
 		{
@@ -439,8 +440,8 @@ func TestSyncHandler(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
 			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
-			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
-			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
+			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 
 			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, podSchedulingInformer, claimInformer, templateInformer)
 			if err != nil {
@@ -478,7 +479,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected success")
 			}
 
-			claims, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := fakeKubeClient.ResourceV1beta1().ResourceClaims("").List(ctx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
@@ -627,7 +628,7 @@ func normalizeClaims(claims []resourceapi.ResourceClaim) []resourceapi.ResourceC
 	return claims
 }
 
-func normalizeScheduling(scheduling []resourceapi.PodSchedulingContext) []resourceapi.PodSchedulingContext {
+func normalizeScheduling(scheduling []resourcealpha.PodSchedulingContext) []resourcealpha.PodSchedulingContext {
 	sort.Slice(scheduling, func(i, j int) bool {
 		return scheduling[i].Namespace < scheduling[j].Namespace ||
 			scheduling[i].Name < scheduling[j].Name

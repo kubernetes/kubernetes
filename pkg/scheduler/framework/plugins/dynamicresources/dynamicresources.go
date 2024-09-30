@@ -27,7 +27,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourceapiapply "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
+	resourceapiapplyalpha "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	"k8s.io/client-go/kubernetes"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcelistersalpha "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -112,7 +114,7 @@ type informationForClaim struct {
 	// The status of the claim got from the
 	// schedulingCtx by PreFilter for repeated
 	// evaluation in Filter. Nil for claim which don't have it.
-	status *resourceapi.ResourceClaimSchedulingStatus
+	status *resourcealpha.ResourceClaimSchedulingStatus
 
 	structuredParameters bool
 
@@ -128,7 +130,7 @@ type podSchedulingState struct {
 	// where it might get shared by different plugins. But in practice,
 	// it is currently only used by dynamic provisioning and thus
 	// managed entirely here.
-	schedulingCtx *resourceapi.PodSchedulingContext
+	schedulingCtx *resourcealpha.PodSchedulingContext
 
 	// selectedNode is set if (and only if) a node has been selected.
 	selectedNode *string
@@ -145,7 +147,7 @@ func (p *podSchedulingState) isDirty() bool {
 
 // init checks whether there is already a PodSchedulingContext object.
 // Must not be called concurrently,
-func (p *podSchedulingState) init(ctx context.Context, pod *v1.Pod, podSchedulingContextLister resourcelisters.PodSchedulingContextLister) error {
+func (p *podSchedulingState) init(ctx context.Context, pod *v1.Pod, podSchedulingContextLister resourcelistersalpha.PodSchedulingContextLister) error {
 	if podSchedulingContextLister == nil {
 		return nil
 	}
@@ -204,7 +206,7 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 			// Using SSA instead of Get+Update has the advantage that
 			// there is no delay for the Get. SSA is safe because only
 			// the scheduler updates these fields.
-			spec := resourceapiapply.PodSchedulingContextSpec()
+			spec := resourceapiapplyalpha.PodSchedulingContextSpec()
 			spec.SelectedNode = p.selectedNode
 			if p.potentialNodes != nil {
 				spec.PotentialNodes = *p.potentialNodes
@@ -214,7 +216,7 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 				// the list would clear it.
 				spec.PotentialNodes = p.schedulingCtx.Spec.PotentialNodes
 			}
-			schedulingCtxApply := resourceapiapply.PodSchedulingContext(pod.Name, pod.Namespace).WithSpec(spec)
+			schedulingCtxApply := resourceapiapplyalpha.PodSchedulingContext(pod.Name, pod.Namespace).WithSpec(spec)
 
 			if loggerV := logger.V(6); loggerV.Enabled() {
 				// At a high enough log level, dump the entire object.
@@ -227,7 +229,7 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 
 	} else {
 		// Create it.
-		schedulingCtx := &resourceapi.PodSchedulingContext{
+		schedulingCtx := &resourcealpha.PodSchedulingContext{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            pod.Name,
 				Namespace:       pod.Namespace,
@@ -256,7 +258,7 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 	return nil
 }
 
-func statusForClaim(schedulingCtx *resourceapi.PodSchedulingContext, podClaimName string) *resourceapi.ResourceClaimSchedulingStatus {
+func statusForClaim(schedulingCtx *resourcealpha.PodSchedulingContext, podClaimName string) *resourcealpha.ResourceClaimSchedulingStatus {
 	if schedulingCtx == nil {
 		return nil
 	}
@@ -277,7 +279,7 @@ type dynamicResources struct {
 	fh                         framework.Handle
 	clientset                  kubernetes.Interface
 	classLister                resourcelisters.DeviceClassLister
-	podSchedulingContextLister resourcelisters.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
+	podSchedulingContextLister resourcelistersalpha.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
 	sliceLister                resourcelisters.ResourceSliceLister
 
 	// claimAssumeCache enables temporarily storing a newer claim object
@@ -350,8 +352,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 
 		fh:               fh,
 		clientset:        fh.ClientSet(),
-		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
-		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
+		classLister:      fh.SharedInformerFactory().Resource().V1beta1().DeviceClasses().Lister(),
+		sliceLister:      fh.SharedInformerFactory().Resource().V1beta1().ResourceSlices().Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
 	}
 	if pl.controlPlaneControllerEnabled {
@@ -541,7 +543,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 		return framework.QueueSkip, nil
 	}
 
-	oldPodScheduling, newPodScheduling, err := schedutil.As[*resourceapi.PodSchedulingContext](oldObj, newObj)
+	oldPodScheduling, newPodScheduling, err := schedutil.As[*resourcealpha.PodSchedulingContext](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
 		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterPodSchedulingContextChange: %w", err)
@@ -642,7 +644,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 
 }
 
-func podSchedulingHasClaimInfo(podScheduling *resourceapi.PodSchedulingContext, podResourceName string) bool {
+func podSchedulingHasClaimInfo(podScheduling *resourcealpha.PodSchedulingContext, podResourceName string) bool {
 	for _, claimStatus := range podScheduling.Status.ResourceClaims {
 		if claimStatus.Name == podResourceName {
 			return true
@@ -1061,7 +1063,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 				claim.Status.DeallocationRequested = true
 			}
 			logger.V(5).Info("Requesting deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if _, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			if _, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return nil, statusError(logger, err)
 			}
 			return nil, framework.NewStatus(framework.Unschedulable, "deallocation of ResourceClaim completed")
@@ -1113,8 +1115,8 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	// is only a single node.
 	logger.V(5).Info("remembering potential nodes", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
 	numNodes := len(nodes)
-	if numNodes > resourceapi.PodSchedulingNodeListMaxSize {
-		numNodes = resourceapi.PodSchedulingNodeListMaxSize
+	if numNodes > resourcealpha.PodSchedulingNodeListMaxSize {
+		numNodes = resourcealpha.PodSchedulingNodeListMaxSize
 	}
 	potentialNodes := make([]string, 0, numNodes)
 	if numNodes == len(nodes) {
@@ -1132,7 +1134,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 			nodeNames[node.Node().Name] = struct{}{}
 		}
 		for nodeName := range nodeNames {
-			if len(potentialNodes) >= resourceapi.PodSchedulingNodeListMaxSize {
+			if len(potentialNodes) >= resourcealpha.PodSchedulingNodeListMaxSize {
 				break
 			}
 			potentialNodes = append(potentialNodes, nodeName)
@@ -1143,7 +1145,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	return nil
 }
 
-func haveAllPotentialNodes(schedulingCtx *resourceapi.PodSchedulingContext, nodes []*framework.NodeInfo) bool {
+func haveAllPotentialNodes(schedulingCtx *resourcealpha.PodSchedulingContext, nodes []*framework.NodeInfo) bool {
 	if schedulingCtx == nil {
 		return false
 	}
@@ -1350,7 +1352,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 				pod.UID,
 			)
 			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
-			claim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+			claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
 			if err != nil {
 				// We will get here again when pod scheduling is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
@@ -1434,7 +1436,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	refreshClaim := false
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
-			updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("get updated claim %s after conflict: %w", klog.KObj(claim), err)
 			}
@@ -1459,7 +1461,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			// If we were interrupted in the past, it might already be set and we simply continue.
 			if !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
-				updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
 				}
@@ -1472,7 +1474,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
-		updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
 				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)

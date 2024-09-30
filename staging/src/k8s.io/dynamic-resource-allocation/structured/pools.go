@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 

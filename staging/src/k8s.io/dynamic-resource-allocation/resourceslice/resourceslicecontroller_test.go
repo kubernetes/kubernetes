@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -201,7 +201,7 @@ func TestControllerSyncPool(t *testing.T) {
 			require.NoError(t, err, "unexpected syncPool error")
 
 			// Check ResourceSlices
-			resourceSlices, err := kubeClient.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
+			resourceSlices, err := kubeClient.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list resource slices")
 			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items, "unexpected ResourceSlices")
 		})
