@@ -67,6 +67,10 @@ type CompilationResult struct {
 	OutputType  *cel.Type
 	Environment *cel.Env
 
+	// MaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MaxCost uint64
+
 	emptyMapVal ref.Val
 }
 
@@ -107,6 +111,10 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
 
+	// We don't have a SizeEstimator. The potential size of the input (= a
+	// device) is already declared in the definition of the environment.
+	estimator := &library.CostEstimator{}
+
 	ast, issues := env.Compile(expression)
 	if issues != nil {
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
@@ -122,18 +130,35 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
+		// cel.CostLimit is also set to the VAP PerCallLimit as part of
+		// the base environment.
+		//
+		// This call here should override that. In practice it shouldn't
+		// matter because the limits are the same.
+		cel.CostLimit(resourceapi.CELSelectorExpressionMaxCost),
+		cel.CostTracking(estimator),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
-	return CompilationResult{
+
+	compilationResult := CompilationResult{
 		Program:     prog,
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 	}
+
+	costEst, err := env.EstimateCost(ast, estimator)
+	if err != nil {
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
+		return compilationResult
+	}
+
+	compilationResult.MaxCost = costEst.Max
+	return compilationResult
 }
 
 // getAttributeValue returns the native representation of the one value that
