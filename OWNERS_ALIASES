@@ -307,14 +307,12 @@ aliases:
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
-    - ehashman
     - RainbowMango
     - serathius
     - dgrisonnet
     - rexagod
   sig-instrumentation-reviewers:
     - dashpole
-    - ehashman
     - s-urbaniak
     - coffeepac
     - logicalhan
@@ -327,6 +325,7 @@ aliases:
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
+  # - ehashman
 
   api-approvers:
     - deads2k
@@ -501,12 +500,13 @@ aliases:
     - ardaguclu # CLI
     - aojea # Network, Testing
     - danwinship # Network
+    - dashpole # Instrumentation
     - dchen1107 # Node
     - deads2k # API Machinery
     - derekwaynecarr # Node
+    - dgrisonnet # Instrumentation
     - dims # Architecture
     - eddiezane # CLI
-    - ehashman # Instrumentation
     - enj # Auth
     - gjtempleton # Autoscaling
     - janetkuo # Apps
