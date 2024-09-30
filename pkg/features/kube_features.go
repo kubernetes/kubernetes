@@ -498,6 +498,7 @@ const (
 	// alpha: v1.22
 	// beta1: v1.28 (default=false)
 	// beta2: v.1.30 (default=true)
+	// GA: v1.32
 
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
