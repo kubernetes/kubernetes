@@ -171,7 +171,7 @@ func (p *RemoteRuntime) RemovePodSandbox(ctx context.Context, req *runtimeapi.Re
 	if err := p.runInjectors(RemovePodSandbox); err != nil {
 		return nil, err
 	}
-	err := p.runtimeService.StopPodSandbox(ctx, req.PodSandboxId)
+	err := p.runtimeService.RemovePodSandbox(ctx, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}
