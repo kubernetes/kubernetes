@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -60,10 +59,6 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 	f := framework.NewDefaultFramework("swap-qos")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-
-	ginkgo.BeforeEach(func() {
-		gomega.Expect(isSwapFeatureGateEnabled()).To(gomega.BeTrueBecause("NodeSwap feature should be on"))
-	})
 
 	f.Context(framework.WithNodeConformance(), func() {
 
@@ -384,11 +379,6 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrueBecause("pod %+v was expected to be ready", pod))
 
 	return pod
-}
-
-func isSwapFeatureGateEnabled() bool {
-	ginkgo.By("figuring if NodeSwap feature gate is turned on")
-	return e2eskipper.IsFeatureGateEnabled(features.NodeSwap)
 }
 
 func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
