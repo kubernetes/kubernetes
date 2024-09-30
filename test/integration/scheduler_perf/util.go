@@ -405,7 +405,8 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 type throughputCollector struct {
 	podInformer           coreinformers.PodInformer
 	schedulingThroughputs []float64
-	labels                map[string]string
+	labelSelector         map[string]string
+	resultLabels          map[string]string
 	namespaces            sets.Set[string]
 	errorMargin           float64
 
@@ -413,12 +414,13 @@ type throughputCollector struct {
 	start    time.Time
 }
 
-func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
+func newThroughputCollector(podInformer coreinformers.PodInformer, resultLabels map[string]string, labelSelector map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
 	return &throughputCollector{
-		podInformer: podInformer,
-		labels:      labels,
-		namespaces:  sets.New(namespaces...),
-		errorMargin: errorMargin,
+		podInformer:   podInformer,
+		labelSelector: labelSelector,
+		resultLabels:  resultLabels,
+		namespaces:    sets.New(namespaces...),
+		errorMargin:   errorMargin,
 	}
 }
 
@@ -451,7 +453,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			return
 		}
 
-		if !tc.namespaces.Has(newPod.Namespace) {
+		if !tc.namespaces.Has(newPod.Namespace) || !labelsMatch(newPod.Labels, tc.labelSelector) {
 			return
 		}
 
@@ -577,7 +579,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 
 func (tc *throughputCollector) collect() []DataItem {
 	throughputSummary := DataItem{
-		Labels:   tc.labels,
+		Labels:   tc.resultLabels,
 		progress: tc.progress,
 		start:    tc.start,
 	}
