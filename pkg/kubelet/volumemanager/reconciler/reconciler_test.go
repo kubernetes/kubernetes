@@ -20,6 +20,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -2183,6 +2184,8 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	<-stoppedChan
 
 	finished := make(chan interface{})
+	finishedOnce := &sync.Once{}
+
 	fakePlugin.Lock()
 	fakePlugin.UnmountDeviceHook = func(mountPath string) error {
 		// Act:
@@ -2196,14 +2199,15 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	}
 
 	fakePlugin.WaitForAttachHook = func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error) {
+		defer finishedOnce.Do(func() {
+			close(finished)
+		})
 		// Assert
 		// 4. When the volume is mounted again, expect that UnmountDevice operation did not clear devicePath
 		if devicePath == "" {
 			klog.ErrorS(nil, "Expected WaitForAttach called with devicePath from Node.Status")
-			close(finished)
 			return "", fmt.Errorf("Expected devicePath from Node.Status")
 		}
-		close(finished)
 		return devicePath, nil
 	}
 	fakePlugin.Unlock()
