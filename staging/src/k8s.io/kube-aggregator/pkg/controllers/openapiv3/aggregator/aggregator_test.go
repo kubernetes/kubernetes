@@ -31,6 +31,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/util/responsewriter"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -301,9 +302,9 @@ func sendReq(t *testing.T, handler http.Handler, path string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer := newInMemoryResponseWriter()
+	writer := responsewriter.NewInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
-	return writer.data
+	return writer.Data()
 }
 
 func getTestAPIServiceOpenAPIDefinitions(_ openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition {
