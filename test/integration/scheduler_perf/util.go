@@ -159,8 +159,9 @@ func isAttempted(pod *v1.Pod) bool {
 
 // getScheduledPods returns the list of scheduled, attempted but unschedulable
 // and unattempted pods in the specified namespaces.
+// Label selector can be used to filter the pods.
 // Note that no namespaces specified matches all namespaces.
-func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, []*v1.Pod, []*v1.Pod, error) {
+func getScheduledPods(podInformer coreinformers.PodInformer, labelSelector map[string]string, namespaces ...string) ([]*v1.Pod, []*v1.Pod, []*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
 		return nil, nil, nil, err
@@ -172,7 +173,7 @@ func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...strin
 	unattempted := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]
-		if len(s) == 0 || s.Has(pod.Namespace) {
+		if (len(s) == 0 || s.Has(pod.Namespace)) && labelsMatch(pod.Labels, labelSelector) {
 			if len(pod.Spec.NodeName) > 0 {
 				scheduled = append(scheduled, pod)
 			} else if isAttempted(pod) {
