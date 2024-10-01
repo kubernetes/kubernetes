@@ -988,7 +988,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		var message string
 		var reason containerKillReason
 		restart := shouldRestartOnFailure(pod)
-		if _, _, changed := containerChanged(&container, containerStatus); changed {
+		if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
+			// computePodResizeAction updates `changes.ContainersToUpdate` if the container needs resizing.
+			// This shuld be done before the nexe check with `containerChanged()`
+			// for a case where both the iamge and resources are updated.
+			// If resize policy requires restarting this container,
+			// computePodResizeAction also updates 'changes.ContainersToKill' and `chages.ContainersToStart`, then returns false.
+			// In this case, `changes` has been updated completely for this container. So, continue.
+			continue
+		} else if _, _, changed := containerChanged(&container, containerStatus); changed {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
 			// spec changed.
@@ -1001,9 +1009,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
-			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
-			continue
 		} else {
 			// Keep the container.
 			keepCount++

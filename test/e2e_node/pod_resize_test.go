@@ -1131,6 +1131,52 @@ func doPodResizeTests() {
 				},
 			},
 		},
+		{
+			name: "Guaranteed QoS pod, one container - increase CPU & memory with changing image",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+						{"name":"c1","image":"%s","resources":{"requests":{"cpu":"200m","memory":"400Mi"},"limits":{"cpu":"200m","memory":"400Mi"}}}
+					]}}`, imageutils.GetE2EImage(imageutils.Agnhost)),
+			expected: []TestContainerInfo{
+				{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, one container - decrease CPU & memory with changing image",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "500Mi", MemLim: "500Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+						{"name":"c1","image":"%s","resources":{"requests":{"cpu":"100m","memory":"250Mi"},"limits":{"cpu":"100m","memory":"250Mi"}}}
+					]}}`, imageutils.GetE2EImage(imageutils.Agnhost)),
+			expected: []TestContainerInfo{
+				{
+					Name:         "c1",
+					Resources:    &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "250Mi", MemLim: "250Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
