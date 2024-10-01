@@ -189,7 +189,6 @@ func TestSchedulingGates(t *testing.T) {
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 func TestCoreResourceEnqueue(t *testing.T) {
-	volType := v1.HostPathDirectoryOrCreate
 	tests := []struct {
 		name string
 		// initialNodes is the list of Nodes to be created at first.
@@ -769,7 +768,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -798,7 +797,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				pv2 := st.MakePersistentVolume().Name("pv2").Label(v1.LabelTopologyZone, "us-west1-a").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj()
 				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Create(testCtx.Ctx, pv2, metav1.CreateOptions{}); err != nil {
 					return fmt.Errorf("failed to create pv2: %w", err)
@@ -817,14 +816,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 				st.MakePersistentVolume().
 					Name("pv2").
 					Labels(map[string]string{v1.LabelTopologyZone: "us-east1"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -853,7 +852,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				pv2 := st.MakePersistentVolume().Name("pv2").Label(v1.LabelTopologyZone, "us-west1-a").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj()
 				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv2, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("failed to update pv2: %w", err)
@@ -872,14 +871,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 				st.MakePersistentVolume().
 					Name("pv2").
 					Labels(map[string]string{v1.LabelTopologyZone: "us-east1"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -923,14 +922,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 				st.MakePersistentVolume().
 					Name("pv2").
 					Labels(map[string]string{v1.LabelTopologyZone: "us-east1"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -980,7 +979,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -1028,14 +1027,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-west1-a"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 				st.MakePersistentVolume().
 					Name("pv2").
 					Labels(map[string]string{v1.LabelTopologyZone: "us-east1"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
@@ -1065,7 +1064,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 					Labels(map[string]string{v1.LabelTopologyZone: "us-east1", "unrelated": "unrelated"}).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj()
 				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv2, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("failed to update pv2: %w", err)
