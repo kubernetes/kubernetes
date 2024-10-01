@@ -23,7 +23,6 @@ import (
 	"time"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +41,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("CustomResourceFieldSelectors [Privileged:ClusterAdmin]", framework.WithFeatureGate(apiextensionsfeatures.CustomResourceFieldSelectors), func() {
+var _ = SIGDescribe("CustomResourceFieldSelectors [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("crd-selectable-fields")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
