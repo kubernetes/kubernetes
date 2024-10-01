@@ -1142,7 +1142,7 @@
         },
         "matchConstraints": {
           "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.MatchResources",
-          "description": "matchConstraints specifies what resources this policy is designed to validate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. Only the CREATE and UPDATE operations are allowed.  DELETE and CONNECT operations may not be matched. '*' matches only CREATE and UPDATE. Required."
+          "description": "matchConstraints specifies what resources this policy is designed to validate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. Only the CREATE, UPDATE, and CONNECT operations are allowed. '*' matches only CREATE, UPDATE, and CONNECT. Required."
         },
         "mutations": {
           "description": "mutations contain operations which are used to perform mutations. mutations may not be empty; a minimum of one mutation is required. mutations are evaluated in order, and are reinvoked according to the reinvocationPolicy. The mutations of a policy are invoked for each binding of this policy and reinvocation of mutations occurs on a per binding basis.",
