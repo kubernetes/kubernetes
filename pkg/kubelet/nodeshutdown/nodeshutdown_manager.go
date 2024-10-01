@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 )
 
@@ -40,6 +41,7 @@ type Manager interface {
 type Config struct {
 	Logger                           klog.Logger
 	ProbeManager                     prober.Manager
+	VolumeManager                    volumemanager.VolumeManager
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc

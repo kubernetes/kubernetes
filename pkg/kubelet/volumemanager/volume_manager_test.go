@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -86,7 +87,11 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				if err := os.RemoveAll(tmpDir); err != nil {
+					t.Fatalf("failed to remove temp dir: %v", err)
+				}
+			}()
 			podManager := kubepod.NewBasicPodManager()
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
@@ -544,4 +549,66 @@ func delayClaimBecomesBound(
 		Phase: v1.ClaimBound,
 	}
 	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(context.TODO(), volumeClaim, metav1.UpdateOptions{})
+}
+
+func TestWaitForAllPodsUnmount(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	require.NoError(t, err, "Failed to create temp directory")
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("Failed to remove temp directory: %v", err)
+		}
+	}()
+
+	tests := []struct {
+		name          string
+		podMode       v1.PersistentVolumeMode
+		expectedError bool
+	}{
+		{
+			name:          "successful unmount",
+			podMode:       "",
+			expectedError: false,
+		},
+		{
+			name:          "timeout waiting for unmount",
+			podMode:       v1.PersistentVolumeFilesystem,
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			podManager := kubepod.NewBasicPodManager()
+
+			node, pod, pv, claim := createObjects(test.podMode, test.podMode)
+			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+
+			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			defer cancel()
+			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+			go manager.Run(ctx, sourcesReady)
+
+			podManager.SetPods([]*v1.Pod{pod})
+
+			go simulateVolumeInUseUpdate(
+				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
+				ctx.Done(),
+				manager)
+
+			err := manager.WaitForAttachAndMount(context.Background(), pod)
+			require.NoError(t, err, "Failed to wait for attach and mount")
+
+			err = manager.WaitForAllPodsUnmount(ctx, []*v1.Pod{pod})
+
+			if test.expectedError {
+				require.Error(t, err, "Expected error due to timeout")
+				require.Contains(t, err.Error(), "context deadline exceeded", "Expected deadline exceeded error")
+			} else {
+				require.NoError(t, err, "Expected no error")
+			}
+		})
+	}
 }
