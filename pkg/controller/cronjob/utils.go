@@ -100,7 +100,11 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 //   - error in an edge case where the schedule specification is grammatically correct,
 //     but logically doesn't make sense (31st day for months with only 30 days, for example).
 func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, includeStartingDeadlineSeconds bool) (time.Time, *time.Time, missedSchedulesType, error) {
-	earliestTime := cj.ObjectMeta.CreationTimestamp.Time
+    // Convert 'now' to UTC to ensure consistent time comparisons
+    now = now.UTC()
+    earliestTime := cj.ObjectMeta.CreationTimestamp.Time
+	// Convert 'earliestTime' to UTC to match 'now' and 'schedule' time zones
+    earliestTime = earliestTime.UTC()
 	missedSchedules := noneMissed
 	if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
