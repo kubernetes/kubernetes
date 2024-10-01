@@ -64,7 +64,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, initialEventsListBlueprint runtime.Object) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -91,25 +91,25 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	ctx := req.Context()
 
 	// locate the appropriate embedded encoder based on the transform
-	var embeddedEncoder runtime.Encoder
+	var negotiatedEncoder runtime.Encoder
 	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
 	if transform {
 		info, ok := runtime.SerializerInfoForMediaType(contentSerializer.SupportedMediaTypes(), serializer.MediaType)
 		if !ok {
 			return nil, fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer)
 		}
-		embeddedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
+		negotiatedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
 	} else {
-		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+		negotiatedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
 	}
 
 	var memoryAllocator runtime.MemoryAllocator
 
-	if encoderWithAllocator, supportsAllocator := embeddedEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
+	if encoderWithAllocator, supportsAllocator := negotiatedEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		// don't put the allocator inside the embeddedEncodeFn as that would allocate memory on every call.
 		// instead, we allocate the buffer for the entire watch session and release it when we close the connection.
 		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
-		embeddedEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+		negotiatedEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
 	var tableOptions *metav1.TableOptions
 	if options != nil {
@@ -119,7 +119,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 			return nil, fmt.Errorf("unexpected options type: %T", options)
 		}
 	}
-	embeddedEncoder = newWatchEmbeddedEncoder(ctx, embeddedEncoder, mediaTypeOptions.Convert, tableOptions, scope)
+	embeddedEncoder := newWatchEmbeddedEncoder(ctx, negotiatedEncoder, mediaTypeOptions.Convert, tableOptions, scope)
 
 	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		if memoryAllocator == nil {
@@ -144,6 +144,8 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		Framer:          framer,
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
+
+		watchListTransformerFn: newWatchListTransformer(initialEventsListBlueprint, mediaTypeOptions.Convert, negotiatedEncoder).transform,
 
 		MemoryAllocator:      memoryAllocator,
 		TimeoutFactory:       &realTimeoutFactory{timeout},
@@ -174,6 +176,10 @@ type WatchServer struct {
 	Encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
+	// watchListTransformerFn a function applied
+	// to watchlist bookmark events that transforms
+	// the embedded object before sending it to a client.
+	watchListTransformerFn watchListTransformerFunction
 
 	MemoryAllocator      runtime.MemoryAllocator
 	TimeoutFactory       TimeoutFactory
@@ -219,7 +225,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
+	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -288,7 +294,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	framer := newWebsocketFramer(ws, s.UseTextFraming)
 
 	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer)
+	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
 	ch := s.Watching.ResultChan()
 
 	for {
