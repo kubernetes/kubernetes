@@ -20,31 +20,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
-	"sync"
 	"sync/atomic"
 
-	"k8s.io/api/apiserverinternal/v1alpha1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/reconcilers"
-	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/apiserver/pkg/util/peerproxy/metrics"
-	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
+
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	v1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
+	coordinationv1 "k8s.io/client-go/listers/coordination/v1"
+	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -52,40 +56,19 @@ const (
 )
 
 type peerProxyHandler struct {
-	name string
-	// StorageVersion informer used to fetch apiserver ids than can serve a resource
-	storageversionInformer cache.SharedIndexInformer
-
-	// StorageVersion manager used to ensure it has finished updating storageversions before
-	// we start handling external requests
-	storageversionManager storageversion.Manager
-
-	// proxy transport
-	proxyTransport http.RoundTripper
-
+	name                      string
+	apiserverIdentityInformer cache.SharedIndexInformer
+	// ApiserverIdentityLister is used to fetch all apiservers in the cluster.
+	apiserverIdentityLister coordinationv1.LeaseLister
 	// identity for this server
 	serverId string
-
 	// reconciler that is used to fetch host port of peer apiserver when proxying request to a peer
-	reconciler reconcilers.PeerEndpointLeaseReconciler
-
-	serializer runtime.NegotiatedSerializer
-
-	// SyncMap for storing an up to date copy of the storageversions and apiservers that can serve them
-	// This map is populated using the StorageVersion informer
-	// This map has key set to GVR and value being another SyncMap
-	// The nested SyncMap has key set to apiserver id and value set to boolean
-	// The nested maps are created to have a "Set" like structure to store unique apiserver ids
-	// for a given GVR
-	svMap sync.Map
-
-	finishedSync atomic.Bool
-}
-
-type serviceableByResponse struct {
-	locallyServiceable            bool
-	errorFetchingAddressFromLease bool
-	peerEndpoints                 []string
+	reconciler           reconcilers.PeerEndpointLeaseReconciler
+	serializer           runtime.NegotiatedSerializer
+	discoverySerializer  serializer.CodecFactory
+	loopbackClientConfig *restclient.Config
+	proxyClientConfig    *transport.Config
+	finishedSync         atomic.Bool
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -99,8 +82,7 @@ func (h *peerProxyHandler) HasFinishedSync() bool {
 }
 
 func (h *peerProxyHandler) WaitForCacheSync(stopCh <-chan struct{}) error {
-
-	ok := cache.WaitForNamedCacheSync("unknown-version-proxy", stopCh, h.storageversionInformer.HasSynced, h.storageversionManager.Completed)
+	ok := cache.WaitForNamedCacheSync("unknown-version-proxy", stopCh, h.apiserverIdentityInformer.HasSynced)
 	if !ok {
 		return fmt.Errorf("error while waiting for initial cache sync")
 	}
@@ -115,7 +97,6 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
-
 		if !ok {
 			responsewriters.InternalError(w, r, errors.New("no RequestInfo found in the context"))
 			return
@@ -135,111 +116,171 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 			return
 		}
 
-		// StorageVersion Informers and/or StorageVersionManager is not synced yet, pass request to next handler
+		// Apiserver Identity Informers is not synced yet, pass request to next handler
 		// This will happen for self requests from the kube-apiserver because we have a poststarthook
-		// to ensure that external requests are not served until the StorageVersion Informer and
-		// StorageVersionManager has synced
+		// to ensure that external requests are not served until the ApiserverIdentity Informer has synced
 		if !h.HasFinishedSync() {
 			handler.ServeHTTP(w, r)
 			return
 		}
 
 		gvr := schema.GroupVersionResource{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion, Resource: requestInfo.Resource}
-		if requestInfo.APIGroup == "" {
-			gvr.Group = "core"
+		apiserversi, err := h.apiserverIdentityLeases()
+		if err != nil {
+			klog.ErrorS(err, "no apiserver identity leases found: %v", err)
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		if h.shouldServeLocally(apiserversi, gvr) {
+			handler.ServeHTTP(w, r)
+			return
 		}
 
 		// find servers that are capable of serving this request
-		serviceableByResp, err := h.findServiceableByServers(gvr, h.serverId, h.reconciler)
+		peerEndpoint, err := h.findServiceableByServers(r.Context(), gvr, apiserversi)
 		if err != nil {
-			// this means that resource is an aggregated API or a CR since it wasn't found in SV informer cache, pass as it is
-			handler.ServeHTTP(w, r)
-			return
-		}
-		// found the gvr locally, pass request to the next handler in local apiserver
-		if serviceableByResp.locallyServiceable {
-			handler.ServeHTTP(w, r)
+			klog.ErrorS(err, "error fetching remote server details while proxying")
+			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gvr.GroupVersion(), w, r)
 			return
 		}
 
-		gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
-
-		if serviceableByResp.errorFetchingAddressFromLease {
-			klog.ErrorS(err, "error fetching ip and port of remote server while proxying")
-			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
-			return
+		if peerEndpoint != "" {
+			h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint)
 		}
-
-		// no apiservers were found that could serve the request, pass request to
-		// next handler, that should eventually serve 404
-
-		// TODO: maintain locally serviceable GVRs somewhere so that we dont have to
-		// consult the storageversion-informed map for those
-		if len(serviceableByResp.peerEndpoints) == 0 {
-			klog.Error(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
-			handler.ServeHTTP(w, r)
-			return
-		}
-
-		// otherwise, randomly select an apiserver and proxy request to it
-		rand := rand.Intn(len(serviceableByResp.peerEndpoints))
-		destServerHostPort := serviceableByResp.peerEndpoints[rand]
-		h.proxyRequestToDestinationAPIServer(r, w, destServerHostPort)
-
 	})
 }
 
-func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResource, localAPIServerId string, reconciler reconcilers.PeerEndpointLeaseReconciler) (serviceableByResponse, error) {
-
-	apiserversi, ok := h.svMap.Load(gvr)
-
-	// no value found for the requested gvr in svMap
-	if !ok || apiserversi == nil {
-		return serviceableByResponse{}, fmt.Errorf("no StorageVersions found for the GVR: %v", gvr)
+func (h *peerProxyHandler) apiserverIdentityLeases() ([]*v1.Lease, error) {
+	var apiserversi []*v1.Lease
+	apiserversi, err := h.apiserverIdentityLister.Leases(metav1.NamespaceSystem).List(labels.SelectorFromSet(labels.Set{"apiserver.kubernetes.io/identity": "kube-apiserver"}))
+	if err != nil {
+		return apiserversi, err
 	}
-	apiservers := apiserversi.(*sync.Map)
-	response := serviceableByResponse{}
-	var peerServerEndpoints []string
-	apiservers.Range(func(key, value interface{}) bool {
-		apiserverKey := key.(string)
-		if apiserverKey == localAPIServerId {
-			response.errorFetchingAddressFromLease = true
-			response.locallyServiceable = true
-			// stop iteration
+
+	return apiserversi, nil
+}
+
+func (h *peerProxyHandler) shouldServeLocally(apiserversi []*v1.Lease, gvr schema.GroupVersionResource) bool {
+	if len(apiserversi) <= 1 {
+		return true
+	}
+
+	return h.localDiscoverySuccessful(gvr)
+}
+
+func (h *peerProxyHandler) localDiscoverySuccessful(gvr schema.GroupVersionResource) bool {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(h.loopbackClientConfig)
+	if err != nil {
+		klog.Errorf("error creating discovery client: %v\n", err)
+		return false
+	}
+
+	_, resourcesByGV, _, err := discoveryClient.GroupsAndMaybeResources()
+	if err != nil {
+		klog.Errorf("error getting API group resources from discovery: %v\n", err)
+		return false
+	}
+
+	resources, ok := resourcesByGV[gvr.GroupVersion()]
+	if !ok {
+		klog.Errorf("error getting resources from discovery: %v\n", err)
+		return false
+	}
+
+	for _, resource := range resources.APIResources {
+		if gvr.GroupResource().Resource == resource.Name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (h *peerProxyHandler) findServiceableByServers(ctx context.Context, gvr schema.GroupVersionResource, apiserversi []*v1.Lease) (string, error) {
+	var foundPeer bool
+	var peerEndpoint string
+	for _, identity := range apiserversi {
+		apiserverKey := identity.Name
+		if apiserverKey == h.serverId {
+			continue
+		}
+
+		hostPort, err := getHostPortInfoFromLease(apiserverKey, h.reconciler)
+		if err != nil {
+			klog.Errorf("failed to get host port info from identity lease for server %s: %v", apiserverKey, err)
+			continue
+		}
+
+		if h.proxyDiscoverySuccessful(ctx, hostPort, gvr) {
+			peerEndpoint = hostPort
+			foundPeer = true
+			break
+		}
+	}
+
+	if foundPeer {
+		return peerEndpoint, nil
+	}
+
+	return "", fmt.Errorf("failed to fetch any apiserver capable of handling the request")
+}
+
+func getHostPortInfoFromLease(apiserverKey string, reconciler reconcilers.PeerEndpointLeaseReconciler) (string, error) {
+	hostPort, err := reconciler.GetEndpoint(apiserverKey)
+	if err != nil {
+		return "", err
+	}
+	// check ip format
+	_, _, err = net.SplitHostPort(hostPort)
+	if err != nil {
+		return "", err
+	}
+
+	return hostPort, nil
+}
+
+func (h *peerProxyHandler) proxyDiscoverySuccessful(ctx context.Context, hostport string, gvr schema.GroupVersionResource) bool {
+	discoveryPaths := []string{"/api", "/apis"}
+	for _, path := range discoveryPaths {
+		discoveryResponse, err := h.aggregateDiscovery(ctx, path, hostport)
+		if err != nil {
+			klog.Errorf("error while querying discovery endpoint: %v", err)
 			return false
 		}
 
-		hostPort, err := reconciler.GetEndpoint(apiserverKey)
-		if err != nil {
-			response.errorFetchingAddressFromLease = true
-			klog.Errorf("failed to get peer ip from storage lease for server %s", apiserverKey)
-			// continue with iteration
+		if foundGVRInDiscoveryDoc(discoveryResponse, gvr) {
 			return true
 		}
-		// check ip format
-		_, _, err = net.SplitHostPort(hostPort)
-		if err != nil {
-			response.errorFetchingAddressFromLease = true
-			klog.Errorf("invalid address found for server %s", apiserverKey)
-			// continue with iteration
-			return true
-		}
-		peerServerEndpoints = append(peerServerEndpoints, hostPort)
-		// continue with iteration
-		return true
-	})
+	}
 
-	response.peerEndpoints = peerServerEndpoints
-	return response, nil
+	return false
+}
+
+func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req = req.WithContext(ctx)
+	req.Header.Add("Accept", discovery.AcceptV2+","+discovery.AcceptV2Beta1)
+
+	writer := newInMemoryResponseWriter()
+	h.proxyRequestToDestinationAPIServer(req, writer, hostport)
+	if writer.respCode != http.StatusOK {
+		return nil, fmt.Errorf("discovery request failed with status: %d", writer.respCode)
+	}
+
+	parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
+	if err := runtime.DecodeInto(h.discoverySerializer.UniversalDecoder(), writer.data, parsed); err != nil {
+		return nil, fmt.Errorf("error decoding discovery response: %v", err)
+	}
+
+	return parsed, nil
 }
 
 func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string) {
-	user, ok := apirequest.UserFrom(req.Context())
-	if !ok {
-		klog.Errorf("failed to get user info from request")
-		return
-	}
-
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
@@ -251,15 +292,49 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	newReq.Header.Add(PeerProxiedHeader, "true")
 	defer cancelFn()
 
-	proxyRoundTripper := transport.NewAuthProxyRoundTripper(user.GetName(), user.GetUID(), user.GetGroups(), user.GetExtra(), h.proxyTransport)
+	proxyRoundTripper, err := h.buildProxyRoundtripper(req)
+	if err != nil {
+		klog.Errorf("failed to build proxy round tripper: %v", err)
+		return
+	}
 
 	delegate := &epmetrics.ResponseWriterDelegator{ResponseWriter: rw}
 	w := responsewriter.WrapForHTTP1Or2(delegate)
-
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, false, &responder{w: w, ctx: req.Context()})
 	handler.ServeHTTP(w, newReq)
-	// Increment the count of proxied requests
 	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()))
+}
+
+func (h *peerProxyHandler) buildProxyRoundtripper(req *http.Request) (http.RoundTripper, error) {
+	proxyTransport, err := transport.New(h.proxyClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create proxy transport")
+	}
+
+	user, ok := apirequest.UserFrom(req.Context())
+	if !ok {
+		return nil, err
+	}
+
+	return transport.NewAuthProxyRoundTripper(user.GetName(), user.GetUID(), user.GetGroups(), user.GetExtra(), proxyTransport), nil
+}
+
+func foundGVRInDiscoveryDoc(discoveryDoc *apidiscoveryv2.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
+	for _, groupDiscovery := range discoveryDoc.Items {
+		if groupDiscovery.Name == gvr.Group {
+			for _, version := range groupDiscovery.Versions {
+				if version.Version == gvr.Version {
+					for _, resource := range version.Resources {
+						if resource.Resource == gvr.Resource {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
@@ -267,91 +342,45 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	http.Error(w, err.Error(), http.StatusServiceUnavailable)
 }
 
-// Adds a storageversion object to SVMap
-func (h *peerProxyHandler) addSV(obj interface{}) {
-	sv, ok := obj.(*v1alpha1.StorageVersion)
-	if !ok {
-		klog.Errorf("Invalid StorageVersion provided to addSV()")
-		return
-	}
-	h.updateSVMap(nil, sv)
+// !TODO: This was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator/downloader.go
+// which was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator/downloader.go
+// so we should find a home for this
+// inMemoryResponseWriter is a http.Writer that keep the response in memory.
+type inMemoryResponseWriter struct {
+	writeHeaderCalled bool
+	header            http.Header
+	respCode          int
+	data              []byte
 }
 
-// Updates the SVMap to delete old storageversion and add new storageversion
-func (h *peerProxyHandler) updateSV(oldObj interface{}, newObj interface{}) {
-	oldSV, ok := oldObj.(*v1alpha1.StorageVersion)
-	if !ok {
-		klog.Errorf("Invalid StorageVersion provided to updateSV()")
-		return
-	}
-	newSV, ok := newObj.(*v1alpha1.StorageVersion)
-	if !ok {
-		klog.Errorf("Invalid StorageVersion provided to updateSV()")
-		return
-	}
-	h.updateSVMap(oldSV, newSV)
+func newInMemoryResponseWriter() *inMemoryResponseWriter {
+	return &inMemoryResponseWriter{header: http.Header{}}
 }
 
-// Deletes a storageversion object from SVMap
-func (h *peerProxyHandler) deleteSV(obj interface{}) {
-	sv, ok := obj.(*v1alpha1.StorageVersion)
-	if !ok {
-		klog.Errorf("Invalid StorageVersion provided to deleteSV()")
-		return
-	}
-	h.updateSVMap(sv, nil)
+func (r *inMemoryResponseWriter) Header() http.Header {
+	return r.header
 }
 
-// Delete old storageversion, add new storagversion
-func (h *peerProxyHandler) updateSVMap(oldSV *v1alpha1.StorageVersion, newSV *v1alpha1.StorageVersion) {
-	if oldSV != nil {
-		// delete old SV entries
-		h.deleteSVFromMap(oldSV)
-	}
-	if newSV != nil {
-		// add new SV entries
-		h.addSVToMap(newSV)
-	}
+func (r *inMemoryResponseWriter) WriteHeader(code int) {
+	r.writeHeaderCalled = true
+	r.respCode = code
 }
 
-func (h *peerProxyHandler) deleteSVFromMap(sv *v1alpha1.StorageVersion) {
-	// The name of storageversion is <group>.<resource>
-	splitInd := strings.LastIndex(sv.Name, ".")
-	group := sv.Name[:splitInd]
-	resource := sv.Name[splitInd+1:]
-
-	gvr := schema.GroupVersionResource{Group: group, Resource: resource}
-	for _, gr := range sv.Status.StorageVersions {
-		for _, version := range gr.ServedVersions {
-			versionSplit := strings.Split(version, "/")
-			if len(versionSplit) == 2 {
-				version = versionSplit[1]
-			}
-			gvr.Version = version
-			h.svMap.Delete(gvr)
-		}
+func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
+	if !r.writeHeaderCalled {
+		r.WriteHeader(http.StatusOK)
 	}
+	r.data = append(r.data, in...)
+	return len(in), nil
 }
 
-func (h *peerProxyHandler) addSVToMap(sv *v1alpha1.StorageVersion) {
-	// The name of storageversion is <group>.<resource>
-	splitInd := strings.LastIndex(sv.Name, ".")
-	group := sv.Name[:splitInd]
-	resource := sv.Name[splitInd+1:]
-
-	gvr := schema.GroupVersionResource{Group: group, Resource: resource}
-	for _, gr := range sv.Status.StorageVersions {
-		for _, version := range gr.ServedVersions {
-
-			// some versions have groups included in them, so get rid of the groups
-			versionSplit := strings.Split(version, "/")
-			if len(versionSplit) == 2 {
-				version = versionSplit[1]
-			}
-			gvr.Version = version
-			apiserversi, _ := h.svMap.LoadOrStore(gvr, &sync.Map{})
-			apiservers := apiserversi.(*sync.Map)
-			apiservers.Store(gr.APIServerID, true)
-		}
+func (r *inMemoryResponseWriter) String() string {
+	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
+	if r.data != nil {
+		s += fmt.Sprintf(", Body: %s", string(r.data))
 	}
+	if r.header != nil {
+		s += fmt.Sprintf(", Header: %s", r.header)
+	}
+	return s
 }
