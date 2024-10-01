@@ -475,8 +475,12 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 	// Evented PLEG after the event has been received by the Kubelet.
 	// For more details refer to:
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3386-kubelet-evented-pleg#timestamp-of-the-pod-status
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && isEventedPLEGInUse() && status != nil && !status.TimeStamp.IsZero() {
-		timestamp = status.TimeStamp
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && isEventedPLEGInUse() && status != nil {
+		if status.TimeStamp.IsZero() {
+			status.TimeStamp = timestamp
+		} else {
+			timestamp = status.TimeStamp
+		}
 	}
 
 	return err, g.cache.Set(pod.ID, status, err, timestamp)

@@ -1249,6 +1249,9 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 			default:
 				if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 					status, err = p.podCache.Get(update.Options.Pod.UID)
+					if err == nil && status.TimeStamp.Before(lastSyncTime) {
+						status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
+					}
 				} else {
 					// wait until we see the next refresh from the PLEG via the cache (max 2s)
 					// TODO: this adds ~1s of latency on all transitions from sync to terminating
