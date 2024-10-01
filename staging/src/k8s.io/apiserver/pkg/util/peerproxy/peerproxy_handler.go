@@ -264,7 +264,7 @@ func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, 
 	}
 
 	req = req.WithContext(ctx)
-	req.Header.Add("Accept", discovery.AcceptV2+","+discovery.AcceptV2Beta1)
+	req.Header.Add("Accept", discovery.AcceptV2)
 
 	writer := newInMemoryResponseWriter()
 	h.proxyRequestToDestinationAPIServer(req, writer, hostport)

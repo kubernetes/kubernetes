@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -46,7 +45,7 @@ const (
 
 func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, loopbackClientConfig *rest.Config,
 	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
-	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer, discoverySerializer serializer.CodecFactory) (utilpeerproxy.Interface, error) {
+	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
 	if proxyClientCertFile == "" {
 		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
 	}
@@ -68,7 +67,6 @@ func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, l
 		apiServerID,
 		reconciler,
 		serializer,
-		discoverySerializer,
 		loopbackClientConfig,
 		proxyClientConfig,
 	), nil

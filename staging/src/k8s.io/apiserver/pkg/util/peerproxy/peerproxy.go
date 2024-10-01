@@ -25,6 +25,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 )
 
@@ -39,20 +41,23 @@ type Interface interface {
 func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
 	serverId string,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	serializer runtime.NegotiatedSerializer,
-	discoverySerlializer serializer.CodecFactory,
+	ser runtime.NegotiatedSerializer,
 	loopbackClientConfig *rest.Config,
 	proxyClientConfig *transport.Config) *peerProxyHandler {
 	h := &peerProxyHandler{
 		name:                 "PeerProxyHandler",
 		serverId:             serverId,
 		reconciler:           reconciler,
-		serializer:           serializer,
-		discoverySerializer:  discoverySerlializer,
+		serializer:           ser,
 		loopbackClientConfig: loopbackClientConfig,
 		proxyClientConfig:    proxyClientConfig,
 	}
+
 	h.apiserverIdentityInformer = informerFactory.Coordination().V1().Leases().Informer()
 	h.apiserverIdentityLister = informerFactory.Coordination().V1().Leases().Lister()
+	discoveryScheme := runtime.NewScheme()
+	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
+	h.discoverySerializer = serializer.NewCodecFactory(discoveryScheme)
+
 	return h
 }
