@@ -706,8 +706,8 @@ type MutatingAdmissionPolicySpec struct {
 	// The AdmissionPolicy cares about a request if it matches _all_ Constraints.
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding.
-	// Only the CREATE and UPDATE operations are allowed.  DELETE and CONNECT operations may not be matched.
-	// '*' matches only CREATE and UPDATE.
+	// Only the CREATE, UPDATE, and CONNECT operations are allowed.
+	// '*' matches only CREATE, UPDATE, and CONNECT.
 	// Required.
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
