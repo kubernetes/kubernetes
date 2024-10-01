@@ -20,17 +20,8 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
-const (
-	// owner: @logicalhan
-	// kep: https://kep.k8s.io/3466
-	// alpha: v1.26
-	ComponentSLIs featuregate.Feature = "ComponentSLIs"
-)
-
 func featureGates() map[featuregate.Feature]featuregate.FeatureSpec {
-	return map[featuregate.Feature]featuregate.FeatureSpec{
-		ComponentSLIs: {Default: true, PreRelease: featuregate.Beta},
-	}
+	return map[featuregate.Feature]featuregate.FeatureSpec{}
 }
 
 // AddFeatureGates adds all feature gates used by this package.
