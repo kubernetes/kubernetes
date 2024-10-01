@@ -1,0 +1,126 @@
+clusternetworks.network.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/527
+  CRDName: clusternetworks.network.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: ""
+  FilenameOperatorOrdering: "001"
+  FilenameRunLevel: ""
+  GroupName: network.openshift.io
+  HasStatus: false
+  KindName: ClusterNetwork
+  Labels: {}
+  PluralName: clusternetworks
+  PrinterColumns:
+  - description: The primary cluster network CIDR
+    jsonPath: .network
+    name: Cluster Network
+    type: string
+  - description: The service network CIDR
+    jsonPath: .serviceNetwork
+    name: Service Network
+    type: string
+  - description: The OpenShift SDN network plug-in in use
+    jsonPath: .pluginName
+    name: Plugin Name
+    type: string
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+egressnetworkpolicies.network.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/527
+  CRDName: egressnetworkpolicies.network.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: ""
+  FilenameOperatorOrdering: "004"
+  FilenameRunLevel: ""
+  GroupName: network.openshift.io
+  HasStatus: false
+  KindName: EgressNetworkPolicy
+  Labels: {}
+  PluralName: egressnetworkpolicies
+  PrinterColumns: []
+  Scope: Namespaced
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+hostsubnets.network.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/527
+  CRDName: hostsubnets.network.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: ""
+  FilenameOperatorOrdering: "002"
+  FilenameRunLevel: ""
+  GroupName: network.openshift.io
+  HasStatus: false
+  KindName: HostSubnet
+  Labels: {}
+  PluralName: hostsubnets
+  PrinterColumns:
+  - description: The name of the node
+    jsonPath: .host
+    name: Host
+    type: string
+  - description: The IP address to be used as a VTEP by other nodes in the overlay
+      network
+    jsonPath: .hostIP
+    name: Host IP
+    type: string
+  - description: The CIDR range of the overlay network assigned to the node for its
+      pods
+    jsonPath: .subnet
+    name: Subnet
+    type: string
+  - description: The network egress CIDRs
+    jsonPath: .egressCIDRs
+    name: Egress CIDRs
+    type: string
+  - description: The network egress IP addresses
+    jsonPath: .egressIPs
+    name: Egress IPs
+    type: string
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+netnamespaces.network.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/527
+  CRDName: netnamespaces.network.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: ""
+  FilenameOperatorOrdering: "003"
+  FilenameRunLevel: ""
+  GroupName: network.openshift.io
+  HasStatus: false
+  KindName: NetNamespace
+  Labels: {}
+  PluralName: netnamespaces
+  PrinterColumns:
+  - description: The network identifier of the network namespace
+    jsonPath: .netid
+    name: NetID
+    type: integer
+  - description: The network egress IP addresses
+    jsonPath: .egressIPs
+    name: Egress IPs
+    type: string
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+

@@ -1,0 +1,22 @@
+clusterresourcequotas.quota.openshift.io:
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: clusterresourcequotas.quota.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_03"
+  GroupName: quota.openshift.io
+  HasStatus: true
+  KindName: ClusterResourceQuota
+  Labels: {}
+  PluralName: clusterresourcequotas
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
