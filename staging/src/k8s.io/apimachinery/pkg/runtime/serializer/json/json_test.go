@@ -1042,3 +1042,50 @@ func TestEncode(t *testing.T) {
 		})
 	}
 }
+
+// TestRoundtripUnstructuredFloat64 demonstrates that encoding a fractionless float64 value to JSON
+// then decoding into interface{} can produce a value with concrete type int64. This is a
+// consequence of two specific behaviors. First, there is nothing in the JSON encoding of a
+// fractionless float64 value to distinguish it from the JSON encoding of an integer value. Second,
+// if, when unmarshaling into interface{}, the decoder encounters a JSON number with no decimal
+// point in the input, it produces a value with concrete type int64 as long as the number can be
+// precisely represented by an int64.
+func TestRoundtripUnstructuredFractionlessFloat64(t *testing.T) {
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, runtime.NewScheme(), runtime.NewScheme(), json.SerializerOptions{})
+
+	initial := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion":                    "v1",
+		"kind":                          "Test",
+		"with-fraction":                 float64(1.5),
+		"without-fraction":              float64(1),
+		"without-fraction-big-positive": float64(9223372036854776000),
+		"without-fraction-big-negative": float64(-9223372036854776000),
+	}}
+
+	var buf bytes.Buffer
+	if err := s.Encode(initial, &buf); err != nil {
+		t.Fatal(err)
+	}
+
+	final := &unstructured.Unstructured{}
+	got, _, err := s.Decode(buf.Bytes(), nil, final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != final {
+		t.Fatalf("expected Decode to return target Unstructured object but got: %v", got)
+	}
+
+	expected := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion":                    "v1",
+		"kind":                          "Test",
+		"with-fraction":                 float64(1.5),
+		"without-fraction":              int64(1), // note the change in concrete type
+		"without-fraction-big-positive": float64(9223372036854776000),
+		"without-fraction-big-negative": float64(-9223372036854776000),
+	}}
+
+	if diff := cmp.Diff(expected, final); diff != "" {
+		t.Fatalf("unexpected diff:\n%s", diff)
+	}
+}
