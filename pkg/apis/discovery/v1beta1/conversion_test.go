@@ -135,11 +135,11 @@ func TestEndpointZoneConverstion(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			convertedInternal := discovery.Endpoint{}
 			require.NoError(t, Convert_v1beta1_Endpoint_To_discovery_Endpoint(&tc.external, &convertedInternal, nil))
-			assert.Equal(t, tc.internal, convertedInternal, "v1beta1.Endpoint -> discovery.Endpoint")
+			assert.Equalf(t, tc.internal, convertedInternal, "v1beta1.Endpoint -> discovery.Endpoint")
 
 			convertedV1beta1 := v1beta1.Endpoint{}
 			require.NoError(t, Convert_discovery_Endpoint_To_v1beta1_Endpoint(&tc.internal, &convertedV1beta1, nil))
-			assert.Equal(t, tc.external, convertedV1beta1, "discovery.Endpoint -> v1beta1.Endpoint")
+			assert.Equalf(t, tc.external, convertedV1beta1, "discovery.Endpoint -> v1beta1.Endpoint")
 		})
 	}
 }

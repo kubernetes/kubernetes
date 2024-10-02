@@ -83,7 +83,7 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, target, res)
 	target["foo"] = "baz"
-	assert.Equal(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a reference to the expected item")
+	assert.Equalf(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a reference to the expected item")
 
 	// case 2: field exists and is nil
 	res, exists, err = NestedFieldNoCopy(obj, "a", "c")
@@ -141,7 +141,7 @@ func TestNestedFieldCopy(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, target, res)
 	target["foo"] = "baz"
-	assert.NotEqual(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a copy of the expected item")
+	assert.NotEqualf(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a copy of the expected item")
 
 	// case 2: field exists and is nil
 	res, exists, err = NestedFieldCopy(obj, "a", "c")

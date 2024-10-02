@@ -4105,7 +4105,7 @@ func TestRequestLogging(t *testing.T) {
 			klog.LogToStderr(false)
 			var fs flag.FlagSet
 			klog.InitFlags(&fs)
-			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoErrorf(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
 
 			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
@@ -4123,7 +4123,7 @@ func TestRequestLogging(t *testing.T) {
 
 			_, file, line, _ := goruntime.Caller(0)
 			result := req.Do(ctx)
-			require.NoError(t, result.Error(), "request.Do")
+			require.NoErrorf(t, result.Error(), "request.Do")
 
 			// Compare log output:
 			// - strip date/time/pid from each line (fixed length header)

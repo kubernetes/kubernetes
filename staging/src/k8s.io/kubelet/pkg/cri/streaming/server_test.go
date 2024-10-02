@@ -70,7 +70,7 @@ func TestGetExec(t *testing.T) {
 
 	assertRequestToken := func(expectedReq *runtimeapi.ExecRequest, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
-		require.True(t, ok, "token %s not found!", token)
+		require.Truef(t, ok, "token %s not found!", token)
 		assert.Equal(t, expectedReq, req)
 	}
 	request := &runtimeapi.ExecRequest{
@@ -165,7 +165,7 @@ func TestValidateExecAttachRequest(t *testing.T) {
 					Stderr:      c.stderr,
 				}
 				err := validateExecRequest(execReq)
-				assert.Equal(t, tc.expectErr, err != nil, "config: %v,  err: %v", c, err)
+				assert.Equalf(t, tc.expectErr, err != nil, "config: %v,  err: %v", c, err)
 
 				// validate the attach request.
 				attachReq := &runtimeapi.AttachRequest{
@@ -176,7 +176,7 @@ func TestValidateExecAttachRequest(t *testing.T) {
 					Stderr:      c.stderr,
 				}
 				err = validateAttachRequest(attachReq)
-				assert.Equal(t, tc.expectErr, err != nil, "config: %v, err: %v", c, err)
+				assert.Equalf(t, tc.expectErr, err != nil, "config: %v, err: %v", c, err)
 			}
 		})
 	}
@@ -196,7 +196,7 @@ func TestGetAttach(t *testing.T) {
 
 	assertRequestToken := func(expectedReq *runtimeapi.AttachRequest, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
-		require.True(t, ok, "token %s not found!", token)
+		require.Truef(t, ok, "token %s not found!", token)
 		assert.Equal(t, expectedReq, req)
 	}
 
@@ -242,7 +242,7 @@ func TestGetPortForward(t *testing.T) {
 		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
 		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := serv.(*server).cache.Consume(token)
-		require.True(t, ok, "token %s not found!", token)
+		require.Truef(t, ok, "token %s not found!", token)
 		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
 	}
 
@@ -258,7 +258,7 @@ func TestGetPortForward(t *testing.T) {
 		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
 		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := tlsServer.(*server).cache.Consume(token)
-		require.True(t, ok, "token %s not found!", token)
+		require.Truef(t, ok, "token %s not found!", token)
 		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
 	}
 }
@@ -457,13 +457,13 @@ func doClientStreams(t *testing.T, prefix string, stdin io.Writer, stdout, stder
 func readExpected(t *testing.T, streamName string, r io.Reader, expected string) {
 	result := make([]byte, len(expected))
 	_, err := io.ReadAtLeast(r, result, len(expected))
-	assert.NoError(t, err, "stream %s", streamName)
-	assert.Equal(t, expected, string(result), "stream %s", streamName)
+	assert.NoErrorf(t, err, "stream %s", streamName)
+	assert.Equalf(t, expected, string(result), "stream %s", streamName)
 }
 
 // Write and verify success of the data over the stream.
 func writeExpected(t *testing.T, streamName string, w io.Writer, data string) {
 	n, err := io.WriteString(w, data)
-	assert.NoError(t, err, "stream %s", streamName)
-	assert.Equal(t, len(data), n, "stream %s", streamName)
+	assert.NoErrorf(t, err, "stream %s", streamName)
+	assert.Equalf(t, len(data), n, "stream %s", streamName)
 }

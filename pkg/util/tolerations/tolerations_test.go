@@ -169,11 +169,11 @@ func TestIsSuperset(t *testing.T) {
 	}}
 
 	assertSuperset := func(t *testing.T, super, sub string) {
-		assert.True(t, isSuperset(tolerations[super], tolerations[sub]),
+		assert.Truef(t, isSuperset(tolerations[super], tolerations[sub]),
 			"%s should be a superset of %s", super, sub)
 	}
 	assertNotSuperset := func(t *testing.T, super, sub string) {
-		assert.False(t, isSuperset(tolerations[super], tolerations[sub]),
+		assert.Falsef(t, isSuperset(tolerations[super], tolerations[sub]),
 			"%s should NOT be a superset of %s", super, sub)
 	}
 	contains := func(ss []string, s string) bool {
@@ -306,7 +306,7 @@ func TestMergeTolerations(t *testing.T) {
 			actual := MergeTolerations(getTolerations(test.a), getTolerations(test.b))
 			require.Len(t, actual, len(test.expected))
 			for i, expect := range getTolerations(test.expected) {
-				assert.Equal(t, expect, actual[i], "expected[%d] = %s", i, test.expected[i])
+				assert.Equalf(t, expect, actual[i], "expected[%d] = %s", i, test.expected[i])
 			}
 		})
 	}
@@ -341,7 +341,7 @@ func TestFuzzed(t *testing.T) {
 			gen.TolerationSeconds = utilpointer.Int64Ptr(r.Int63n(10))
 		}
 		// Ensure only valid tolerations are generated.
-		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath("")).ToAggregate(), "%#v", gen)
+		require.NoErrorf(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath("")).ToAggregate(), "%#v", gen)
 		return gen
 	}
 	genTolerations := func() []api.Toleration {
@@ -377,7 +377,7 @@ func TestFuzzed(t *testing.T) {
 			whitelist := append(genTolerations(), genToleration()) // Non-empty
 			if VerifyAgainstWhitelist(input, whitelist) {
 				for _, tol := range input {
-					require.True(t, isContained(tol, whitelist), debugMsg(input, whitelist))
+					require.Truef(t, isContained(tol, whitelist), debugMsg(input, whitelist))
 				}
 			} else {
 				uncontained := false
@@ -387,7 +387,7 @@ func TestFuzzed(t *testing.T) {
 						break
 					}
 				}
-				require.True(t, uncontained, debugMsg(input, whitelist))
+				require.Truef(t, uncontained, debugMsg(input, whitelist))
 			}
 		}
 	})
@@ -398,7 +398,7 @@ func TestFuzzed(t *testing.T) {
 			b := genTolerations()
 			result := MergeTolerations(a, b)
 			for _, tol := range append(a, b...) {
-				require.True(t, isContained(tol, result), debugMsg(a, b, result))
+				require.Truef(t, isContained(tol, result), debugMsg(a, b, result))
 			}
 		}
 	})

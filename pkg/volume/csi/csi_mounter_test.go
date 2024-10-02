@@ -1172,7 +1172,7 @@ func TestIsCorruptedDir(t *testing.T) {
 
 	for i, test := range tests {
 		isCorruptedDir := isCorruptedDir(test.dir)
-		assert.Equal(t, test.expectedResult, isCorruptedDir, "TestCase[%d]: %s", i, test.desc)
+		assert.Equalf(t, test.expectedResult, isCorruptedDir, "TestCase[%d]: %s", i, test.desc)
 	}
 }
 

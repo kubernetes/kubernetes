@@ -224,6 +224,9 @@ linters-settings: # please keep this alphabetized
     checks:
       - "all"
   testifylint:
-    enable-all: true
     disable:  # TODO: remove each disabled rule and fix it
       - require-error
+    enable-all: true
+    formatter:
+      # To require f-assertions if format string is used.
+      require-f-funcs: true

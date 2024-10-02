@@ -90,7 +90,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout waiting for spdy stream to arrive on channel.")
 	}
-	assert.Equal(t, expected, string(actual), "error validating tunneled string")
+	assert.Equalf(t, expected, string(actual), "error validating tunneled string")
 }
 
 func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
@@ -112,17 +112,17 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 	url, err := url.Parse(tunnelingServer.URL)
 	require.NoError(t, err)
 	tConn, err := dialForTunnelingConnection(url)
-	require.NoError(t, err, "error creating client tunneling connection")
+	require.NoErrorf(t, err, "error creating client tunneling connection")
 	defer tConn.Close() //nolint:errcheck
 	// Validate "LocalAddr()" and "RemoteAddr()"
 	localAddr := tConn.LocalAddr()
 	remoteAddr := tConn.RemoteAddr()
-	assert.Equal(t, "tcp", localAddr.Network(), "tunneling connection must be TCP")
-	assert.Equal(t, "tcp", remoteAddr.Network(), "tunneling connection must be TCP")
+	assert.Equalf(t, "tcp", localAddr.Network(), "tunneling connection must be TCP")
+	assert.Equalf(t, "tcp", remoteAddr.Network(), "tunneling connection must be TCP")
 	_, err = net.ResolveTCPAddr("tcp", localAddr.String())
-	assert.NoError(t, err, "tunneling connection local addr should parse")
+	assert.NoErrorf(t, err, "tunneling connection local addr should parse")
 	_, err = net.ResolveTCPAddr("tcp", remoteAddr.String())
-	assert.NoError(t, err, "tunneling connection remote addr should parse")
+	assert.NoErrorf(t, err, "tunneling connection remote addr should parse")
 }
 
 func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
@@ -144,21 +144,21 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 	url, err := url.Parse(tunnelingServer.URL)
 	require.NoError(t, err)
 	tConn, err := dialForTunnelingConnection(url)
-	require.NoError(t, err, "error creating client tunneling connection")
+	require.NoErrorf(t, err, "error creating client tunneling connection")
 	defer tConn.Close() //nolint:errcheck
 	// Validate the read and write deadlines.
 	err = tConn.SetReadDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	assert.NoErrorf(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetWriteDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	assert.NoErrorf(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	assert.NoErrorf(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetReadDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	assert.NoErrorf(t, err, "setting deadline 10 year from now succeeds")
 	err = tConn.SetWriteDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	assert.NoErrorf(t, err, "setting deadline 10 year from now succeeds")
 	err = tConn.SetDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	assert.NoErrorf(t, err, "setting deadline 10 year from now succeeds")
 }
 
 // dialForTunnelingConnection upgrades a request at the passed "url", creating

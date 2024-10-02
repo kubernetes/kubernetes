@@ -62,10 +62,10 @@ func TestParseEndpoint(t *testing.T) {
 		protocol, addr, err := parseEndpoint(test.endpoint)
 		assert.Equal(t, test.expectedProtocol, protocol)
 		if test.expectError {
-			assert.Error(t, err, "Expect error during parsing %q", test.endpoint)
+			assert.Errorf(t, err, "Expect error during parsing %q", test.endpoint)
 			continue
 		}
-		assert.NoError(t, err, "Expect no error during parsing %q", test.endpoint)
+		assert.NoErrorf(t, err, "Expect no error during parsing %q", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
 
@@ -109,10 +109,10 @@ func TestGetAddressAndDialer(t *testing.T) {
 		// just test addr and err
 		addr, _, err := GetAddressAndDialer(test.endpoint)
 		if test.expectError {
-			assert.Error(t, err, "expected error during parsing %s", test.endpoint)
+			assert.Errorf(t, err, "expected error during parsing %s", test.endpoint)
 			continue
 		}
-		assert.NoError(t, err, "expected no error during parsing %s", test.endpoint)
+		assert.NoErrorf(t, err, "expected no error during parsing %s", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
 }

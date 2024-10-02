@@ -51,13 +51,13 @@ func TestInsert(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, newestTok, tokenLen)
 	assertCacheSize(t, c, maxInFlight)
-	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
+	require.Containsf(t, c.tokens, oldestTok, "oldest request should still be cached")
 
 	// Consume newest token.
 	req, ok := c.Consume(newestTok)
-	assert.True(t, ok, "newest request should still be cached")
+	assert.Truef(t, ok, "newest request should still be cached")
 	assert.Equal(t, newestReq, req)
-	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
+	require.Containsf(t, c.tokens, oldestTok, "oldest request should still be cached")
 
 	// Insert again (still full)
 	tok, err := c.Insert(nextRequest())
@@ -67,7 +67,7 @@ func TestInsert(t *testing.T) {
 
 	// Insert again (should evict)
 	_, err = c.Insert(nextRequest())
-	assert.Error(t, err, "should reject further requests")
+	assert.Errorf(t, err, "should reject further requests")
 	recorder := httptest.NewRecorder()
 	require.NoError(t, WriteError(err, recorder))
 	errResponse := recorder.Result()
@@ -76,7 +76,7 @@ func TestInsert(t *testing.T) {
 
 	assertCacheSize(t, c, maxInFlight)
 	_, ok = c.Consume(oldestTok)
-	assert.True(t, ok, "oldest request should be valid")
+	assert.Truef(t, ok, "oldest request should be valid")
 }
 
 func TestConsume(t *testing.T) {
@@ -210,8 +210,8 @@ func newTestCache() (*requestCache, *testingclock.FakeClock) {
 func assertCacheSize(t *testing.T, cache *requestCache, expectedSize int) {
 	tokenLen := len(cache.tokens)
 	llLen := cache.ll.Len()
-	assert.Equal(t, tokenLen, llLen, "inconsistent cache size! len(tokens)=%d; len(ll)=%d", tokenLen, llLen)
-	assert.Equal(t, expectedSize, tokenLen, "unexpected cache size!")
+	assert.Equalf(t, tokenLen, llLen, "inconsistent cache size! len(tokens)=%d; len(ll)=%d", tokenLen, llLen)
+	assert.Equalf(t, expectedSize, tokenLen, "unexpected cache size!")
 }
 
 var requestUID = 0

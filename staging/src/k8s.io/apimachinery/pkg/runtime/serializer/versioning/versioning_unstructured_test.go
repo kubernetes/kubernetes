@@ -332,7 +332,7 @@ func TestDecodeUnstructured(t *testing.T) {
 			return
 		}
 		assert.NoError(t, err)
-		assert.Equal(t, testCase.expectedOut, actualObj, "%v failed", testCase.name)
-		assert.Equal(t, testCase.expectedGVKOfSerializedData, actualSerializedGVK, "%v failed", testCase.name)
+		assert.Equalf(t, testCase.expectedOut, actualObj, "%v failed", testCase.name)
+		assert.Equalf(t, testCase.expectedGVKOfSerializedData, actualSerializedGVK, "%v failed", testCase.name)
 	}
 }

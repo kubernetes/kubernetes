@@ -36,7 +36,7 @@ func TestValidChecks(t *testing.T) {
 	for _, check := range allChecks {
 		for _, c := range check.Versions {
 			for _, override := range c.OverrideCheckIDs {
-				assert.Contains(t, allIDs, override, "check %s overrides non-existent check %s", check.ID, override)
+				assert.Containsf(t, allIDs, override, "check %s overrides non-existent check %s", check.ID, override)
 			}
 		}
 	}

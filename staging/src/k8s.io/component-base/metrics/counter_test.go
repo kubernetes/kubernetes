@@ -89,10 +89,10 @@ func TestCounter(t *testing.T) {
 			var buf bytes.Buffer
 			enc := expfmt.NewEncoder(&buf, "text/plain; version=0.0.4; charset=utf-8")
 			assert.Lenf(t, mfs, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 			for _, metric := range mfs {
 				err := enc.Encode(metric)
-				require.NoError(t, err, "Unexpected err %v in encoding the metric", err)
+				require.NoErrorf(t, err, "Unexpected err %v in encoding the metric", err)
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
@@ -102,7 +102,7 @@ func TestCounter(t *testing.T) {
 				c.Inc()
 			}
 			mfs, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				mfMetric := mf.GetMetric()
@@ -188,7 +188,7 @@ func TestCounterVec(t *testing.T) {
 			c.WithLabelValues("1", "2").Inc()
 			mfs, err := registry.Gather()
 			assert.Lenf(t, mfs, test.expectedMetricFamilyCount, "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -200,7 +200,7 @@ func TestCounterVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Inc()
 			c.WithLabelValues("2", "3").Inc()
 			mfs, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -258,7 +258,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Inc()
 			}
 			mfs, err := registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -278,7 +278,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 					}
 					labelValuePair := aValue + " " + bValue
 					expectedValue, ok := test.expectMetricValues[labelValuePair]
-					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					assert.Truef(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
 					actualValue := int(m.GetCounter().GetValue())
 					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
 				}

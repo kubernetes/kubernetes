@@ -110,7 +110,7 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout waiting for spdy stream to arrive on channel.")
 	}
-	assert.Equal(t, randomData, actual, "error validating tunneled random data")
+	assert.Equalf(t, randomData, actual, "error validating tunneled random data")
 
 	// Validate the streamtunnel metrics; should be one 101 Switching Protocols.
 	metricNames := []string{"apiserver_stream_tunnel_requests_total"}
@@ -169,7 +169,7 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Handshake fails.
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-		require.Error(t, err, "handshake should have returned an error")
+		require.Errorf(t, err, "handshake should have returned an error")
 		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
 	}))
@@ -223,7 +223,7 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 		// Create fake upstream SPDY server, which returns a 500-level error.
 		spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-			require.NoError(t, err, "handshake should have succeeded")
+			require.NoErrorf(t, err, "handshake should have succeeded")
 			// Returned status code should be incremented in metrics.
 			w.WriteHeader(statusCode)
 		}))
@@ -267,23 +267,23 @@ apiserver_stream_tunnel_requests_total{code="` + codeStr + `"} 1
 func TestTunnelingResponseWriter_Hijack(t *testing.T) {
 	// Regular hijack returns connection, nil bufio, and no error.
 	trw := &tunnelingResponseWriter{conn: &mockConn{}}
-	assert.False(t, trw.hijacked, "hijacked field starts false before Hijack()")
-	assert.False(t, trw.written, "written field startes false before Hijack()")
+	assert.Falsef(t, trw.hijacked, "hijacked field starts false before Hijack()")
+	assert.Falsef(t, trw.written, "written field startes false before Hijack()")
 	actual, bufio, err := trw.Hijack()
-	assert.NoError(t, err, "Hijack() does not return error")
-	assert.NotNil(t, actual, "conn returned from Hijack() is not nil")
-	assert.Nil(t, bufio, "bufio returned from Hijack() is always nil")
-	assert.True(t, trw.hijacked, "hijacked field becomes true after Hijack()")
-	assert.False(t, trw.written, "written field stays false after Hijack()")
+	assert.NoErrorf(t, err, "Hijack() does not return error")
+	assert.NotNilf(t, actual, "conn returned from Hijack() is not nil")
+	assert.Nilf(t, bufio, "bufio returned from Hijack() is always nil")
+	assert.Truef(t, trw.hijacked, "hijacked field becomes true after Hijack()")
+	assert.Falsef(t, trw.written, "written field stays false after Hijack()")
 	// Hijacking after writing to response writer is an error.
 	trw = &tunnelingResponseWriter{written: true}
 	_, _, err = trw.Hijack()
-	assert.Error(t, err, "Hijack after writing to response writer is error")
+	assert.Errorf(t, err, "Hijack after writing to response writer is error")
 	assert.ErrorContains(t, err, "connection has already been written to")
 	// Hijacking after already hijacked is an error.
 	trw = &tunnelingResponseWriter{hijacked: true}
 	_, _, err = trw.Hijack()
-	assert.Error(t, err, "Hijack after writing to response writer is error")
+	assert.Errorf(t, err, "Hijack after writing to response writer is error")
 	assert.ErrorContains(t, err, "connection has already been hijacked")
 }
 
@@ -292,40 +292,40 @@ func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
 	expectedHeader := http.Header{}
 	expectedHeader.Set("foo", "bar")
 	trw := &tunnelingResponseWriter{w: &mockResponseWriter{header: expectedHeader}}
-	assert.Equal(t, expectedHeader, trw.Header(), "")
+	assert.Equalf(t, expectedHeader, trw.Header(), "")
 	// Validate Write() for delegate response writer.
 	expectedWrite := []byte("this is a test write string")
-	assert.False(t, trw.written, "written field is before Write()")
+	assert.Falsef(t, trw.written, "written field is before Write()")
 	_, err := trw.Write(expectedWrite)
-	assert.NoError(t, err, "No error expected after Write() on tunneling response writer")
-	assert.True(t, trw.written, "written field is set after writing to tunneling response writer")
+	assert.NoErrorf(t, err, "No error expected after Write() on tunneling response writer")
+	assert.Truef(t, trw.written, "written field is set after writing to tunneling response writer")
 	// Writing to response writer after hijacked is an error.
 	trw.hijacked = true
 	_, err = trw.Write(expectedWrite)
-	assert.Error(t, err, "Writing to ResponseWriter after Hijack() is an error")
-	require.ErrorIs(t, err, http.ErrHijacked, "Hijacked error returned if writing after hijacked")
+	assert.Errorf(t, err, "Writing to ResponseWriter after Hijack() is an error")
+	require.ErrorIsf(t, err, http.ErrHijacked, "Hijacked error returned if writing after hijacked")
 	// Validate WriteHeader().
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{}}
 	expectedStatusCode := 201
-	assert.False(t, trw.written, "Written field originally false in delegate response writer")
+	assert.Falsef(t, trw.written, "Written field originally false in delegate response writer")
 	trw.WriteHeader(expectedStatusCode)
-	assert.Equal(t, expectedStatusCode, trw.w.(*mockResponseWriter).statusCode, "Expected written status code is correct")
-	assert.True(t, trw.written, "Written field set to true after writing delegate response writer")
+	assert.Equalf(t, expectedStatusCode, trw.w.(*mockResponseWriter).statusCode, "Expected written status code is correct")
+	assert.Truef(t, trw.written, "Written field set to true after writing delegate response writer")
 	// Response writer already written to does not write status.
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{}}
 	trw.written = true
 	trw.WriteHeader(expectedStatusCode)
-	assert.Equal(t, 0, trw.w.(*mockResponseWriter).statusCode, "No status code for previously written response writer")
+	assert.Equalf(t, 0, trw.w.(*mockResponseWriter).statusCode, "No status code for previously written response writer")
 	// Hijacked response writer does not write status.
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{}}
 	trw.hijacked = true
 	trw.WriteHeader(expectedStatusCode)
-	assert.Equal(t, 0, trw.w.(*mockResponseWriter).statusCode, "No status code written to hijacked response writer")
-	assert.False(t, trw.written, "Hijacked response writer does not write status")
+	assert.Equalf(t, 0, trw.w.(*mockResponseWriter).statusCode, "No status code written to hijacked response writer")
+	assert.Falsef(t, trw.written, "Hijacked response writer does not write status")
 	// Writing "101 Switching Protocols" status is an error, since it should happen via hijacked connection.
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{header: http.Header{}}}
 	trw.WriteHeader(http.StatusSwitchingProtocols)
-	assert.Equal(t, http.StatusInternalServerError, trw.w.(*mockResponseWriter).statusCode, "Internal server error written")
+	assert.Equalf(t, http.StatusInternalServerError, trw.w.(*mockResponseWriter).statusCode, "Internal server error written")
 }
 
 func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
@@ -343,39 +343,39 @@ func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
 			remoteAddr: expectedRemoteAddr,
 		},
 	}
-	assert.Equal(t, expectedLocalAddr, tc.LocalAddr(), "LocalAddr() returns expected TCPAddr")
-	assert.Equal(t, expectedRemoteAddr, tc.RemoteAddr(), "RemoteAddr() returns expected TCPAddr")
+	assert.Equalf(t, expectedLocalAddr, tc.LocalAddr(), "LocalAddr() returns expected TCPAddr")
+	assert.Equalf(t, expectedRemoteAddr, tc.RemoteAddr(), "RemoteAddr() returns expected TCPAddr")
 	// Connection nil, returns empty address
 	tc.conn = nil
-	assert.Equal(t, noopAddr{}, tc.LocalAddr(), "nil connection, LocalAddr() returns noopAddr")
-	assert.Equal(t, noopAddr{}, tc.RemoteAddr(), "nil connection, RemoteAddr() returns noopAddr")
+	assert.Equalf(t, noopAddr{}, tc.LocalAddr(), "nil connection, LocalAddr() returns noopAddr")
+	assert.Equalf(t, noopAddr{}, tc.RemoteAddr(), "nil connection, RemoteAddr() returns noopAddr")
 	// Validate the empty strings from noopAddr
-	assert.Equal(t, "", noopAddr{}.Network(), "noopAddr Network() returns empty string")
-	assert.Equal(t, "", noopAddr{}.String(), "noopAddr String() returns empty string")
+	assert.Equalf(t, "", noopAddr{}.Network(), "noopAddr Network() returns empty string")
+	assert.Equalf(t, "", noopAddr{}.String(), "noopAddr String() returns empty string")
 }
 
 func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
 	tc := &tunnelingWebsocketUpgraderConn{conn: &mockConn{}}
 	expected := time.Now()
-	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline does not return error")
-	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "SetDeadline() sets read deadline")
-	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "SetDeadline() sets write deadline")
+	assert.NoErrorf(t, tc.SetDeadline(expected), "SetDeadline does not return error")
+	assert.Equalf(t, expected, tc.conn.(*mockConn).readDeadline, "SetDeadline() sets read deadline")
+	assert.Equalf(t, expected, tc.conn.(*mockConn).writeDeadline, "SetDeadline() sets write deadline")
 	expected = time.Now()
-	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
-	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "Expected write deadline set")
+	assert.NoErrorf(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
+	assert.Equalf(t, expected, tc.conn.(*mockConn).writeDeadline, "Expected write deadline set")
 	expected = time.Now()
-	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
-	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "Expected read deadline set")
+	assert.NoErrorf(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
+	assert.Equalf(t, expected, tc.conn.(*mockConn).readDeadline, "Expected read deadline set")
 	expectedErr := fmt.Errorf("deadline error")
 	tc = &tunnelingWebsocketUpgraderConn{conn: &mockConn{deadlineErr: expectedErr}}
 	expected = time.Now()
 	actualErr := tc.SetDeadline(expected)
-	assert.Equal(t, expectedErr, actualErr, "SetDeadline() expected error returned")
+	assert.Equalf(t, expectedErr, actualErr, "SetDeadline() expected error returned")
 	// Connection nil, returns nil error.
 	tc.conn = nil
-	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
-	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
-	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
+	assert.NoErrorf(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
+	assert.NoErrorf(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
+	assert.NoErrorf(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
 }
 
 var expectedContentLengthHeaders = http.Header{
@@ -425,11 +425,11 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		hic := &headerInterceptingConn{initializableConn: testConnConstructor}
 		_, err := hic.Write([]byte(responseHeaders))
 		require.NoError(t, err)
-		assert.True(t, hic.initialized, "successfully parsed http response headers")
+		assert.Truef(t, hic.initialized, "successfully parsed http response headers")
 		assert.Equal(t, expectedResponseHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "101 Switching Protocols", testConnConstructor.resp.Status)
 		assert.Equal(t, "portforward.k8s.io", testConnConstructor.resp.Header.Get("X-App-Protocol"))
-		assert.Equal(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
+		assert.Equalf(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
 		assert.Equal(t, "", string(testConnConstructor.mockConn.written))
 	})
 
@@ -442,8 +442,8 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		assert.True(t, hic.initialized)
 		assert.Equal(t, expectedResponseHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "101 Switching Protocols", testConnConstructor.resp.Status)
-		assert.Equal(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
-		assert.Equal(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
+		assert.Equalf(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
+		assert.Equalf(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
 	})
 
 	// Partially written headers are buffered and decoded
@@ -458,8 +458,8 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		assert.True(t, hic.initialized)
 		assert.Equal(t, expectedResponseHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "101 Switching Protocols", testConnConstructor.resp.Status)
-		assert.Equal(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
-		assert.Equal(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
+		assert.Equalf(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
+		assert.Equalf(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
 	})
 
 	// Writes spanning the header/body breakpoint are buffered and decoded
@@ -480,8 +480,8 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		assert.True(t, hic.initialized)
 		assert.Equal(t, expectedResponseHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "101 Switching Protocols", testConnConstructor.resp.Status)
-		assert.Equal(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
-		assert.Equal(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
+		assert.Equalf(t, responseHeaders, string(testConnConstructor.initializeWriteConn.written), "only headers are written in initializeWrite")
+		assert.Equalf(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
 	})
 
 	// Tolerate header separators of \n instead of \r\n, and extra data after response headers should be sent to net.Conn.
@@ -493,8 +493,8 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		assert.True(t, hic.initialized)
 		assert.Equal(t, expectedResponseHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "101 Switching Protocols", testConnConstructor.resp.Status)
-		assert.Equal(t, strings.ReplaceAll(responseHeaders, "\r", ""), string(testConnConstructor.initializeWriteConn.written), "only normalized headers are written in initializeWrite")
-		assert.Equal(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
+		assert.Equalf(t, strings.ReplaceAll(responseHeaders, "\r", ""), string(testConnConstructor.initializeWriteConn.written), "only normalized headers are written in initializeWrite")
+		assert.Equalf(t, responseBody, string(testConnConstructor.mockConn.written), "extra data written to net.Conn")
 	})
 
 	// Content-Length handling
@@ -503,10 +503,10 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		hic := &headerInterceptingConn{initializableConn: testConnConstructor}
 		_, err := hic.Write([]byte(contentLengthHeadersAndBody))
 		require.NoError(t, err)
-		assert.True(t, hic.initialized, "successfully parsed http response headers")
+		assert.Truef(t, hic.initialized, "successfully parsed http response headers")
 		assert.Equal(t, expectedContentLengthHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "400 Error", testConnConstructor.resp.Status)
-		assert.Equal(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
+		assert.Equalf(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
 		assert.Equal(t, contentLengthBody, string(testConnConstructor.mockConn.written))
 	})
 
@@ -518,10 +518,10 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hic.Write([]byte(contentLengthBody))
 		require.NoError(t, err)
-		assert.True(t, hic.initialized, "successfully parsed http response headers")
+		assert.Truef(t, hic.initialized, "successfully parsed http response headers")
 		assert.Equal(t, expectedContentLengthHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "400 Error", testConnConstructor.resp.Status)
-		assert.Equal(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
+		assert.Equalf(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
 		assert.Equal(t, contentLengthBody, string(testConnConstructor.mockConn.written))
 	})
 
@@ -533,10 +533,10 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 			_, err := hic.Write([]byte{b})
 			require.NoError(t, err)
 		}
-		assert.True(t, hic.initialized, "successfully parsed http response headers")
+		assert.Truef(t, hic.initialized, "successfully parsed http response headers")
 		assert.Equal(t, expectedContentLengthHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "400 Error", testConnConstructor.resp.Status)
-		assert.Equal(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
+		assert.Equalf(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
 		assert.Equal(t, contentLengthBody, string(testConnConstructor.mockConn.written))
 	})
 
@@ -555,10 +555,10 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 			require.Len(t, chunk, n)
 			require.NoError(t, err)
 		}
-		assert.True(t, hic.initialized, "successfully parsed http response headers")
+		assert.Truef(t, hic.initialized, "successfully parsed http response headers")
 		assert.Equal(t, expectedContentLengthHeaders, testConnConstructor.resp.Header)
 		assert.Equal(t, "400 Error", testConnConstructor.resp.Status)
-		assert.Equal(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
+		assert.Equalf(t, contentLengthHeaders, string(testConnConstructor.initializeWriteConn.written), "headers and content are written in initializeWrite")
 		assert.Equal(t, contentLengthBody, string(testConnConstructor.mockConn.written))
 	})
 
@@ -567,7 +567,7 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		testConnConstructor := &mockConnInitializer{mockConn: &mockConn{}, initializeWriteConn: &mockConn{}}
 		hic := &headerInterceptingConn{initializableConn: testConnConstructor}
 		_, err := hic.Write([]byte(invalidResponseData))
-		assert.Error(t, err, "expected error from invalid http response")
+		assert.Errorf(t, err, "expected error from invalid http response")
 	})
 
 	// Invalid response written byte by byte returns error.
@@ -581,7 +581,7 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 				break
 			}
 		}
-		assert.Error(t, err, "expected error from invalid http response")
+		assert.Errorf(t, err, "expected error from invalid http response")
 	})
 }
 

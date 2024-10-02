@@ -149,19 +149,19 @@ func TestWithAudit(t *testing.T) {
 		auditHandler := WithAudit(handler)
 		a := attributes()
 
-		assert.Equal(t, handler.Handles(Create), auditHandler.Handles(Create), tcName+": WithAudit decorator should not effect the return value")
+		assert.Equalf(t, handler.Handles(Create), auditHandler.Handles(Create), tcName+": WithAudit decorator should not effect the return value")
 
 		mutator, ok := handler.(MutationInterface)
 		require.True(t, ok)
 		auditMutator, ok := auditHandler.(MutationInterface)
 		require.True(t, ok)
-		assert.Equal(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
+		assert.Equalf(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
 
 		validator, ok := handler.(ValidationInterface)
 		require.True(t, ok)
 		auditValidator, ok := auditHandler.(ValidationInterface)
 		require.True(t, ok)
-		assert.Equal(t, validator.Validate(ctx, a, nil), auditValidator.Validate(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
+		assert.Equalf(t, validator.Validate(ctx, a, nil), auditValidator.Validate(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
 
 		annotations := make(map[string]string, len(tc.admitAnnotations)+len(tc.validateAnnotations))
 		for k, v := range tc.admitAnnotations {
@@ -171,9 +171,9 @@ func TestWithAudit(t *testing.T) {
 			annotations[k] = v
 		}
 		if len(annotations) == 0 {
-			assert.Nil(t, ae.Annotations, tcName+": unexptected annotations set in audit event")
+			assert.Nilf(t, ae.Annotations, tcName+": unexptected annotations set in audit event")
 		} else {
-			assert.Equal(t, annotations, ae.Annotations, tcName+": unexptected annotations set in audit event")
+			assert.Equalf(t, annotations, ae.Annotations, tcName+": unexptected annotations set in audit event")
 		}
 	}
 }
@@ -203,7 +203,7 @@ func TestWithAuditConcurrency(t *testing.T) {
 			require.True(t, ok)
 			auditMutator, ok := auditHandler.(MutationInterface)
 			require.True(t, ok)
-			assert.Equal(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), "WithAudit decorator should not effect the return value")
+			assert.Equalf(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), "WithAudit decorator should not effect the return value")
 		}()
 	}
 	wg.Wait()

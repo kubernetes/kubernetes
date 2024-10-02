@@ -247,8 +247,8 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 
 	cdc := fakeCachedDiscoveryInterface{fresh: false}
 	m := NewDeferredDiscoveryRESTMapper(&cdc)
-	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
-	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
+	assert.Falsef(cdc.fresh, "should NOT be fresh after instantiation")
+	assert.Zerof(cdc.invalidateCalls, "should not have called Invalidate()")
 
 	gvk, err := m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
@@ -256,8 +256,8 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Resource: "foo",
 	})
 	assert.NoError(err)
-	assert.True(cdc.fresh, "should be fresh after a cache-miss")
-	assert.Equal(1, cdc.invalidateCalls, "should have called Invalidate() once")
+	assert.Truef(cdc.fresh, "should be fresh after a cache-miss")
+	assert.Equalf(1, cdc.invalidateCalls, "should have called Invalidate() once")
 	assert.Equal("Foo", gvk.Kind)
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
@@ -266,7 +266,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Resource: "foo",
 	})
 	assert.NoError(err)
-	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again")
+	assert.Equalf(1, cdc.invalidateCalls, "should NOT have called Invalidate() again")
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
@@ -274,7 +274,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Resource: "bar",
 	})
 	assert.Error(err)
-	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
+	assert.Equalf(1, cdc.invalidateCalls, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
 
 	cdc.fresh = false
 	gvk, err = m.KindFor(schema.GroupVersionResource{
@@ -283,7 +283,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Resource: "bar",
 	})
 	assert.Error(err)
-	assert.Equal(2, cdc.invalidateCalls, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
+	assert.Equalf(2, cdc.invalidateCalls, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
 }
 
 func TestGetAPIGroupResources(t *testing.T) {

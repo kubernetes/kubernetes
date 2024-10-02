@@ -1112,7 +1112,7 @@ func TestFastPathLeaderElection(t *testing.T) {
 			cancelFunc = cancel
 
 			elector.Run(ctx)
-			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			assert.Equalf(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
 		})
 	}
 }

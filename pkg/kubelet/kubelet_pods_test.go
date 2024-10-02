@@ -179,12 +179,12 @@ fe00::2	ip6-allrouters
 	for _, testCase := range testCases {
 		t.Run(testCase.hostsFileName, func(t *testing.T) {
 			tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.rawHostsFileContent)
-			require.NoError(t, err, "could not create a temp hosts file")
+			require.NoErrorf(t, err, "could not create a temp hosts file")
 			defer os.RemoveAll(tmpdir)
 
 			actualContent, fileReadErr := nodeHostsFileContent(filepath.Join(tmpdir, testCase.hostsFileName), testCase.hostAliases)
-			require.NoError(t, fileReadErr, "could not create read hosts file")
-			assert.Equal(t, testCase.expectedHostsFileContent, string(actualContent), "hosts file content not expected")
+			require.NoErrorf(t, fileReadErr, "could not create read hosts file")
+			assert.Equalf(t, testCase.expectedHostsFileContent, string(actualContent), "hosts file content not expected")
 		})
 	}
 }
@@ -298,7 +298,7 @@ fd00::6	podFoo.domainFoo	podFoo
 
 	for _, testCase := range testCases {
 		actualContent := managedHostsFileContent(testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
-		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
+		assert.Equalf(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
 	}
 }
 
@@ -320,7 +320,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 		containerName,
 		[]string{"ls"})
 	assert.Error(t, err)
-	assert.Nil(t, output, "output should be nil")
+	assert.Nilf(t, output, "output should be nil")
 }
 
 func TestRunInContainer(t *testing.T) {
@@ -351,11 +351,11 @@ func TestRunInContainer(t *testing.T) {
 		}
 		cmd := []string{"ls"}
 		actualOutput, err := kubelet.RunInContainer(ctx, "podFoo_nsFoo", "", "containerFoo", cmd)
-		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
-		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
+		assert.Equalf(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
+		assert.Equalf(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
-		assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
-		assert.Equal(t, err, testError, "(testError=%v) err", testError)
+		assert.Equalf(t, "foo", string(actualOutput), "(testError=%v) output", testError)
+		assert.Equalf(t, err, testError, "(testError=%v) err", testError)
 	}
 }
 
@@ -2042,13 +2042,13 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				assert.Equal(t, "", tc.expectedEvent)
 			}
 			if tc.expectedError {
-				assert.Error(t, err, tc.name)
+				assert.Errorf(t, err, tc.name)
 			} else {
-				assert.NoError(t, err, "[%s]", tc.name)
+				assert.NoErrorf(t, err, "[%s]", tc.name)
 
 				sort.Sort(envs(result))
 				sort.Sort(envs(tc.expectedEnvs))
-				assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
+				assert.Equalf(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
 			}
 		})
 
@@ -2307,7 +2307,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 	}
 	for _, test := range tests {
 		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -2410,7 +2410,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, false)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -2622,7 +2622,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, test.podIsTerminal)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -2722,7 +2722,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 	}
 	for _, test := range tests {
 		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -2825,7 +2825,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, false)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -3024,7 +3024,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, false)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -3137,7 +3137,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	}
 	for _, test := range tests {
 		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
-		assert.Equal(t, test.status, status, "[test %s]", test.test)
+		assert.Equalf(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -3230,7 +3230,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.isInitContainer,
 			)
 			for i, status := range containerStatuses {
-				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
+				assert.Equalf(t, test.expected[i], status, "[test %s]", test.name)
 			}
 		})
 	}
@@ -3933,10 +3933,10 @@ func TestGetExec(t *testing.T) {
 
 			redirect, err := kubelet.GetExec(ctx, tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
 			if tc.expectError {
-				assert.Error(t, err, description)
+				assert.Errorf(t, err, description)
 			} else {
-				assert.NoError(t, err, description)
-				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
+				assert.NoErrorf(t, err, description)
+				assert.Equalf(t, containertest.FakeHost, redirect.Host, description+": redirect")
 			}
 		})
 	}
@@ -3988,10 +3988,10 @@ func TestGetPortForward(t *testing.T) {
 
 		redirect, err := kubelet.GetPortForward(ctx, tc.podName, podNamespace, podUID, portforward.V4Options{})
 		if tc.expectError {
-			assert.Error(t, err, description)
+			assert.Errorf(t, err, description)
 		} else {
-			assert.NoError(t, err, description)
-			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
+			assert.NoErrorf(t, err, description)
+			assert.Equalf(t, containertest.FakeHost, redirect.Host, description+": redirect")
 		}
 	}
 }

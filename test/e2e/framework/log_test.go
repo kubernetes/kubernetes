@@ -263,16 +263,16 @@ In [AfterEach] at: log_test.go:53 <time>
 	tmp := t.TempDir()
 	filename := path.Join(tmp, "stderr.log")
 	f, err := os.Create(filename)
-	require.NoError(t, err, "create temporary file")
+	require.NoErrorf(t, err, "create temporary file")
 	os.Stderr = f
 	defer func() {
 		os.Stderr = oldStderr
 
 		err := f.Close()
-		require.NoError(t, err, "close temporary file")
+		require.NoErrorf(t, err, "close temporary file")
 		actual, err := os.ReadFile(filename)
-		require.NoError(t, err, "read temporary file")
-		assert.Empty(t, string(actual), "no output on stderr")
+		require.NoErrorf(t, err, "read temporary file")
+		assert.Emptyf(t, string(actual), "no output on stderr")
 	}()
 
 	output.TestGinkgoOutput(t, expected)

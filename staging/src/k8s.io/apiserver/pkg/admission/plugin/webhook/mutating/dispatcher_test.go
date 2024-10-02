@@ -48,7 +48,7 @@ func TestMutationAnnotationValue(t *testing.T) {
 
 	for _, tc := range tcs {
 		actual, err := mutationAnnotationValue(tc.config, tc.webhook, tc.mutated)
-		assert.NoError(t, err, "unexpected error")
+		assert.NoErrorf(t, err, "unexpected error")
 		if actual != tc.expected {
 			t.Errorf("composed mutation annotation value doesn't match, want: %s, got: %s", tc.expected, actual)
 		}
@@ -103,9 +103,9 @@ func TestJSONPatchAnnotationValue(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			jsonPatch, err := jsonpatch.DecodePatch(tc.patch)
-			assert.NoError(t, err, "unexpected error decode patch")
+			assert.NoErrorf(t, err, "unexpected error decode patch")
 			actual, err := jsonPatchAnnotationValue(tc.config, tc.webhook, jsonPatch)
-			assert.NoError(t, err, "unexpected error getting json patch annotation")
+			assert.NoErrorf(t, err, "unexpected error getting json patch annotation")
 			if actual != tc.expected {
 				t.Errorf("composed patch annotation value doesn't match, want: %s, got: %s", tc.expected, actual)
 			}

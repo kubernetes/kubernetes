@@ -373,9 +373,9 @@ func TestManager(t *testing.T) {
 					t.Errorf("unexpected error message. Got: %s want %s", err.Error(), tc.expectedError.Error())
 				}
 			} else {
-				assert.NoError(t, err, "expected manager.Start() to not return error")
-				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
-				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
+				assert.NoErrorf(t, err, "expected manager.Start() to not return error")
+				assert.Truef(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
+				assert.NoErrorf(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
 				assert.True(t, manager.Admit(nil).Admit)
 
 				// Send fake shutdown event
@@ -397,10 +397,10 @@ func TestManager(t *testing.T) {
 					}
 				}
 
-				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
+				assert.Errorf(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
 				assert.False(t, manager.Admit(nil).Admit)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
-				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
+				assert.Equalf(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {
 					for _, pod := range tc.activePods {
 						if diff := cmp.Diff(tc.expectedPodStatuses[pod.Name], pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {

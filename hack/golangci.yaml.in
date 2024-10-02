@@ -209,7 +209,6 @@ linters-settings: # please keep this alphabetized
       - "ST1019"   # Importing the same package multiple times
   {{- end}}
   testifylint:
-    enable-all: true
     {{- if not .Hints }}
     disable:  # TODO: remove each disabled rule and fix it
       {{- if .Base }}
@@ -218,3 +217,7 @@ linters-settings: # please keep this alphabetized
       {{- end}}
       - require-error
     {{- end}}
+    enable-all: true
+    formatter:
+      # To require f-assertions if format string is used.
+      require-f-funcs: true

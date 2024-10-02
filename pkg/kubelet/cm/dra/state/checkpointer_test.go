@@ -215,29 +215,29 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	require.NoError(t, err, "could not create testing checkpoint manager")
+	require.NoErrorf(t, err, "could not create testing checkpoint manager")
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			require.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
+			require.NoErrorf(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
 			// prepare checkpoint for testing
 			if strings.TrimSpace(tc.checkpointContent) != "" {
 				mock := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				require.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, mock), "could not create testing checkpoint")
+				require.NoErrorf(t, cpm.CreateCheckpoint(testingCheckpoint, mock), "could not create testing checkpoint")
 			}
 
 			checkpointer, err := NewCheckpointer(testingDir, testingCheckpoint)
-			require.NoError(t, err, "could not create testing checkpointer")
+			require.NoErrorf(t, err, "could not create testing checkpointer")
 
 			checkpoint, err := checkpointer.GetOrCreate()
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.ErrorContains(t, err, tc.expectedError)
 			} else {
-				require.NoError(t, err, "unexpected error")
+				require.NoErrorf(t, err, "unexpected error")
 				stateList, err := checkpoint.GetClaimInfoStateList()
-				require.NoError(t, err, "could not get data entries from checkpoint")
+				require.NoErrorf(t, err, "could not get data entries from checkpoint")
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedClaimInfoStateList, stateList)
 			}
@@ -369,25 +369,25 @@ func TestCheckpointStateStore(t *testing.T) {
 	}
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	require.NoError(t, err, "could not create testing checkpoint manager")
-	require.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
+	require.NoErrorf(t, err, "could not create testing checkpoint manager")
+	require.NoErrorf(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
 	cs, err := NewCheckpointer(testingDir, testingCheckpoint)
-	require.NoError(t, err, "could not create testing checkpointState instance")
+	require.NoErrorf(t, err, "could not create testing checkpointState instance")
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			checkpoint, err := NewCheckpoint(tc.claimInfoStateList)
-			require.NoError(t, err, "could not create Checkpoint")
+			require.NoErrorf(t, err, "could not create Checkpoint")
 
 			err = cs.Store(checkpoint)
-			require.NoError(t, err, "could not store checkpoint")
+			require.NoErrorf(t, err, "could not store checkpoint")
 
 			err = cpm.GetCheckpoint(testingCheckpoint, checkpoint)
-			require.NoError(t, err, "could not get checkpoint")
+			require.NoErrorf(t, err, "could not get checkpoint")
 
 			checkpointContent, err := checkpoint.MarshalCheckpoint()
-			require.NoError(t, err, "could not Marshal Checkpoint")
+			require.NoErrorf(t, err, "could not Marshal Checkpoint")
 			assert.Equal(t, tc.expectedCheckpointContent, string(checkpointContent))
 		})
 	}

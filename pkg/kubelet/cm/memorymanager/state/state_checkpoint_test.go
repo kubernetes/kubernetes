@@ -34,11 +34,11 @@ const testingCheckpoint = "memorymanager_checkpoint_test"
 func assertStateEqual(t *testing.T, restoredState, expectedState State) {
 	expectedMachineState := expectedState.GetMachineState()
 	restoredMachineState := restoredState.GetMachineState()
-	assert.Equal(t, expectedMachineState, restoredMachineState, "expected MachineState does not equal to restored one")
+	assert.Equalf(t, expectedMachineState, restoredMachineState, "expected MachineState does not equal to restored one")
 
 	expectedMemoryAssignments := expectedState.GetMemoryAssignments()
 	restoredMemoryAssignments := restoredState.GetMemoryAssignments()
-	assert.Equal(t, expectedMemoryAssignments, restoredMemoryAssignments, "state memory assignments mismatch")
+	assert.Equalf(t, expectedMemoryAssignments, restoredMemoryAssignments, "state memory assignments mismatch")
 }
 
 func TestCheckpointStateRestore(t *testing.T) {
@@ -118,17 +118,17 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	assert.NoError(t, err, "could not create testing checkpoint manager")
+	assert.NoErrorf(t, err, "could not create testing checkpoint manager")
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
+			assert.NoErrorf(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
 			// prepare checkpoint for testing
 			if strings.TrimSpace(tc.checkpointContent) != "" {
 				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				assert.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, checkpoint), "could not create testing checkpoint")
+				assert.NoErrorf(t, cpm.CreateCheckpoint(testingCheckpoint, checkpoint), "could not create testing checkpoint")
 			}
 
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
@@ -136,7 +136,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, "could not restore state from checkpoint: "+tc.expectedError)
 			} else {
-				assert.NoError(t, err, "unexpected error while creating checkpointState")
+				assert.NoErrorf(t, err, "unexpected error while creating checkpointState")
 				// compare state after restoration with the one expected
 				assertStateEqual(t, restoredState, tc.expectedState)
 			}
@@ -180,12 +180,12 @@ func TestCheckpointStateStore(t *testing.T) {
 	defer os.RemoveAll(testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	assert.NoError(t, err, "could not create testing checkpoint manager")
+	assert.NoErrorf(t, err, "could not create testing checkpoint manager")
 
-	assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
+	assert.NoErrorf(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
 	cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
-	assert.NoError(t, err, "could not create testing checkpointState instance")
+	assert.NoErrorf(t, err, "could not create testing checkpointState instance")
 
 	// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
 	cs1.SetMachineState(expectedState.machineState)
@@ -193,7 +193,7 @@ func TestCheckpointStateStore(t *testing.T) {
 
 	// restore checkpoint with previously stored values
 	cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
-	assert.NoError(t, err, "could not create testing checkpointState instance")
+	assert.NoErrorf(t, err, "could not create testing checkpointState instance")
 
 	assertStateEqual(t, cs2, expectedState)
 }
@@ -299,26 +299,26 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	defer os.RemoveAll(testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	assert.NoError(t, err, "could not create testing checkpoint manager")
+	assert.NoErrorf(t, err, "could not create testing checkpoint manager")
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
+			assert.NoErrorf(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
 			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
-			assert.NoError(t, err, "could not create testing checkpoint manager")
+			assert.NoErrorf(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)
-			assert.Equal(t, tc.machineState, state.GetMachineState(), "machine state inconsistent")
+			assert.Equalf(t, tc.machineState, state.GetMachineState(), "machine state inconsistent")
 
 			for pod := range tc.assignments {
 				for container, blocks := range tc.assignments[pod] {
 					state.SetMemoryBlocks(pod, container, blocks)
-					assert.Equal(t, blocks, state.GetMemoryBlocks(pod, container), "memory block inconsistent")
+					assert.Equalf(t, blocks, state.GetMemoryBlocks(pod, container), "memory block inconsistent")
 
 					state.Delete(pod, container)
-					assert.Nil(t, state.GetMemoryBlocks(pod, container), "deleted container still existing in state")
+					assert.Nilf(t, state.GetMemoryBlocks(pod, container), "deleted container still existing in state")
 				}
 			}
 		})
@@ -370,14 +370,14 @@ func TestCheckpointStateClear(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
-			assert.NoError(t, err, "could not create testing checkpoint manager")
+			assert.NoErrorf(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)
 			state.SetMemoryAssignments(tc.assignments)
 
 			state.ClearState()
-			assert.Equal(t, NUMANodeMap{}, state.GetMachineState(), "cleared state with non-empty machine state")
-			assert.Equal(t, ContainerMemoryAssignments{}, state.GetMemoryAssignments(), "cleared state with non-empty memory assignments")
+			assert.Equalf(t, NUMANodeMap{}, state.GetMachineState(), "cleared state with non-empty machine state")
+			assert.Equalf(t, ContainerMemoryAssignments{}, state.GetMemoryAssignments(), "cleared state with non-empty memory assignments")
 		})
 	}
 }

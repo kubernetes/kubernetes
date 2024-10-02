@@ -55,5 +55,5 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 }
 
 func TestCrioSocket(t *testing.T) {
-	assert.True(t, strings.HasSuffix(crio.CrioSocket, CrioSocketSuffix), "CrioSocketSuffix in this package must be a suffix of the one in github.com/google/cadvisor/container/crio/client.go")
+	assert.Truef(t, strings.HasSuffix(crio.CrioSocket, CrioSocketSuffix), "CrioSocketSuffix in this package must be a suffix of the one in github.com/google/cadvisor/container/crio/client.go")
 }

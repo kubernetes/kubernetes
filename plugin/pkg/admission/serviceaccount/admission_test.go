@@ -969,7 +969,7 @@ func TestAddImagePullSecrets(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	assert.EqualValues(t, expected, pod.Spec.ImagePullSecrets, "expected %v, got %v", expected, pod.Spec.ImagePullSecrets)
+	assert.EqualValuesf(t, expected, pod.Spec.ImagePullSecrets, "expected %v, got %v", expected, pod.Spec.ImagePullSecrets)
 
 	pod.Spec.ImagePullSecrets[1] = api.LocalObjectReference{Name: "baz"}
 	if !reflect.DeepEqual(originalSA, sa) {

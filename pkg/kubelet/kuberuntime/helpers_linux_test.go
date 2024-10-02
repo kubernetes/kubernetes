@@ -305,10 +305,10 @@ func TestGetSeccompProfile(t *testing.T) {
 	for i, test := range tests {
 		seccompProfile, err := m.getSeccompProfile(test.annotation, test.containerName, test.podSc, test.containerSc, false)
 		if test.expectedError != "" {
-			assert.EqualError(t, err, test.expectedError, "TestCase[%d]: %s", i, test.description)
+			assert.EqualErrorf(t, err, test.expectedError, "TestCase[%d]: %s", i, test.description)
 		} else {
-			assert.NoError(t, err, "TestCase[%d]: %s", i, test.description)
-			assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
+			assert.NoErrorf(t, err, "TestCase[%d]: %s", i, test.description)
+			assert.Equalf(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
 		}
 	}
 }
@@ -405,10 +405,10 @@ func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
 	for i, test := range tests {
 		seccompProfile, err := m.getSeccompProfile(test.annotation, test.containerName, test.podSc, test.containerSc, true)
 		if test.expectedError != "" {
-			assert.EqualError(t, err, test.expectedError, "TestCase[%d]: %s", i, test.description)
+			assert.EqualErrorf(t, err, test.expectedError, "TestCase[%d]: %s", i, test.description)
 		} else {
-			assert.NoError(t, err, "TestCase[%d]: %s", i, test.description)
-			assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
+			assert.NoErrorf(t, err, "TestCase[%d]: %s", i, test.description)
+			assert.Equalf(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
 		}
 	}
 }

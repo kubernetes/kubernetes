@@ -156,9 +156,9 @@ func TestAuditValidOptions(t *testing.T) {
 			fs := pflag.NewFlagSet("Test", pflag.PanicOnError)
 			options.AddFlags(fs)
 			require.NoError(t, fs.Parse(nil))
-			assert.Equal(t, tc.options(), options, "Flag defaults should match default options.")
+			assert.Equalf(t, tc.options(), options, "Flag defaults should match default options.")
 
-			assert.Empty(t, options.Validate(), "Options should be valid.")
+			assert.Emptyf(t, options.Validate(), "Options should be valid.")
 			config := &server.Config{}
 			require.NoError(t, options.ApplyTo(config))
 			if tc.expected == "" {
@@ -168,7 +168,7 @@ func TestAuditValidOptions(t *testing.T) {
 			}
 
 			w, err := options.LogOptions.getWriter()
-			require.NoError(t, err, "Writer creation should not fail.")
+			require.NoErrorf(t, err, "Writer creation should not fail.")
 
 			// Don't check writer if logging is disabled.
 			if w == nil {
@@ -260,7 +260,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			options := tc.options()
 			require.NotNil(t, options)
-			assert.NotEmpty(t, options.Validate(), "Options should be invalid.")
+			assert.NotEmptyf(t, options.Validate(), "Options should be invalid.")
 		})
 	}
 }
@@ -272,8 +272,8 @@ func makeTmpWebhookConfig(t *testing.T) string {
 		},
 	}
 	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
-	require.NoError(t, err, "creating temp file")
-	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing webhook kubeconfig")
+	require.NoErrorf(t, err, "creating temp file")
+	require.NoErrorf(t, stdjson.NewEncoder(f).Encode(config), "writing webhook kubeconfig")
 	require.NoError(t, f.Close())
 	return f.Name()
 }
@@ -290,8 +290,8 @@ func makeTmpPolicy(t *testing.T) string {
 		},
 	}
 	f, err := ioutil.TempFile("", "k8s_audit_policy_test_")
-	require.NoError(t, err, "creating temp file")
-	require.NoError(t, stdjson.NewEncoder(f).Encode(pol), "writing policy file")
+	require.NoErrorf(t, err, "creating temp file")
+	require.NoErrorf(t, stdjson.NewEncoder(f).Encode(pol), "writing policy file")
 	require.NoError(t, f.Close())
 	return f.Name()
 }

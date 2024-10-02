@@ -58,7 +58,7 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 		assertNoEvents(t, target.C())
 		actualWarning := target.produceWarningIfExpired()
 
-		require.Empty(t, actualWarning, "didn't expect any warning")
+		require.Emptyf(t, actualWarning, "didn't expect any warning")
 		// validate if the other methods don't produce panic
 		target.warnIfExpired()
 		target.observeLastEventTimeStamp(clock.Now())
@@ -66,7 +66,7 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 		// make sure that after calling the other methods
 		// nothing hasn't changed
 		actualWarning = target.produceWarningIfExpired()
-		require.Empty(t, actualWarning, "didn't expect any warning")
+		require.Emptyf(t, actualWarning, "didn't expect any warning")
 		assertNoEvents(t, target.C())
 
 		target.Stop()

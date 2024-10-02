@@ -123,7 +123,7 @@ func TestReconcileEmpty(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	slices := fetchEndpointSlices(t, client, namespace)
-	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
+	assert.Lenf(t, slices, 1, "Expected 1 endpoint slices")
 
 	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
@@ -580,7 +580,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 			if tc.existing != nil {
 				existingSlices = append(existingSlices, tc.existing)
 				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), tc.existing, metav1.CreateOptions{})
-				assert.NoError(t, createErr, "Expected no error creating endpoint slice")
+				assert.NoErrorf(t, createErr, "Expected no error creating endpoint slice")
 			}
 
 			numActionsBefore := len(client.Actions())
@@ -592,10 +592,10 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 				numUpdates = 1
 			}
 			wantActions := numActionsBefore + numUpdates
-			assert.Len(t, client.Actions(), wantActions, "Expected %d additional clientset actions", numUpdates)
+			assert.Lenf(t, client.Actions(), wantActions, "Expected %d additional clientset actions", numUpdates)
 
 			slices := fetchEndpointSlices(t, client, namespace)
-			assert.Len(t, slices, 1, "Expected 1 endpoint slices")
+			assert.Lenf(t, slices, 1, "Expected 1 endpoint slices")
 
 			if !tc.wantUpdate {
 				assert.Regexp(t, "^"+svc.Name, slices[0].Name)
@@ -708,7 +708,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 
 	// Only 1 action, an EndpointSlice create
-	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	assert.Lenf(t, client.Actions(), 1, "Expected 1 additional clientset action")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// Two endpoint slices should be completely full, the remainder should be in another one
@@ -742,7 +742,7 @@ func TestReconcileManyPods(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 
 	// This is an ideal scenario where only 3 actions are required, and they're all creates
-	assert.Len(t, client.Actions(), 3, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), 3, "Expected 3 additional clientset actions")
 	expectActions(t, client.Actions(), 3, "create", "endpointslices")
 
 	// Two endpoint slices should be completely full, the remainder should be in another one
@@ -792,9 +792,9 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
 
 	actions := client.Actions()
-	assert.Len(t, actions, numActionsBefore+2, "Expected 2 additional client actions as part of reconcile")
-	assert.True(t, actions[numActionsBefore].Matches("create", "endpointslices"), "First action should be create endpoint slice")
-	assert.True(t, actions[numActionsBefore+1].Matches("update", "endpointslices"), "Second action should be update endpoint slice")
+	assert.Lenf(t, actions, numActionsBefore+2, "Expected 2 additional client actions as part of reconcile")
+	assert.Truef(t, actions[numActionsBefore].Matches("create", "endpointslices"), "First action should be create endpoint slice")
+	assert.Truef(t, actions[numActionsBefore+1].Matches("update", "endpointslices"), "Second action should be update endpoint slice")
 
 	// 1 new slice (0->100) + 1 updated slice (62->89)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{89, 61, 100})
@@ -848,7 +848,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
 
 	actions := client.Actions()
-	assert.Len(t, actions, numActionsBefore+2, "Expected 2 additional client actions as part of reconcile")
+	assert.Lenf(t, actions, numActionsBefore+2, "Expected 2 additional client actions as part of reconcile")
 	expectActions(t, client.Actions(), 2, "create", "endpointslices")
 
 	// 2 new slices (100, 52) in addition to existing slices (74, 74)
@@ -876,7 +876,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	numActionsExpected := 3
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
 
 	slices := fetchEndpointSlices(t, client, namespace)
 	numActionsExpected++
@@ -886,7 +886,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{&slices[0], &slices[1], &slices[2]}, time.Now())
 
 	numActionsExpected += 3
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
 	expectActions(t, client.Actions(), 3, "update", "endpointslices")
 
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 50})
@@ -909,7 +909,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	numActionsExpected := 3
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
 
 	slices := fetchEndpointSlices(t, client, namespace)
 	numActionsExpected++
@@ -920,7 +920,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{&slices[0], &slices[1], &slices[2]}, time.Now())
 
 	numActionsExpected += 3
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
 	expectActions(t, client.Actions(), 3, "update", "endpointslices")
 
 	newSlices := fetchEndpointSlices(t, client, namespace)
@@ -953,7 +953,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	numActionsExpected := 3
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
 	slices := fetchEndpointSlices(t, client, namespace)
 	numActionsExpected++
 	expectUnorderedSlicesWithLengths(t, slices, []int{100, 100, 50})
@@ -961,7 +961,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	// update service with new labels
 	svc.Labels = map[string]string{discovery.LabelServiceName: "bad", discovery.LabelManagedBy: "actor", corev1.IsHeadlessService: "invalid"}
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{&slices[0], &slices[1], &slices[2]}, time.Now())
-	assert.Len(t, client.Actions(), numActionsExpected, "Expected no additional clientset actions")
+	assert.Lenf(t, client.Actions(), numActionsExpected, "Expected no additional clientset actions")
 
 	newSlices := fetchEndpointSlices(t, client, namespace)
 	expectUnorderedSlicesWithLengths(t, newSlices, []int{100, 100, 50})
@@ -1001,14 +1001,14 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
 	// initial reconcile should be a no op, all pods are accounted for in slices, no repacking should be done
-	assert.Len(t, client.Actions(), numActionsBefore+0, "Expected 0 additional client actions as part of reconcile")
+	assert.Lenf(t, client.Actions(), numActionsBefore+0, "Expected 0 additional client actions as part of reconcile")
 
 	// changing a service port should require all slices to be updated, time for a repack
 	svc.Spec.Ports[0].TargetPort.IntVal = 81
 	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
 
 	// this should reflect 3 updates + 7 deletes
-	assert.Len(t, client.Actions(), numActionsBefore+10, "Expected 10 additional client actions as part of reconcile")
+	assert.Lenf(t, client.Actions(), numActionsBefore+10, "Expected 10 additional client actions as part of reconcile")
 
 	// thanks to recycling, we get a free repack of endpoints, resulting in 3 full slices instead of 10 mostly empty slices
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 100})
@@ -1242,7 +1242,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 
 	// reconcile should create 5 endpoint slices
-	assert.Len(t, client.Actions(), 5, "Expected 5 client actions as part of reconcile")
+	assert.Lenf(t, client.Actions(), 5, "Expected 5 client actions as part of reconcile")
 	expectActions(t, client.Actions(), 5, "create", "endpointslices")
 	expectMetrics(t, expectedMetrics{desiredSlices: 5, actualSlices: 5, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 5, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 5})
 
@@ -1338,8 +1338,8 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 
 	actions := client.Actions()
-	assert.Len(t, actions, 1, "Expected 1 additional client actions as part of reconcile")
-	assert.True(t, actions[0].Matches("create", "endpointslices"), "First action should be create endpoint slice")
+	assert.Lenf(t, actions, 1, "Expected 1 additional client actions as part of reconcile")
+	assert.Truef(t, actions[0].Matches("create", "endpointslices"), "First action should be create endpoint slice")
 
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 20, addedPerSync: 20, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1})
 
@@ -2206,7 +2206,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 
 // ensures endpoint slices exist with the desired set of lengths
 func expectUnorderedSlicesWithLengths(t *testing.T, endpointSlices []discovery.EndpointSlice, expectedLengths []int) {
-	assert.Len(t, endpointSlices, len(expectedLengths), "Expected %d endpoint slices", len(expectedLengths))
+	assert.Lenf(t, endpointSlices, len(expectedLengths), "Expected %d endpoint slices", len(expectedLengths))
 
 	lengthsWithNoMatch := []int{}
 	desiredLengths := expectedLengths
@@ -2236,7 +2236,7 @@ func expectUnorderedSlicesWithLengths(t *testing.T, endpointSlices []discovery.E
 // ensures endpoint slices exist with the desired set of ports and address types
 func expectUnorderedSlicesWithTopLevelAttrs(t *testing.T, endpointSlices []discovery.EndpointSlice, expectedSlices []discovery.EndpointSlice) {
 	t.Helper()
-	assert.Len(t, endpointSlices, len(expectedSlices), "Expected %d endpoint slices", len(expectedSlices))
+	assert.Lenf(t, endpointSlices, len(expectedSlices), "Expected %d endpoint slices", len(expectedSlices))
 
 	slicesWithNoMatch := []discovery.EndpointSlice{}
 	for _, endpointSlice := range endpointSlices {
@@ -2254,8 +2254,8 @@ func expectUnorderedSlicesWithTopLevelAttrs(t *testing.T, endpointSlices []disco
 		}
 	}
 
-	assert.Empty(t, slicesWithNoMatch, "EndpointSlice(s) found without matching attributes")
-	assert.Empty(t, expectedSlices, "Expected slices(s) not found in EndpointSlices")
+	assert.Emptyf(t, slicesWithNoMatch, "EndpointSlice(s) found without matching attributes")
+	assert.Emptyf(t, expectedSlices, "Expected slices(s) not found in EndpointSlices")
 }
 
 func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, resource string) {
@@ -2267,8 +2267,8 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 
 	for i := 0; i < num; i++ {
 		relativePos := len(actions) - i - 1
-		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
-		assert.Equal(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
+		assert.Equalf(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
+		assert.Equalf(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
 	}
 }
 

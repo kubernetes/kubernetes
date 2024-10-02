@@ -56,10 +56,10 @@ func TestCSIImageConfigs(t *testing.T) {
 	}
 	actualImages := sets.NewString()
 	for _, config := range configs {
-		assert.NotEmpty(t, config.registry, "registry")
-		assert.NotEmpty(t, config.name, "name")
-		assert.NotEmpty(t, config.version, "version")
+		assert.NotEmptyf(t, config.registry, "registry")
+		assert.NotEmptyf(t, config.name, "name")
+		assert.NotEmptyf(t, config.version, "version")
 		actualImages.Insert(config.name)
 	}
-	assert.ElementsMatch(t, expectedImages, actualImages.UnsortedList(), "found these images: %+v", configs)
+	assert.ElementsMatchf(t, expectedImages, actualImages.UnsortedList(), "found these images: %+v", configs)
 }

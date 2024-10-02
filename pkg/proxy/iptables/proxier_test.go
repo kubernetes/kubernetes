@@ -5815,7 +5815,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	fp.syncProxyRules()
 
 	svc4Endpoint, numEndpoints, _ := countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
-	assert.Equal(t, "-A KUBE-SEP-SU5STNODRYEWJAUF -m tcp -p tcp -j DNAT --to-destination 10.4.0.1:8082", svc4Endpoint, "svc4 endpoint was not created")
+	assert.Equalf(t, "-A KUBE-SEP-SU5STNODRYEWJAUF -m tcp -p tcp -j DNAT --to-destination 10.4.0.1:8082", svc4Endpoint, "svc4 endpoint was not created")
 	// should only sync svc4
 	if numEndpoints != 1 {
 		t.Errorf("Found wrong number of endpoints after svc4 creation: expected %d, got %d", 1, numEndpoints)
@@ -5828,24 +5828,24 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	fp.syncProxyRules()
 
 	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
-	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
+	assert.Equalf(t, "", svc4Endpoint, "svc4 endpoint was still created!")
 	// should only sync svc4, and shouldn't output its endpoints
 	if numEndpoints != 0 {
 		t.Errorf("Found wrong number of endpoints after service deletion: expected %d, got %d", 0, numEndpoints)
 	}
-	assert.NotContains(t, fp.iptablesData.String(), "-X ", "iptables data unexpectedly contains chain deletions")
+	assert.NotContainsf(t, fp.iptablesData.String(), "-X ", "iptables data unexpectedly contains chain deletions")
 
 	// But resyncing after a long-enough delay will delete the stale chains
 	fp.lastIPTablesCleanup = time.Now().Add(-fp.syncPeriod).Add(-1)
 	fp.syncProxyRules()
 
 	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
-	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
+	assert.Equalf(t, "", svc4Endpoint, "svc4 endpoint was still created!")
 	if numEndpoints != 0 {
 		t.Errorf("Found wrong number of endpoints after delayed resync: expected %d, got %d", 0, numEndpoints)
 	}
-	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SVC-EBDQOQU5SJFXRIL3", "iptables data does not contain chain deletion")
-	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SEP-SU5STNODRYEWJAUF", "iptables data does not contain endpoint deletions")
+	assert.Containsf(t, fp.iptablesData.String(), "-X KUBE-SVC-EBDQOQU5SJFXRIL3", "iptables data does not contain chain deletion")
+	assert.Containsf(t, fp.iptablesData.String(), "-X KUBE-SEP-SU5STNODRYEWJAUF", "iptables data does not contain endpoint deletions")
 
 	// force a full sync and count
 	fp.forceSyncProxyRules()

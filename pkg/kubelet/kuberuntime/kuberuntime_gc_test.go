@@ -477,7 +477,7 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	err = m.containerGC.evictContainers(ctx, defaultGCPolicy, true, false)
 	assert.NoError(t, err)
 
-	assert.Contains(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",
+	assert.Containsf(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",
 		"container in unknown state should be stopped before being removed")
 
 	remain, err := fakeRuntime.ListContainers(ctx, nil)

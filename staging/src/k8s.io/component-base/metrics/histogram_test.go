@@ -104,7 +104,7 @@ func TestHistogram(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -117,7 +117,7 @@ func TestHistogram(t *testing.T) {
 			c.Observe(1.5)
 			expected := 4
 			ms, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				for _, m := range mf.GetMetric() {
@@ -213,7 +213,7 @@ func TestHistogramVec(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				if metric.GetHelp() != test.expectedHelp {
 					assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -224,7 +224,7 @@ func TestHistogramVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Observe(1.0)
 			c.WithLabelValues("2", "3").Observe(1.0)
 			ms, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
@@ -284,7 +284,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Observe(1.0)
 			}
 			mfs, err := registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -304,7 +304,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 					}
 					labelValuePair := aValue + " " + bValue
 					expectedValue, ok := test.expectMetricValues[labelValuePair]
-					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					assert.Truef(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
 					actualValue := m.GetHistogram().GetSampleCount()
 					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
 				}

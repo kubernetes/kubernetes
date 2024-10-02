@@ -268,7 +268,7 @@ func TestMakeMounts(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
+			assert.Equalf(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
 		})
 	}
 }
@@ -499,7 +499,7 @@ func TestMakeBlockVolumes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, tc.expectedDevices, blkVolumes, "devices of container %+v", tc.container)
+			assert.Equalf(t, tc.expectedDevices, blkVolumes, "devices of container %+v", tc.container)
 		})
 	}
 }

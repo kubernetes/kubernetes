@@ -41,13 +41,13 @@ func TestStaleEndpointsTracker(t *testing.T) {
 		}},
 	}
 
-	assert.False(t, tracker.IsStale(endpoints), "IsStale should return false before the endpoint is staled")
+	assert.Falsef(t, tracker.IsStale(endpoints), "IsStale should return false before the endpoint is staled")
 
 	tracker.Stale(endpoints)
-	assert.True(t, tracker.IsStale(endpoints), "IsStale should return true after the endpoint is staled")
+	assert.Truef(t, tracker.IsStale(endpoints), "IsStale should return true after the endpoint is staled")
 
 	endpoints.ResourceVersion = "2"
-	assert.False(t, tracker.IsStale(endpoints), "IsStale should return false after the endpoint is updated")
+	assert.Falsef(t, tracker.IsStale(endpoints), "IsStale should return false after the endpoint is updated")
 
 	tracker.Delete(endpoints.Namespace, endpoints.Name)
 	assert.Empty(t, tracker.staleResourceVersionByEndpoints)

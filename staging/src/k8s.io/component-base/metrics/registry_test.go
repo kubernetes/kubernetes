@@ -213,7 +213,7 @@ func TestMustRegister(t *testing.T) {
 			})
 			for i, m := range test.metrics {
 				if test.expectedPanics[i] {
-					assert.Panics(t,
+					assert.Panicsf(t,
 						func() { registry.MustRegister(m) },
 						"Did not panic even though we expected it.")
 				} else {
@@ -235,7 +235,7 @@ func TestShowHiddenMetric(t *testing.T) {
 	registry.MustRegister(alphaHiddenCounter)
 
 	ms, err := registry.Gather()
-	require.NoError(t, err, "Gather failed %v", err)
+	require.NoErrorf(t, err, "Gather failed %v", err)
 	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 
 	showHidden.Store(true)
@@ -253,7 +253,7 @@ func TestShowHiddenMetric(t *testing.T) {
 	expectedMetricCount = 1
 
 	ms, err = registry.Gather()
-	require.NoError(t, err, "Gather failed %v", err)
+	require.NoErrorf(t, err, "Gather failed %v", err)
 	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 }
 

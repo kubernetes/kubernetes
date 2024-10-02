@@ -140,7 +140,7 @@ func TestRelisting(t *testing.T) {
 	// changed.
 	pleg.Relist()
 	actual = getEventsFromChannel(ch)
-	assert.Empty(t, actual, "no container has changed, event length should be 0")
+	assert.Emptyf(t, actual, "no container has changed, event length should be 0")
 
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
@@ -228,7 +228,7 @@ func TestEventChannelFull(t *testing.T) {
 	}
 	// event channel is full, discard events
 	actual = getEventsFromChannel(ch)
-	assert.Len(t, actual, 4, "channel length should be 4")
+	assert.Lenf(t, actual, 4, "channel length should be 4")
 	assert.Subsetf(t, allEvents, actual, "actual events should in all events")
 }
 
@@ -377,8 +377,8 @@ func TestRelistWithCache(t *testing.T) {
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
 		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
-		assert.Equal(t, c.status, actualStatus, testStr)
-		assert.Equal(t, c.error, actualErr, testStr)
+		assert.Equalf(t, c.status, actualStatus, testStr)
+		assert.Equalf(t, c.error, actualErr, testStr)
 	}
 	// pleg should not generate any event for pods[1] because of the error.
 	assert.Exactly(t, []*PodLifecycleEvent{events[0]}, actualEvents)
@@ -398,8 +398,8 @@ func TestRelistWithCache(t *testing.T) {
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
 		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
-		assert.Equal(t, c.status, actualStatus, testStr)
-		assert.Equal(t, c.error, actualErr, testStr)
+		assert.Equalf(t, c.status, actualStatus, testStr)
+		assert.Equalf(t, c.error, actualErr, testStr)
 	}
 	// Now that we are able to query status for pods[1], pleg should generate an event.
 	assert.Exactly(t, []*PodLifecycleEvent{events[1]}, actualEvents)
@@ -430,25 +430,25 @@ func TestHealthy(t *testing.T) {
 	// pleg should initially be unhealthy
 	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
 	ok, _ := pleg.Healthy()
-	assert.False(t, ok, "pleg should be unhealthy")
+	assert.Falsef(t, ok, "pleg should be unhealthy")
 
 	// Advance the clock without any relisting.
 	clock.Step(time.Minute * 10)
 	ok, _ = pleg.Healthy()
-	assert.False(t, ok, "pleg should be unhealthy")
+	assert.Falsef(t, ok, "pleg should be unhealthy")
 
 	// Relist and than advance the time by 1 minute. pleg should be healthy
 	// because this is within the allowed limit.
 	pleg.Relist()
 	clock.Step(time.Minute * 1)
 	ok, _ = pleg.Healthy()
-	assert.True(t, ok, "pleg should be healthy")
+	assert.Truef(t, ok, "pleg should be healthy")
 
 	// Advance by relistThreshold without any relisting. pleg should be unhealthy
 	// because it has been longer than relistThreshold since a relist occurred.
 	clock.Step(pleg.relistDuration.RelistThreshold)
 	ok, _ = pleg.Healthy()
-	assert.False(t, ok, "pleg should be unhealthy")
+	assert.Falsef(t, ok, "pleg should be unhealthy")
 }
 
 func TestRelistWithReinspection(t *testing.T) {
@@ -633,8 +633,8 @@ func TestRelistIPChange(t *testing.T) {
 		pleg.Relist()
 		actualEvents := getEventsFromChannel(ch)
 		actualStatus, actualErr := pleg.cache.Get(pod.ID)
-		assert.Equal(t, status, actualStatus, tc.name)
-		assert.NoError(t, actualErr, tc.name)
+		assert.Equalf(t, status, actualStatus, tc.name)
+		assert.NoErrorf(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 
 		// Clear the IP address and mark the container terminated
@@ -658,8 +658,8 @@ func TestRelistIPChange(t *testing.T) {
 		// the way to the event
 		statusCopy := *status
 		statusCopy.IPs = tc.podIPs
-		assert.Equal(t, &statusCopy, actualStatus, tc.name)
-		require.NoError(t, actualErr, tc.name)
+		assert.Equalf(t, &statusCopy, actualStatus, tc.name)
+		require.NoErrorf(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 	}
 }

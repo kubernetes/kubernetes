@@ -375,7 +375,7 @@ func TestIsWebSocketRequestWithStreamCloseProtocol(t *testing.T) {
 			req.Header.Add(key, value)
 		}
 		actual := IsWebSocketRequestWithStreamCloseProtocol(req)
-		assert.Equal(t, test.expected, actual, "%s: expected (%t), got (%t)", name, test.expected, actual)
+		assert.Equalf(t, test.expected, actual, "%s: expected (%t), got (%t)", name, test.expected, actual)
 	}
 }
 
@@ -412,7 +412,7 @@ func TestProtocolSupportsStreamClose(t *testing.T) {
 
 	for name, test := range tests {
 		actual := protocolSupportsStreamClose(test.protocol)
-		assert.Equal(t, test.expected, actual,
+		assert.Equalf(t, test.expected, actual,
 			"%s: expected (%t), got (%t)", name, test.expected, actual)
 	}
 }

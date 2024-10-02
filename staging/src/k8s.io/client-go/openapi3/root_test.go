@@ -160,7 +160,7 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 			require.NoError(t, err)
 			for _, path := range test.expectedPaths {
 				if _, found := gvSpec.Paths.Paths[path]; !found {
-					assert.True(t, found, "expected path not found (%s)\n", path)
+					assert.Truef(t, found, "expected path not found (%s)\n", path)
 				}
 			}
 		})
@@ -219,7 +219,7 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 			for _, path := range test.expectedPaths {
 				pathsMap := gvSpecAsMap["paths"]
 				if _, found := pathsMap.(map[string]interface{})[path]; !found {
-					assert.True(t, found, "expected path not found (%s)\n", path)
+					assert.Truef(t, found, "expected path not found (%s)\n", path)
 				}
 			}
 		})
@@ -260,7 +260,7 @@ func TestOpenAPIV3Root_GroupVersionToPath(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualPath := gvToAPIPath(test.groupVersion)
-			assert.Equal(t, test.expectedPath, actualPath, "expected API path (%s), got (%s)",
+			assert.Equalf(t, test.expectedPath, actualPath, "expected API path (%s), got (%s)",
 				test.expectedPath, actualPath)
 		})
 	}
@@ -307,10 +307,10 @@ func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actualGV, err := pathToGroupVersion(test.path)
 			if test.expectedErr {
-				require.Error(t, err, "should have received error for path: %s", test.path)
+				require.Errorf(t, err, "should have received error for path: %s", test.path)
 			} else {
-				require.NoError(t, err, "expected no error, got (%v)", err)
-				assert.Equal(t, test.expectedGV, actualGV, "expected GroupVersion (%s), got (%s)",
+				require.NoErrorf(t, err, "expected no error, got (%v)", err)
+				assert.Equalf(t, test.expectedGV, actualGV, "expected GroupVersion (%s), got (%s)",
 					test.expectedGV, actualGV)
 			}
 		})

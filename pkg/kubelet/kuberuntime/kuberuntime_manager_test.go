@@ -130,7 +130,7 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 // makeFakePodSandbox creates a fake pod sandbox based on a sandbox template.
 func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template sandboxTemplate) *apitest.FakePodSandbox {
 	config, err := m.generatePodSandboxConfig(template.pod, template.attempt)
-	assert.NoError(t, err, "generatePodSandboxConfig for sandbox template %+v", template)
+	assert.NoErrorf(t, err, "generatePodSandboxConfig for sandbox template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(config.Metadata)
 	podSandBoxStatus := &apitest.FakePodSandbox{
@@ -172,10 +172,10 @@ func makeFakePodSandboxes(t *testing.T, m *kubeGenericRuntimeManager, templates 
 func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template containerTemplate) *apitest.FakeContainer {
 	ctx := context.Background()
 	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
-	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
+	assert.NoErrorf(t, err, "generatePodSandboxConfig for container template %+v", template)
 
 	containerConfig, _, err := m.generateContainerConfig(ctx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
-	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
+	assert.NoErrorf(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
 	containerID := apitest.BuildContainerName(containerConfig.Metadata, podSandboxID)
@@ -282,7 +282,7 @@ func verifyContainerStatuses(t *testing.T, runtime *apitest.FakeRuntimeService, 
 	}
 	sort.Sort(cRecordList(expected))
 	sort.Sort(cRecordList(actual))
-	assert.Equal(t, expected, actual, desc)
+	assert.Equalf(t, expected, actual, desc)
 }
 
 func TestNewKubeRuntimeManager(t *testing.T) {
@@ -1230,7 +1230,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
-	assert.Equal(t, expected, actual, desc)
+	assert.Equalf(t, expected, actual, desc)
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
@@ -2604,16 +2604,16 @@ func TestUpdatePodContainerResources(t *testing.T) {
 		}
 		fakeRuntime.Called = []string{}
 		err := m.updatePodContainerResources(pod, tc.resourceName, containersToUpdate)
-		assert.NoError(t, err, dsc)
+		assert.NoErrorf(t, err, dsc)
 
 		if tc.invokeUpdateResources {
-			assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
+			assert.Containsf(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
 		}
 		for idx := range pod.Spec.Containers {
-			assert.Equal(t, tc.expectedCurrentLimits[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryLimit, dsc)
-			assert.Equal(t, tc.expectedCurrentRequests[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryRequest, dsc)
-			assert.Equal(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
-			assert.Equal(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
+			assert.Equalf(t, tc.expectedCurrentLimits[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryLimit, dsc)
+			assert.Equalf(t, tc.expectedCurrentRequests[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryRequest, dsc)
+			assert.Equalf(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
+			assert.Equalf(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
 		}
 	}
 }
@@ -2679,7 +2679,7 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
-			require.NoError(t, err, desc)
+			require.NoErrorf(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumes, imageVolumes)
 	}
@@ -2740,7 +2740,7 @@ func TestGetImageVolumes(t *testing.T) {
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
-			require.NoError(t, err, desc)
+			require.NoErrorf(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
 	}

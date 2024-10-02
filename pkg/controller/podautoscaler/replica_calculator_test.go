@@ -232,13 +232,13 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 			return true, nil, fmt.Errorf("no custom metrics specified in test client")
 		}
 
-		assert.Equal(t, tc.metric.name, getForAction.GetMetricName(), "the metric requested should have matched the one specified")
+		assert.Equalf(t, tc.metric.name, getForAction.GetMetricName(), "the metric requested should have matched the one specified")
 
 		if getForAction.GetName() == "*" {
 			metrics := cmapi.MetricValueList{}
 
 			// multiple objects
-			assert.Equal(t, "pods", getForAction.GetResource().Resource, "the type of object that we requested multiple metrics for should have been pods")
+			assert.Equalf(t, "pods", getForAction.GetResource().Resource, "the type of object that we requested multiple metrics for should have been pods")
 
 			for i, level := range tc.metric.levels {
 				podMetric := cmapi.MetricValue{
@@ -261,7 +261,7 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 		name := getForAction.GetName()
 		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 		metrics := &cmapi.MetricValueList{}
-		assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
+		assert.NotNilf(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
 		gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()
 		mapping, err := mapper.RESTMapping(gk)
 		if err != nil {
@@ -269,8 +269,8 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 		}
 		groupResource := mapping.Resource.GroupResource()
 
-		assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
-		assert.Equal(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
+		assert.Equalf(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
+		assert.Equalf(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
 
 		metrics.Items = []cmapi.MetricValue{
 			{
@@ -304,13 +304,13 @@ func (tc *replicaCalcTestCase) prepareTestEMClient(t *testing.T) *emfake.FakeExt
 			return true, nil, fmt.Errorf("no external metrics specified in test client")
 		}
 
-		assert.Equal(t, tc.metric.name, listAction.GetResource().Resource, "the metric requested should have matched the one specified")
+		assert.Equalf(t, tc.metric.name, listAction.GetResource().Resource, "the metric requested should have matched the one specified")
 
 		selector, err := metav1.LabelSelectorAsSelector(tc.metric.selector)
 		if err != nil {
 			return true, nil, fmt.Errorf("failed to convert label selector specified in test client")
 		}
-		assert.Equal(t, selector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
+		assert.Equalf(t, selector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
 
 		metrics := emapi.ExternalMetricValueList{}
 
@@ -355,21 +355,21 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
 	})
-	require.NoError(t, err, "something went horribly wrong...")
+	require.NoErrorf(t, err, "something went horribly wrong...")
 
 	if tc.resource != nil {
 		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
-			require.Error(t, err, "there should be an error calculating the replica count")
-			assert.ErrorContains(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
+			require.Errorf(t, err, "there should be an error calculating the replica count")
+			assert.ErrorContainsf(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
 			return
 		}
-		require.NoError(t, err, "there should not have been an error calculating the replica count")
-		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
-		assert.Equal(t, tc.resource.expectedUtilization, outUtilization, "utilization should be as expected")
-		assert.Equal(t, tc.resource.expectedValue, outRawValue, "raw value should be as expected")
-		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
+		require.NoErrorf(t, err, "there should not have been an error calculating the replica count")
+		assert.Equalf(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+		assert.Equalf(t, tc.resource.expectedUtilization, outUtilization, "utilization should be as expected")
+		assert.Equalf(t, tc.resource.expectedValue, outRawValue, "raw value should be as expected")
+		assert.Truef(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 		return
 	}
 
@@ -411,14 +411,14 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.expectedError != nil {
-		require.Error(t, err, "there should be an error calculating the replica count")
-		assert.ErrorContains(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
+		require.Errorf(t, err, "there should be an error calculating the replica count")
+		assert.ErrorContainsf(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
 		return
 	}
-	require.NoError(t, err, "there should not have been an error calculating the replica count")
-	assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
-	assert.Equal(t, tc.metric.expectedUsage, outUsage, "usage should be as expected")
-	assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
+	require.NoErrorf(t, err, "there should not have been an error calculating the replica count")
+	assert.Equalf(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+	assert.Equalf(t, tc.metric.expectedUsage, outUsage, "usage should be as expected")
+	assert.Truef(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 }
 func makePodMetricLevels(containerMetric ...int64) [][]int64 {
 	metrics := make([][]int64, len(containerMetric))
@@ -2101,8 +2101,8 @@ func TestCalculatePodRequests(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			requests, err := calculatePodRequests(tc.pods, tc.container, tc.resource)
-			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
-			assert.Equal(t, tc.expectedError, err, "error should be as expected")
+			assert.Equalf(t, tc.expectedRequests, requests, "requests should be as expected")
+			assert.Equalf(t, tc.expectedError, err, "error should be as expected")
 		})
 	}
 }

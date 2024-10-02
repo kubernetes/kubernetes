@@ -1289,7 +1289,7 @@ func TestValidateNonResourceURLPath(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			err := ValidateNonResourceURLPath(testCase.path, field.NewPath(""))
-			assert.Equal(t, testCase.expectingError, err != nil,
+			assert.Equalf(t, testCase.expectingError, err != nil,
 				"actual error: %v", err)
 		})
 	}

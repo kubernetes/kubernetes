@@ -175,8 +175,8 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 
 	for i := 0; i < num; i++ {
 		relativePos := len(actions) - i - 1
-		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
-		assert.Equal(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
+		assert.Equalf(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
+		assert.Equalf(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 
 			sliceList, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
 			require.NoError(t, err)
-			assert.Empty(t, sliceList.Items, "Expected 0 endpoint slices")
+			assert.Emptyf(t, sliceList.Items, "Expected 0 endpoint slices")
 		})
 	}
 }
@@ -300,8 +300,8 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	sliceList, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
-	require.NoError(t, err, "Expected no error fetching endpoint slices")
-	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
+	require.NoErrorf(t, err, "Expected no error fetching endpoint slices")
+	assert.Lenf(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
 	assert.Regexp(t, "^"+serviceName, slice.Name)
 	assert.Equal(t, serviceName, slice.Labels[discovery.LabelServiceName])
@@ -338,7 +338,7 @@ func TestSyncServiceMissing(t *testing.T) {
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, missingServiceName))
 
 	// nil should be returned when the service doesn't exist
-	require.NoError(t, err, "Expected no error syncing service")
+	require.NoErrorf(t, err, "Expected no error syncing service")
 
 	// That should mean no client actions were performed
 	assert.Empty(t, client.Actions())
@@ -368,10 +368,10 @@ func TestSyncServicePodSelection(t *testing.T) {
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
 	slices, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
-	require.NoError(t, err, "Expected no error fetching endpoint slices")
-	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
+	require.NoErrorf(t, err, "Expected no error fetching endpoint slices")
+	assert.Lenf(t, slices.Items, 1, "Expected 1 endpoint slices")
 	slice := slices.Items[0]
-	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoint in first slice")
+	assert.Lenf(t, slice.Endpoints, 1, "Expected 1 endpoint in first slice")
 	assert.NotEmpty(t, slice.Annotations[v1.EndpointsLastChangeTriggerTime])
 	endpoint := slice.Endpoints[0]
 	assert.EqualValues(t, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name}, endpoint.TargetRef)
@@ -384,7 +384,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	service := createService(t, esController, ns, serviceName)
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	require.NoError(t, err, "Expected no error syncing service")
+	require.NoErrorf(t, err, "Expected no error syncing service")
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
@@ -415,7 +415,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	logger, _ = ktesting.NewTestContext(t)
 	numActionsBefore := len(client.Actions())
 	err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	require.NoError(t, err, "Expected no error syncing service")
+	require.NoErrorf(t, err, "Expected no error syncing service")
 
 	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
 	// should not result in any action.
@@ -505,7 +505,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	numActionsBefore := len(client.Actions())
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
-	require.NoError(t, err, "Expected no error syncing service")
+	require.NoErrorf(t, err, "Expected no error syncing service")
 
 	if len(client.Actions()) != numActionsBefore+2 {
 		t.Errorf("Expected 2 more actions, got %d", len(client.Actions())-numActionsBefore)
@@ -1292,7 +1292,7 @@ func TestSyncService(t *testing.T) {
 			esController.serviceStore.Add(testcase.service)
 
 			_, err := esController.client.CoreV1().Services(testcase.service.Namespace).Create(context.TODO(), testcase.service, metav1.CreateOptions{})
-			require.NoError(t, err, "Expected no error creating service")
+			require.NoErrorf(t, err, "Expected no error creating service")
 
 			logger, _ := ktesting.NewTestContext(t)
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
@@ -1301,8 +1301,8 @@ func TestSyncService(t *testing.T) {
 			// last action should be to create endpoint slice
 			expectActions(t, client.Actions(), 1, "create", "endpointslices")
 			sliceList, err := client.DiscoveryV1().EndpointSlices(testcase.service.Namespace).List(context.TODO(), metav1.ListOptions{})
-			require.NoError(t, err, "Expected no error fetching endpoint slices")
-			assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
+			require.NoErrorf(t, err, "Expected no error fetching endpoint slices")
+			assert.Lenf(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
 			// ensure all attributes of endpoint slice match expected state
 			slice := sliceList.Items[0]
@@ -1684,8 +1684,8 @@ func TestPodDeleteBatching(t *testing.T) {
 				time.Sleep(update.delay)
 
 				old, exists, err := esController.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
-				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
-				assert.True(t, exists, "pod should exist")
+				require.NoErrorf(t, err, "error while retrieving old value of %q: %v", update.podName, err)
+				assert.Truef(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
 				esController.deletePod(old)
 			}
@@ -2050,7 +2050,7 @@ func standardSyncService(t *testing.T, esController *endpointSliceController, na
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
-	require.NoError(t, err, "Expected no error syncing service")
+	require.NoErrorf(t, err, "Expected no error syncing service")
 }
 
 func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) *v1.Service {
@@ -2070,7 +2070,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 	}
 	esController.serviceStore.Add(service)
 	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
-	require.NoError(t, err, "Expected no error creating service")
+	require.NoErrorf(t, err, "Expected no error creating service")
 	return service
 }
 

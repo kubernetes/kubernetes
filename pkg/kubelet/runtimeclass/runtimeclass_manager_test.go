@@ -50,7 +50,7 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		t.Run(fmt.Sprintf("%q->%q(err:%v)", tname, test.expected, test.expectError), func(t *testing.T) {
 			handler, err := manager.LookupRuntimeHandler(test.rcn)
 			if test.expectError {
-				assert.Error(t, err, "handler=%q", handler)
+				assert.Errorf(t, err, "handler=%q", handler)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, test.expected, handler)

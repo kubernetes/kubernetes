@@ -22659,7 +22659,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type default and annotation does not match",
@@ -22678,7 +22678,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type localhost and annotation does not match",
@@ -22698,7 +22698,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type localhost and localhost/ prefixed annotation does not match",
@@ -22718,7 +22718,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type unconfined and annotation does not match (container)",
@@ -22740,7 +22740,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type default and annotation does not match (container)",
@@ -22762,7 +22762,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type localhost and annotation does not match (container)",
@@ -22785,7 +22785,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Field type localhost and localhost/ prefixed annotation does not match (container)",
@@ -22808,7 +22808,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.NotNil(t, allErrs, desc)
+			require.NotNilf(t, allErrs, desc)
 		},
 	}, {
 		description: "Nil errors must not be appended (pod)",
@@ -22830,7 +22830,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.Empty(t, allErrs, desc)
+			require.Emptyf(t, allErrs, desc)
 		},
 	}, {
 		description: "Nil errors must not be appended (container)",
@@ -22852,7 +22852,7 @@ func TestValidateSeccompAnnotationAndField(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, desc string, allErrs field.ErrorList, pod *v1.Pod) {
-			require.Empty(t, allErrs, desc)
+			require.Emptyf(t, allErrs, desc)
 		},
 	},
 	} {
@@ -22935,7 +22935,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 
 	for i, test := range tests {
 		err := validateSeccompAnnotationsAndFieldsMatch(test.annotationValue, test.seccompField, test.fldPath)
-		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
+		assert.Equalf(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
@@ -23021,7 +23021,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 
 	for i, test := range tests {
 		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
-		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
+		assert.Equalf(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
@@ -23724,7 +23724,7 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 	for _, test := range tests {
 		err := ValidateAppArmorProfileFormat(test.profile)
 		if test.expectValid {
-			assert.NoError(t, err, "Profile %s should be valid", test.profile)
+			assert.NoErrorf(t, err, "Profile %s should be valid", test.profile)
 		} else {
 			assert.Errorf(t, err, "Profile %s should not be valid", test.profile)
 		}

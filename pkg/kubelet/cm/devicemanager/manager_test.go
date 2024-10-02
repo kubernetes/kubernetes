@@ -155,8 +155,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			capacity, allocatable, _ := m.GetCapacity()
 			resourceCapacity := capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
-			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-			require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
+			require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+			require.Equalf(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
 			p2 := plugin.NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
 			err = p2.Start()
@@ -171,8 +171,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			capacity, allocatable, _ = m.GetCapacity()
 			resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
-			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-			require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices shouldn't change.")
+			require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+			require.Equalf(t, int64(2), resourceAllocatable.Value(), "Devices shouldn't change.")
 
 			// Test the scenario that a plugin re-registers with different devices.
 			p3 := plugin.NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
@@ -188,8 +188,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			capacity, allocatable, _ = m.GetCapacity()
 			resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
-			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-			require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of plugin previously registered should be removed.")
+			require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+			require.Equalf(t, int64(1), resourceAllocatable.Value(), "Devices of plugin previously registered should be removed.")
 			p2.Stop()
 			p3.Stop()
 			cleanup(t, m, p1)
@@ -229,8 +229,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	capacity, allocatable, _ := m.GetCapacity()
 	resourceCapacity := capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
-	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
+	require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+	require.Equalf(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
 	p2 := plugin.NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, false, false)
 	err = p2.Start()
@@ -245,8 +245,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	capacity, allocatable, _ = m.GetCapacity()
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
-	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
+	require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+	require.Equalf(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
 	// Test the scenario that a plugin re-registers with different devices.
 	p3 := plugin.NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, false, false)
@@ -262,8 +262,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	capacity, allocatable, _ = m.GetCapacity()
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
-	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-	require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of previous registered should be removed")
+	require.Equalf(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
+	require.Equalf(t, int64(1), resourceAllocatable.Value(), "Devices of previous registered should be removed")
 	p2.Stop()
 	p3.Stop()
 	cleanup(t, m, p1)
@@ -1960,7 +1960,7 @@ func sortContainerStatuses(statuses []v1.ContainerStatus) {
 
 func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
-	require.NoError(t, err, "err should be nil")
+	require.NoErrorf(t, err, "err should be nil")
 	defer func() {
 		err = os.RemoveAll(tmpDir)
 		if err != nil {
@@ -1968,7 +1968,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 		}
 	}()
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
-	require.NoError(t, err, "err should be nil")
+	require.NoErrorf(t, err, "err should be nil")
 	resourceName := "domain1.com/resource1"
 	existDevices := map[string]DeviceInstances{}
 	resourceNameMap := make(map[string]pluginapi.Device)

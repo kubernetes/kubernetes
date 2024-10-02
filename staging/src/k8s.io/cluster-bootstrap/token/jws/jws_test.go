@@ -30,8 +30,8 @@ const (
 
 func TestComputeDetachedSignature(t *testing.T) {
 	sig, err := ComputeDetachedSignature(content, id, secret)
-	assert.NoError(t, err, "Error when computing signature: %v", err)
-	assert.Equal(
+	assert.NoErrorf(t, err, "Error when computing signature: %v", err)
+	assert.Equalf(
 		t,
 		"eyJhbGciOiJIUzI1NiIsImtpZCI6Impvc2h1YSJ9..VShe2taLd-YTrmWuRkcL_8QTNDHYxQIEBsAYYiIj1_8",
 		sig,
@@ -39,8 +39,8 @@ func TestComputeDetachedSignature(t *testing.T) {
 
 	// Try with null content
 	sig, err = ComputeDetachedSignature("", id, secret)
-	assert.NoError(t, err, "Error when computing signature: %v", err)
-	assert.Equal(
+	assert.NoErrorf(t, err, "Error when computing signature: %v", err)
+	assert.Equalf(
 		t,
 		"eyJhbGciOiJIUzI1NiIsImtpZCI6Impvc2h1YSJ9..7Ui1ALizW4jXphVUB7xUqC9vLYLL9RZeOFfVLoB7Tgk",
 		sig,
@@ -48,8 +48,8 @@ func TestComputeDetachedSignature(t *testing.T) {
 
 	// Try with no secret
 	sig, err = ComputeDetachedSignature(content, id, "")
-	assert.NoError(t, err, "Error when computing signature: %v", err)
-	assert.Equal(
+	assert.NoErrorf(t, err, "Error when computing signature: %v", err)
+	assert.Equalf(
 		t,
 		"eyJhbGciOiJIUzI1NiIsImtpZCI6Impvc2h1YSJ9..UfkqvDGiIFxrMnFseDj9LYJOLNrvjW8aHhF71mvvAs8",
 		sig,
@@ -59,11 +59,11 @@ func TestComputeDetachedSignature(t *testing.T) {
 func TestDetachedTokenIsValid(t *testing.T) {
 	// Valid detached JWS token and valid inputs should succeed
 	sig := "eyJhbGciOiJIUzI1NiIsImtpZCI6Impvc2h1YSJ9..VShe2taLd-YTrmWuRkcL_8QTNDHYxQIEBsAYYiIj1_8"
-	assert.True(t, DetachedTokenIsValid(sig, content, id, secret),
+	assert.Truef(t, DetachedTokenIsValid(sig, content, id, secret),
 		"Content %q and token \"%s:%s\" should equal signature: %q", content, id, secret, sig)
 
 	// Invalid detached JWS token and valid inputs should fail
 	sig2 := sig + "foo"
-	assert.False(t, DetachedTokenIsValid(sig2, content, id, secret),
+	assert.Falsef(t, DetachedTokenIsValid(sig2, content, id, secret),
 		"Content %q and token \"%s:%s\" should not equal signature: %q", content, id, secret, sig)
 }

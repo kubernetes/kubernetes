@@ -247,7 +247,7 @@ func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtim
 	r.Lock()
 	defer r.Unlock()
 	expected := &pulledImage{imageSpec: image, authConfig: auth}
-	assert.Contains(t, r.pulledImages, expected, failMsg)
+	assert.Containsf(t, r.pulledImages, expected, failMsg)
 }
 
 type pulledImage struct {

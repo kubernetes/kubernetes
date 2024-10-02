@@ -61,7 +61,7 @@ func TestBatchedBackendCollectEvents(t *testing.T) {
 	t.Log("Max batch size encountered.")
 	backend.ProcessEvents(newEvents(batchSize + 1)...)
 	batch := backend.collectEvents(nil, nil)
-	assert.Len(t, batch, batchSize, "Expected full batch")
+	assert.Lenf(t, batch, batchSize, "Expected full batch")
 
 	t.Log("Partial batch should hang until timer expires.")
 	backend.ProcessEvents(newEvents(1)...)
@@ -80,7 +80,7 @@ func TestBatchedBackendCollectEvents(t *testing.T) {
 
 	tc <- time.Now() // Trigger "timeout"
 	wg.Wait()
-	assert.Len(t, batch, 2, "Expected partial batch")
+	assert.Lenf(t, batch, 2, "Expected partial batch")
 
 	t.Log("Collected events should be delivered when stop channel is closed.")
 	backend.ProcessEvents(newEvents(3)...)
@@ -98,7 +98,7 @@ func TestBatchedBackendCollectEvents(t *testing.T) {
 
 	close(stopCh)
 	wg.Wait()
-	assert.Len(t, batch, 3, "Expected partial batch")
+	assert.Lenf(t, batch, 3, "Expected partial batch")
 }
 
 func TestUnbatchedBackendCollectEvents(t *testing.T) {
@@ -109,12 +109,12 @@ func TestUnbatchedBackendCollectEvents(t *testing.T) {
 	t.Log("Max batch size encountered.")
 	backend.ProcessEvents(newEvents(3)...)
 	batch := backend.collectEvents(nil, nil)
-	assert.Len(t, batch, 1, "Expected single event")
+	assert.Lenf(t, batch, 1, "Expected single event")
 
 	t.Log("Queue should always be drained.")
 	for len(backend.buffer) > 0 {
 		batch = backend.collectEvents(nil, nil)
-		assert.Len(t, batch, 1, "Expected single event")
+		assert.Lenf(t, batch, 1, "Expected single event")
 	}
 
 	t.Log("Collection should hault when stop channel is closed.")
@@ -127,7 +127,7 @@ func TestUnbatchedBackendCollectEvents(t *testing.T) {
 	}()
 	close(stopCh)
 	wg.Wait()
-	assert.Empty(t, batch, "Empty final batch")
+	assert.Emptyf(t, batch, "Empty final batch")
 }
 
 func TestBufferedBackendProcessEventsAfterStop(t *testing.T) {
@@ -142,7 +142,7 @@ func TestBufferedBackendProcessEventsAfterStop(t *testing.T) {
 	backend.ProcessEvents(newEvents(1)...)
 	batch := backend.collectEvents(infiniteTimeCh, wait.NeverStop)
 
-	require.Empty(t, batch, "processed events after the backed has been stopped")
+	require.Emptyf(t, batch, "processed events after the backed has been stopped")
 }
 
 func TestBufferedBackendProcessEventsBufferFull(t *testing.T) {
@@ -154,7 +154,7 @@ func TestBufferedBackendProcessEventsBufferFull(t *testing.T) {
 
 	backend.ProcessEvents(newEvents(2)...)
 
-	require.Len(t, backend.buffer, 1, "buffed contains more elements than it should")
+	require.Lenf(t, backend.buffer, 1, "buffed contains more elements than it should")
 }
 
 func TestBufferedBackendShutdownWaitsForDelegatedCalls(t *testing.T) {
@@ -207,7 +207,7 @@ func TestDelegateProcessEvents(t *testing.T) {
 			wg := sync.WaitGroup{}
 			delegate := &fake.Backend{
 				OnRequest: func(events []*auditinternal.Event) {
-					assert.Len(t, events, config.MaxBatchSize, "Unexpected batch")
+					assert.Lenf(t, events, config.MaxBatchSize, "Unexpected batch")
 					wg.Done()
 				},
 			}

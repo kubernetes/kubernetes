@@ -196,14 +196,14 @@ func TestControllerSyncPool(t *testing.T) {
 			}
 			ctrl, err := newController(ctx, kubeClient, driveName, owner, test.inputDriverResources)
 			defer ctrl.Stop()
-			require.NoError(t, err, "unexpected controller creation error")
+			require.NoErrorf(t, err, "unexpected controller creation error")
 			err = ctrl.syncPool(ctx, test.poolName)
-			require.NoError(t, err, "unexpected syncPool error")
+			require.NoErrorf(t, err, "unexpected syncPool error")
 
 			// Check ResourceSlices
 			resourceSlices, err := kubeClient.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
-			require.NoError(t, err, "list resource slices")
-			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items, "unexpected ResourceSlices")
+			require.NoErrorf(t, err, "list resource slices")
+			assert.Equalf(t, test.expectedResourceSlices, resourceSlices.Items, "unexpected ResourceSlices")
 		})
 	}
 }

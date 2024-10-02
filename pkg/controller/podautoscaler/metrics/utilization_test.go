@@ -39,15 +39,15 @@ func (tc *resourceUtilizationRatioTestCase) runTest(t *testing.T) {
 	actualUtilizationRatio, actualCurrentUtilization, actualRawAverageValue, actualErr := GetResourceUtilizationRatio(tc.metrics, tc.requests, tc.targetUtilization)
 
 	if tc.expectedErr != nil {
-		require.Error(t, actualErr, "there should be an error getting the utilization ratio")
-		assert.Contains(t, fmt.Sprintf("%v", actualErr), fmt.Sprintf("%v", tc.expectedErr), "the error message should be as expected")
+		require.Errorf(t, actualErr, "there should be an error getting the utilization ratio")
+		assert.Containsf(t, fmt.Sprintf("%v", actualErr), fmt.Sprintf("%v", tc.expectedErr), "the error message should be as expected")
 		return
 	}
 
-	require.NoError(t, actualErr, "there should be no error retrieving the utilization ratio")
-	assert.Equal(t, tc.expectedUtilizationRatio, actualUtilizationRatio, "the utilization ratios should be as expected")
-	assert.Equal(t, tc.expectedCurrentUtilization, actualCurrentUtilization, "the current utilization should be as expected")
-	assert.Equal(t, tc.expectedRawAverageValue, actualRawAverageValue, "the raw average value should be as expected")
+	require.NoErrorf(t, actualErr, "there should be no error retrieving the utilization ratio")
+	assert.Equalf(t, tc.expectedUtilizationRatio, actualUtilizationRatio, "the utilization ratios should be as expected")
+	assert.Equalf(t, tc.expectedCurrentUtilization, actualCurrentUtilization, "the current utilization should be as expected")
+	assert.Equalf(t, tc.expectedRawAverageValue, actualRawAverageValue, "the raw average value should be as expected")
 }
 
 type metricUsageRatioTestCase struct {
@@ -61,8 +61,8 @@ type metricUsageRatioTestCase struct {
 func (tc *metricUsageRatioTestCase) runTest(t *testing.T) {
 	actualUsageRatio, actualCurrentUsage := GetMetricUsageRatio(tc.metrics, tc.targetUsage)
 
-	assert.Equal(t, tc.expectedUsageRatio, actualUsageRatio, "the usage ratios should be as expected")
-	assert.Equal(t, tc.expectedCurrentUsage, actualCurrentUsage, "the current usage should be as expected")
+	assert.Equalf(t, tc.expectedUsageRatio, actualUsageRatio, "the usage ratios should be as expected")
+	assert.Equalf(t, tc.expectedCurrentUsage, actualCurrentUsage, "the current usage should be as expected")
 }
 
 func TestGetResourceUtilizationRatioBaseCase(t *testing.T) {

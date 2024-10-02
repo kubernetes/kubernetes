@@ -67,9 +67,9 @@ func TestMixinRestrictedPodSecurity(t *testing.T) {
 		t.Run(pod.Name, func(t *testing.T) {
 			p := pod // closure
 			require.NoError(t, MixinRestrictedPodSecurity(&p))
-			assert.Equal(t, GetRestrictedPodSecurityContext(), p.Spec.SecurityContext,
+			assert.Equalf(t, GetRestrictedPodSecurityContext(), p.Spec.SecurityContext,
 				"Mixed in PodSecurityContext should equal the from-scratch PodSecurityContext")
-			assert.Equal(t, GetRestrictedContainerSecurityContext(), p.Spec.Containers[0].SecurityContext,
+			assert.Equalf(t, GetRestrictedContainerSecurityContext(), p.Spec.Containers[0].SecurityContext,
 				"Mixed in SecurityContext should equal the from-scratch SecurityContext")
 		})
 	}

@@ -82,7 +82,7 @@ func TestIsUnixDomainSocket(t *testing.T) {
 		} else {
 			assert.NoErrorf(t, err, "Unexpected error invoking IsUnixDomainSocket for %s", test.label)
 		}
-		assert.Equal(t, result, test.expectSocket, "Unexpected result from IsUnixDomainSocket: %v for %s", result, test.label)
+		assert.Equalf(t, result, test.expectSocket, "Unexpected result from IsUnixDomainSocket: %v for %s", result, test.label)
 	}
 }
 

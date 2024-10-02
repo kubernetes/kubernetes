@@ -134,7 +134,7 @@ func TestInvalidCustomCollector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			registry := newKubeRegistry(currentVersion)
 			customCollector := newTestCustomCollector(tc.descriptors...)
-			assert.Panics(t, func() {
+			assert.Panicsf(t, func() {
 				registry.CustomMustRegister(customCollector)
 			}, tc.panicStr)
 		})

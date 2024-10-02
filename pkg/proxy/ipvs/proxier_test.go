@@ -4407,14 +4407,14 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
-	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
+	assert.Equalf(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
+	assert.Truef(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
 	virtualServers1, vsErr1 := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr1, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers1, 1, "Expected 1 virtual server")
+	assert.NoErrorf(t, vsErr1, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers1, 1, "Expected 1 virtual server")
 	realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 3, "Expected 3 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Lenf(t, realServers1, 3, "Expected 3 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
 	assert.Equal(t, "10.0.1.3:80", realServers1[2].String())
@@ -4425,13 +4425,13 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+	assert.Equalf(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 	virtualServers2, vsErr2 := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr2, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
+	assert.NoErrorf(t, vsErr2, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers2, 1, "Expected 1 virtual server")
 	realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Empty(t, realServers2, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers2, "Expected 0 real servers")
 }
 
 func TestHealthCheckNodePortE2E(t *testing.T) {
@@ -4464,8 +4464,8 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after service's being created
 	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
 	activeEntries1 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
-	assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
-	assert.True(t, activeEntries1.Has("30000"), "Expected activeEntries to reference hc node port in spec")
+	assert.Equalf(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
+	assert.Truef(t, activeEntries1.Has("30000"), "Expected activeEntries to reference hc node port in spec")
 
 	// Update health check node port in the spec
 	newSvc := svc
@@ -4476,8 +4476,8 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after service's being updated
 	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
 	activeEntries2 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
-	assert.Equal(t, 1, activeEntries2.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
-	assert.True(t, activeEntries2.Has("30001"), "Expected activeEntries to reference updated hc node port in spec")
+	assert.Equalf(t, 1, activeEntries2.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
+	assert.Truef(t, activeEntries2.Has("30001"), "Expected activeEntries to reference updated hc node port in spec")
 
 	fp.OnServiceDelete(&svc)
 	fp.syncProxyRules()
@@ -4485,7 +4485,7 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
 	activeEntries3 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
-	assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-HEALTH-CHECK-NODE-PORT")
+	assert.Equalf(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-HEALTH-CHECK-NODE-PORT")
 }
 
 // Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
@@ -4798,18 +4798,18 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
 
 		if tc.expectLocalEntries {
-			assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
+			assert.Equalf(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
 		} else {
-			assert.Equal(t, 0, activeEntries1.Len(), "Expected no active entry in KUBE-LOOP-BACK")
+			assert.Equalf(t, 0, activeEntries1.Len(), "Expected no active entry in KUBE-LOOP-BACK")
 		}
 
 		if tc.expectVirtualServer {
 			virtualServers1, vsErr1 := ipvs.GetVirtualServers()
-			assert.NoError(t, vsErr1, "Expected no error getting virtual servers")
+			assert.NoErrorf(t, vsErr1, "Expected no error getting virtual servers")
 
-			assert.Len(t, virtualServers1, 1, "Expected 1 virtual server")
+			assert.Lenf(t, virtualServers1, 1, "Expected 1 virtual server")
 			realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
-			assert.NoError(t, rsErr1, "Expected no error getting real servers")
+			assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
 
 			assert.Lenf(t, realServers1, tc.expectLocalRealServerNum, "Expected %d real servers", tc.expectLocalRealServerNum)
 			for i := 0; i < tc.expectLocalRealServerNum; i++ {
@@ -4823,13 +4823,13 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 		assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 		activeEntries3 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-		assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+		assert.Equalf(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 		virtualServers2, vsErr2 := ipvs.GetVirtualServers()
-		assert.NoError(t, vsErr2, "Expected no error getting virtual servers")
-		assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
+		assert.NoErrorf(t, vsErr2, "Expected no error getting virtual servers")
+		assert.Lenf(t, virtualServers2, 1, "Expected 1 virtual server")
 		realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
-		assert.NoError(t, rsErr2, "Expected no error getting real servers")
-		assert.Empty(t, realServers2, "Expected 0 real servers")
+		assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+		assert.Emptyf(t, realServers2, "Expected 0 real servers")
 	}
 }
 
@@ -4938,15 +4938,15 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 4, activeEntries1.Len(), "Expected 4 active entry in KUBE-LOOP-BACK")
-	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first pod")
-	assert.True(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second pod")
-	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference third pod")
-	assert.True(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference fourth pod")
+	assert.Equalf(t, 4, activeEntries1.Len(), "Expected 4 active entry in KUBE-LOOP-BACK")
+	assert.Truef(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference third pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference fourth pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
 	for _, virtualServer := range virtualServers {
@@ -4961,16 +4961,16 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 
 	// clusterIP should route to cluster-wide ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 3, "Expected 3 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Lenf(t, realServers1, 3, "Expected 3 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
 	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
 
 	// externalIP should route to cluster-wide ready endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 3, "Expected 3 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Lenf(t, realServers2, 3, "Expected 3 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
@@ -4981,11 +4981,11 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+	assert.Equalf(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -4998,12 +4998,12 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Empty(t, realServers1, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Empty(t, realServers2, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
@@ -5111,15 +5111,15 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 4, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
-	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference second (local) pod")
+	assert.Equalf(t, 4, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
+	assert.Truef(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
 	for _, virtualServer := range virtualServers {
@@ -5134,16 +5134,16 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 
 	// clusterIP should route to cluster-wide ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 3, "Expected 3 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Lenf(t, realServers1, 3, "Expected 3 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
 	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
 
 	// externalIP should route to local ready + non-terminating endpoints if they exist
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 2, "Expected 2 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Lenf(t, realServers2, 2, "Expected 2 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 
@@ -5153,11 +5153,11 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+	assert.Equalf(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5170,12 +5170,12 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Empty(t, realServers1, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Empty(t, realServers2, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
@@ -5283,14 +5283,14 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
-	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
+	assert.Equalf(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
+	assert.Truef(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
 	for _, virtualServer := range virtualServers {
@@ -5305,16 +5305,16 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 
 	// clusterIP should fall back to cluster-wide ready + terminating endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 3, "Expected 1 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Lenf(t, realServers1, 3, "Expected 1 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
 	assert.Equal(t, "10.0.1.4:80", realServers1[2].String())
 
 	// externalIP should fall back to ready + terminating endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 3, "Expected 2 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Lenf(t, realServers2, 3, "Expected 2 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 	assert.Equal(t, "10.0.1.4:80", realServers2[2].String())
@@ -5325,11 +5325,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+	assert.Equalf(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5342,12 +5342,12 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Empty(t, realServers1, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Empty(t, realServers2, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
@@ -5455,14 +5455,14 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
-	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
-	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
+	assert.Equalf(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
+	assert.Truef(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
+	assert.Truef(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
 	for _, virtualServer := range virtualServers {
@@ -5477,14 +5477,14 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 
 	// clusterIP should route to cluster-wide Ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 1, "Expected 1 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Lenf(t, realServers1, 1, "Expected 1 real servers")
 	assert.Equal(t, "10.0.1.5:80", realServers1[0].String())
 
 	// externalIP should fall back to local ready + terminating endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 2, "Expected 2 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Lenf(t, realServers2, 2, "Expected 2 real servers")
 	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
 	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 
@@ -5494,11 +5494,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
 	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+	assert.Equalf(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+	assert.NoErrorf(t, vsErr, "Expected no error getting virtual servers")
+	assert.Lenf(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5511,12 +5511,12 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.NoError(t, rsErr1, "Expected no error getting real servers")
-	assert.Empty(t, realServers1, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr1, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.NoError(t, rsErr2, "Expected no error getting real servers")
-	assert.Empty(t, realServers2, "Expected 0 real servers")
+	assert.NoErrorf(t, rsErr2, "Expected no error getting real servers")
+	assert.Emptyf(t, realServers2, "Expected 0 real servers")
 }
 
 func TestIpIsValidForSet(t *testing.T) {

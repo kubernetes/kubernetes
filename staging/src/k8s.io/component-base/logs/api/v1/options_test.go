@@ -251,14 +251,14 @@ func testContextualLogging(t *testing.T, enabled bool) {
 	// nolint:logcheck // This intentionally creates a new context independently of the feature gate.
 	ctx = logr.NewContext(ctx, logger)
 	if enabled {
-		assert.Equal(t, logger, klog.FromContext(ctx), "FromContext")
-		assert.NotEqual(t, ctx, klog.NewContext(ctx, logger), "NewContext")
-		assert.NotEqual(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
-		assert.NotEqual(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
+		assert.Equalf(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.NotEqualf(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.NotEqualf(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.NotEqualf(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
 	} else {
-		assert.NotEqual(t, logger, klog.FromContext(ctx), "FromContext")
-		assert.Equal(t, ctx, klog.NewContext(ctx, logger), "NewContext")
-		assert.Equal(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
-		assert.Equal(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
+		assert.NotEqualf(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.Equalf(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.Equalf(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.Equalf(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
 	}
 }

@@ -469,23 +469,23 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
-		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+		assert.Equalf(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
 
 		images, _ := fakeRuntime.ListImages(ctx)
-		assert.Len(t, images, 1, "ListImages() count")
+		assert.Lenf(t, images, 1, "ListImages() count")
 
 		image := images[0]
-		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
-		assert.Equal(t, "", image.Spec.RuntimeHandler, "image.Spec.RuntimeHandler not empty", "ImageID", image.ID)
+		assert.Equalf(t, "missing_image:latest", image.ID, "Image ID")
+		assert.Equalf(t, "", image.Spec.RuntimeHandler, "image.Spec.RuntimeHandler not empty", "ImageID", image.ID)
 
 		expectedAnnotations := []Annotation{
 			{
 				Name:  "kubernetes.io/runtimehandler",
 				Value: "handler_name",
 			}}
-		assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
+		assert.Equalf(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
 	})
 }
 
@@ -526,26 +526,26 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, runtimeHandler, container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
-		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+		assert.Equalf(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
 
 		images, _ := fakeRuntime.ListImages(ctx)
-		assert.Len(t, images, 1, "ListImages() count")
+		assert.Lenf(t, images, 1, "ListImages() count")
 
 		image := images[0]
-		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+		assert.Equalf(t, "missing_image:latest", image.ID, "Image ID")
 
 		// when RuntimeClassInImageCriAPI feature gate is enabled, check runtime
 		// handler information for every image in the ListImages() response
-		assert.Equal(t, runtimeHandler, image.Spec.RuntimeHandler, "runtime handler returned not as expected", "Image ID", image)
+		assert.Equalf(t, runtimeHandler, image.Spec.RuntimeHandler, "runtime handler returned not as expected", "Image ID", image)
 
 		expectedAnnotations := []Annotation{
 			{
 				Name:  "kubernetes.io/runtimehandler",
 				Value: "handler_name",
 			}}
-		assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
+		assert.Equalf(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
 	})
 }
 

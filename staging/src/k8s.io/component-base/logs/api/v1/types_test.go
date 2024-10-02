@@ -110,7 +110,7 @@ func TestVModule(t *testing.T) {
 				if err == nil {
 					t.Fatal("parsing should have failed")
 				}
-				assert.Equal(t, test.expectError, err.Error(), "parse error")
+				assert.Equalf(t, test.expectError, err.Error(), "parse error")
 			} else {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -120,7 +120,7 @@ func TestVModule(t *testing.T) {
 				if expectParam == "" {
 					expectParam = test.arg
 				}
-				assert.Equal(t, expectParam, param, "encoded parameter value not identical")
+				assert.Equalf(t, expectParam, param, "encoded parameter value not identical")
 			}
 		})
 	}

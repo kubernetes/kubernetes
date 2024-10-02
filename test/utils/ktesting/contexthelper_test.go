@@ -113,7 +113,7 @@ func TestCause(t *testing.T) {
 			}
 			if tt.expectDeadline != 0 {
 				actualDeadline, ok := ctx.Deadline()
-				if assert.True(t, ok, "should have had a deadline") {
+				if assert.Truef(t, ok, "should have had a deadline") {
 					// Testing timing behavior is unreliable in Prow because
 					// the test runs in parallel with several others.
 					// Therefore this check is skipped if a CI environment is
@@ -123,7 +123,7 @@ func TestCause(t *testing.T) {
 					case "yes", "true", "1":
 						// Skip.
 					default:
-						assert.InDelta(t, time.Until(actualDeadline), tt.expectDeadline, float64(time.Second), "remaining time till Deadline()")
+						assert.InDeltaf(t, time.Until(actualDeadline), tt.expectDeadline, float64(time.Second), "remaining time till Deadline()")
 					}
 				}
 			}
@@ -135,8 +135,8 @@ func TestCause(t *testing.T) {
 			case "yes", "true", "1":
 				// Skip.
 			default:
-				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
-				assert.Equal(t, tt.expectCause, actualCause, "context.Cause()")
+				assert.Equalf(t, tt.expectErr, actualErr, "ctx.Err()")
+				assert.Equalf(t, tt.expectCause, actualCause, "context.Cause()")
 			}
 		})
 	}

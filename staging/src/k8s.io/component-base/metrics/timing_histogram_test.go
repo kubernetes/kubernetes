@@ -113,7 +113,7 @@ func TestTimingHistogram(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -138,7 +138,7 @@ func TestTimingHistogram(t *testing.T) {
 			expectedCount := uint64(dt1 + dt2 + dt3)
 			expectedSum := float64(dt1)*v0 + float64(dt2)*v1 + float64(dt3)*v2
 			ms, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.GetName())
@@ -244,7 +244,7 @@ func TestTimingHistogramVec(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				if metric.GetHelp() != test.expectedHelp {
 					assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -261,7 +261,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Add(5.0)
 			c.WithLabelValues("2", "3").Add(5.0)
 			ms, err = registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.String())
@@ -336,7 +336,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Add(1.0)
 			}
 			mfs, err := registry.Gather()
-			require.NoError(t, err, "Gather failed %v", err)
+			require.NoErrorf(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -357,7 +357,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 					}
 					labelValuePair := aValue + " " + bValue
 					expectedCount, ok := test.expectMetricValues[labelValuePair]
-					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					assert.Truef(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
 					expectedSum := float64(dt1) * v0 * float64(expectedCount)
 					expectedCount *= uint64(dt1)
 					actualCount := m.GetHistogram().GetSampleCount()

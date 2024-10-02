@@ -96,7 +96,7 @@ func TestValidateValidHost(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
+	assert.NoErrorf(t, v.Validate(pod), "Multi-container pod should validate")
 }
 
 func getPodWithProfile(profile string) *v1.Pod {

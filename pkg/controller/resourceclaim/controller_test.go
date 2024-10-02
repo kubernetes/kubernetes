@@ -498,7 +498,7 @@ func TestSyncHandler(t *testing.T) {
 				}
 				actualStatuses[pod.Name] = pod.Status.ResourceClaimStatuses
 			}
-			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
+			assert.Equalf(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
 			scheduling, err := fakeKubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
 			if err != nil {

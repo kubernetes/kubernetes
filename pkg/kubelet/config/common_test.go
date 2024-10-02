@@ -290,7 +290,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 		},
 	}
 	for _, c := range testCases {
-		assert.Equal(t, c.expected, generatePodName(c.podName, c.nodeName), "wrong pod name generated")
+		assert.Equalf(t, c.expected, generatePodName(c.podName, c.nodeName), "wrong pod name generated")
 		pod := podtest.MakePod("")
 		pod.Name = c.podName
 		if c.overwrite != "" {
@@ -304,7 +304,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 					specNameErrored = true
 				}
 			}
-			assert.NotEmpty(t, specNameErrored, "expecting error")
+			assert.NotEmptyf(t, specNameErrored, "expecting error")
 		} else {
 			for _, err := range errs {
 				if err.Field == "metadata.name" {

@@ -74,12 +74,12 @@ func TestCancelCtx(t *testing.T) {
 		if tCtx.Err() != nil {
 			t.Errorf("context should not be canceled but is: %v", tCtx.Err())
 		}
-		assert.Equal(t, baseCtx.Logger(), tCtx.Logger(), "Logger()")
-		assert.Equal(t, baseCtx.RESTConfig(), tCtx.RESTConfig(), "RESTConfig()")
-		assert.Equal(t, baseCtx.RESTMapper(), tCtx.RESTMapper(), "RESTMapper()")
-		assert.Equal(t, baseCtx.Client(), tCtx.Client(), "Client()")
-		assert.Equal(t, baseCtx.Dynamic(), tCtx.Dynamic(), "Dynamic()")
-		assert.Equal(t, baseCtx.APIExtensions(), tCtx.APIExtensions(), "APIExtensions()")
+		assert.Equalf(t, baseCtx.Logger(), tCtx.Logger(), "Logger()")
+		assert.Equalf(t, baseCtx.RESTConfig(), tCtx.RESTConfig(), "RESTConfig()")
+		assert.Equalf(t, baseCtx.RESTMapper(), tCtx.RESTMapper(), "RESTMapper()")
+		assert.Equalf(t, baseCtx.Client(), tCtx.Client(), "Client()")
+		assert.Equalf(t, baseCtx.Dynamic(), tCtx.Dynamic(), "Dynamic()")
+		assert.Equalf(t, baseCtx.APIExtensions(), tCtx.APIExtensions(), "APIExtensions()")
 	})
 
 	// Cancel, then let testing.T invoke test cleanup.
@@ -99,11 +99,11 @@ func TestWithTB(t *testing.T) {
 	t.Run("sub", func(t *testing.T) {
 		tCtx := ktesting.WithTB(tCtx, t)
 
-		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
-		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
-		assert.Equal(t, client, tCtx.Client(), "Client")
-		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
-		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
+		assert.Equalf(t, cfg, tCtx.RESTConfig(), "RESTConfig")
+		assert.Equalf(t, mapper, tCtx.RESTMapper(), "RESTMapper")
+		assert.Equalf(t, client, tCtx.Client(), "Client")
+		assert.Equalf(t, dynamic, tCtx.Dynamic(), "Dynamic")
+		assert.Equalf(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
 
 		tCtx.Cancel("test is complete")
 	})

@@ -86,7 +86,7 @@ func (t *testWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// In a goroutine, can't call Fatal.
-	assert.NoError(t.t, err, "failed to read request body")
+	assert.NoErrorf(t.t, err, "failed to read request body")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
@@ -97,7 +97,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 		},
 	}
 	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
-	require.NoError(t, err, "creating temp file")
+	require.NoErrorf(t, err, "creating temp file")
 
 	defer func() {
 		f.Close()
@@ -105,7 +105,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 	}()
 
 	// NOTE(ericchiang): Do we need to use a proper serializer?
-	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing kubeconfig")
+	require.NoErrorf(t, stdjson.NewEncoder(f).Encode(config), "writing kubeconfig")
 
 	retryBackoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
@@ -114,7 +114,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 		Steps:    5,
 	}
 	b, err := NewBackend(f.Name(), groupVersion, retryBackoff, nil)
-	require.NoError(t, err, "initializing backend")
+	require.NoErrorf(t, err, "initializing backend")
 
 	return b.(*backend)
 }

@@ -428,7 +428,7 @@ func TestReconcile(t *testing.T) {
 				cloud.RouteMap[route.Name] = fakeRoute
 			}
 			routes, ok := cloud.Routes()
-			assert.True(t, ok, "fakecloud failed to run Routes()")
+			assert.Truef(t, ok, "fakecloud failed to run Routes()")
 			cidrs := make([]*net.IPNet, 0)
 			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
 			cidrs = append(cidrs, cidr)
@@ -440,12 +440,12 @@ func TestReconcile(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
 			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 			rc.nodeListerSynced = alwaysReady
-			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
+			require.NoErrorf(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {
 				if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 					node := action.(core.UpdateAction).GetObject().(*v1.Node)
 					_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
-					assert.NotEmpty(t, condition, "Missing NodeNetworkUnavailable condition for Node %q", node.Name)
+					assert.NotEmptyf(t, condition, "Missing NodeNetworkUnavailable condition for Node %q", node.Name)
 					check := func(index int) bool {
 						return (condition.Status == v1.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
 					}
@@ -459,7 +459,7 @@ func TestReconcile(t *testing.T) {
 						// Something's wrong
 						continue
 					}
-					assert.True(t, check(index), "Invalid NodeNetworkUnavailable condition for Node %q, expected %v, got %v",
+					assert.Truef(t, check(index), "Invalid NodeNetworkUnavailable condition for Node %q, expected %v, got %v",
 						node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == v1.ConditionFalse))
 				}
 			}

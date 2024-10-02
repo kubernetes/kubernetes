@@ -2018,7 +2018,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				ResourceVersion:   "105",
 			},
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+				require.NotEqualf(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
 
@@ -2053,7 +2053,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				return s
 			}(),
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+				require.NotEqualf(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
 
@@ -2088,7 +2088,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				return s
 			}(),
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+				require.NotEqualf(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
 	}
@@ -2115,7 +2115,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 			}
 
 			w, err := cacher.Watch(context.Background(), "pods/ns", scenario.opts)
-			require.NoError(t, err, "failed to create watch: %v")
+			require.NoErrorf(t, err, "failed to create watch: %v")
 			defer w.Stop()
 			var expectedErr *apierrors.StatusError
 			if !errors.As(storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds), &expectedErr) {
@@ -2136,10 +2136,10 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 
 			go func(t *testing.T) {
 				err := cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
-				require.NoError(t, err, "failed adding a pod to the watchCache")
+				require.NoErrorf(t, err, "failed adding a pod to the watchCache")
 			}(t)
 			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
-			require.NoError(t, err, "failed to create watch: %v")
+			require.NoErrorf(t, err, "failed to create watch: %v")
 			defer w.Stop()
 			verifyEvents(t, w, []watch.Event{
 				{
@@ -2264,7 +2264,7 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
-	require.NoError(t, err, "failed to create cacher")
+	require.NoErrorf(t, err, "failed to create cacher")
 	defer cacher.Stop()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
@@ -2280,7 +2280,7 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 		SendInitialEvents: pointer.Bool(true),
 	}
 	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
-	require.NoError(t, err, "failed to create watch: %v")
+	require.NoErrorf(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
 	verifyEvents(t, w, []watch.Event{
@@ -2495,7 +2495,7 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			backingStorage := &dummyStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
-			require.NoError(t, err, "couldn't create cacher")
+			require.NoErrorf(t, err, "couldn't create cacher")
 			defer cacher.Stop()
 
 			parsedResourceVersion := 0
@@ -2506,7 +2506,7 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 
 			actualResourceVersion, err := cacher.getWatchCacheResourceVersion(context.TODO(), uint64(parsedResourceVersion), scenario.opts)
 			require.NoError(t, err)
-			require.Equal(t, uint64(scenario.expectedWatchResourceVersion), actualResourceVersion, "received unexpected ResourceVersion")
+			require.Equalf(t, uint64(scenario.expectedWatchResourceVersion), actualResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
 }
@@ -2689,7 +2689,7 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			backingStorage := &dummyStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
-			require.NoError(t, err, "couldn't create cacher")
+			require.NoErrorf(t, err, "couldn't create cacher")
 
 			defer cacher.Stop()
 
@@ -2711,7 +2711,7 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 			cacher.watchCache.RLock()
 			defer cacher.watchCache.RUnlock()
 			getBookMarkResourceVersion := getBookMarkFn()
-			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
+			require.Equalf(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
 }

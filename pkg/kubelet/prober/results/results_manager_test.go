@@ -35,16 +35,16 @@ func TestCacheOperations(t *testing.T) {
 	setID := kubecontainer.ContainerID{Type: "test", ID: "set"}
 
 	_, found := m.Get(unsetID)
-	assert.False(t, found, "unset result found")
+	assert.Falsef(t, found, "unset result found")
 
 	m.Set(setID, Success, &corev1.Pod{})
 	result, found := m.Get(setID)
-	assert.Equal(t, Success, result, "set result")
-	assert.True(t, found, "set result found")
+	assert.Equalf(t, Success, result, "set result")
+	assert.Truef(t, found, "set result found")
 
 	m.Remove(setID)
 	_, found = m.Get(setID)
-	assert.False(t, found, "removed result found")
+	assert.Falsef(t, found, "removed result found")
 }
 
 func TestUpdates(t *testing.T) {

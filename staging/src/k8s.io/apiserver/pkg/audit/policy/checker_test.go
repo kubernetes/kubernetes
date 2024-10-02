@@ -186,8 +186,8 @@ func test(t *testing.T, req string, expLevel audit.Level, policyStages, expOmitS
 	}
 	require.Contains(t, attrs, req)
 	auditConfig := NewPolicyRuleEvaluator(&policy).EvaluatePolicyRule(attrs[req])
-	assert.Equal(t, expLevel, auditConfig.Level, "request:%s rules:%s", req, strings.Join(ruleNames, ","))
-	assert.True(t, stageEqual(expOmitStages, auditConfig.OmitStages), "request:%s rules:%s, expected stages: %v, actual stages: %v",
+	assert.Equalf(t, expLevel, auditConfig.Level, "request:%s rules:%s", req, strings.Join(ruleNames, ","))
+	assert.Truef(t, stageEqual(expOmitStages, auditConfig.OmitStages), "request:%s rules:%s, expected stages: %v, actual stages: %v",
 		req, strings.Join(ruleNames, ","), expOmitStages, auditConfig.OmitStages)
 }
 

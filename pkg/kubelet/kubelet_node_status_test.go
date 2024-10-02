@@ -328,17 +328,17 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 			assert.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
-				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
+				assert.Falsef(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
+				assert.Falsef(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
 				updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 				updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
 
 			// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-			assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+			assert.Equalf(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
 				"NotReady should be last")
 			assert.Len(t, updatedNode.Status.Images, len(expectedImageList))
-			assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+			assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 		})
 	}
 }
@@ -523,17 +523,17 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	for i, cond := range updatedNode.Status.Conditions {
 		old := metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time
 		// Expect LastHearbeat to be updated to Now, while LastTransitionTime to be the same.
-		assert.NotEqual(t, old, cond.LastHeartbeatTime.Rfc3339Copy().UTC(), "LastHeartbeatTime for condition %v", cond.Type)
-		assert.EqualValues(t, old, cond.LastTransitionTime.Rfc3339Copy().UTC(), "LastTransitionTime for condition %v", cond.Type)
+		assert.NotEqualf(t, old, cond.LastHeartbeatTime.Rfc3339Copy().UTC(), "LastHeartbeatTime for condition %v", cond.Type)
+		assert.EqualValuesf(t, old, cond.LastTransitionTime.Rfc3339Copy().UTC(), "LastTransitionTime for condition %v", cond.Type)
 
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 	}
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+	assert.Equalf(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
 		"NodeReady should be the last condition")
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+	assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 }
 
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
@@ -722,18 +722,18 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		require.Equal(t, "status", actions[1].GetSubresource())
 
 		updatedNode, err := kubeClient.CoreV1().Nodes().Get(ctx, testKubeletHostname, metav1.GetOptions{})
-		require.NoError(t, err, "can't apply node status patch")
+		require.NoErrorf(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {
-			assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-			assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+			assert.Falsef(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
+			assert.Falsef(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
 			updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 			updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 		}
 
 		// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
 		lastIndex := len(updatedNode.Status.Conditions) - 1
-		assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[lastIndex].Type, "NodeReady should be the last condition")
+		assert.Equalf(t, v1.NodeReady, updatedNode.Status.Conditions[lastIndex].Type, "NodeReady should be the last condition")
 		assert.NotEmpty(t, updatedNode.Status.Conditions[lastIndex].Message)
 
 		updatedNode.Status.Conditions[lastIndex].Message = ""
@@ -744,7 +744,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastHeartbeatTime:  metav1.Time{},
 			LastTransitionTime: metav1.Time{},
 		}
-		assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+		assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 	}
 
 	// TODO(random-liu): Refactor the unit test to be table driven test.
@@ -962,10 +962,10 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 		cond.LastHeartbeatTime = cond.LastHeartbeatTime.Rfc3339Copy()
 		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
 	}
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+	assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+	assert.Equalf(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
 		"NodeReady should be the last condition")
 
 	// Update node status again when nothing is changed (except heartbeat time).
@@ -991,7 +991,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	for i, cond := range expectedNode.Status.Conditions {
 		expectedNode.Status.Conditions[i].LastHeartbeatTime = metav1.NewTime(cond.LastHeartbeatTime.Time.Add(time.Minute)).Rfc3339Copy()
 	}
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+	assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
@@ -1027,27 +1027,27 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	require.NoError(t, err)
 	memCapacity := updatedNode.Status.Capacity[v1.ResourceMemory]
 	updatedMemoryCapacity, _ := (&memCapacity).AsInt64()
-	assert.Equal(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
+	assert.Equalf(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
 
 	now = metav1.NewTime(clock.Now()).Rfc3339Copy()
 	for _, cond := range updatedNode.Status.Conditions {
 		// Expect LastHearbeat updated, while LastTransitionTime unchanged.
-		assert.Equal(t, now, cond.LastHeartbeatTime.Rfc3339Copy(),
+		assert.Equalf(t, now, cond.LastHeartbeatTime.Rfc3339Copy(),
 			"LastHeartbeatTime for condition %v", cond.Type)
-		assert.Equal(t, now, metav1.NewTime(cond.LastTransitionTime.Time.Add(time.Minute+20*time.Second)).Rfc3339Copy(),
+		assert.Equalf(t, now, metav1.NewTime(cond.LastTransitionTime.Time.Add(time.Minute+20*time.Second)).Rfc3339Copy(),
 			"LastTransitionTime for condition %v", cond.Type)
 	}
 
 	// Update node status when changing pod CIDR.
 	// Report node status if it is still within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
+	assert.Equalf(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
 	podCIDRs := []string{"10.0.0.0/24", "2000::/10"}
 	updatedNode.Spec.PodCIDR = podCIDRs[0]
 	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
-	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	assert.Equalf(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 9)
@@ -1057,7 +1057,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status when keeping the pod CIDR.
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.Equalf(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
 
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 	// Only 1 more action (There were 9 actions before).
@@ -1154,14 +1154,14 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 				updatedNode, err := applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
 				require.NoError(t, err)
-				assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedNode, updatedNode), "%s", cmp.Diff(tc.expectedNode, updatedNode))
+				assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectedNode, updatedNode), "%s", cmp.Diff(tc.expectedNode, updatedNode))
 			} else {
 				assert.Len(t, actions, 1)
 				assert.IsType(t, core.GetActionImpl{}, actions[0])
 			}
 
 			reportedInUse := fakeVolumeManager.GetVolumesReportedInUse()
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedReportedInUse, reportedInUse), "%s", cmp.Diff(tc.expectedReportedInUse, reportedInUse))
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectedReportedInUse, reportedInUse), "%s", cmp.Diff(tc.expectedReportedInUse, reportedInUse))
 		})
 	}
 }
@@ -1549,10 +1549,10 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			addNotImplatedReaction(kubeClient)
 
 			result := kubelet.tryRegisterWithAPIServer(tc.newNode)
-			require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
+			require.Equalf(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 			actions := kubeClient.Actions()
-			assert.Len(t, actions, tc.expectedActions, "test [%s]", tc.name)
+			assert.Lenf(t, actions, tc.expectedActions, "test [%s]", tc.name)
 
 			if tc.testSavedNode {
 				var savedNode *v1.Node
@@ -1572,7 +1572,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 				}
 
 				actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[util.ControllerManagedAttachAnnotation])
-				assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
+				assert.Equalf(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
 			}
 		})
 	}
@@ -1646,7 +1646,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[0].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", cmp.Diff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
+	assert.Truef(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", cmp.Diff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }
 
 func TestUpdateDefaultLabels(t *testing.T) {
@@ -1949,8 +1949,8 @@ func TestUpdateDefaultLabels(t *testing.T) {
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
-		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
+		assert.Equalf(t, tc.needsUpdate, needsUpdate, tc.name)
+		assert.Equalf(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
 	}
 }
 
@@ -2158,8 +2158,8 @@ func TestUpdateDefaultResources(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
 			needsUpdate := updateDefaultResources(tc.initialNode, tc.existingNode)
-			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
+			assert.Equalf(t, tc.needsUpdate, needsUpdate, tc.name)
+			assert.Equalf(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
 	}
 }
@@ -2450,8 +2450,8 @@ func TestReconcileHugePageResource(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
-			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
+			assert.Equalf(t, tc.needsUpdate, needsUpdate, tc.name)
+			assert.Equalf(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
 	}
 
@@ -2638,8 +2638,8 @@ func TestReconcileExtendedResource(t *testing.T) {
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
-		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
+		assert.Equalf(t, tc.needsUpdate, needsUpdate, tc.name)
+		assert.Equalf(t, tc.expectedNode, tc.existingNode, tc.name)
 	}
 
 }
@@ -2774,7 +2774,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	require.True(t,
+	require.Truef(t,
 		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
 }
@@ -2928,9 +2928,9 @@ func TestNodeStatusHasChanged(t *testing.T) {
 			originalStatusCopy := tc.originalStatus.DeepCopy()
 			statusCopy := tc.status.DeepCopy()
 			changed := nodeStatusHasChanged(tc.originalStatus, tc.status)
-			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
-			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", cmp.Diff(originalStatusCopy, tc.originalStatus))
-			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", cmp.Diff(statusCopy, tc.status))
+			assert.Equalf(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
+			assert.Truef(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", cmp.Diff(originalStatusCopy, tc.originalStatus))
+			assert.Truef(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", cmp.Diff(statusCopy, tc.status))
 		})
 	}
 }
@@ -3084,7 +3084,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 			updatedNode, err := applyNodeStatusPatch(oldNode, patchAction.GetPatch())
 			require.NoError(t, err)
 
-			assert.True(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+			assert.Truef(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 		})
 	}
 }

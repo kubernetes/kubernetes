@@ -276,7 +276,7 @@ func TestReadRotatedLog(t *testing.T) {
 
 			newF := filepath.Join(dir, baseName)
 			if file, err = os.Create(newF); err != nil {
-				assert.NoError(t, err, "unable to create new log file")
+				assert.NoErrorf(t, err, "unable to create new log file")
 				return
 			}
 			time.Sleep(20 * time.Millisecond)
@@ -534,9 +534,9 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 		//   1. The timestamp should exist
 		//   2. The last item in the log should be 9999
 		_, err = time.Parse(time.RFC3339, string(ts))
-		assert.NoError(t, err, "timestamp not found")
-		assert.True(t, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
+		assert.NoErrorf(t, err, "timestamp not found")
+		assert.Truef(t, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
 	}
 
-	assert.Equal(t, 2, lineCount, "should have two lines")
+	assert.Equalf(t, 2, lineCount, "should have two lines")
 }

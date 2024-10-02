@@ -41,7 +41,7 @@ func init() {
 
 func TestCreateMasterAuditPolicy(t *testing.T) {
 	baseDir, err := os.MkdirTemp("", "configure-helper-test") // cleaned up by c.tearDown()
-	require.NoError(t, err, "Failed to create temp directory")
+	require.NoErrorf(t, err, "Failed to create temp directory")
 
 	policyFile := filepath.Join(baseDir, "audit_policy.yaml")
 	c := ManifestTestCase{
@@ -60,7 +60,7 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 	)
 
 	policy, err := auditpolicy.LoadPolicyFromFile(policyFile)
-	require.NoError(t, err, "Failed to load generated policy.")
+	require.NoErrorf(t, err, "Failed to load generated policy.")
 
 	// Users for test cases
 	var (
@@ -181,9 +181,9 @@ func (t *auditTester) testResources(level audit.Level, usrVerbRes ...interface{}
 			t.Fatalf("Invalid test argument: %+v", arg)
 		}
 	}
-	require.NotEmpty(t, verbs, "testcases must have a verb")
-	require.NotEmpty(t, users, "testcases must have a user")
-	require.NotEmpty(t, resources, "resource testcases must have a resource")
+	require.NotEmptyf(t, verbs, "testcases must have a verb")
+	require.NotEmptyf(t, users, "testcases must have a user")
+	require.NotEmptyf(t, resources, "resource testcases must have a resource")
 
 	for _, usr := range users {
 		for _, verb := range verbs {

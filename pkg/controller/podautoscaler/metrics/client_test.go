@@ -123,8 +123,8 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	} else if isExternal {
 		fakeEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			listAction := action.(core.ListAction)
-			assert.Equal(t, tc.metricName, listAction.GetResource().Resource, "the metric requested should have matched the one specified.")
-			assert.Equal(t, tc.metricLabelSelector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
+			assert.Equalf(t, tc.metricName, listAction.GetResource().Resource, "the metric requested should have matched the one specified.")
+			assert.Equalf(t, tc.metricLabelSelector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
 
 			metrics := emapi.ExternalMetricValueList{}
 			for _, metricPoint := range tc.reportedMetricPoints {
@@ -141,12 +141,12 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	} else {
 		fakeCMClient.AddReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			getForAction := action.(cmfake.GetForAction)
-			assert.Equal(t, tc.metricName, getForAction.GetMetricName(), "the metric requested should have matched the one specified")
+			assert.Equalf(t, tc.metricName, getForAction.GetMetricName(), "the metric requested should have matched the one specified")
 
 			if getForAction.GetName() == "*" {
 				// multiple objects
 				metrics := cmapi.MetricValueList{}
-				assert.Equal(t, "pods", getForAction.GetResource().Resource, "type of object that we requested multiple metrics for should have been pods")
+				assert.Equalf(t, "pods", getForAction.GetResource().Resource, "type of object that we requested multiple metrics for should have been pods")
 
 				for i, metricPoint := range tc.reportedMetricPoints {
 					timestamp := offsetTimestampBy(metricPoint.timestamp)
@@ -170,7 +170,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 			} else {
 				name := getForAction.GetName()
 				mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
-				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
+				assert.NotNilf(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
 				gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
 				mapping, err := mapper.RESTMapping(gk)
 				if err != nil {
@@ -178,8 +178,8 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				}
 				groupResource := mapping.Resource.GroupResource()
 
-				assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
-				assert.Equal(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
+				assert.Equalf(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
+				assert.Equalf(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
 				metricPoint := tc.reportedMetricPoints[0]
 				timestamp := offsetTimestampBy(metricPoint.timestamp)
 
@@ -210,12 +210,12 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 
 func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo, timestamp time.Time, err error) {
 	if tc.desiredError != nil {
-		require.Error(t, err, "there should be an error retrieving the metrics")
-		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be as expected")
+		require.Errorf(t, err, "there should be an error retrieving the metrics")
+		assert.Containsf(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be as expected")
 		return
 	}
-	require.NoError(t, err, "there should be no error retrieving the metrics")
-	assert.NotNil(t, metrics, "there should be metrics returned")
+	require.NoErrorf(t, err, "there should be no error retrieving the metrics")
+	assert.NotNilf(t, metrics, "there should be metrics returned")
 
 	if len(metrics) != len(tc.desiredMetricValues) {
 		t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
@@ -231,7 +231,7 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 	}
 
 	targetTimestamp := offsetTimestampBy(tc.targetTimestamp)
-	assert.True(t, targetTimestamp.Equal(timestamp), "the timestamp should be as expected (%s) but was %s", targetTimestamp, timestamp)
+	assert.Truef(t, targetTimestamp.Equal(timestamp), "the timestamp should be as expected (%s) but was %s", targetTimestamp, timestamp)
 }
 
 func (tc *restClientTestCase) runTest(t *testing.T) {

@@ -289,8 +289,8 @@ func TestAuditAnnotation(t *testing.T) {
 		ae := audit.AuditEventFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
-		assert.Equal(t, tc.decisionAnnotation, ae.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
-		assert.Equal(t, tc.reasonAnnotation, ae.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
+		assert.Equalf(t, tc.decisionAnnotation, ae.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
+		assert.Equalf(t, tc.reasonAnnotation, ae.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
 	}
 
 }

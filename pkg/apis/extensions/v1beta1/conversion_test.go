@@ -97,12 +97,12 @@ func TestIngressBackendConversion(t *testing.T) {
 			convertedInternal := networking.IngressSpec{}
 			require.NoError(t,
 				Convert_v1beta1_IngressSpec_To_networking_IngressSpec(&test.external, &convertedInternal, nil))
-			assert.Equal(t, test.internal, convertedInternal, "v1beta1.IngressSpec -> networking.IngressSpec")
+			assert.Equalf(t, test.internal, convertedInternal, "v1beta1.IngressSpec -> networking.IngressSpec")
 
 			convertedV1beta1 := v1beta1.IngressSpec{}
 			require.NoError(t,
 				Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&test.internal, &convertedV1beta1, nil))
-			assert.Equal(t, test.external, convertedV1beta1, "networking.IngressSpec -> v1beta1.IngressSpec")
+			assert.Equalf(t, test.external, convertedV1beta1, "networking.IngressSpec -> v1beta1.IngressSpec")
 		})
 	}
 }

@@ -60,7 +60,7 @@ func TestLevelVersionEquals(t *testing.T) {
 			for _, v := range []Version{LatestVersion(), MajorMinorVersion(1, 18), MajorMinorVersion(1, 30)} {
 				lv := LevelVersion{l, v}
 				other := lv
-				assert.True(t, lv.Equivalent(&other), lv.String())
+				assert.Truef(t, lv.Equivalent(&other), lv.String())
 			}
 		}
 	})
@@ -70,7 +70,7 @@ func TestLevelVersionEquals(t *testing.T) {
 				if l1 != l2 {
 					lv1 := LevelVersion{l1, LatestVersion()}
 					lv2 := LevelVersion{l2, LatestVersion()}
-					assert.False(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
+					assert.Falsef(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
 				}
 			}
 		}
@@ -81,7 +81,7 @@ func TestLevelVersionEquals(t *testing.T) {
 				for _, v2 := range []Version{MajorMinorVersion(1, 16), MajorMinorVersion(1, 13)} {
 					lv1 := LevelVersion{l, v1}
 					lv2 := LevelVersion{l, v2}
-					assert.False(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
+					assert.Falsef(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
 				}
 			}
 		}
@@ -91,7 +91,7 @@ func TestLevelVersionEquals(t *testing.T) {
 			for _, v2 := range []Version{MajorMinorVersion(1, 16), MajorMinorVersion(1, 13)} {
 				lv1 := LevelVersion{LevelPrivileged, v1}
 				lv2 := LevelVersion{LevelPrivileged, v2}
-				assert.True(t, lv1.Equivalent(&lv2), "%#v == %#v", lv1, lv2)
+				assert.Truef(t, lv1.Equivalent(&lv2), "%#v == %#v", lv1, lv2)
 			}
 		}
 	})
@@ -113,9 +113,9 @@ func TestPolicyEquals(t *testing.T) {
 	baseline.Audit.Level = LevelBaseline
 	require.False(t, baseline.FullyPrivileged())
 
-	assert.True(t, privileged.Equivalent(&privileged2), "ignore privileged versions")
-	assert.True(t, baseline.Equivalent(&baseline), "baseline policy equals itself")
-	assert.False(t, privileged.Equivalent(&baseline), "privileged != baseline")
+	assert.Truef(t, privileged.Equivalent(&privileged2), "ignore privileged versions")
+	assert.Truef(t, baseline.Equivalent(&baseline), "baseline policy equals itself")
+	assert.Falsef(t, privileged.Equivalent(&baseline), "privileged != baseline")
 }
 
 func TestPolicyToEvaluate(t *testing.T) {

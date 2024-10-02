@@ -79,7 +79,8 @@ func TestCustomMetrics(t *testing.T) {
 			},
 		},
 	}
-	assert.Contains(t, cadvisorInfoToUserDefinedMetrics(&cInfo),
+	definedMetrics := cadvisorInfoToUserDefinedMetrics(&cInfo)
+	assert.Contains(t, definedMetrics,
 		statsapi.UserDefinedMetric{
 			UserDefinedMetricDescriptor: statsapi.UserDefinedMetricDescriptor{
 				Name:  "qos",
@@ -88,7 +89,8 @@ func TestCustomMetrics(t *testing.T) {
 			},
 			Time:  metav1.NewTime(timestamp2),
 			Value: 100,
-		},
+		})
+	assert.Contains(t, definedMetrics,
 		statsapi.UserDefinedMetric{
 			UserDefinedMetricDescriptor: statsapi.UserDefinedMetricDescriptor{
 				Name:  "cpuLoad",

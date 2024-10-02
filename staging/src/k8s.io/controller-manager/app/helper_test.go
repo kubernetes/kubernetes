@@ -85,7 +85,7 @@ func TestIsControllerEnabled(t *testing.T) {
 
 	for _, tc := range tcs {
 		actual := IsControllerEnabled(tc.controllerName, sets.NewString(tc.disabledByDefaultControllers...), tc.controllers)
-		assert.Equal(t, tc.expected, actual, "%v: expected %v, got %v", tc.name, tc.expected, actual)
+		assert.Equalf(t, tc.expected, actual, "%v: expected %v, got %v", tc.name, tc.expected, actual)
 	}
 
 }

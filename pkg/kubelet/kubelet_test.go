@@ -379,7 +379,7 @@ func newTestKubeletWithImageList(
 	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), &clustertrustbundle.NoopManager{}, allPlugins, prober)
-	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
+	require.NoErrorf(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.volumeManager = kubeletvolume.NewVolumeManager(
 		controllerAttachDetachEnabled,
@@ -403,7 +403,7 @@ func newTestKubeletWithImageList(
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
-	require.NoError(t, err, "Can't initialize active deadline handler")
+	require.NoErrorf(t, err, "Can't initialize active deadline handler")
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
@@ -442,7 +442,7 @@ func TestSyncLoopAbort(t *testing.T) {
 
 	// sanity check (also prevent this test from hanging in the next step)
 	ok := kubelet.syncLoopIteration(ctx, ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
-	require.False(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
+	require.Falsef(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
 
 	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
 	kubelet.syncLoop(ctx, ch, kubelet)
@@ -522,12 +522,12 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 		return destroyCount >= 1, nil
 	})
 
-	assert.NoError(t, err, "wait should not return error")
+	assert.NoErrorf(t, err, "wait should not return error")
 	// housekeeping can get called multiple times. The cgroup Destroy() is
 	// done within a goroutine and can get called multiple times, so the
 	// Destroy() count in not deterministic on the actual number.
 	// https://github.com/kubernetes/kubernetes/blob/29fdbb065b5e0d195299eb2d260b975cbc554673/pkg/kubelet/kubelet_pods.go#L2006
-	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
+	assert.GreaterOrEqualf(t, destroyCount, 1, "Expect 1 or more destroys")
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
@@ -768,7 +768,7 @@ func (nl testNodeLister) List(_ labels.Selector) (ret []*v1.Node, err error) {
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
 	t.Helper()
 	status, found := kl.statusManager.GetPodStatus(pod.UID)
-	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
+	require.Truef(t, found, "Status of pod %q is not found in the status map", pod.UID)
 	require.Equal(t, phase, status.Phase)
 }
 
@@ -1366,8 +1366,8 @@ func TestCreateMirrorPod(t *testing.T) {
 				t.Fatalf("pod should not be terminal: %#v", pod)
 			}
 			podFullName := kubecontainer.GetPodFullName(pod)
-			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
-			assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
+			assert.Truef(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+			assert.Equalf(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 		})
 	}
 }
@@ -1460,7 +1460,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 
 	// Sync with an empty pod list to delete all mirror pods.
 	kl.HandlePodCleanups(ctx)
-	assert.Empty(t, manager.GetPods(), "Expected no mirror pods")
+	assert.Emptyf(t, manager.GetPods(), "Expected no mirror pods")
 	for i, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
 		creates, deletes := manager.GetCounts(name)
@@ -1494,7 +1494,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 	isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
-	assert.Error(t, err, "expected pod with hostNetwork=false to fail when network in error")
+	assert.Errorf(t, err, "expected pod with hostNetwork=false to fail when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
 	}
@@ -1502,7 +1502,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 	pod.Spec.HostNetwork = true
 	isTerminal, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
-	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
+	assert.NoErrorf(t, err, "expected pod with hostNetwork=true to succeed when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
 	}
@@ -1715,7 +1715,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	// Let the pod worker sets the status to fail after this sync.
 	kubelet.HandlePodUpdates(pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
+	assert.Truef(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
 	// check pod status contains ContainerStatuses, etc.
 	assert.NotNil(t, status.ContainerStatuses)
@@ -1765,7 +1765,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	kubelet.HandlePodUpdates(pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
+	assert.Truef(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.NotEqual(t, v1.PodFailed, status.Phase)
 }
 
@@ -1800,14 +1800,14 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	// Sync to create pod directories.
 	kl.HandlePodSyncs(kl.podManager.GetPods())
 	for i := range pods {
-		assert.True(t, dirExists(kl.getPodDir(pods[i].UID)), "Expected directory to exist for pod %d", i)
+		assert.Truef(t, dirExists(kl.getPodDir(pods[i].UID)), "Expected directory to exist for pod %d", i)
 	}
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*v1.Pod{pods[0]})
 	kl.HandlePodCleanups(ctx)
-	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
-	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
+	assert.Truef(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
+	assert.Falsef(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
 }
 
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod, podsToCheck []*v1.Pod, shouldExist bool) {
@@ -1820,7 +1820,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 	kl.HandlePodCleanups(ctx)
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
-		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)
+		assert.Equalf(t, shouldExist, exist, "directory of pod %d", i)
 	}
 }
 
@@ -1949,8 +1949,8 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 
 func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, expectedState, expectedLastTerminationState map[string]v1.ContainerState, message string) {
 	for _, s := range statuses {
-		assert.Equal(t, expectedState[s.Name], s.State, "%s: state", message)
-		assert.Equal(t, expectedLastTerminationState[s.Name], s.LastTerminationState, "%s: last terminated state", message)
+		assert.Equalf(t, expectedState[s.Name], s.State, "%s: state", message)
+		assert.Equalf(t, expectedLastTerminationState[s.Name], s.LastTerminationState, "%s: last terminated state", message)
 	}
 }
 
@@ -2564,7 +2564,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 		if !found {
 			t.Fatalf("resource allocation should exist: (pod: %#v, container: %s)", tc.pod, tc.pod.Spec.Containers[0].Name)
 		}
-		assert.Equal(t, tc.expectedPodResourceAllocation[string(tc.pod.UID)][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
+		assert.Equalf(t, tc.expectedPodResourceAllocation[string(tc.pod.UID)][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
 	}
 }
 
@@ -2719,9 +2719,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
 		kubelet.handlePodResourcesResize(tt.pod)
 		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
-		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
-		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
-		assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
+		assert.Truef(t, found, "expected to find pod %s", tt.pod.Name)
+		assert.Equalf(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
+		assert.Equalf(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
 		testKubelet.fakeKubeClient.ClearActions()
 	}
 }
@@ -3116,8 +3116,8 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		1024,
 		false,
 	)
-	assert.NoError(t, err, "NewMainKubelet should succeed")
-	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
+	assert.NoErrorf(t, err, "NewMainKubelet should succeed")
+	assert.NotNilf(t, testMainKubelet, "testMainKubelet should not be nil")
 
 	testMainKubelet.BirthCry()
 	testMainKubelet.StartGarbageCollection()
@@ -3144,8 +3144,8 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// }
 	// testMainKubelet.configMapManager.RegisterPod(pod)
 	// testMainKubelet.secretManager.RegisterPod(pod)
-	assert.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
-	assert.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+	assert.Nilf(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
+	assert.Nilf(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
 }
 
 func TestSyncPodSpans(t *testing.T) {
@@ -3263,8 +3263,8 @@ func TestSyncPodSpans(t *testing.T) {
 			}
 		}
 	}
-	assert.NotEmpty(t, imageServiceSpans, "syncPod trace should have image service spans")
-	assert.NotEmpty(t, runtimeServiceSpans, "syncPod trace should have runtime service spans")
+	assert.NotEmptyf(t, imageServiceSpans, "syncPod trace should have image service spans")
+	assert.NotEmptyf(t, runtimeServiceSpans, "syncPod trace should have runtime service spans")
 
 	for _, span := range imageServiceSpans {
 		assert.Equalf(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), "image service span %s %s should be child of root span", span.Name, span.Parent.SpanID())

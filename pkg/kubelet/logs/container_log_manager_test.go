@@ -371,11 +371,11 @@ func TestCompressLog(t *testing.T) {
 	c := &containerLogManager{osInterface: container.RealOS{}}
 	require.NoError(t, c.compressLog(testLog))
 	_, err = os.Stat(testLog + compressSuffix)
-	assert.NoError(t, err, "log should be compressed")
+	assert.NoErrorf(t, err, "log should be compressed")
 	_, err = os.Stat(testLog + tmpSuffix)
-	assert.Error(t, err, "temporary log should be renamed")
+	assert.Errorf(t, err, "temporary log should be renamed")
 	_, err = os.Stat(testLog)
-	assert.Error(t, err, "original log should be removed")
+	assert.Errorf(t, err, "original log should be removed")
 
 	rc, err := UncompressLog(testLog + compressSuffix)
 	require.NoError(t, err)

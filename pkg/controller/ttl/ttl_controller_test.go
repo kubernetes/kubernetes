@@ -86,9 +86,9 @@ func TestPatchNode(t *testing.T) {
 			continue
 		}
 		actions := fakeClient.Actions()
-		assert.Len(t, actions, 1, "unexpected actions: %#v", actions)
+		assert.Lenf(t, actions, 1, "unexpected actions: %#v", actions)
 		patchAction := actions[0].(core.PatchActionImpl)
-		assert.Equal(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
+		assert.Equalf(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
 	}
 }
 
@@ -145,11 +145,11 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		}
 		actions := fakeClient.Actions()
 		if testCase.patch == "" {
-			assert.Empty(t, actions, "unexpected actions")
+			assert.Emptyf(t, actions, "unexpected actions")
 		} else {
-			assert.Len(t, actions, 1, "unexpected actions: %#v", actions)
+			assert.Lenf(t, actions, 1, "unexpected actions: %#v", actions)
 			patchAction := actions[0].(core.PatchActionImpl)
-			assert.Equal(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
+			assert.Equalf(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
 		}
 	}
 }
@@ -242,7 +242,7 @@ func TestDesiredTTL(t *testing.T) {
 		if testCase.deleteNode {
 			ttlController.deleteNode(&v1.Node{})
 		}
-		assert.Equal(t, testCase.expectedTTL, ttlController.getDesiredTTLSeconds(),
+		assert.Equalf(t, testCase.expectedTTL, ttlController.getDesiredTTLSeconds(),
 			"%d: unexpected ttl: %d", i, ttlController.getDesiredTTLSeconds())
 	}
 }

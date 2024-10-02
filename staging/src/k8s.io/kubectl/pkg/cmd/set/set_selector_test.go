@@ -161,7 +161,7 @@ func TestUpdateNewSelectorValuesForObject(t *testing.T) {
 			t.Errorf("%q. updateSelectorForObject() error = %v, wantErr %v", tt.name, err, tt.wantErr)
 		}
 
-		assert.EqualValues(t, tt.args.selector.MatchLabels, ser.Spec.Selector, tt.name)
+		assert.EqualValuesf(t, tt.args.selector.MatchLabels, ser.Spec.Selector, tt.name)
 
 	}
 }
@@ -235,7 +235,7 @@ func TestUpdateOldSelectorValuesForObject(t *testing.T) {
 		if (err != nil) != tt.wantErr {
 			t.Errorf("%q. updateSelectorForObject() error = %v, wantErr %v", tt.name, err, tt.wantErr)
 		} else if !tt.wantErr {
-			assert.EqualValues(t, tt.args.selector.MatchLabels, ser.Spec.Selector, tt.name)
+			assert.EqualValuesf(t, tt.args.selector.MatchLabels, ser.Spec.Selector, tt.name)
 		}
 	}
 }

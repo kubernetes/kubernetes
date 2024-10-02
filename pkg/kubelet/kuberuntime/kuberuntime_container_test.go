@@ -230,7 +230,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 		},
 	} {
 		actual := toKubeContainerStatus(test.input, cid.Type)
-		assert.Equal(t, test.expected, actual, desc)
+		assert.Equalf(t, test.expected, actual, desc)
 	}
 }
 
@@ -364,7 +364,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				t.Skip("Skip failing test on Windows.")
 			}
 			actual := toKubeContainerStatus(test.input, cid.Type)
-			assert.Equal(t, test.expected, actual, desc)
+			assert.Equalf(t, test.expected, actual, desc)
 		})
 	}
 }
@@ -448,7 +448,7 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 				User:      test.input,
 			}
 			actual := toKubeContainerStatus(cStatus, cid.Type)
-			assert.EqualValues(t, test.expected, actual.User, desc)
+			assert.EqualValuesf(t, test.expected, actual.User, desc)
 		})
 	}
 }
@@ -756,15 +756,15 @@ func TestRestartCountByLogDir(t *testing.T) {
 		},
 	} {
 		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
-		assert.NoError(t, err, "create tempdir error")
+		assert.NoErrorf(t, err, "create tempdir error")
 		defer os.RemoveAll(tempDirPath)
 		for _, filename := range tc.filenames {
 			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
-			assert.NoError(t, err, "could not write log file")
+			assert.NoErrorf(t, err, "could not write log file")
 		}
 		count, err := calcRestartCountByLogDir(tempDirPath)
 		if assert.NoError(t, err) {
-			assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+			assert.Equalf(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
 		}
 	}
 }

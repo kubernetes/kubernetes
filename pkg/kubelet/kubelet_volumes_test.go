@@ -90,13 +90,13 @@ func TestListVolumesForPod(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
-	assert.True(t, volumeExsit, "expected to find volumes for pod %q", podName)
+	assert.Truef(t, volumeExsit, "expected to find volumes for pod %q", podName)
 
 	outerVolumeSpecName1 := "vol1"
-	assert.NotNil(t, volumesToReturn[outerVolumeSpecName1], "key %s", outerVolumeSpecName1)
+	assert.NotNilf(t, volumesToReturn[outerVolumeSpecName1], "key %s", outerVolumeSpecName1)
 
 	outerVolumeSpecName2 := "vol2"
-	assert.NotNil(t, volumesToReturn[outerVolumeSpecName2], "key %s", outerVolumeSpecName2)
+	assert.NotNilf(t, volumesToReturn[outerVolumeSpecName2], "key %s", outerVolumeSpecName2)
 }
 
 func TestPodVolumesExist(t *testing.T) {
@@ -210,7 +210,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 	for _, pod := range pods {
 		podVolumesExist := kubelet.podVolumesExist(pod.UID)
-		assert.True(t, podVolumesExist, "pod %q", pod.UID)
+		assert.Truef(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }
 
@@ -386,11 +386,11 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
+	assert.Lenf(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
+		assert.Containsf(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyAttachCallCount(
@@ -449,12 +449,12 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
+	assert.Lenf(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
+		assert.Containsf(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyAttachCallCount(
@@ -478,7 +478,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
 
-	assert.Empty(t, podVolumes,
+	assert.Emptyf(t, podVolumes,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
 
 	assert.NoError(t, volumetest.VerifyTearDownCallCount(
@@ -486,7 +486,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 	// Verify volumes detached and no longer reported as in use
 	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyDetachCallCount(
 		1 /* expectedDetachCallCount */, testKubelet.volumePlugin))
 }
@@ -559,14 +559,14 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.Equalf(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
+	assert.Lenf(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
+		assert.Containsf(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
@@ -646,15 +646,15 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.Equalf(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
+	assert.Lenf(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
+		assert.Containsf(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
@@ -674,9 +674,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 	allPodVolumes = kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.Equalf(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
-	assert.Empty(t, podVolumes,
+	assert.Emptyf(t, podVolumes,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted")
 
 	assert.NoError(t, volumetest.VerifyTearDownCallCount(
@@ -684,7 +684,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Verify volumes detached and no longer reported as in use
 	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
-	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqualf(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
 }
 

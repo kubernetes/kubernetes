@@ -351,11 +351,11 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
 		case core.GetAction:
-			assert.Equal(t, pod.Name, action.GetName(), "Unexpected GetAction: %+v", action)
+			assert.Equalf(t, pod.Name, action.GetName(), "Unexpected GetAction: %+v", action)
 		case core.UpdateAction:
-			assert.Equal(t, pod.Name, action.GetObject().(*v1.Pod).Name, "Unexpected UpdateAction: %+v", action)
+			assert.Equalf(t, pod.Name, action.GetObject().(*v1.Pod).Name, "Unexpected UpdateAction: %+v", action)
 		default:
-			assert.Fail(t, "Unexpected Action: %+v", action)
+			assert.Fail(t, fmt.Sprintf("Unexpected Action: %+v", action))
 		}
 		return true, ret, err
 	})
@@ -589,7 +589,7 @@ func TestStaticPod(t *testing.T) {
 
 	t.Logf("Create the static pod")
 	m.podManager.(mutablePodManager).AddPod(staticPod)
-	assert.True(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
+	assert.Truef(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
 
 	status := getRandomPodStatus()
 	now := metav1.Now()
@@ -599,20 +599,20 @@ func TestStaticPod(t *testing.T) {
 	t.Logf("Should be able to get the static pod status from status manager")
 	retrievedStatus := expectPodStatus(t, m, staticPod)
 	normalizeStatus(staticPod, &status)
-	assert.True(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
+	assert.Truef(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Logf("Should not sync pod in syncBatch because there is no corresponding mirror pod for the static pod.")
 	m.syncBatch(true)
-	assert.Empty(t, m.kubeClient.(*fake.Clientset).Actions(), "Expected no updates after syncBatch")
+	assert.Emptyf(t, m.kubeClient.(*fake.Clientset).Actions(), "Expected no updates after syncBatch")
 
 	t.Logf("Create the mirror pod")
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)
-	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.Truef(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	t.Logf("Should be able to get the mirror pod status from status manager")
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
-	assert.True(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
+	assert.Truef(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Logf("Should sync pod because the corresponding mirror pod is created")
 	assert.Equal(t, 1, m.syncBatch(true))
@@ -683,10 +683,10 @@ func TestTerminatePod(t *testing.T) {
 	t.Logf("we expect the container statuses to have changed to terminated")
 	newStatus := expectPodStatus(t, syncer, testPod)
 	for i := range newStatus.ContainerStatuses {
-		assert.NotNil(t, newStatus.ContainerStatuses[i].State.Terminated, "expected containers to be terminated")
+		assert.NotNilf(t, newStatus.ContainerStatuses[i].State.Terminated, "expected containers to be terminated")
 	}
 	for i := range newStatus.InitContainerStatuses {
-		assert.NotNil(t, newStatus.InitContainerStatuses[i].State.Terminated, "expected init containers to be terminated")
+		assert.NotNilf(t, newStatus.InitContainerStatuses[i].State.Terminated, "expected init containers to be terminated")
 	}
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: kubecontainer.ContainerReasonStatusUnknown, Message: "The container could not be located when the pod was terminated", ExitCode: 137}}
@@ -765,13 +765,13 @@ func TestTerminatePodWaiting(t *testing.T) {
 	t.Logf("we expect the container statuses to have changed to terminated")
 	newStatus := expectPodStatus(t, syncer, testPod)
 	for _, container := range newStatus.ContainerStatuses {
-		assert.NotNil(t, container.State.Terminated, "expected containers to be terminated")
+		assert.NotNilf(t, container.State.Terminated, "expected containers to be terminated")
 	}
 	for _, container := range newStatus.InitContainerStatuses[:2] {
-		assert.NotNil(t, container.State.Terminated, "expected init containers to be terminated")
+		assert.NotNilf(t, container.State.Terminated, "expected init containers to be terminated")
 	}
 	for _, container := range newStatus.InitContainerStatuses[2:] {
-		assert.NotNil(t, container.State.Waiting, "expected init containers to be waiting")
+		assert.NotNilf(t, container.State.Waiting, "expected init containers to be waiting")
 	}
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: kubecontainer.ContainerReasonStatusUnknown, Message: "The container could not be located when the pod was terminated", ExitCode: 137}}
@@ -1500,8 +1500,8 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	m.podManager.(mutablePodManager).AddPod(staticPod)
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)
 	t.Logf("Verify setup.")
-	assert.True(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
-	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.Truef(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
+	assert.Truef(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	status := getRandomPodStatus()

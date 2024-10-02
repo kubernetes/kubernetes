@@ -1263,11 +1263,11 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 
 		// Update the cache and get the latest value.
 		real := provider.getAndUpdateContainerUsageNanoCores(test.stats)
-		assert.Equal(t, test.expected, real, test.desc)
+		assert.Equalf(t, test.expected, real, test.desc)
 
 		// After the update, the cached value should be up-to-date
 		cached = provider.getContainerUsageNanoCores(test.stats)
-		assert.Equal(t, test.expected, cached, test.desc)
+		assert.Equalf(t, test.expected, cached, test.desc)
 	}
 }
 

@@ -147,13 +147,13 @@ func TestAlphaEnablement(t *testing.T) {
 		cmd := &cobra.Command{}
 		flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 		flags.AddFlags(cmd)
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
+		require.Nilf(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
 
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 			flags.AddFlags(cmd)
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
+			require.NotNilf(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
 		})
 	}
 }
@@ -1361,8 +1361,8 @@ func TestApplyCSAMigration(t *testing.T) {
 			cmd.Run(cmd, []string{})
 
 			// JSONPatch should have been attempted exactly the given number of times
-			require.Equal(t, targetPatches, patches, "should retry as many times as a conflict was returned")
-			require.Equal(t, 3, applies, "should perform specified # of apply calls upon migration")
+			require.Equalf(t, targetPatches, patches, "should retry as many times as a conflict was returned")
+			require.Equalf(t, 3, applies, "should perform specified # of apply calls upon migration")
 			require.Empty(t, errBuf.String())
 
 			// ensure that in the future there will be no migrations necessary
@@ -1377,7 +1377,7 @@ func TestApplyCSAMigration(t *testing.T) {
 			err = csaupgrade.UpgradeManagedFields(upgradedRC, sets.New("kubectl-client-side-apply"), "kubectl")
 			require.NoError(t, err)
 			require.NotEmpty(t, rc.ManagedFields)
-			require.Equal(t, rc, upgradedRC, "upgrading should be no-op in future")
+			require.Equalf(t, rc, upgradedRC, "upgrading should be no-op in future")
 
 			// Apply the upgraded object.
 			// Expect only a single PATCH call to apiserver
@@ -1390,8 +1390,8 @@ func TestApplyCSAMigration(t *testing.T) {
 			cmd.Run(cmd, []string{})
 
 			require.Empty(t, errBuf)
-			require.Equal(t, 4, applies, "only a single call to server-side apply should have been performed")
-			require.Equal(t, targetPatches, patches, "no more json patches should have been needed")
+			require.Equalf(t, 4, applies, "only a single call to server-side apply should have been performed")
+			require.Equalf(t, targetPatches, patches, "no more json patches should have been needed")
 		})
 	}
 }
@@ -2389,7 +2389,7 @@ func TestApplySetParentValidation(t *testing.T) {
 
 				o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
 				if test.expectErr == "" {
-					require.NoError(t, err, "ToOptions error")
+					require.NoErrorf(t, err, "ToOptions error")
 				} else if err != nil {
 					require.EqualError(t, err, test.expectErr)
 					return
@@ -2402,7 +2402,7 @@ func TestApplySetParentValidation(t *testing.T) {
 				if test.expectErr != "" {
 					require.EqualError(t, err, test.expectErr)
 				} else {
-					require.NoError(t, err, "Validate error")
+					require.NoErrorf(t, err, "Validate error")
 				}
 			})
 		})
@@ -2450,7 +2450,7 @@ func setUpClientsForApplySetWithSSA(t *testing.T, tf *cmdtesting.TestFactory, ob
 					t.Fatalf("error getting object: %v", err)
 				}
 			case "PATCH":
-				require.Equal(t, string(types.ApplyPatchType), req.Header.Get("Content-Type"), "received patch request with unexpected patch type")
+				require.Equalf(t, string(types.ApplyPatchType), req.Header.Get("Content-Type"), "received patch request with unexpected patch type")
 
 				var existing *unstructured.Unstructured
 				existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
@@ -2473,20 +2473,20 @@ func setUpClientsForApplySetWithSSA(t *testing.T, tf *cmdtesting.TestFactory, ob
 				if existing == nil {
 					patch.SetUID("a-static-fake-uid")
 					err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace)
-					require.NoError(t, err, "error creating object")
+					require.NoErrorf(t, err, "error creating object")
 
 					returnData, err = json.Marshal(patch)
-					require.NoError(t, err, "error marshalling response: %v", err)
+					require.NoErrorf(t, err, "error marshalling response: %v", err)
 				} else {
 					uid := existing.GetUID()
 					patch.DeepCopyInto(existing)
 					existing.SetUID(uid)
 
 					err = fakeDynamicClient.Tracker().Update(gvr, existing, namespace)
-					require.NoError(t, err, "error updating object")
+					require.NoErrorf(t, err, "error updating object")
 
 					returnData, err = json.Marshal(existing)
-					require.NoError(t, err, "error marshalling response")
+					require.NoErrorf(t, err, "error marshalling response")
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
 
@@ -2784,7 +2784,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.NotEmpty(t, test.expectErr, "invalid test case")
+			require.NotEmptyf(t, test.expectErr, "invalid test case")
 			cmdutil.BehaviorOnFatal(func(s string, i int) {
 				assert.Equal(t, test.expectErr, s)
 			})
@@ -3432,8 +3432,8 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc serverside-applied (server dry run)\n", outbuff.String())
-		assert.Len(t, serverSideData, 1, "unexpected creation")
-		require.Nil(t, serverSideData[pathSecret], "secret was created")
+		assert.Lenf(t, serverSideData, 1, "unexpected creation")
+		require.Nilf(t, serverSideData[pathSecret], "secret was created")
 	})
 
 	t.Run("client side dry run", func(t *testing.T) {
@@ -3449,7 +3449,7 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc configured (dry run)\n", outbuff.String())
-		assert.Len(t, serverSideData, 1, "unexpected creation")
-		require.Nil(t, serverSideData[pathSecret], "secret was created")
+		assert.Lenf(t, serverSideData, 1, "unexpected creation")
+		require.Nilf(t, serverSideData[pathSecret], "secret was created")
 	})
 }

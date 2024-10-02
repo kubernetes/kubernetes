@@ -781,21 +781,21 @@ func TestDropAppArmor(t *testing.T) {
 			}
 
 			DropDisabledPodFields(newPod, newPod)
-			require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
+			require.Equalf(t, &test.pod, newPod, "unchanged pod should never be mutated")
 
 			DropDisabledPodFields(newPod, nil)
-			assert.Equal(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
+			assert.Equalf(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
 
 			expectAnnotations := test.hasAnnotations
-			assert.Equal(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
+			assert.Equalf(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
 			if expectAnnotations == test.hasAnnotations {
-				assert.Equal(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
+				assert.Equalf(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
 			}
 
 			expectFields := test.hasFields
-			assert.Equal(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
+			assert.Equalf(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
 			if expectFields == test.hasFields {
-				assert.Equal(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
+				assert.Equalf(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
 			}
 		})
 

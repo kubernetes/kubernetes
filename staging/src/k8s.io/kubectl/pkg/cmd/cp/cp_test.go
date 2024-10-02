@@ -889,10 +889,10 @@ func TestUntar(t *testing.T) {
 				Mode: 0666,
 				Size: int64(len(f.path)),
 			}
-			require.NoError(t, tw.WriteHeader(hdr), f.path)
+			require.NoErrorf(t, tw.WriteHeader(hdr), f.path)
 			if !strings.HasSuffix(f.path, "/") {
 				_, err := tw.Write([]byte(f.path))
-				require.NoError(t, err, f.path)
+				require.NoErrorf(t, err, f.path)
 			}
 		} else {
 			hdr := &tar.Header{
@@ -901,7 +901,7 @@ func TestUntar(t *testing.T) {
 				Typeflag: tar.TypeSymlink,
 				Linkname: f.linkTarget,
 			}
-			require.NoError(t, tw.WriteHeader(hdr), f.path)
+			require.NoErrorf(t, tw.WriteHeader(hdr), f.path)
 		}
 	}
 	tw.Close()

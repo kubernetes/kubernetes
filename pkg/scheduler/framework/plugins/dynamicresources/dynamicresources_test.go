@@ -1127,13 +1127,13 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
 	claims, err := tc.client.ResourceV1alpha3().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list claims")
+	require.NoErrorf(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
 		objects = append(objects, &claim)
 	}
 	schedulings, err := tc.client.ResourceV1alpha3().PodSchedulingContexts("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list pod scheduling")
+	require.NoErrorf(t, err, "list pod scheduling")
 	for _, scheduling := range schedulings.Items {
 		scheduling := scheduling
 		objects = append(objects, &scheduling)
@@ -1263,15 +1263,15 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	// get triggered.
 	for _, claim := range claims {
 		_, err := tc.client.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource claim")
+		require.NoErrorf(t, err, "create resource claim")
 	}
 	for _, class := range classes {
 		_, err := tc.client.ResourceV1alpha3().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource class")
+		require.NoErrorf(t, err, "create resource class")
 	}
 	for _, scheduling := range schedulings {
 		_, err := tc.client.ResourceV1alpha3().PodSchedulingContexts(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
-		require.NoError(t, err, "create pod scheduling")
+		require.NoErrorf(t, err, "create pod scheduling")
 	}
 
 	tc.informerFactory.Start(tc.ctx.Done())
@@ -1483,9 +1483,9 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				}
 
 				// Eventually the assume cache will have it, too.
-				require.EventuallyWithT(t, func(t *assert.CollectT) {
+				require.EventuallyWithTf(t, func(t *assert.CollectT) {
 					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
-					require.NoError(t, err, "retrieve claim")
+					require.NoErrorf(t, err, "retrieve claim")
 					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
 						t.Errorf("cached claim not updated yet")
 					}

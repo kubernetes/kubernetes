@@ -200,11 +200,11 @@ func testTypes(t *testing.T, testcase TypesTestCase) {
 		copy := bytes.Buffer{}
 		flags.SetOutput(&copy)
 		flags.PrintDefaults()
-		assert.Equal(t, original.String(), copy.String(), testcase.name+": help messages equal")
-		assert.Contains(t, copy.String(), "some number", testcase.name+": copied help message contains defaults")
+		assert.Equalf(t, original.String(), copy.String(), testcase.name+": help messages equal")
+		assert.Containsf(t, copy.String(), "some number", testcase.name+": copied help message contains defaults")
 	}
 
-	require.Equal(t, []simpleFlag{
+	require.Equalf(t, []simpleFlag{
 		{
 			name:     "bool",
 			defValue: "true",
@@ -241,13 +241,13 @@ func testTypes(t *testing.T, testcase TypesTestCase) {
 		},
 	},
 		allFlags(flags), testcase.name)
-	assert.Equal(t,
+	assert.Equalf(t,
 		Context{true, time.Millisecond, 1.23456789, "hello world",
 			-1, -1234567890123456789, 1, 1234567890123456789,
 		},
 		context,
 		"default values must match")
-	require.NoError(t, flags.Parse([]string{
+	require.NoErrorf(t, flags.Parse([]string{
 		"-int", "-2",
 		"-int64", "-9123456789012345678",
 		"-uint", "2",
@@ -257,7 +257,7 @@ func testTypes(t *testing.T, testcase TypesTestCase) {
 		"-bool=false",
 		"-duration=1s",
 	}), testcase.name)
-	assert.Equal(t,
+	assert.Equalf(t,
 		Context{false, time.Second, -1.23456789, "pong",
 			-2, -9123456789012345678, 2, 9123456789012345678,
 		},

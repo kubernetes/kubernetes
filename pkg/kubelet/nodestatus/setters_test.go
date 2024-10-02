@@ -670,10 +670,10 @@ func TestNodeAddress(t *testing.T) {
 				return
 			}
 
-			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", cmp.Diff(testCase.expectedAddresses, existingNode.Status.Addresses))
 			if testCase.expectedAnnotations != nil {
-				assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAnnotations, existingNode.Annotations),
+				assert.Truef(t, apiequality.Semantic.DeepEqual(testCase.expectedAnnotations, existingNode.Annotations),
 					"Diff: %s", cmp.Diff(testCase.expectedAnnotations, existingNode.Annotations))
 			}
 		})
@@ -758,7 +758,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", cmp.Diff(testCase.expectedAddresses, existingNode.Status.Addresses))
 		})
 	}
@@ -1240,7 +1240,7 @@ func TestMachineInfo(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected node
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
 				"Diff: %s", cmp.Diff(tc.expectNode, tc.node))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
@@ -1392,7 +1392,7 @@ func TestVersionInfo(t *testing.T) {
 			err := setter(ctx, tc.node)
 			require.Equal(t, tc.expectError, err)
 			// check expected node
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
 				"Diff: %s", cmp.Diff(tc.expectNode, tc.node))
 		})
 	}
@@ -1472,7 +1472,7 @@ func TestImages(t *testing.T) {
 			if err == nil {
 				expectNode.Status.Images = makeExpectedImageList(tc.imageList, tc.maxImages, MaxNamesPerImageInNodeStatus)
 			}
-			assert.True(t, apiequality.Semantic.DeepEqual(expectNode, node),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(expectNode, node),
 				"Diff: %s", cmp.Diff(expectNode, node))
 		})
 	}
@@ -1649,7 +1649,7 @@ func TestReadyCondition(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
 				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
@@ -1771,7 +1771,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
 				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
@@ -1893,7 +1893,7 @@ func TestPIDPressureCondition(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
 				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
@@ -2015,7 +2015,7 @@ func TestDiskPressureCondition(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
 				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
@@ -2072,7 +2072,7 @@ func TestVolumesInUse(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected volumes
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectVolumesInUse, tc.node.Status.VolumesInUse),
+			assert.Truef(t, apiequality.Semantic.DeepEqual(tc.expectVolumesInUse, tc.node.Status.VolumesInUse),
 				"Diff: %s", cmp.Diff(tc.expectVolumesInUse, tc.node.Status.VolumesInUse))
 		})
 	}

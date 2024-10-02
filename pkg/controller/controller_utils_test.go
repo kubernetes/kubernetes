@@ -184,7 +184,7 @@ func TestControllerExpectations(t *testing.T) {
 
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
-	require.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
+	require.NoErrorf(t, err, "Couldn't get key for object %#v: %v", rc, err)
 
 	e.SetExpectations(logger, rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -200,7 +200,7 @@ func TestControllerExpectations(t *testing.T) {
 	wg.Wait()
 
 	// There are still delete expectations
-	assert.False(t, e.SatisfiedExpectations(logger, rcKey), "Rc will sync before expectations are met")
+	assert.Falsef(t, e.SatisfiedExpectations(logger, rcKey), "Rc will sync before expectations are met")
 
 	for i := 0; i < dels+1; i++ {
 		wg.Add(1)
@@ -239,17 +239,17 @@ func TestControllerExpectations(t *testing.T) {
 				e.SetExpectations(logger, rcKey, test.expectationsToSet[0], test.expectationsToSet[1])
 			}
 			podExp, exists, err := e.GetExpectations(rcKey)
-			require.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
-			assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
+			require.NoErrorf(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
+			assert.Truef(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
 
 			add, del := podExp.GetExpectations()
-			assert.Equal(t, test.wantPodExpectations[0], add, "Unexpected pod expectations %#v", podExp)
-			assert.Equal(t, test.wantPodExpectations[1], del, "Unexpected pod expectations %#v", podExp)
-			assert.Equal(t, test.wantExpectationsSatisfied, e.SatisfiedExpectations(logger, rcKey), "Expectations are met but the rc will not sync")
+			assert.Equalf(t, test.wantPodExpectations[0], add, "Unexpected pod expectations %#v", podExp)
+			assert.Equalf(t, test.wantPodExpectations[1], del, "Unexpected pod expectations %#v", podExp)
+			assert.Equalf(t, test.wantExpectationsSatisfied, e.SatisfiedExpectations(logger, rcKey), "Expectations are met but the rc will not sync")
 
 			if test.expireExpectations {
 				fakeClock.Step(ttl + 1)
-				assert.True(t, e.SatisfiedExpectations(logger, rcKey), "Expectations should have expired but didn't")
+				assert.Truef(t, e.SatisfiedExpectations(logger, rcKey), "Expectations should have expired but didn't")
 			}
 		})
 	}
@@ -306,19 +306,19 @@ func TestUIDExpectations(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			rcKey, rcPodNames := getRcDataFrom(test)
-			assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			assert.Falsef(t, uidExp.SatisfiedExpectations(logger, rcKey),
 				"Controller %v satisfied expectations before deletion", rcKey)
 
 			for _, p := range rcPodNames {
 				uidExp.DeletionObserved(logger, rcKey, p)
 			}
 
-			assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+			assert.Truef(t, uidExp.SatisfiedExpectations(logger, rcKey),
 				"Controller %v didn't satisfy expectations after deletion", rcKey)
 
 			uidExp.DeleteExpectations(logger, rcKey)
 
-			assert.Nil(t, uidExp.GetUIDs(rcKey),
+			assert.Nilf(t, uidExp.GetUIDs(rcKey),
 				"Failed to delete uid expectations for %v", rcKey)
 		})
 	}
@@ -383,13 +383,13 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			}
 
 			err := test.podCreationFunc(podControl)
-			require.NoError(t, err, "unexpected error: %v", err)
+			require.NoErrorf(t, err, "unexpected error: %v", err)
 
 			fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
 			var actualPod = &v1.Pod{}
 			err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
-			require.NoError(t, err, "unexpected error: %v", err)
-			assert.True(t, apiequality.Semantic.DeepDerivative(test.wantPod, actualPod),
+			require.NoErrorf(t, err, "unexpected error: %v", err)
+			assert.Truef(t, apiequality.Semantic.DeepDerivative(test.wantPod, actualPod),
 				"Body: %s", fakeHandler.RequestBody)
 		})
 	}
@@ -793,7 +793,7 @@ func TestComputeHash(t *testing.T) {
 		hash := ComputeHash(test.template, test.collisionCount)
 		otherHash := ComputeHash(test.template, test.otherCollisionCount)
 
-		assert.NotEqual(t, hash, otherHash, "expected different hashes but got the same: %d", hash)
+		assert.NotEqualf(t, hash, otherHash, "expected different hashes but got the same: %d", hash)
 	}
 }
 
@@ -958,14 +958,14 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
-		require.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
+		require.NoErrorf(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
+		assert.EqualValuesf(t, test.expectedTaints, node.Spec.Taints,
 			"%s: failed to remove taint off node: expected %+v, got %+v",
 			test.name, test.expectedTaints, node.Spec.Taints)
 
-		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
+		assert.Equalf(t, test.requestCount, test.nodeHandler.RequestCount,
 			"%s: unexpected request count: expected %+v, got %+v",
 			test.name, test.requestCount, test.nodeHandler.RequestCount)
 	}
@@ -1194,17 +1194,17 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 	for _, test := range tests {
 		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
 		if test.expectedErr != nil {
-			assert.Equal(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
+			assert.Equalf(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
 			continue
 		}
-		require.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
+		require.NoErrorf(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
+		assert.EqualValuesf(t, test.expectedTaints, node.Spec.Taints,
 			"%s: failed to add taint to node: expected %+v, got %+v",
 			test.name, test.expectedTaints, node.Spec.Taints)
 
-		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
+		assert.Equalf(t, test.requestCount, test.nodeHandler.RequestCount,
 			"%s: unexpected request count: expected %+v, got %+v",
 			test.name, test.requestCount, test.nodeHandler.RequestCount)
 	}

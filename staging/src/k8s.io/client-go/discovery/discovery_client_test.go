@@ -1328,17 +1328,17 @@ func TestAggregatedServerGroups(t *testing.T) {
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+		assert.Truef(t, expectedGroupNames.Equal(actualGroupNames),
 			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+		assert.Truef(t, expectedGroupVersions.Equal(actualGroupVersions),
 			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
 		// Test the groups preferred version is correct.
 		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
 		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
-		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
+		assert.Truef(t, expectedPreferredVersions.Equal(actualPreferredVersions),
 			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
 	}
 }
@@ -2413,7 +2413,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				require.Error(t, err)
 				expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
 				actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
-				assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+				assert.Truef(t, expectedFailedGVs.Equal(actualFailedGVs),
 					"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
 			} else {
 				require.NoError(t, err)
@@ -2421,7 +2421,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			// Test the expected groups are returned for the aggregated format.
 			expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 			actualGroupNames := sets.NewString(groupNames(apiGroups)...)
-			assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+			assert.Truef(t, expectedGroupNames.Equal(actualGroupNames),
 				"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 			// If the core V1 group is returned from /api, it should be the first group.
 			if expectedGroupNames.Has("") {
@@ -2434,12 +2434,12 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			// Test the expected group/versions are returned from the aggregated discovery.
 			expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
 			actualGroupVersions := sets.NewString(groupVersions(resources)...)
-			assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+			assert.Truef(t, expectedGroupVersions.Equal(actualGroupVersions),
 				"%s: Expected GroupVersions(%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
 			// Test the expected GVKs are returned from the aggregated discovery.
 			expectedGVKs := sets.NewString(test.expectedGVKs...)
 			actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-			assert.True(t, expectedGVKs.Equal(actualGVKs),
+			assert.Truef(t, expectedGVKs.Equal(actualGVKs),
 				"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
 		}
 	}
@@ -2565,12 +2565,12 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 		// First check the returned groups
 		expectedGroups := sets.NewString(test.expectedGroups...)
 		actualGroups := sets.NewString(groupNames(apiGroups)...)
-		assert.True(t, expectedGroups.Equal(actualGroups),
+		assert.Truef(t, expectedGroups.Equal(actualGroups),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroups.List(), actualGroups.List())
 		// Next check the returned resources
 		expectedGVKs := sets.NewString(test.expectedResources...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
+		assert.Truef(t, expectedGVKs.Equal(actualGVKs),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
 	}
 }
@@ -3171,7 +3171,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			require.Error(t, err)
 			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
 			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
-			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+			assert.Truef(t, expectedFailedGVs.Equal(actualFailedGVs),
 				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
 		} else {
 			require.NoError(t, err)
@@ -3179,7 +3179,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		// Test the expected preferred GVKs are returned from the aggregated discovery.
 		expectedGVKs := sets.NewString(test.expectedGVKs...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
+		assert.Truef(t, expectedGVKs.Equal(actualGVKs),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
 	}
 }

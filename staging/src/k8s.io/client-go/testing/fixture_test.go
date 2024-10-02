@@ -79,7 +79,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 		}
 	}()
 	out := <-watch.ResultChan()
-	assert.Equal(t, testObj, out.Object, "watched object mismatch")
+	assert.Equalf(t, testObj, out.Object, "watched object mismatch")
 }
 
 func TestWatchCallAllNamespace(t *testing.T) {
@@ -103,34 +103,34 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	}
 	go func() {
 		err := o.Create(testResource, testObj, ns)
-		assert.NoError(t, err, "test resource creation failed")
+		assert.NoErrorf(t, err, "test resource creation failed")
 	}()
 	out := <-w.ResultChan()
 	outAll := <-wAll.ResultChan()
-	assert.Equal(t, watch.Added, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Added, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched created object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched created object mismatch")
+	assert.Equalf(t, watch.Added, out.Type, "watch event mismatch")
+	assert.Equalf(t, watch.Added, outAll.Type, "watch event mismatch")
+	assert.Equalf(t, testObj, out.Object, "watched created object mismatch")
+	assert.Equalf(t, testObj, outAll.Object, "watched created object mismatch")
 	go func() {
 		err := o.Update(testResource, testObj, ns)
-		assert.NoError(t, err, "test resource updating failed")
+		assert.NoErrorf(t, err, "test resource updating failed")
 	}()
 	out = <-w.ResultChan()
 	outAll = <-wAll.ResultChan()
-	assert.Equal(t, watch.Modified, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Modified, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched updated object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched updated object mismatch")
+	assert.Equalf(t, watch.Modified, out.Type, "watch event mismatch")
+	assert.Equalf(t, watch.Modified, outAll.Type, "watch event mismatch")
+	assert.Equalf(t, testObj, out.Object, "watched updated object mismatch")
+	assert.Equalf(t, testObj, outAll.Object, "watched updated object mismatch")
 	go func() {
 		err := o.Delete(testResource, "test_namespace", "test_name")
-		assert.NoError(t, err, "test resource deletion failed")
+		assert.NoErrorf(t, err, "test resource deletion failed")
 	}()
 	out = <-w.ResultChan()
 	outAll = <-wAll.ResultChan()
-	assert.Equal(t, watch.Deleted, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Deleted, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched deleted object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched deleted object mismatch")
+	assert.Equalf(t, watch.Deleted, out.Type, "watch event mismatch")
+	assert.Equalf(t, watch.Deleted, outAll.Type, "watch event mismatch")
+	assert.Equalf(t, testObj, out.Object, "watched deleted object mismatch")
+	assert.Equalf(t, testObj, outAll.Object, "watched deleted object mismatch")
 }
 
 func TestWatchCallMultipleInvocation(t *testing.T) {
@@ -202,7 +202,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
 		}
 		go func() {
-			assert.NoError(t, err, "watch invocation failed")
+			assert.NoErrorf(t, err, "watch invocation failed")
 			for _, c := range cases {
 				if watchNamespace == "" || c.ns == watchNamespace {
 					fmt.Printf("%#v %#v\n", c, i)
@@ -212,9 +212,9 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 						t.Errorf("unexpected error: %v", err)
 						break
 					}
-					assert.Equal(t, c.op, event.Type, "watch event mismatched")
-					assert.Equal(t, c.name, accessor.GetName(), "watched object mismatch")
-					assert.Equal(t, c.ns, accessor.GetNamespace(), "watched object mismatch")
+					assert.Equalf(t, c.op, event.Type, "watch event mismatched")
+					assert.Equalf(t, c.name, accessor.GetName(), "watched object mismatch")
+					assert.Equalf(t, c.ns, accessor.GetNamespace(), "watched object mismatch")
 				}
 			}
 			wg.Done()

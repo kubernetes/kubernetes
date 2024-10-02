@@ -141,9 +141,9 @@ func TestDefaultExtractPodSpec(t *testing.T) {
 	for _, obj := range objects {
 		name := obj.(metav1.Object).GetName()
 		actualMetadata, actualSpec, err := extractor.ExtractPodSpec(obj)
-		assert.NoError(t, err, name)
-		assert.Equal(t, &metadata, actualMetadata, "%s: Metadata mismatch", name)
-		assert.Equal(t, &spec, actualSpec, "%s: PodSpec mismatch", name)
+		assert.NoErrorf(t, err, name)
+		assert.Equalf(t, &metadata, actualMetadata, "%s: Metadata mismatch", name)
+		assert.Equalf(t, &spec, actualSpec, "%s: PodSpec mismatch", name)
 	}
 
 	service := &corev1.Service{
@@ -152,7 +152,7 @@ func TestDefaultExtractPodSpec(t *testing.T) {
 		},
 	}
 	_, _, err := extractor.ExtractPodSpec(service)
-	assert.Error(t, err, "service should not have an extractable pod spec")
+	assert.Errorf(t, err, "service should not have an extractable pod spec")
 }
 
 func TestDefaultHasPodSpec(t *testing.T) {
@@ -169,7 +169,7 @@ func TestDefaultHasPodSpec(t *testing.T) {
 	}
 	extractor := &DefaultPodSpecExtractor{}
 	for _, gr := range podLikeResources {
-		assert.True(t, extractor.HasPodSpec(gr), gr.String())
+		assert.Truef(t, extractor.HasPodSpec(gr), gr.String())
 	}
 
 	nonPodResources := []schema.GroupResource{
@@ -178,7 +178,7 @@ func TestDefaultHasPodSpec(t *testing.T) {
 		appsv1.Resource("foobars"),
 	}
 	for _, gr := range nonPodResources {
-		assert.False(t, extractor.HasPodSpec(gr), gr.String())
+		assert.Falsef(t, extractor.HasPodSpec(gr), gr.String())
 	}
 }
 
@@ -697,7 +697,7 @@ func TestValidatePodAndController(t *testing.T) {
 	}
 
 	config, err := load.LoadFromData(nil) // Start with the default config.
-	require.NoError(t, err, "loading default config")
+	require.NoErrorf(t, err, "loading default config")
 	config.Exemptions.Namespaces = []string{exemptNs}
 	config.Exemptions.RuntimeClasses = []string{exemptRuntimeClass}
 	config.Exemptions.Usernames = []string{exemptUser}
@@ -999,27 +999,27 @@ func TestValidatePodAndController(t *testing.T) {
 				Metrics:         recorder,
 				NamespaceGetter: nsGetter,
 			}
-			require.NoError(t, a.CompleteConfiguration(), "CompleteConfiguration()")
-			require.NoError(t, a.ValidateConfiguration(), "ValidateConfiguration()")
+			require.NoErrorf(t, a.CompleteConfiguration(), "CompleteConfiguration()")
+			require.NoErrorf(t, a.ValidateConfiguration(), "ValidateConfiguration()")
 
 			response := a.Validate(ctx, attrs)
 
 			var expectedEvaluations []MetricsRecord
 			var expectedAuditAnnotationKeys []string
 			if tc.expectAllowed {
-				assert.True(t, response.Allowed, "Allowed")
+				assert.Truef(t, response.Allowed, "Allowed")
 				assert.Nil(t, response.Result)
 			} else {
 				assert.False(t, response.Allowed)
-				if assert.NotNil(t, response.Result, "Result") {
-					assert.Equal(t, tc.expectReason, response.Result.Reason, "Reason")
+				if assert.NotNilf(t, response.Result, "Result") {
+					assert.Equalf(t, tc.expectReason, response.Result.Reason, "Reason")
 				}
 			}
 
 			if tc.expectWarning != "" {
-				assert.NotEmpty(t, response.Warnings, "Warnings")
+				assert.NotEmptyf(t, response.Warnings, "Warnings")
 			} else {
-				assert.Empty(t, response.Warnings, "Warnings")
+				assert.Emptyf(t, response.Warnings, "Warnings")
 			}
 
 			if tc.expectEnforce != "" {
@@ -1039,23 +1039,23 @@ func TestValidatePodAndController(t *testing.T) {
 			}
 			if tc.expectError {
 				expectedAuditAnnotationKeys = append(expectedAuditAnnotationKeys, "error")
-				assert.ElementsMatch(t, []MetricsRecord{{ObjectName: podName}}, recorder.errors, "expected RecordError() calls")
+				assert.ElementsMatchf(t, []MetricsRecord{{ObjectName: podName}}, recorder.errors, "expected RecordError() calls")
 			} else {
-				assert.Empty(t, recorder.errors, "expected RecordError() calls")
+				assert.Emptyf(t, recorder.errors, "expected RecordError() calls")
 			}
 			if tc.expectExempt {
 				expectedAuditAnnotationKeys = append(expectedAuditAnnotationKeys, "exempt")
-				assert.ElementsMatch(t, []MetricsRecord{{ObjectName: podName}}, recorder.exemptions, "expected RecordExemption() calls")
+				assert.ElementsMatchf(t, []MetricsRecord{{ObjectName: podName}}, recorder.exemptions, "expected RecordExemption() calls")
 			} else {
-				assert.Empty(t, recorder.exemptions, "expected RecordExemption() calls")
+				assert.Emptyf(t, recorder.exemptions, "expected RecordExemption() calls")
 			}
 
-			assert.Len(t, response.AuditAnnotations, len(expectedAuditAnnotationKeys), "AuditAnnotations")
+			assert.Lenf(t, response.AuditAnnotations, len(expectedAuditAnnotationKeys), "AuditAnnotations")
 			for _, key := range expectedAuditAnnotationKeys {
-				assert.Contains(t, response.AuditAnnotations, key, "AuditAnnotations")
+				assert.Containsf(t, response.AuditAnnotations, key, "AuditAnnotations")
 			}
 
-			assert.ElementsMatch(t, expectedEvaluations, recorder.evaluations, "expected RecordEvaluation() calls")
+			assert.ElementsMatchf(t, expectedEvaluations, recorder.evaluations, "expected RecordEvaluation() calls")
 		})
 	}
 }
@@ -1238,8 +1238,8 @@ func TestExemptNamespaceWarning(t *testing.T) {
 			}
 			require.NotEmpty(t, warning)
 
-			assert.NotContains(t, warning, sentinelLabelKey, "non-podsecurity label key included")
-			assert.NotContains(t, warning, sentinelLabelValue, "non-podsecurity label value included")
+			assert.NotContainsf(t, warning, sentinelLabelKey, "non-podsecurity label key included")
+			assert.NotContainsf(t, warning, sentinelLabelValue, "non-podsecurity label value included")
 
 			assert.Contains(t, warning, test.expectWarningContains)
 		})

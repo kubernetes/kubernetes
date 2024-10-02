@@ -68,9 +68,9 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
 	assert.NoError(t, err)
 	if cgroups.IsCgroup2UnifiedMode() {
-		assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
+		assert.Truef(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 	} else {
-		assert.False(t, f.cpuHardcapping, "cpu hardcapping is expected to be disabled")
+		assert.Falsef(t, f.cpuHardcapping, "cpu hardcapping is expected to be disabled")
 	}
 }
 
@@ -170,7 +170,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 		})
 	f, err := validateSystemRequirements(mountInt)
 	assert.NoError(t, err)
-	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
+	assert.Truef(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 }
 
 func TestGetCapacity(t *testing.T) {

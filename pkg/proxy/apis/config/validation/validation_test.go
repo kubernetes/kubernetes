@@ -185,9 +185,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			testCase.mutateConfigFunc(config)
 			errs := Validate(config)
 			if len(testCase.expectedErrs) == 0 {
-				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
+				assert.Equalf(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
-				assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+				assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 			}
 		})
 	}
@@ -215,7 +215,7 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateKubeProxyIPTablesConfiguration(testCase.config, newPath.Child("KubeIPTablesConfiguration"))
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -255,7 +255,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateKubeProxyIPVSConfiguration(testCase.config, newPath.Child("KubeIPVSConfiguration"))
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -409,7 +409,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateKubeProxyLinuxConfiguration(testCase.config, newPath.Child("KubeProxyLinuxConfiguration"))
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -451,7 +451,7 @@ func testValidateProxyModeLinux(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateProxyMode(testCase.mode, newPath)
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -491,7 +491,7 @@ func testValidateProxyModeWindows(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateProxyMode(testCase.mode, newPath)
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -517,7 +517,7 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateClientConnectionConfiguration(testCase.ccc, newPath)
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
@@ -561,9 +561,9 @@ func TestValidateHostPort(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			errs := validateHostPort(testCase.ip, newPath.Child("HealthzBindAddress"))
 			if len(testCase.expectedErrs) == 0 {
-				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
+				assert.Equalf(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
-				assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+				assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 			}
 		})
 	}
@@ -651,9 +651,9 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath.Child("NodePortAddresses"))
 			if len(testCase.expectedErrs) == 0 {
-				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
+				assert.Equalf(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
-				assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+				assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 			}
 		})
 	}
@@ -730,9 +730,9 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			errs := validateIPVSExcludeCIDRs(testCase.addresses, newPath.Child("ExcludeCIDRS"))
 			if len(testCase.expectedErrs) == 0 {
-				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
+				assert.Equalf(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
-				assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+				assert.Equalf(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 			}
 		})
 	}

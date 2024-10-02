@@ -217,10 +217,10 @@ func TestBroadcasterWatchAfterShutdown(t *testing.T) {
 	m.Shutdown()
 
 	_, err := m.Watch()
-	assert.EqualError(t, err, "broadcaster already stopped", "Watch should report error id broadcaster is shutdown")
+	assert.EqualErrorf(t, err, "broadcaster already stopped", "Watch should report error id broadcaster is shutdown")
 
 	_, err = m.WatchWithPrefix([]Event{event1, event2})
-	assert.EqualError(t, err, "broadcaster already stopped", "WatchWithPrefix should report error id broadcaster is shutdown")
+	assert.EqualErrorf(t, err, "broadcaster already stopped", "WatchWithPrefix should report error id broadcaster is shutdown")
 }
 
 func TestBroadcasterSendEventAfterShutdown(t *testing.T) {
@@ -239,11 +239,11 @@ func TestBroadcasterSendEventAfterShutdown(t *testing.T) {
 	t.Log("Sending event")
 
 	err := m.Action(event.Type, event.Object)
-	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
+	assert.EqualErrorf(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 
 	sendOnClosed, err := m.ActionOrDrop(event.Type, event.Object)
-	assert.False(t, sendOnClosed, "ActionOrDrop should return false if broadcaster is already shutdown")
-	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
+	assert.Falsef(t, sendOnClosed, "ActionOrDrop should return false if broadcaster is already shutdown")
+	assert.EqualErrorf(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 }
 
 // Test this since we see usage patterns where the broadcaster and watchers are

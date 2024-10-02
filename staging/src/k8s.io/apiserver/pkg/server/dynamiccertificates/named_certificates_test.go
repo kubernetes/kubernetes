@@ -235,12 +235,12 @@ NextTest:
 			got := map[string]int{}
 			for name, cert := range certMap {
 				x509Certs, err := x509.ParseCertificates(cert.Certificate[0])
-				assert.NoError(t, err, "%d - invalid certificate for %q", i, name)
-				assert.NotEmpty(t, x509Certs, "%d - expected at least one x509 cert in tls cert for %q", i, name)
+				assert.NoErrorf(t, err, "%d - invalid certificate for %q", i, name)
+				assert.NotEmptyf(t, x509Certs, "%d - expected at least one x509 cert in tls cert for %q", i, name)
 				got[name] = bySignature[x509CertSignature(x509Certs[0])]
 			}
 
-			assert.EqualValues(t, test.expected, got, "%d - wrong certificate map", i)
+			assert.EqualValuesf(t, test.expected, got, "%d - wrong certificate map", i)
 		}
 	}
 }

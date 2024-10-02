@@ -374,12 +374,12 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			defer tc.Unlock()
 
 			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
-			assert.Equal(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
-			assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
-			assert.Equal(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
+			assert.Equalf(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
+			assert.Equalf(t, hpaName, obj.Name, "the HPA name should be as expected")
+			assert.Equalf(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
 			if tc.verifyCPUCurrent {
-				if utilization := findCpuUtilization(obj.Status.CurrentMetrics); assert.NotNil(t, utilization, "the reported CPU utilization percentage should be non-nil") {
-					assert.Equal(t, tc.CPUCurrent, *utilization, "the report CPU utilization percentage should be as expected")
+				if utilization := findCpuUtilization(obj.Status.CurrentMetrics); assert.NotNilf(t, utilization, "the reported CPU utilization percentage should be non-nil") {
+					assert.Equalf(t, tc.CPUCurrent, *utilization, "the report CPU utilization percentage should be as expected")
 				}
 			}
 			actualConditions := obj.Status.Conditions
@@ -394,7 +394,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				actualConditions[i].Message = ""
 				actualConditions[i].LastTransitionTime = metav1.Time{}
 			}
-			assert.Equal(t, tc.expectedConditions, actualConditions, "the status conditions should have been as expected")
+			assert.Equalf(t, tc.expectedConditions, actualConditions, "the status conditions should have been as expected")
 			tc.statusUpdated = true
 			// Every time we reconcile HPA object we are updating status.
 			return true, obj, nil
@@ -472,7 +472,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 		obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale)
 		replicas := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale).Spec.Replicas
-		assert.Equal(t, tc.expectedDesiredReplicas, replicas, "the replica count of the RC should be as expected")
+		assert.Equalf(t, tc.expectedDesiredReplicas, replicas, "the replica count of the RC should be as expected")
 		tc.scaleUpdated = true
 		return true, obj, nil
 	})
@@ -483,7 +483,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 		obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale)
 		replicas := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale).Spec.Replicas
-		assert.Equal(t, tc.expectedDesiredReplicas, replicas, "the replica count of the deployment should be as expected")
+		assert.Equalf(t, tc.expectedDesiredReplicas, replicas, "the replica count of the deployment should be as expected")
 		tc.scaleUpdated = true
 		return true, obj, nil
 	})
@@ -494,7 +494,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 		obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale)
 		replicas := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale).Spec.Replicas
-		assert.Equal(t, tc.expectedDesiredReplicas, replicas, "the replica count of the replicaset should be as expected")
+		assert.Equalf(t, tc.expectedDesiredReplicas, replicas, "the replica count of the replicaset should be as expected")
 		tc.scaleUpdated = true
 		return true, obj, nil
 	})
@@ -564,8 +564,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			metrics := &cmapi.MetricValueList{}
 
 			// multiple objects
-			assert.Equal(t, "pods", getForAction.GetResource().Resource, "the type of object that we requested multiple metrics for should have been pods")
-			assert.Equal(t, "qps", getForAction.GetMetricName(), "the metric name requested should have been qps, as specified in the metric spec")
+			assert.Equalf(t, "pods", getForAction.GetResource().Resource, "the type of object that we requested multiple metrics for should have been pods")
+			assert.Equalf(t, "qps", getForAction.GetMetricName(), "the metric name requested should have been qps, as specified in the metric spec")
 
 			for i, level := range tc.reportedLevels {
 				podMetric := cmapi.MetricValue{
@@ -605,8 +605,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				}
 			}
 		}
-		assert.NotNil(t, matchedTarget, "this request should have matched one of the metric specs")
-		assert.Equal(t, "qps", getForAction.GetMetricName(), "the metric name requested should have been qps, as specified in the metric spec")
+		assert.NotNilf(t, matchedTarget, "this request should have matched one of the metric specs")
+		assert.Equalf(t, "qps", getForAction.GetMetricName(), "the metric name requested should have been qps, as specified in the metric spec")
 
 		metrics.Items = []cmapi.MetricValue{
 			{
@@ -639,7 +639,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 		metrics := &emapi.ExternalMetricValueList{}
 
-		assert.Equal(t, "qps", listAction.GetResource().Resource, "the metric name requested should have been qps, as specified in the metric spec")
+		assert.Equalf(t, "qps", listAction.GetResource().Resource, "the metric name requested should have been qps, as specified in the metric spec")
 
 		for _, level := range tc.reportedLevels {
 			metric := emapi.ExternalMetricValue{
@@ -679,10 +679,10 @@ func (tc *testCase) verifyResults(t *testing.T, m *mockMonitor) {
 	tc.Lock()
 	defer tc.Unlock()
 
-	assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
-	assert.True(t, tc.statusUpdated, "the status should have been updated")
+	assert.Equalf(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
+	assert.Truef(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
-		assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
+		assert.Equalf(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
 	}
 
 	tc.verifyRecordedMetric(t, m)
@@ -692,8 +692,8 @@ func (tc *testCase) verifyRecordedMetric(t *testing.T, m *mockMonitor) {
 	// First, wait for the reconciliation completed at least once.
 	m.waitUntilRecorded(t)
 
-	assert.Equal(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
-	assert.Equal(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
+	assert.Equalf(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
+	assert.Equalf(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
 
 	if len(tc.expectedReportedMetricComputationActionLabels) != len(m.metricComputationActionLabels) {
 		t.Fatalf("the metric computation actions for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationActionLabels), len(m.metricComputationActionLabels))
@@ -707,14 +707,14 @@ func (tc *testCase) verifyRecordedMetric(t *testing.T, m *mockMonitor) {
 		if !ok {
 			t.Fatalf("the metric computation action should be recorded with metricType %s, but actually nothing was recorded", metricType)
 		}
-		assert.Equal(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
+		assert.Equalf(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
 	}
 	for metricType, l := range tc.expectedReportedMetricComputationErrorLabels {
 		_, ok := m.metricComputationErrorLabels[metricType]
 		if !ok {
 			t.Fatalf("the metric computation error should be recorded with metricType %s, but actually nothing was recorded", metricType)
 		}
-		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
+		assert.Equalf(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
 }
 
@@ -757,7 +757,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 					tc.expectedDesiredReplicas,
 					(int64(tc.reportedLevels[0])*100)/tc.reportedCPURequests[0].MilliValue(), tc.specReplicas), obj.Message)
 			default:
-				assert.False(t, true, "Unexpected event: %s / %s", obj.Reason, obj.Message)
+				assert.Falsef(t, true, "Unexpected event: %s / %s", obj.Reason, obj.Message)
 			}
 		}
 		tc.eventCreated = true
@@ -3838,8 +3838,8 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 				ctc.currentReplicas, ctc.expectedDesiredReplicas, ctc.hpaMinReplicas, ctc.hpaMaxReplicas,
 			)
 
-			assert.Equal(t, ctc.expectedConvertedDesiredReplicas, actualConvertedDesiredReplicas, ctc.annotation)
-			assert.Equal(t, ctc.expectedCondition, actualCondition, ctc.annotation)
+			assert.Equalf(t, ctc.expectedConvertedDesiredReplicas, actualConvertedDesiredReplicas, ctc.annotation)
+			assert.Equalf(t, ctc.expectedCondition, actualCondition, ctc.annotation)
 		})
 	}
 }
@@ -4511,8 +4511,8 @@ func TestScalingWithRules(t *testing.T) {
 			}
 
 			replicas, condition, _ := hc.convertDesiredReplicasWithBehaviorRate(arg)
-			assert.Equal(t, tc.expectedReplicas, replicas, "expected replicas do not match with converted replicas")
-			assert.Equal(t, tc.expectedCondition, condition, "HPA condition does not match with expected condition")
+			assert.Equalf(t, tc.expectedReplicas, replicas, "expected replicas do not match with converted replicas")
+			assert.Equalf(t, tc.expectedCondition, condition, "HPA condition does not match with expected condition")
 		})
 	}
 
@@ -4647,13 +4647,13 @@ func TestStoreScaleEvents(t *testing.T) {
 			gotReplicasChangeUp := getReplicasChangePerPeriod(60, hcUp.scaleUpEvents[tc.key])
 			assert.Equal(t, tc.expectedReplicasChange, gotReplicasChangeUp)
 			hcUp.storeScaleEvent(behaviorUp, tc.key, 10, 10+tc.replicaChange)
-			if !assert.Len(t, hcUp.scaleUpEvents[tc.key], len(tc.newScaleEvents), "up: scale events differ in length") {
+			if !assert.Lenf(t, hcUp.scaleUpEvents[tc.key], len(tc.newScaleEvents), "up: scale events differ in length") {
 				return
 			}
 			for i, gotEvent := range hcUp.scaleUpEvents[tc.key] {
 				expEvent := tc.newScaleEvents[i]
-				assert.Equal(t, expEvent.replicaChange, gotEvent.replicaChange, "up: idx:%v replicaChange", i)
-				assert.Equal(t, expEvent.outdated, gotEvent.outdated, "up: idx:%v outdated", i)
+				assert.Equalf(t, expEvent.replicaChange, gotEvent.replicaChange, "up: idx:%v replicaChange", i)
+				assert.Equalf(t, expEvent.outdated, gotEvent.outdated, "up: idx:%v outdated", i)
 			}
 			// testing scale down
 			var behaviorDown *autoscalingv2.HorizontalPodAutoscalerBehavior
@@ -4670,13 +4670,13 @@ func TestStoreScaleEvents(t *testing.T) {
 			gotReplicasChangeDown := getReplicasChangePerPeriod(60, hcDown.scaleDownEvents[tc.key])
 			assert.Equal(t, tc.expectedReplicasChange, gotReplicasChangeDown)
 			hcDown.storeScaleEvent(behaviorDown, tc.key, 10, 10-tc.replicaChange)
-			if !assert.Len(t, hcDown.scaleDownEvents[tc.key], len(tc.newScaleEvents), "down: scale events differ in length") {
+			if !assert.Lenf(t, hcDown.scaleDownEvents[tc.key], len(tc.newScaleEvents), "down: scale events differ in length") {
 				return
 			}
 			for i, gotEvent := range hcDown.scaleDownEvents[tc.key] {
 				expEvent := tc.newScaleEvents[i]
-				assert.Equal(t, expEvent.replicaChange, gotEvent.replicaChange, "down: idx:%v replicaChange", i)
-				assert.Equal(t, expEvent.outdated, gotEvent.outdated, "down: idx:%v outdated", i)
+				assert.Equalf(t, expEvent.replicaChange, gotEvent.replicaChange, "down: idx:%v replicaChange", i)
+				assert.Equalf(t, expEvent.outdated, gotEvent.outdated, "down: idx:%v outdated", i)
 			}
 		})
 	}
@@ -4884,14 +4884,14 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 				},
 			}
 			r, _, _ := hc.stabilizeRecommendationWithBehaviors(arg)
-			assert.Equal(t, tc.expectedStabilizedReplicas, r, "expected replicas do not match")
+			assert.Equalf(t, tc.expectedStabilizedReplicas, r, "expected replicas do not match")
 			if tc.expectedRecommendations != nil {
-				if !assert.Len(t, hc.recommendations[tc.key], len(tc.expectedRecommendations), "stored recommendations differ in length") {
+				if !assert.Lenf(t, hc.recommendations[tc.key], len(tc.expectedRecommendations), "stored recommendations differ in length") {
 					return
 				}
 				for i, r := range hc.recommendations[tc.key] {
 					expectedRecommendation := tc.expectedRecommendations[i]
-					assert.Equal(t, expectedRecommendation.recommendation, r.recommendation, "stored recommendation differs at position %d", i)
+					assert.Equalf(t, expectedRecommendation.recommendation, r.recommendation, "stored recommendation differs at position %d", i)
 				}
 			}
 		})
@@ -5248,7 +5248,7 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		handled, obj, err := func() (handled bool, ret *autoscalingv2.HorizontalPodAutoscaler, err error) {
 			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
-			assert.Equal(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
+			assert.Equalf(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
 
 			return true, obj, nil
 		}()
@@ -5293,5 +5293,5 @@ func TestMultipleHPAs(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
+	assert.Lenf(t, processedHPA, hpaCount, "Expected to process all HPAs")
 }

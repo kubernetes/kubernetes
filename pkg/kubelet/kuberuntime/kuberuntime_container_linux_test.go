@@ -115,9 +115,9 @@ func TestGenerateContainerConfig(t *testing.T) {
 	expectedConfig := makeExpectedConfig(m, pod, 0, false)
 	containerConfig, _, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
-	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
-	assert.Equal(t, runAsGroup, containerConfig.GetLinux().GetSecurityContext().GetRunAsGroup().GetValue(), "RunAsGroup should be set")
+	assert.Equalf(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
+	assert.Equalf(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
+	assert.Equalf(t, runAsGroup, containerConfig.GetLinux().GetSecurityContext().GetRunAsGroup().GetValue(), "RunAsGroup should be set")
 
 	runAsRoot := int64(0)
 	runAsNonRootTrue := true
@@ -157,7 +157,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
 	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
-	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
+	assert.Errorf(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
 func TestGenerateLinuxContainerConfigResources(t *testing.T) {
@@ -230,10 +230,10 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 
 		linuxConfig, err := m.generateLinuxContainerConfig(&pod.Spec.Containers[0], pod, new(int64), "", nil, false)
 		assert.NoError(t, err)
-		assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
-		assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
-		assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
-		assert.Equal(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
+		assert.Equalf(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
+		assert.Equalf(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
+		assert.Equalf(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
+		assert.Equalf(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
 	}
 }
 
@@ -470,9 +470,9 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	for _, test := range tests {
 		linuxConfig, err := m.generateLinuxContainerConfig(&test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
-		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
+		assert.Equalf(t, test.expected.containerConfig, linuxConfig, test.name)
+		assert.Equalf(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
+		assert.Equalf(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
 	}
 }
 
@@ -778,8 +778,8 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 				assert.Emptyf(t, err, "Unexpected error")
 				assert.EqualValuesf(t, tc.expected, actual.SecurityContext.SupplementalGroupsPolicy, "SupplementalGroupPolicy for %s", tc.name)
 			} else {
-				assert.NotEmpty(t, err, "Unexpected success")
-				assert.Empty(t, actual, "Unexpected non empty value")
+				assert.NotEmptyf(t, err, "Unexpected success")
+				assert.Emptyf(t, actual, "Unexpected non empty value")
 				assert.ErrorContainsf(t, err, tc.expectedErrMsg, "Error for %s", tc.name)
 			}
 		})
@@ -986,9 +986,9 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		for _, r := range resources {
 			switch cgroupVersion {
 			case cgroupV1:
-				assert.Equal(t, int64(0), r.MemorySwapLimitInBytes, msg)
+				assert.Equalf(t, int64(0), r.MemorySwapLimitInBytes, msg)
 			case cgroupV2:
-				assert.NotContains(t, r.Unified, cm.Cgroup2MaxSwapFilename, msg)
+				assert.NotContainsf(t, r.Unified, cm.Cgroup2MaxSwapFilename, msg)
 			}
 		}
 	}
@@ -999,9 +999,9 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		for _, r := range resources {
 			switch cgroupVersion {
 			case cgroupV1:
-				assert.Equal(t, r.MemoryLimitInBytes, r.MemorySwapLimitInBytes, msg)
+				assert.Equalf(t, r.MemoryLimitInBytes, r.MemorySwapLimitInBytes, msg)
 			case cgroupV2:
-				assert.Equal(t, "0", r.Unified[cm.Cgroup2MaxSwapFilename], msg)
+				assert.Equalf(t, "0", r.Unified[cm.Cgroup2MaxSwapFilename], msg)
 			}
 		}
 	}
@@ -1011,9 +1011,9 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 
 		switch cgroupVersion {
 		case cgroupV1:
-			assert.Equal(t, resources.MemoryLimitInBytes+swapBytesExpected, resources.MemorySwapLimitInBytes, msg)
+			assert.Equalf(t, resources.MemoryLimitInBytes+swapBytesExpected, resources.MemorySwapLimitInBytes, msg)
 		case cgroupV2:
-			assert.Equal(t, fmt.Sprintf("%d", swapBytesExpected), resources.Unified[cm.Cgroup2MaxSwapFilename], msg)
+			assert.Equalf(t, fmt.Sprintf("%d", swapBytesExpected), resources.Unified[cm.Cgroup2MaxSwapFilename], msg)
 		}
 	}
 
@@ -1259,7 +1259,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 
 			if tc.isCriticalPod {
 				pod.Spec.Priority = ptr.To(scheduling.SystemCriticalPriority)
-				assert.True(t, types.IsCriticalPod(pod), "pod is expected to be critical")
+				assert.Truef(t, types.IsCriticalPod(pod), "pod is expected to be critical")
 			}
 
 			resourcesC1 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)

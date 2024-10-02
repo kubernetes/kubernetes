@@ -69,9 +69,9 @@ func TestDriverParameter(t *testing.T) {
 	for _, testcase := range testcases {
 		actual, err := loadDriverDefinition(testcase.filename)
 		if testcase.err == "" {
-			require.NoError(t, err, testcase.name)
+			require.NoErrorf(t, err, testcase.name)
 		} else {
-			if assert.Error(t, err, testcase.name) {
+			if assert.Errorf(t, err, testcase.name) {
 				assert.Equal(t, testcase.err, err.Error())
 			}
 		}

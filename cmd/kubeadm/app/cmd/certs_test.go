@@ -353,7 +353,7 @@ func TestRunGenCSR(t *testing.T) {
 	}
 
 	err := runGenCSR(nil, &config)
-	require.NoError(t, err, "expected runGenCSR to not fail")
+	require.NoErrorf(t, err, "expected runGenCSR to not fail")
 
 	t.Log("The command generates key and CSR files in the configured --cert-dir")
 	for _, name := range expectedCertificates {
@@ -627,9 +627,9 @@ kubernetesVersion: %s`,
 			assert.Len(t, info.CertificateAuthorities, len(caCerts))
 			for _, cert := range info.Certificates {
 				if tc.brokenCertName == cert.Name {
-					assert.True(t, cert.Missing, "expected certificate to be missing")
+					assert.Truef(t, cert.Missing, "expected certificate to be missing")
 				} else {
-					assert.False(t, cert.Missing, "expected certificate to be present")
+					assert.Falsef(t, cert.Missing, "expected certificate to be present")
 				}
 			}
 		default:

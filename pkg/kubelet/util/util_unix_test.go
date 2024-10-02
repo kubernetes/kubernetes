@@ -42,10 +42,10 @@ func TestLocalEndpoint(t *testing.T) {
 	for _, test := range tests {
 		fullPath, err := LocalEndpoint(test.path, test.file)
 		if test.expectError {
-			assert.Error(t, err, "expected error")
+			assert.Errorf(t, err, "expected error")
 			continue
 		}
-		assert.NoError(t, err, "expected no error")
+		assert.NoErrorf(t, err, "expected no error")
 		assert.Equal(t, test.expectedFullPath, fullPath)
 	}
 }

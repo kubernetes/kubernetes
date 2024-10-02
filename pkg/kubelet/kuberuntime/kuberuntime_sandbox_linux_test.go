@@ -167,8 +167,8 @@ func TestApplySandboxResources(t *testing.T) {
 		setCgroupVersionDuringTest(test.cgroupVersion)
 
 		m.applySandboxResources(test.pod, config)
-		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
-		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
+		assert.Equalf(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
+		assert.Equalf(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
@@ -257,7 +257,7 @@ func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 			assert.Containsf(t, err.Error(), test.expectedErrMsg, "TestCase[%d]: %s", i, test.description)
 		} else {
 			actualPolicy := config.SecurityContext.SupplementalGroupsPolicy.String()
-			assert.EqualValues(t, test.expected, actualPolicy, "TestCase[%d]: %s", i, test.description)
+			assert.EqualValuesf(t, test.expected, actualPolicy, "TestCase[%d]: %s", i, test.description)
 		}
 	}
 }

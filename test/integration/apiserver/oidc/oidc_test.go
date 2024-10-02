@@ -207,7 +207,7 @@ jwt:
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck), errorToCheck)
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 		},
 		{
@@ -329,7 +329,7 @@ jwt:
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck), errorToCheck)
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 		},
 		{
@@ -391,10 +391,10 @@ jwt:
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				if useAuthenticationConfig { // since the config uses a CEL expression
-					assert.True(t, apierrors.IsUnauthorized(errorToCheck), errorToCheck)
+					assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 				} else {
 					// the claim based approach is still allowed to use empty usernames
-					_ = assert.True(t, apierrors.IsForbidden(errorToCheck), errorToCheck) &&
+					_ = assert.True(t, apierrors.IsForbidden(errorToCheck)) &&
 						assert.Equal(
 							t,
 							`pods is forbidden: User "" cannot list resource "pods" in API group "" in the namespace "default"`,
@@ -739,7 +739,7 @@ jwt:
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck), errorToCheck)
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 		},
 		{
@@ -897,7 +897,7 @@ jwt:
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck), errorToCheck)
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 			wantUser: nil,
 		},
@@ -1136,7 +1136,7 @@ jwt:
 `, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 			wantUser:              nil,
 			ignoreTransitionErrFn: apierrors.IsUnauthorized,
@@ -1196,7 +1196,7 @@ jwt:
 `, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 			wantUser:              nil,
 			ignoreTransitionErrFn: apierrors.IsUnauthorized,
@@ -1304,7 +1304,7 @@ kind: AuthenticationConfiguration
 				Groups:   []string{"system:authenticated"},
 			},
 			newAssertErrFn: func(t *testing.T, errorToCheck error) {
-				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+				assert.Truef(t, apierrors.IsUnauthorized(errorToCheck), "%v is expected to be Unauthorized but is not", errorToCheck)
 			},
 			newWantUser:         nil,
 			waitAfterConfigSwap: true,
@@ -1433,7 +1433,7 @@ jwt:
 
 					return len(diff) == 0, nil
 				})
-				require.NoError(t, err, "new authentication config not loaded")
+				require.NoErrorf(t, err, "new authentication config not loaded")
 			}
 
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})

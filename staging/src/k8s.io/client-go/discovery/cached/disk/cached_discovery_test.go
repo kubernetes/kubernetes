@@ -53,38 +53,38 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 
 	c := fakeDiscoveryClient{}
 	cdc := newCachedDiscoveryClient(&c, d, 60*time.Second)
-	assert.True(cdc.Fresh(), "should be fresh after creation")
+	assert.Truef(cdc.Fresh(), "should be fresh after creation")
 
 	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after groups call without cache")
+	assert.Truef(cdc.Fresh(), "should be fresh after groups call without cache")
 	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after another groups call")
+	assert.Truef(cdc.Fresh(), "should be fresh after another groups call")
 	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should be fresh after resources call")
+	assert.Truef(cdc.Fresh(), "should be fresh after resources call")
 	assert.Equal(1, c.resourceCalls)
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should be fresh after another resources call")
+	assert.Truef(cdc.Fresh(), "should be fresh after another resources call")
 	assert.Equal(1, c.resourceCalls)
 
 	cdc = newCachedDiscoveryClient(&c, d, 60*time.Second)
 	cdc.ServerGroups()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
+	assert.Falsef(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
 	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroupsAndResources()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
+	assert.Falsef(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
 	assert.Equal(1, c.resourceCalls)
 
 	cdc.Invalidate()
-	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
+	assert.Truef(cdc.Fresh(), "should be fresh after cache invalidation")
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
+	assert.Truef(cdc.Fresh(), "should ignore existing resources cache after invalidation")
 	assert.Equal(2, c.resourceCalls)
 }
 
@@ -369,17 +369,17 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
 		assert.NoError(t, err)
-		assert.Equal(t, 1, numFound,
+		assert.Equalf(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+		assert.Truef(t, expectedGroupNames.Equal(actualGroupNames),
 			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+		assert.Truef(t, expectedGroupVersions.Equal(actualGroupVersions),
 			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
 	}
 }
@@ -660,22 +660,22 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
 		assert.NoError(t, err)
-		assert.Equal(t, 1, numFound,
+		assert.Equalf(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+		assert.Truef(t, expectedGroupNames.Equal(actualGroupNames),
 			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+		assert.Truef(t, expectedGroupVersions.Equal(actualGroupVersions),
 			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
 		// Test the groups preferred version is correct.
 		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
 		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
-		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
+		assert.Truef(t, expectedPreferredVersions.Equal(actualPreferredVersions),
 			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
 	}
 }

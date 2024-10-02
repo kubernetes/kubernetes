@@ -72,31 +72,31 @@ func TestServeWSPortForward(t *testing.T) {
 			portForwardFuncDone := make(chan struct{})
 
 			fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
-				assert.Equal(t, podName, name, "pod name")
-				assert.Equal(t, podNamespace, namespace, "pod namespace")
+				assert.Equalf(t, podName, name, "pod name")
+				assert.Equalf(t, podNamespace, namespace, "pod namespace")
 				if test.uid {
-					assert.Equal(t, testUID, string(uid), "uid")
+					assert.Equalf(t, testUID, string(uid), "uid")
 				}
 			}
 
 			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 				defer close(portForwardFuncDone)
-				assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
+				assert.Equalf(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 				// The port should be valid if it reaches here.
 				testPort, err := strconv.ParseInt(test.port, 10, 32)
-				require.NoError(t, err, "parse port")
-				assert.Equal(t, int32(testPort), port, "port")
+				require.NoErrorf(t, err, "parse port")
+				assert.Equalf(t, int32(testPort), port, "port")
 
 				if test.clientData != "" {
 					fromClient := make([]byte, 32)
 					n, err := stream.Read(fromClient)
-					assert.NoError(t, err, "reading client data")
-					assert.Equal(t, test.clientData, string(fromClient[0:n]), "client data")
+					assert.NoErrorf(t, err, "reading client data")
+					assert.Equalf(t, test.clientData, string(fromClient[0:n]), "client data")
 				}
 
 				if test.containerData != "" {
 					_, err := stream.Write([]byte(test.containerData))
-					assert.NoError(t, err, "writing container data")
+					assert.NoErrorf(t, err, "writing container data")
 				}
 
 				return nil
@@ -110,38 +110,38 @@ func TestServeWSPortForward(t *testing.T) {
 			}
 
 			ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
-			assert.Equal(t, test.shouldError, err != nil, "websocket dial")
+			assert.Equalf(t, test.shouldError, err != nil, "websocket dial")
 			if test.shouldError {
 				return
 			}
 			defer ws.Close()
 
 			p, err := strconv.ParseUint(test.port, 10, 16)
-			require.NoError(t, err, "parse port")
+			require.NoErrorf(t, err, "parse port")
 			p16 := uint16(p)
 
 			channel, data, err := wsRead(ws)
-			require.NoError(t, err, "read")
-			assert.Equal(t, dataChannel, int(channel), "channel")
-			assert.Len(t, data, binary.Size(p16), "data size")
-			assert.Equal(t, p16, binary.LittleEndian.Uint16(data), "data")
+			require.NoErrorf(t, err, "read")
+			assert.Equalf(t, dataChannel, int(channel), "channel")
+			assert.Lenf(t, data, binary.Size(p16), "data size")
+			assert.Equalf(t, p16, binary.LittleEndian.Uint16(data), "data")
 
 			channel, data, err = wsRead(ws)
-			assert.NoError(t, err, "read")
-			assert.Equal(t, errorChannel, int(channel), "channel")
-			assert.Len(t, data, binary.Size(p16), "data size")
-			assert.Equal(t, p16, binary.LittleEndian.Uint16(data), "data")
+			assert.NoErrorf(t, err, "read")
+			assert.Equalf(t, errorChannel, int(channel), "channel")
+			assert.Lenf(t, data, binary.Size(p16), "data size")
+			assert.Equalf(t, p16, binary.LittleEndian.Uint16(data), "data")
 
 			if test.clientData != "" {
 				println("writing the client data")
 				err := wsWrite(ws, dataChannel, []byte(test.clientData))
-				assert.NoError(t, err, "writing client data")
+				assert.NoErrorf(t, err, "writing client data")
 			}
 
 			if test.containerData != "" {
 				_, data, err = wsRead(ws)
-				assert.NoError(t, err, "reading container data")
-				assert.Equal(t, test.containerData, string(data), "container data")
+				assert.NoErrorf(t, err, "reading container data")
+				assert.Equalf(t, test.containerData, string(data), "container data")
 			}
 
 			<-portForwardFuncDone
@@ -168,13 +168,13 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	portsForwarded := map[int32]struct{}{}
 
 	fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
-		assert.Equal(t, podName, name, "pod name")
-		assert.Equal(t, podNamespace, namespace, "pod namespace")
+		assert.Equalf(t, podName, name, "pod name")
+		assert.Equalf(t, podNamespace, namespace, "pod namespace")
 	}
 
 	ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 		defer portForwardWG.Done()
-		assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
+		assert.Equalf(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 
 		portsMutex.Lock()
 		portsForwarded[port] = struct{}{}
@@ -182,11 +182,11 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 
 		fromClient := make([]byte, 32)
 		n, err := stream.Read(fromClient)
-		assert.NoError(t, err, "reading client data")
-		assert.Equal(t, fmt.Sprintf("client data on port %d", port), string(fromClient[0:n]), "client data")
+		assert.NoErrorf(t, err, "reading client data")
+		assert.Equalf(t, fmt.Sprintf("client data on port %d", port), string(fromClient[0:n]), "client data")
 
 		_, err = stream.Write([]byte(fmt.Sprintf("container data on port %d", port)))
-		assert.NoError(t, err, "writing container data")
+		assert.NoErrorf(t, err, "writing container data")
 
 		return nil
 	}
@@ -197,40 +197,40 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	}
 
 	ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
-	require.NoError(t, err, "websocket dial")
+	require.NoErrorf(t, err, "websocket dial")
 
 	defer ws.Close()
 
 	for i, port := range ports {
 		channel, data, err := wsRead(ws)
-		assert.NoError(t, err, "port %d read", port)
-		assert.Equal(t, i*2+dataChannel, int(channel), "port %d channel", port)
-		assert.Len(t, data, binary.Size(port), "port %d data size", port)
-		assert.Equal(t, binary.LittleEndian.Uint16(data), port, "port %d data", port)
+		assert.NoErrorf(t, err, "port %d read", port)
+		assert.Equalf(t, i*2+dataChannel, int(channel), "port %d channel", port)
+		assert.Lenf(t, data, binary.Size(port), "port %d data size", port)
+		assert.Equalf(t, binary.LittleEndian.Uint16(data), port, "port %d data", port)
 
 		channel, data, err = wsRead(ws)
-		assert.NoError(t, err, "port %d read", port)
-		assert.Equal(t, i*2+errorChannel, int(channel), "port %d channel", port)
-		assert.Len(t, data, binary.Size(port), "port %d data size", port)
-		assert.Equal(t, binary.LittleEndian.Uint16(data), port, "port %d data", port)
+		assert.NoErrorf(t, err, "port %d read", port)
+		assert.Equalf(t, i*2+errorChannel, int(channel), "port %d channel", port)
+		assert.Lenf(t, data, binary.Size(port), "port %d data size", port)
+		assert.Equalf(t, binary.LittleEndian.Uint16(data), port, "port %d data", port)
 	}
 
 	for i, port := range ports {
 		t.Logf("port %d writing the client data", port)
 		err := wsWrite(ws, byte(i*2+dataChannel), []byte(fmt.Sprintf("client data on port %d", port)))
-		assert.NoError(t, err, "port %d write client data", port)
+		assert.NoErrorf(t, err, "port %d write client data", port)
 
 		channel, data, err := wsRead(ws)
-		assert.NoError(t, err, "port %d read container data", port)
-		assert.Equal(t, i*2+dataChannel, int(channel), "port %d channel", port)
-		assert.Equal(t, fmt.Sprintf("container data on port %d", port), string(data), "port %d container data", port)
+		assert.NoErrorf(t, err, "port %d read container data", port)
+		assert.Equalf(t, i*2+dataChannel, int(channel), "port %d channel", port)
+		assert.Equalf(t, fmt.Sprintf("container data on port %d", port), string(data), "port %d container data", port)
 	}
 
 	portForwardWG.Wait()
 
 	portsMutex.Lock()
 	defer portsMutex.Unlock()
-	assert.Len(t, portsForwarded, len(ports), "all ports forwarded")
+	assert.Lenf(t, portsForwarded, len(ports), "all ports forwarded")
 }
 
 func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {

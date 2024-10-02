@@ -94,7 +94,7 @@ func TestIsInitContainerFailed(t *testing.T) {
 	}
 	for i, test := range tests {
 		isFailed := isInitContainerFailed(test.status)
-		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]: %s", i, test.description)
+		assert.Equalf(t, test.isFailed, isFailed, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
@@ -279,14 +279,14 @@ func TestGetImageUser(t *testing.T) {
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
 		uid, username, err := m.getImageUser(ctx, test.originalImage.name)
-		assert.NoError(t, err, "TestCase[%d]", j)
+		assert.NoErrorf(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {
-			assert.Equal(t, test.expectedImageUserValues.uid, uid, "TestCase[%d]", j)
+			assert.Equalf(t, test.expectedImageUserValues.uid, uid, "TestCase[%d]", j)
 		} else {
-			assert.Equal(t, test.expectedImageUserValues.uid, *uid, "TestCase[%d]", j)
+			assert.Equalf(t, test.expectedImageUserValues.uid, *uid, "TestCase[%d]", j)
 		}
-		assert.Equal(t, test.expectedImageUserValues.username, username, "TestCase[%d]", j)
+		assert.Equalf(t, test.expectedImageUserValues.username, username, "TestCase[%d]", j)
 	}
 }
 
@@ -436,8 +436,8 @@ func TestGetAppArmorProfile(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, test.expectedProfile, actual, "AppArmor profile")
-			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
+			assert.Equalf(t, test.expectedProfile, actual, "AppArmor profile")
+			assert.Equalf(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
 }

@@ -124,12 +124,12 @@ func TestRuntimeClassConversion(t *testing.T) {
 			convertedInternal := &node.RuntimeClass{}
 			require.NoError(t,
 				Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(test.external, convertedInternal, nil))
-			assert.Equal(t, test.internal, convertedInternal, "external -> internal")
+			assert.Equalf(t, test.internal, convertedInternal, "external -> internal")
 
 			convertedV1alpha1 := &v1alpha1.RuntimeClass{}
 			require.NoError(t,
 				Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(test.internal, convertedV1alpha1, nil))
-			assert.Equal(t, test.external, convertedV1alpha1, "internal -> external")
+			assert.Equalf(t, test.external, convertedV1alpha1, "internal -> external")
 		})
 	}
 }

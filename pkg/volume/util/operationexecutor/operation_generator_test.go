@@ -88,7 +88,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 
 		storageOperationDurationSecondsMetricAfter, _ := testutil.GetHistogramMetricCount(m)
 		metricValueDiff := storageOperationDurationSecondsMetricAfter - storageOperationDurationSecondsMetricBefore
-		assert.Equal(t, uint64(1), metricValueDiff, tc.name)
+		assert.Equalf(t, uint64(1), metricValueDiff, tc.name)
 	}
 }
 

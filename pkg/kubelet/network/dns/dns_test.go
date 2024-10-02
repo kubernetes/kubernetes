@@ -102,11 +102,11 @@ func TestParseResolvConf(t *testing.T) {
 		ns, srch, opts, err := parseResolvConf(strings.NewReader(tc.data))
 		if !tc.isErr {
 			require.NoError(t, err)
-			assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
-			assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
-			assert.EqualValues(t, sets.New[string](tc.options...), sets.New[string](opts...), "test case [%d] options", i)
+			assert.EqualValuesf(t, tc.nameservers, ns, "test case [%d]: name servers", i)
+			assert.EqualValuesf(t, tc.searches, srch, "test case [%d] searches", i)
+			assert.EqualValuesf(t, sets.New[string](tc.options...), sets.New[string](opts...), "test case [%d] options", i)
 		} else {
-			require.Error(t, err, "tc.searches %v", tc.searches)
+			require.Errorf(t, err, "tc.searches %v", tc.searches)
 		}
 	}
 }
@@ -225,11 +225,11 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			dnsSearch := configurer.formDNSSearchFitsLimits(tc.hostNames, pod)
-			assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
+			assert.EqualValuesf(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 			for _, expectedEvent := range tc.events {
 				expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSConfigForming", expectedEvent)
 				event := fetchEvent(recorder)
-				assert.Equal(t, expected, event, "test [%d]", i)
+				assert.Equalf(t, expected, event, "test [%d]", i)
 			}
 		})
 	}
@@ -284,7 +284,7 @@ func TestFormDNSNameserversFitsLimits(t *testing.T) {
 
 	for _, tc := range testCases {
 		appliedNameservers := configurer.formDNSNameserversFitsLimits(tc.nameservers, pod)
-		assert.EqualValues(t, tc.expectedNameserver, appliedNameservers, tc.desc)
+		assert.EqualValuesf(t, tc.expectedNameserver, appliedNameservers, tc.desc)
 		event := fetchEvent(recorder)
 		if tc.expectedEvent && len(event) == 0 {
 			t.Errorf("%s: formDNSNameserversFitsLimits(%v) expected event, got no event.", tc.desc, tc.nameservers)

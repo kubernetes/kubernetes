@@ -420,72 +420,72 @@ func testTime(base time.Time, seed int) time.Time {
 
 func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.NetworkStats) {
 	assert.NotNil(t, stats)
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
-	assert.EqualValues(t, "eth0", stats.Name, "default interface name is not eth0")
-	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
-	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
-	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
-	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
+	assert.EqualValuesf(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
+	assert.EqualValuesf(t, "eth0", stats.Name, "default interface name is not eth0")
+	assert.EqualValuesf(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
+	assert.EqualValuesf(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
+	assert.EqualValuesf(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
+	assert.EqualValuesf(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
 
-	assert.Len(t, stats.Interfaces, 2, "network interfaces should contain 2 elements")
+	assert.Lenf(t, stats.Interfaces, 2, "network interfaces should contain 2 elements")
 
-	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is not eth0")
-	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
-	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
-	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
-	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
+	assert.EqualValuesf(t, "eth0", stats.Interfaces[0].Name, "default interface name is not eth0")
+	assert.EqualValuesf(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
+	assert.EqualValuesf(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
+	assert.EqualValuesf(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
+	assert.EqualValuesf(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
 
-	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is not cbr0")
-	assert.EqualValues(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
-	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
-	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
-	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
+	assert.EqualValuesf(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is not cbr0")
+	assert.EqualValuesf(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
+	assert.EqualValuesf(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
+	assert.EqualValuesf(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
+	assert.EqualValuesf(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
 
 }
 
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
-	require.NotNil(t, stats.Time, label+".CPU.Time")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
-	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
-	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
+	require.NotNilf(t, stats.Time, label+".CPU.Time")
+	require.NotNilf(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
+	require.NotNilf(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
+	assert.EqualValuesf(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
+	assert.EqualValuesf(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
+	assert.EqualValuesf(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
 }
 
 func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
-	assert.EqualValues(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
-	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
-	assert.EqualValues(t, seed+offsetMemRSSBytes, *stats.RSSBytes, label+".Mem.RSSBytes")
-	assert.EqualValues(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
-	assert.EqualValues(t, seed+offsetMemMajorPageFaults, *stats.MajorPageFaults, label+".Mem.MajorPageFaults")
+	assert.EqualValuesf(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
+	assert.EqualValuesf(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
+	assert.EqualValuesf(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
+	assert.EqualValuesf(t, seed+offsetMemRSSBytes, *stats.RSSBytes, label+".Mem.RSSBytes")
+	assert.EqualValuesf(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
+	assert.EqualValuesf(t, seed+offsetMemMajorPageFaults, *stats.MajorPageFaults, label+".Mem.MajorPageFaults")
 	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.Limit) {
-		assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
+		assert.Nilf(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
 	} else {
 		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
-		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
+		assert.EqualValuesf(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
 	}
 }
 
 func checkSwapStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.SwapStats) {
 	label += ".Swap"
 
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Time")
-	assert.EqualValues(t, seed+offsetMemSwapUsageBytes, *stats.SwapUsageBytes, label+".SwapUsageBytes")
+	assert.EqualValuesf(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Time")
+	assert.EqualValuesf(t, seed+offsetMemSwapUsageBytes, *stats.SwapUsageBytes, label+".SwapUsageBytes")
 
 	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.SwapLimit) {
-		assert.Nil(t, stats.SwapAvailableBytes, label+".SwapAvailableBytes")
+		assert.Nilf(t, stats.SwapAvailableBytes, label+".SwapAvailableBytes")
 	} else {
 		expected := info.Spec.Memory.Limit - *stats.SwapUsageBytes
-		assert.EqualValues(t, expected, *stats.SwapAvailableBytes, label+".AvailableBytes")
+		assert.EqualValuesf(t, expected, *stats.SwapAvailableBytes, label+".AvailableBytes")
 	}
 }
 
 func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats) {
-	assert.EqualValues(t, seed+offsetFsCapacity, *stats.CapacityBytes, label+".CapacityBytes")
-	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
-	assert.EqualValues(t, seed+offsetFsInodes, *stats.Inodes, label+".Inodes")
-	assert.EqualValues(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
+	assert.EqualValuesf(t, seed+offsetFsCapacity, *stats.CapacityBytes, label+".CapacityBytes")
+	assert.EqualValuesf(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
+	assert.EqualValuesf(t, seed+offsetFsInodes, *stats.Inodes, label+".Inodes")
+	assert.EqualValuesf(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
 }
 
 func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, containerLogStats []*volume.Metrics, stats *statsapi.FsStats) {
@@ -509,8 +509,8 @@ func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volum
 		usedBytes += int(logStats.Used.Value())
 		inodeUsage += int(logStats.InodesUsed.Value())
 	}
-	assert.EqualValues(t, usedBytes, int(*stats.UsedBytes), label+".UsedBytes")
-	assert.EqualValues(t, inodeUsage, int(*stats.InodesUsed), label+".InodesUsed")
+	assert.EqualValuesf(t, usedBytes, int(*stats.UsedBytes), label+".UsedBytes")
+	assert.EqualValuesf(t, inodeUsage, int(*stats.InodesUsed), label+".InodesUsed")
 }
 
 type fakeResourceAnalyzer struct {

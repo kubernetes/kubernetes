@@ -160,15 +160,15 @@ func TestBasicResponse(t *testing.T) {
 	response, body, decoded := fetchPath(manager, "application/json", discoveryPath, "")
 
 	jsonFormatted, err := json.Marshal(&apis)
-	require.NoError(t, err, "json marshal should always succeed")
+	require.NoErrorf(t, err, "json marshal should always succeed")
 
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
-	assert.NotEmpty(t, response.Header.Get("ETag"), "E-Tag should be set")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
+	assert.NotEmptyf(t, response.Header.Get("ETag"), "E-Tag should be set")
 
-	assert.NoError(t, err, "decode should always succeed")
-	assert.EqualValues(t, &apis, decoded, "decoded value should equal input")
-	assert.Equal(t, string(jsonFormatted)+"\n", string(body), "response should be the api group list")
+	assert.NoErrorf(t, err, "decode should always succeed")
+	assert.EqualValuesf(t, &apis, decoded, "decoded value should equal input")
+	assert.Equalf(t, string(jsonFormatted)+"\n", string(body), "response should be the api group list")
 }
 
 // Test that protobuf is outputted correctly
@@ -179,10 +179,10 @@ func TestBasicResponseProtobuf(t *testing.T) {
 	manager.SetGroups(apis.Items)
 
 	response, _, decoded := fetchPath(manager, "application/vnd.kubernetes.protobuf", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, "application/vnd.kubernetes.protobuf;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
-	assert.NotEmpty(t, response.Header.Get("ETag"), "E-Tag should be set")
-	assert.EqualValues(t, &apis, decoded, "decoded value should equal input")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, "application/vnd.kubernetes.protobuf;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
+	assert.NotEmptyf(t, response.Header.Get("ETag"), "E-Tag should be set")
+	assert.EqualValuesf(t, &apis, decoded, "decoded value should equal input")
 }
 
 // V2Beta1 should still be served
@@ -202,15 +202,15 @@ func TestV2Beta1SkewSupport(t *testing.T) {
 	response, body, decoded := fetchPathV2Beta1(manager, "application/json", discoveryPath, "")
 
 	jsonFormatted, err := json.Marshal(v2beta1apis)
-	require.NoError(t, err, "json marshal should always succeed")
+	require.NoErrorf(t, err, "json marshal should always succeed")
 
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
-	assert.NotEmpty(t, response.Header.Get("ETag"), "E-Tag should be set")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", response.Header.Get("Content-Type"), "Content-Type response header should be as requested in Accept header if supported")
+	assert.NotEmptyf(t, response.Header.Get("ETag"), "E-Tag should be set")
 
-	assert.NoError(t, err, "decode should always succeed")
-	assert.EqualValues(t, v2beta1apis, decoded, "decoded value should equal input")
-	assert.Equal(t, string(jsonFormatted)+"\n", string(body), "response should be the api group list")
+	assert.NoErrorf(t, err, "decode should always succeed")
+	assert.EqualValuesf(t, v2beta1apis, decoded, "decoded value should equal input")
+	assert.Equalf(t, string(jsonFormatted)+"\n", string(body), "response should be the api group list")
 }
 
 // Test that an etag associated with the service only depends on the apiresources
@@ -228,9 +228,9 @@ func TestEtagConsistent(t *testing.T) {
 	res1_initial, _, _ := fetchPath(manager1, "application/json", discoveryPath, "")
 	res2_initial, _, _ := fetchPath(manager2, "application/json", discoveryPath, "")
 
-	assert.NotEmpty(t, res1_initial.Header.Get("ETag"), "Etag should be populated")
-	assert.NotEmpty(t, res2_initial.Header.Get("ETag"), "Etag should be populated")
-	assert.Equal(t, res1_initial.Header.Get("ETag"), res2_initial.Header.Get("ETag"), "etag should be deterministic")
+	assert.NotEmptyf(t, res1_initial.Header.Get("ETag"), "Etag should be populated")
+	assert.NotEmptyf(t, res2_initial.Header.Get("ETag"), "Etag should be populated")
+	assert.Equalf(t, res1_initial.Header.Get("ETag"), res2_initial.Header.Get("ETag"), "etag should be deterministic")
 
 	// Then add one service to only one.
 	// Make sure etag is changed, but other is the same
@@ -244,10 +244,10 @@ func TestEtagConsistent(t *testing.T) {
 	res1_addedToOne, _, _ := fetchPath(manager1, "application/json", discoveryPath, "")
 	res2_addedToOne, _, _ := fetchPath(manager2, "application/json", discoveryPath, "")
 
-	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.NotEqual(t, res1_initial.Header.Get("ETag"), res1_addedToOne.Header.Get("ETag"), "ETag should be changed since version was added")
-	assert.Equal(t, res2_initial.Header.Get("ETag"), res2_addedToOne.Header.Get("ETag"), "ETag should be unchanged since data was unchanged")
+	assert.NotEmptyf(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.NotEmptyf(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.NotEqualf(t, res1_initial.Header.Get("ETag"), res1_addedToOne.Header.Get("ETag"), "ETag should be changed since version was added")
+	assert.Equalf(t, res2_initial.Header.Get("ETag"), res2_addedToOne.Header.Get("ETag"), "ETag should be unchanged since data was unchanged")
 
 	// Then add service to other one
 	// Make sure etag is the same
@@ -260,10 +260,10 @@ func TestEtagConsistent(t *testing.T) {
 	res1_addedToBoth, _, _ := fetchPath(manager1, "application/json", discoveryPath, "")
 	res2_addedToBoth, _, _ := fetchPath(manager2, "application/json", discoveryPath, "")
 
-	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.Equal(t, res1_addedToBoth.Header.Get("ETag"), res2_addedToBoth.Header.Get("ETag"), "ETags should be equal since content is equal")
-	assert.NotEqual(t, res2_initial.Header.Get("ETag"), res2_addedToBoth.Header.Get("ETag"), "ETag should be changed since data was changed")
+	assert.NotEmptyf(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.NotEmptyf(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.Equalf(t, res1_addedToBoth.Header.Get("ETag"), res2_addedToBoth.Header.Get("ETag"), "ETags should be equal since content is equal")
+	assert.NotEqualf(t, res2_initial.Header.Get("ETag"), res2_addedToBoth.Header.Get("ETag"), "ETag should be changed since data was changed")
 
 	// Remove the group version from both. Initial E-Tag should be restored
 	for _, group := range apis.Items {
@@ -282,10 +282,10 @@ func TestEtagConsistent(t *testing.T) {
 	res1_removeFromBoth, _, _ := fetchPath(manager1, "application/json", discoveryPath, "")
 	res2_removeFromBoth, _, _ := fetchPath(manager2, "application/json", discoveryPath, "")
 
-	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
-	assert.Equal(t, res1_removeFromBoth.Header.Get("ETag"), res2_removeFromBoth.Header.Get("ETag"), "ETags should be equal since content is equal")
-	assert.Equal(t, res1_initial.Header.Get("ETag"), res1_removeFromBoth.Header.Get("ETag"), "ETag should be equal to initial value since added content was removed")
+	assert.NotEmptyf(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.NotEmptyf(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
+	assert.Equalf(t, res1_removeFromBoth.Header.Get("ETag"), res2_removeFromBoth.Header.Get("ETag"), "ETags should be equal since content is equal")
+	assert.Equalf(t, res1_initial.Header.Get("ETag"), res1_removeFromBoth.Header.Get("ETag"), "ETag should be equal to initial value since added content was removed")
 }
 
 // Test that if a request comes in with an If-None-Match header with an incorrect
@@ -297,15 +297,15 @@ func TestEtagNonMatching(t *testing.T) {
 
 	// fetch the document once
 	initial, _, _ := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
+	assert.NotEmptyf(t, initial.Header.Get("ETag"), "ETag should be populated")
 
 	// Send another request with a wrong e-tag. The same response should
 	// get sent again
 	second, _, _ := fetchPath(manager, "application/json", discoveryPath, "wrongetag")
 
-	assert.Equal(t, http.StatusOK, initial.StatusCode, "response should be 200 OK")
-	assert.Equal(t, http.StatusOK, second.StatusCode, "response should be 200 OK")
-	assert.Equal(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be equal")
+	assert.Equalf(t, http.StatusOK, initial.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, second.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be equal")
 }
 
 // Test that if a request comes in with an If-None-Match header with a correct
@@ -317,17 +317,17 @@ func TestEtagMatching(t *testing.T) {
 
 	// fetch the document once
 	initial, initialBody, _ := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
-	assert.NotEmpty(t, initialBody, "body should not be empty")
+	assert.NotEmptyf(t, initial.Header.Get("ETag"), "ETag should be populated")
+	assert.NotEmptyf(t, initialBody, "body should not be empty")
 
 	// Send another request with a wrong e-tag. The same response should
 	// get sent again
 	second, secondBody, _ := fetchPath(manager, "application/json", discoveryPath, initial.Header.Get("ETag"))
 
-	assert.Equal(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
-	assert.Equal(t, http.StatusNotModified, second.StatusCode, "second response should be 304 Not Modified")
-	assert.Equal(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be equal")
-	assert.Empty(t, secondBody, "body should be empty when returning 304 Not Modified")
+	assert.Equalf(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
+	assert.Equalf(t, http.StatusNotModified, second.StatusCode, "second response should be 304 Not Modified")
+	assert.Equalf(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be equal")
+	assert.Emptyf(t, secondBody, "body should be empty when returning 304 Not Modified")
 }
 
 // Test that if a request comes in with an If-None-Match header with an old
@@ -339,8 +339,8 @@ func TestEtagOutdated(t *testing.T) {
 
 	// fetch the document once
 	initial, initialBody, _ := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
-	assert.NotEmpty(t, initialBody, "body should not be empty")
+	assert.NotEmptyf(t, initial.Header.Get("ETag"), "ETag should be populated")
+	assert.NotEmptyf(t, initialBody, "body should not be empty")
 
 	// Then add some services so the etag changes
 	apis = fuzzAPIGroups(1, 3, 14)
@@ -353,10 +353,10 @@ func TestEtagOutdated(t *testing.T) {
 	// Send another request with the old e-tag. Response should not be 304 Not Modified
 	second, secondBody, _ := fetchPath(manager, "application/json", discoveryPath, initial.Header.Get("ETag"))
 
-	assert.Equal(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
-	assert.Equal(t, http.StatusOK, second.StatusCode, "second response should be 304 Not Modified")
-	assert.NotEqual(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be unequal since contents differ")
-	assert.NotEmpty(t, secondBody, "body should be not empty when returning 304 Not Modified")
+	assert.Equalf(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, second.StatusCode, "second response should be 304 Not Modified")
+	assert.NotEqualf(t, initial.Header.Get("ETag"), second.Header.Get("ETag"), "ETag of both requests should be unequal since contents differ")
+	assert.NotEmptyf(t, secondBody, "body should be not empty when returning 304 Not Modified")
 }
 
 // Test that an api service can be added or removed
@@ -382,10 +382,10 @@ func TestAddRemove(t *testing.T) {
 
 	_, _, secondDocument := fetchPath(manager, "application/json", discoveryPath, "")
 
-	require.NotNil(t, initialDocument, "initial document should parse")
-	require.NotNil(t, secondDocument, "second document should parse")
-	assert.Len(t, initialDocument.Items, len(apis.Items), "initial document should have set number of groups")
-	assert.Empty(t, secondDocument.Items, "second document should have no groups")
+	require.NotNilf(t, initialDocument, "initial document should parse")
+	require.NotNilf(t, secondDocument, "second document should parse")
+	assert.Lenf(t, initialDocument.Items, len(apis.Items), "initial document should have set number of groups")
+	assert.Emptyf(t, secondDocument.Items, "second document should have no groups")
 }
 
 // Show that updating an existing service replaces and does not add the entry
@@ -401,7 +401,7 @@ func TestUpdateService(t *testing.T) {
 
 	_, _, initialDocument := fetchPath(manager, "application/json", discoveryPath, "")
 
-	assert.Equal(t, initialDocument, &apis, "should have returned expected document")
+	assert.Equalf(t, initialDocument, &apis, "should have returned expected document")
 
 	b, err := json.Marshal(apis)
 	if err != nil {
@@ -421,8 +421,8 @@ func TestUpdateService(t *testing.T) {
 	}
 
 	_, _, secondDocument := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, secondDocument, &newapis, "should have returned expected document")
-	assert.NotEqual(t, secondDocument, initialDocument, "should have returned expected document")
+	assert.Equalf(t, secondDocument, &newapis, "should have returned expected document")
+	assert.NotEqualf(t, secondDocument, initialDocument, "should have returned expected document")
 }
 
 func TestMultipleSources(t *testing.T) {
@@ -537,11 +537,11 @@ func TestConcurrentRequests(t *testing.T) {
 				response, body, document := fetchPath(manager, "application/json", discoveryPath, usedEtag)
 
 				if usedEtag != "" {
-					assert.Equal(t, http.StatusNotModified, response.StatusCode, "response should be Not Modified if etag was used")
-					assert.Empty(t, body, "body should be empty if etag used")
+					assert.Equalf(t, http.StatusNotModified, response.StatusCode, "response should be Not Modified if etag was used")
+					assert.Emptyf(t, body, "body should be empty if etag used")
 				} else {
-					assert.Equal(t, http.StatusOK, response.StatusCode, "response should be OK if etag was unused")
-					assert.Equal(t, &apis, document, "document should be equal")
+					assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be OK if etag was unused")
+					assert.Equalf(t, &apis, document, "document should be equal")
 				}
 
 				etag = response.Header.Get("ETag")
@@ -601,7 +601,7 @@ func TestAbuse(t *testing.T) {
 						// Send a request and try to remove a group someone else
 						// might have added
 						_, _, document := fetchPath(manager, "application/json", discoveryPath, "")
-						assert.NotNil(t, document, "manager should always succeed in returning a document")
+						assert.NotNilf(t, document, "manager should always succeed in returning a document")
 
 						if len(document.Items) > 0 {
 							manager.RemoveGroupVersion(metav1.GroupVersion{
@@ -634,10 +634,10 @@ func TestAbuse(t *testing.T) {
 
 				if response.StatusCode == http.StatusNotModified {
 					assert.Equal(t, etag, response.Header.Get("ETag"))
-					assert.Empty(t, body, "body should be empty if etag used")
+					assert.Emptyf(t, body, "body should be empty if etag used")
 					assert.Nil(t, document)
 				} else {
-					assert.Equal(t, http.StatusOK, response.StatusCode, "response should be OK if etag was unused")
+					assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be OK if etag was unused")
 					assert.NotNil(t, document)
 				}
 
@@ -669,7 +669,7 @@ func TestVersionSortingNoPriority(t *testing.T) {
 	})
 
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
 	versions := decoded.Items[0].Versions
 
@@ -694,7 +694,7 @@ func TestVersionSortingWithPriority(t *testing.T) {
 	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1alpha1"}, 1000, 200)
 
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
 	versions := decoded.Items[0].Versions
 
@@ -721,7 +721,7 @@ func TestGroupVersionSortingConflictingPriority(t *testing.T) {
 	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "test", Version: "v1alpha1"}, 2000, 100)
 
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
 	groups := decoded.Items
 
@@ -755,7 +755,7 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 
 	// Expect v1alpha1's group priority to be used and sort it first in the list
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 	assert.Equal(t, "experimental.example.com", decoded.Items[0].Name)
 	assert.Equal(t, "stable.example.com", decoded.Items[1].Name)
 
@@ -763,7 +763,7 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 	manager.RemoveGroupVersion(metav1.GroupVersion{Group: experimentalGroup, Version: "v1alpha1"})
 
 	response, _, decoded = fetchPath(manager, "application/json", discoveryPath, "")
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+	assert.Equalf(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
 	assert.Equal(t, "stable.example.com", decoded.Items[0].Name)
 	assert.Equal(t, "experimental.example.com", decoded.Items[1].Name)

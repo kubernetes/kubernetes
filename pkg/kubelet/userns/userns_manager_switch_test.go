@@ -48,7 +48,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
 		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
-		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
+		require.NoErrorf(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
 	// Test re-init works when the feature gate is disabled and there were some
@@ -60,7 +60,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 	// The feature gate is off, no pods should be allocated.
 	for _, pod := range pods {
 		ok := m2.podAllocated(pod)
-		assert.False(t, ok, "pod %q should not be allocated", pod)
+		assert.Falsef(t, ok, "pod %q should not be allocated", pod)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
 		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
-		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
+		require.NoErrorf(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
 	// Test no-op when the feature gate is disabled and there were some
@@ -97,8 +97,8 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
 		userns, err := m2.GetOrCreateUserNamespaceMappings(&pod, "")
 
-		assert.NoError(t, err, "failed to record userns range for pod %v", podUID)
-		assert.Nil(t, userns, "userns range should be nil for pod %v", podUID)
+		assert.NoErrorf(t, err, "failed to record userns range for pod %v", podUID)
+		assert.Nilf(t, userns, "userns range should be nil for pod %v", podUID)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
 		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
-		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
+		require.NoErrorf(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
 	// Test cleanup works when the feature gate is disabled and there were some
@@ -132,6 +132,6 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	// The feature gate is off, no pods should be allocated.
 	for _, pod := range append(listPods, pods...) {
 		ok := m.podAllocated(pod)
-		assert.False(t, ok, "pod %q should not be allocated", pod)
+		assert.Falsef(t, ok, "pod %q should not be allocated", pod)
 	}
 }

@@ -975,7 +975,7 @@ func TestCustomToUnstructured(t *testing.T) {
 			})
 			require.NoError(t, err)
 			for field, fieldResult := range result {
-				assert.Equal(t, tc.Expected, fieldResult, field)
+				assert.Equalf(t, tc.Expected, fieldResult, field)
 			}
 		})
 	}

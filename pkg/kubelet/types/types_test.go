@@ -172,7 +172,7 @@ func TestSortStatusesOfInitContainers(t *testing.T) {
 	for _, data := range tests {
 		pod.Spec.InitContainers = data.containers
 		result := SortStatusesOfInitContainers(&pod, data.statusMap)
-		require.Equal(t, result, data.expectStatuses, "Unexpected result from SortStatusesOfInitContainers: %v", result)
+		require.Equalf(t, result, data.expectStatuses, "Unexpected result from SortStatusesOfInitContainers: %v", result)
 	}
 }
 

@@ -450,7 +450,7 @@ func TestEventf(t *testing.T) {
 		// We don't get notified by the structured test logger directly.
 		// Instead, we periodically check what new output it has produced.
 		assert.EventuallyWithT(t, func(t *assert.CollectT) {
-			assert.Equal(t, item.expectStructuredLog, logSink.GetBuffer().String()[oldEnd:], "new structured log output")
+			assert.Equalf(t, item.expectStructuredLog, logSink.GetBuffer().String()[oldEnd:], "new structured log output")
 		}, time.Minute, time.Millisecond)
 
 		// validate event

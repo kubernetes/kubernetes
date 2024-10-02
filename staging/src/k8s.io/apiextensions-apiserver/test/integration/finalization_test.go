@@ -90,7 +90,7 @@ func TestFinalization(t *testing.T) {
 	// Check that the object is actually gone.
 	_, err = noxuResourceClient.Get(context.TODO(), name, metav1.GetOptions{})
 	require.Error(t, err)
-	require.True(t, errors.IsNotFound(err), "%#v", err)
+	require.Truef(t, errors.IsNotFound(err), "%#v", err)
 }
 
 func TestFinalizationAndDeletion(t *testing.T) {

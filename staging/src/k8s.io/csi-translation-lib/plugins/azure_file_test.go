@@ -644,7 +644,7 @@ func TestGetStorageAccount(t *testing.T) {
 
 	for i, test := range tests {
 		accountName, err := getStorageAccountName(test.secretName)
-		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]", i)
-		assert.Equal(t, test.expectedResult, accountName, "TestCase[%d]", i)
+		assert.Equalf(t, test.expectedError, err != nil, "TestCase[%d]", i)
+		assert.Equalf(t, test.expectedResult, accountName, "TestCase[%d]", i)
 	}
 }

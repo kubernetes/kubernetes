@@ -116,17 +116,17 @@ func verify(t *testing.T, pm *basicManager, isMirror bool, expectedPod *v1.Pod) 
 	if isMirror {
 		inputPod, ok := pm.mirrorPodByUID[kubetypes.MirrorPodUID(expectedPod.UID)]
 		assert.True(t, ok)
-		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByUID map verification failed.")
+		assert.Emptyf(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByUID map verification failed.")
 		inputPod, ok = pm.mirrorPodByFullName[fullName]
 		assert.True(t, ok)
-		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByFullName map verification failed.")
+		assert.Emptyf(t, cmp.Diff(expectedPod, inputPod), "MirrorPodByFullName map verification failed.")
 	} else {
 		inputPod, ok := pm.podByUID[kubetypes.ResolvedPodUID(expectedPod.UID)]
 		assert.True(t, ok)
-		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "PodByUID map verification failed.")
+		assert.Emptyf(t, cmp.Diff(expectedPod, inputPod), "PodByUID map verification failed.")
 		inputPod, ok = pm.podByFullName[fullName]
 		assert.True(t, ok)
-		assert.Empty(t, cmp.Diff(expectedPod, inputPod), "PodByFullName map verification failed.")
+		assert.Emptyf(t, cmp.Diff(expectedPod, inputPod), "PodByFullName map verification failed.")
 	}
 }
 
@@ -203,36 +203,36 @@ func TestGetSetPods(t *testing.T) {
 			podManager := NewBasicPodManager()
 			podManager.SetPods(test.podList)
 			actualPods := podManager.GetPods()
-			assert.Empty(t, cmp.Diff(test.expectPods, actualPods, sortOpt), "actualPods and expectPods differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPods, actualPods, sortOpt), "actualPods and expectPods differ")
 
 			uid := podManager.TranslatePodUID(test.wantPod.UID)
-			assert.Equal(t, kubetypes.ResolvedPodUID(test.expectUID), uid, "unable to translate pod UID")
+			assert.Equalf(t, kubetypes.ResolvedPodUID(test.expectUID), uid, "unable to translate pod UID")
 
 			fullName := fmt.Sprintf("%s_%s", test.wantPod.Name, test.wantPod.Namespace)
 			actualPod, ok := podManager.GetPodByFullName(fullName)
 			assert.True(t, ok)
-			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by full name and expectGetPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPod, actualPod), "actualPod by full name and expectGetPod differ")
 
 			actualPod, ok = podManager.GetPodByName(test.wantPod.Namespace, test.wantPod.Name)
 			assert.True(t, ok)
-			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
 
 			actualPod, ok = podManager.GetPodByUID(test.wantUID)
 			assert.True(t, ok)
-			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
 
 			podToMirror, mirrorToPod := podManager.GetUIDTranslations()
-			assert.Empty(t, cmp.Diff(test.expectPodToMirrorMap, podToMirror), "podToMirror and expectPodToMirror differ")
-			assert.Empty(t, cmp.Diff(test.expectMirrorToPodMap, mirrorToPod), "mirrorToPod and expectMirrorToPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPodToMirrorMap, podToMirror), "podToMirror and expectPodToMirror differ")
+			assert.Emptyf(t, cmp.Diff(test.expectMirrorToPodMap, mirrorToPod), "mirrorToPod and expectMirrorToPod differ")
 
 			actualPod, ok = podManager.GetMirrorPodByPod(test.wantPod)
 			assert.Equal(t, test.expectedMirrorPod != nil, ok)
-			assert.Empty(t, cmp.Diff(test.expectedMirrorPod, actualPod), "actualPod and expectShouldBeMirrorPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectedMirrorPod, actualPod), "actualPod and expectShouldBeMirrorPod differ")
 
 			actualPod, actualMirrorPod, isMirrorPod := podManager.GetPodAndMirrorPod(test.wantPod)
 			assert.Equal(t, test.isMirrorPod, isMirrorPod)
-			assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
-			assert.Empty(t, cmp.Diff(test.expectedMirrorPod, actualMirrorPod), "actualMirrorPod and shouldBeMirrorPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPod, actualPod), "actualPod and expectGetPod differ")
+			assert.Emptyf(t, cmp.Diff(test.expectedMirrorPod, actualMirrorPod), "actualMirrorPod and shouldBeMirrorPod differ")
 
 			isMirrorPod = IsMirrorPodOf(test.wantPod, mirrorPod)
 			assert.Equal(t, test.isMirrorPod, isMirrorPod)
@@ -240,7 +240,7 @@ func TestGetSetPods(t *testing.T) {
 			if test.isMirrorPod {
 				actualPod, ok = podManager.GetPodByMirrorPod(test.wantPod)
 				assert.Equal(t, test.expectedMirrorPod != nil, ok)
-				assert.Empty(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
+				assert.Emptyf(t, cmp.Diff(test.expectPod, actualPod), "actualPod by name and expectGetPod differ")
 			}
 		})
 	}
@@ -287,10 +287,10 @@ func TestRemovePods(t *testing.T) {
 			actualPods1 := podManager.GetPods()
 			actualPods2, actualMirrorPods, orphanedMirrorPodFullnames := podManager.GetPodsAndMirrorPods()
 			// Check if the actual pods and mirror pods match the expected ones.
-			assert.Empty(t, cmp.Diff(actualPods1, actualPods2, sortOpt), "actualPods by GetPods() and GetPodsAndMirrorPods() differ")
-			assert.Empty(t, cmp.Diff(test.expectPods, actualPods1, sortOpt), "actualPods and expectPods differ")
-			assert.Empty(t, cmp.Diff(test.expectMirrorPods, actualMirrorPods, sortOpt), "actualMirrorPods and expectMirrorPods differ")
-			assert.Empty(t, cmp.Diff(test.expectOrphanedMirrorPodFullnames, orphanedMirrorPodFullnames), "orphanedMirrorPodFullnames and expectOrphanedMirrorPodFullnames differ")
+			assert.Emptyf(t, cmp.Diff(actualPods1, actualPods2, sortOpt), "actualPods by GetPods() and GetPodsAndMirrorPods() differ")
+			assert.Emptyf(t, cmp.Diff(test.expectPods, actualPods1, sortOpt), "actualPods and expectPods differ")
+			assert.Emptyf(t, cmp.Diff(test.expectMirrorPods, actualMirrorPods, sortOpt), "actualMirrorPods and expectMirrorPods differ")
+			assert.Emptyf(t, cmp.Diff(test.expectOrphanedMirrorPodFullnames, orphanedMirrorPodFullnames), "orphanedMirrorPodFullnames and expectOrphanedMirrorPodFullnames differ")
 		})
 	}
 }

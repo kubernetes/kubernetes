@@ -371,14 +371,14 @@ func TestCreateConfig(t *testing.T) {
 		"--webhook-secure-port=10300",
 	}
 	err = fs.Parse(args)
-	require.NoError(t, err, "unexpected error: %s", err)
+	require.NoErrorf(t, err, "unexpected error: %s", err)
 
 	fs.VisitAll(func(f *pflag.Flag) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
 
 	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
-	require.NoError(t, err, "unexpected error: %s", err)
+	require.NoErrorf(t, err, "unexpected error: %s", err)
 
 	expected := &appconfig.Config{
 		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
@@ -437,7 +437,7 @@ func TestCreateConfig(t *testing.T) {
 
 	// Don't check
 	c.SecureServing = nil
-	assert.NotNil(t, c.WebhookSecureServing, "webhook secureserving shouldn't be nil")
+	assert.NotNilf(t, c.WebhookSecureServing, "webhook secureserving shouldn't be nil")
 	c.WebhookSecureServing = nil
 	c.Authentication = apiserver.AuthenticationInfo{}
 	c.Authorization = apiserver.AuthorizationInfo{}

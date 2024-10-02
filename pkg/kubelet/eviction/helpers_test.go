@@ -3457,7 +3457,7 @@ func TestStatsNotFoundForPod(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.Equal(t, 0, test.compFunc(statsFn)(pod1, pod2), "unexpected default result")
+			assert.Equalf(t, 0, test.compFunc(statsFn)(pod1, pod2), "unexpected default result")
 		})
 	}
 }

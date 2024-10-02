@@ -636,7 +636,7 @@ func TestMakePortMappings(t *testing.T) {
 
 	for i, tt := range tests {
 		actual := MakePortMappings(tt.container)
-		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
+		assert.Equalf(t, tt.expectedPortMappings, actual, "[%d]", i)
 	}
 }
 
@@ -670,7 +670,7 @@ func TestHashContainer(t *testing.T) {
 		}
 
 		hashVal := HashContainer(&container)
-		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
+		assert.Equalf(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
 	}
 }
 
@@ -694,7 +694,7 @@ func TestShouldRecordEvent(t *testing.T) {
 
 	var nilObj *v1.ObjectReference = nil
 	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
-	assert.False(t, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
+	assert.Falsef(t, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
 }
 
 func TestHasWindowsHostProcessContainer(t *testing.T) {
@@ -984,8 +984,8 @@ func TestHashContainerWithoutResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			containerCopy := tc.container.DeepCopy()
 			hash := HashContainer(tc.container)
-			assert.Equal(t, tc.expectedHash, hash, "[%s]", tc.name)
-			assert.Equal(t, containerCopy, tc.container, "[%s]", tc.name)
+			assert.Equalf(t, tc.expectedHash, hash, "[%s]", tc.name)
+			assert.Equalf(t, containerCopy, tc.container, "[%s]", tc.name)
 		})
 	}
 }

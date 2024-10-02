@@ -251,7 +251,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer func() {
 				v := recover()
-				assert.Equal(t, testCase.expectPanic, v != nil, "unexpected panic")
+				assert.Equalf(t, testCase.expectPanic, v != nil, "unexpected panic")
 			}()
 			outObject := testCase.convertingObject.DeepCopyObject()
 			// Convert by specifying destination object
@@ -438,7 +438,7 @@ func TestUnstructuredToGVConversion(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer func() {
 				v := recover()
-				assert.Equal(t, testCase.expectPanic, v != nil, "unexpected panic")
+				assert.Equalf(t, testCase.expectPanic, v != nil, "unexpected panic")
 			}()
 			// Convert by specifying destination object
 			outObject, err := scheme.ConvertToVersion(testCase.unstructuredToConvert, testCase.targetGV)

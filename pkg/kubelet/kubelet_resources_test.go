@@ -69,9 +69,9 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	as := assert.New(t)
 	for idx, tc := range cases {
 		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tc.pod, nil)
-		as.NoError(err, "failed to default pod limits: %v", err)
+		as.NoErrorf(err, "failed to default pod limits: %v", err)
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			as.Fail("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)
+			as.Failf("test case [%d] failed.", "Expected: %+v, Got: %+v", idx, tc.expected, actual)
 		}
 	}
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,9 +68,9 @@ func TestPodStatusEqual(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			assert.True(t, PodStatusEqual(tc.sliceA, tc.sliceA), fmt.Sprintf("%v", tc.sliceA))
-			assert.True(t, PodStatusEqual(tc.sliceB, tc.sliceB), fmt.Sprintf("%v", tc.sliceB))
-			assert.Equal(t, tc.expectEqual, PodStatusEqual(tc.sliceA, tc.sliceB), fmt.Sprintf("%v and %v", tc.sliceA, tc.sliceB))
+			assert.Truef(t, PodStatusEqual(tc.sliceA, tc.sliceA), "%v", tc.sliceA)
+			assert.Truef(t, PodStatusEqual(tc.sliceB, tc.sliceB), "%v", tc.sliceB)
+			assert.Equalf(t, tc.expectEqual, PodStatusEqual(tc.sliceA, tc.sliceB), "%v and %v", tc.sliceA, tc.sliceB)
 		})
 
 	}

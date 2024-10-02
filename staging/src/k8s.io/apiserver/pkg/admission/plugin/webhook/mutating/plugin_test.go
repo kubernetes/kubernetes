@@ -184,9 +184,9 @@ func TestAdmit(t *testing.T) {
 				return
 			}
 			if len(tt.ExpectAnnotations) == 0 {
-				assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
+				assert.Emptyf(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			} else {
-				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
+				assert.Equalf(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			}
 			reinvocationCtx := fakeAttr.Attributes.GetReinvocationContext()
 			reinvocationCtx.SetIsReinvoke()

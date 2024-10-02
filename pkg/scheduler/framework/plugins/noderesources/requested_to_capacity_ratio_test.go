@@ -210,7 +210,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
-				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
+				assert.InDeltaf(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
 			}
 		})
 	}

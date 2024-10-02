@@ -2114,7 +2114,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		},
 	}
 
-	assert.False(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
+	assert.Falsef(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
 		"Node address changes are not detected correctly")
 
 	addressSet1 = []v1.NodeAddress{
@@ -2138,7 +2138,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		},
 	}
 
-	assert.True(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
+	assert.Truef(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
 		"Node address changes are not detected correctly")
 
 	addressSet1 = []v1.NodeAddress{
@@ -2166,7 +2166,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		},
 	}
 
-	assert.True(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
+	assert.Truef(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
 		"Node address changes are not detected correctly")
 
 	addressSet1 = []v1.NodeAddress{
@@ -2194,7 +2194,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		},
 	}
 
-	assert.True(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
+	assert.Truef(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
 		"Node address changes are not detected correctly")
 
 	addressSet1 = []v1.NodeAddress{
@@ -2218,7 +2218,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		},
 	}
 
-	assert.True(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
+	assert.Truef(t, nodeAddressesChangeDetected(addressSet1, addressSet2),
 		"Node address changes are not detected correctly")
 }
 

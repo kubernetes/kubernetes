@@ -511,7 +511,7 @@ func TestHandleConnection(t *testing.T) {
 
 	// Test handleConnection
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
-	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
+	assert.Equalf(t, 0, remoteConnection.streamCount, "stream count should be zero")
 	assert.Equal(t, "test data from local", remoteDataReceived.String())
 	assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
@@ -545,7 +545,7 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	// Test handleConnection, using go-routine because it needs to be able to write to unbuffered pf.errorChan
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
 
-	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
+	assert.Equalf(t, 0, remoteConnection.streamCount, "stream count should be zero")
 	assert.Equal(t, "", remoteDataReceived.String())
 	assert.Equal(t, "", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())

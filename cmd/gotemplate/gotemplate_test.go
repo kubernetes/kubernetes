@@ -59,15 +59,15 @@ func TestGenerate(t *testing.T) {
 			tmp := t.TempDir()
 			for fileName, fileContent := range tt.files {
 				err := os.WriteFile(path.Join(tmp, fileName), []byte(fileContent), 0666)
-				require.NoError(t, err, "create input file")
+				require.NoErrorf(t, err, "create input file")
 			}
 			defer os.Chdir(cwd)
-			require.NoError(t, os.Chdir(tmp), "change into tmp directory")
+			require.NoErrorf(t, os.Chdir(tmp), "change into tmp directory")
 			in := strings.NewReader(tt.in)
 			var out bytes.Buffer
 			err := generate(in, &out, tt.data)
 			if tt.expectedErr == "" {
-				require.NoError(t, err, "expand template")
+				require.NoErrorf(t, err, "expand template")
 				require.Equal(t, tt.expected, out.String())
 			} else {
 				require.ErrorContains(t, err, tt.expectedErr)

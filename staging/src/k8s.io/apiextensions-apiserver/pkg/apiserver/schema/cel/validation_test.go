@@ -4381,8 +4381,8 @@ func TestRatcheting(t *testing.T) {
 				WithRatcheting(common.NewCorrelatedObject(c.newObj, c.oldObj, &model.Structural{Structural: c.schema})),
 			)
 
-			require.Len(t, errs, len(c.errors), "must have expected number of errors")
-			require.Len(t, recorder.Warnings(), len(c.warnings), "must have expected number of warnings")
+			require.Lenf(t, errs, len(c.errors), "must have expected number of errors")
+			require.Lenf(t, recorder.Warnings(), len(c.warnings), "must have expected number of warnings")
 
 			// Check that the expected errors were raised
 			for _, expectedErr := range c.errors {
@@ -4394,7 +4394,7 @@ func TestRatcheting(t *testing.T) {
 					}
 				}
 
-				assert.True(t, found, "expected error %q not found", expectedErr)
+				assert.Truef(t, found, "expected error %q not found", expectedErr)
 			}
 
 			// Check that the ratcheting disabled errors were raised as warnings
@@ -4406,7 +4406,7 @@ func TestRatcheting(t *testing.T) {
 						break
 					}
 				}
-				assert.True(t, found, "expected warning %q not found", expectedWarning)
+				assert.Truef(t, found, "expected warning %q not found", expectedWarning)
 			}
 
 		})

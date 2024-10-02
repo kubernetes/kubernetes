@@ -159,12 +159,12 @@ func TestInputStreamRedirects(t *testing.T) {
 		}
 	}))
 	loc, err := url.Parse(s.URL)
-	require.NoError(t, err, "Error parsing server URL")
+	require.NoErrorf(t, err, "Error parsing server URL")
 
 	streamer := &LocationStreamer{
 		Location:        loc,
 		RedirectChecker: PreventRedirects,
 	}
 	_, _, _, err = streamer.InputStream(context.Background(), "", "")
-	assert.Error(t, err, "Redirect should trigger an error")
+	assert.Errorf(t, err, "Redirect should trigger an error")
 }

@@ -319,11 +319,11 @@ func TestController(t *testing.T) {
 			for _, obj := range initialObjects {
 				switch obj.(type) {
 				case *resourceapi.ResourceClaim:
-					require.NoError(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
+					require.NoErrorf(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
 				case *corev1.Pod:
-					require.NoError(t, podInformer.Informer().GetStore().Add(obj), "add pod")
+					require.NoErrorf(t, podInformer.Informer().GetStore().Add(obj), "add pod")
 				case *resourceapi.PodSchedulingContext:
-					require.NoError(t, podSchedulingInformer.Informer().GetStore().Add(obj), "add pod scheduling")
+					require.NoErrorf(t, podSchedulingInformer.Informer().GetStore().Add(obj), "add pod scheduling")
 				default:
 					t.Fatalf("unknown initialObject type: %+v", obj)
 				}
@@ -351,7 +351,7 @@ func TestController(t *testing.T) {
 				t.Fatalf("expected error %q, got %q", test.expectedError, err.Error())
 			}
 			claims, err := kubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
-			require.NoError(t, err, "list claims")
+			require.NoErrorf(t, err, "list claims")
 			var expectedClaims []resourceapi.ResourceClaim
 			if test.expectedClaim != nil {
 				expectedClaims = append(expectedClaims, *test.expectedClaim)
@@ -359,7 +359,7 @@ func TestController(t *testing.T) {
 			assert.Equal(t, expectedClaims, claims.Items)
 
 			podSchedulings, err := kubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
-			require.NoError(t, err, "list pod schedulings")
+			require.NoErrorf(t, err, "list pod schedulings")
 			var expectedPodSchedulings []resourceapi.PodSchedulingContext
 			if test.expectedSchedulingCtx != nil {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
@@ -426,7 +426,7 @@ func (m mockDriver) Allocate(ctx context.Context, claims []*ClaimAllocation, sel
 		if !ok {
 			m.t.Fatalf("unexpected Allocate call for claim %s", claimAllocation.Claim.Name)
 		}
-		assert.Equal(m.t, allocate.selectedNode, selectedNode, "selected node")
+		assert.Equalf(m.t, allocate.selectedNode, selectedNode, "selected node")
 		claimAllocation.Error = allocate.allocErr
 		claimAllocation.Allocation = allocate.allocResult
 	}

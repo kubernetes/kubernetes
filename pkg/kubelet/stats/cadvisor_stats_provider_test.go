@@ -618,11 +618,11 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
 		stats, containerfs, err := provider.ImageFsStats(ctx)
 		if tc.shouldErr {
-			require.Error(t, err, desc)
+			require.Errorf(t, err, desc)
 			assert.Nil(t, stats)
 			assert.Nil(t, containerfs)
 		} else {
-			assert.NoError(t, err, desc)
+			assert.NoErrorf(t, err, desc)
 		}
 	}
 }

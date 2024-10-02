@@ -110,7 +110,7 @@ func TestGetResourceRequest(t *testing.T) {
 	as := assert.New(t)
 	for idx, tc := range cases {
 		actual := GetResourceRequest(tc.pod, tc.resourceName)
-		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+		as.Equalf(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
 	}
 }
 
@@ -260,10 +260,10 @@ func TestExtractResourceValue(t *testing.T) {
 	for idx, tc := range cases {
 		actual, err := ExtractResourceValueByContainerName(tc.fs, tc.pod, tc.cName)
 		if tc.expectedError != nil {
-			require.EqualError(t, err, tc.expectedError.Error(), "expected test case [%d] to fail with error %v; got %v", idx, tc.expectedError, err)
+			require.EqualErrorf(t, err, tc.expectedError.Error(), "expected test case [%d] to fail with error %v; got %v", idx, tc.expectedError, err)
 		} else {
-			require.NoError(t, err, "expected test case [%d] to not return an error; got %v", idx, err)
-			as.Equal(tc.expectedValue, actual, "expected test case [%d] to return %q; got %q instead", idx, tc.expectedValue, actual)
+			require.NoErrorf(t, err, "expected test case [%d] to not return an error; got %v", idx, err)
+			as.Equalf(tc.expectedValue, actual, "expected test case [%d] to return %q; got %q instead", idx, tc.expectedValue, actual)
 		}
 	}
 }

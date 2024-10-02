@@ -35,7 +35,7 @@ func TestCacheNotInitialized(t *testing.T) {
 	cache := newTestCache()
 	// If the global timestamp is not set, always return nil.
 	d := cache.getIfNewerThan(types.UID("1234"), time.Time{})
-	assert.Nil(t, d, "should return nil since cache is not initialized")
+	assert.Nilf(t, d, "should return nil since cache is not initialized")
 }
 
 func getTestPodIDAndStatus(numContainers int) (types.UID, *PodStatus) {
@@ -100,7 +100,7 @@ func TestGetIfNewerThanWhenPodExists(t *testing.T) {
 		cache.UpdateTime(c.cacheTime)
 		cache.Set(podID, status, nil, c.modified)
 		d := cache.getIfNewerThan(podID, timestamp)
-		assert.Equal(t, c.expected, d != nil, "test[%d]", i)
+		assert.Equalf(t, c.expected, d != nil, "test[%d]", i)
 	}
 }
 
@@ -125,7 +125,7 @@ func TestGetPodNewerThanWhenPodDoesNotExist(t *testing.T) {
 	}
 	for i, c := range cases {
 		d := cache.getIfNewerThan(podID, c.timestamp)
-		assert.Equal(t, c.expected, d != nil, "test[%d]", i)
+		assert.Equalf(t, c.expected, d != nil, "test[%d]", i)
 	}
 }
 
@@ -145,8 +145,8 @@ func TestCacheSetAndGet(t *testing.T) {
 		// Read back the status and error stored in cache and make sure they
 		// match the original ones.
 		actualStatus, actualErr := cache.Get(podID)
-		assert.Equal(t, status, actualStatus, "test[%d]", i)
-		assert.Equal(t, c.error, actualErr, "test[%d]", i)
+		assert.Equalf(t, status, actualStatus, "test[%d]", i)
+		assert.Equalf(t, c.error, actualErr, "test[%d]", i)
 	}
 }
 
@@ -178,9 +178,9 @@ func TestDelete(t *testing.T) {
 
 func verifyNotification(t *testing.T, ch chan *data, expectNotification bool) {
 	if expectNotification {
-		assert.NotEmpty(t, ch, "Did not receive notification")
+		assert.NotEmptyf(t, ch, "Did not receive notification")
 	} else {
-		assert.Empty(t, ch, "Should not have triggered the notification")
+		assert.Emptyf(t, ch, "Should not have triggered the notification")
 	}
 	// Drain the channel.
 	for i := 0; i < len(ch); i++ {

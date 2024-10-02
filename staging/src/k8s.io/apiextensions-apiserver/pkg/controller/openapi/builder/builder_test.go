@@ -330,7 +330,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 		}
 		swagger, err := BuildOpenAPIV2(testNamespacedCRD, testCRDVersion, Options{V2: true})
 		require.NoError(t, err)
-		require.Equal(t, len(testCase.paths), len(swagger.Paths.Paths), testCase.scope)
+		require.Equalf(t, len(testCase.paths), len(swagger.Paths.Paths), string(testCase.scope))
 		for path, expected := range testCase.paths {
 			t.Run(path, func(t *testing.T) {
 				path, ok := swagger.Paths.Paths[path]

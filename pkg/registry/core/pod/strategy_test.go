@@ -2430,11 +2430,11 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			test.validation(t, test.pod)
 
 			if test.expectWarning {
-				if assert.NotEmpty(t, warnings.warnings, "expect warnings") {
+				if assert.NotEmptyf(t, warnings.warnings, "expect warnings") {
 					assert.Contains(t, warnings.warnings[0], `deprecated since v1.30; use the "appArmorProfile" field instead`)
 				}
 			} else {
-				assert.Empty(t, warnings.warnings, "shouldn't emit a warning")
+				assert.Emptyf(t, warnings.warnings, "shouldn't emit a warning")
 			}
 		})
 	}

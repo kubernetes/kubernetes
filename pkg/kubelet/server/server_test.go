@@ -599,9 +599,9 @@ func TestAuthFilters(t *testing.T) {
 			defer resp.Body.Close()
 
 			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-			assert.True(t, calledAuthenticate, "Authenticate was not called")
-			assert.True(t, calledAttributes, "Attributes were not called")
-			assert.True(t, calledAuthorize, "Authorize was not called")
+			assert.Truef(t, calledAuthenticate, "Authenticate was not called")
+			assert.Truef(t, calledAttributes, "Attributes were not called")
+			assert.Truef(t, calledAuthorize, "Authorize was not called")
 		})
 	}
 }
@@ -1039,20 +1039,20 @@ func testExecAttach(t *testing.T, verb string) {
 			attachInvoked := false
 
 			checkStream := func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
-				assert.Equal(t, expectedPodName, podFullName, "podFullName")
+				assert.Equalf(t, expectedPodName, podFullName, "podFullName")
 				if test.uid {
-					assert.Equal(t, testUID, string(uid), "uid")
+					assert.Equalf(t, testUID, string(uid), "uid")
 				}
-				assert.Equal(t, expectedContainerName, containerName, "containerName")
-				assert.Equal(t, test.stdin, streamOpts.Stdin, "stdin")
-				assert.Equal(t, test.stdout, streamOpts.Stdout, "stdout")
-				assert.Equal(t, test.tty, streamOpts.TTY, "tty")
-				assert.Equal(t, !test.tty && test.stderr, streamOpts.Stderr, "stderr")
+				assert.Equalf(t, expectedContainerName, containerName, "containerName")
+				assert.Equalf(t, test.stdin, streamOpts.Stdin, "stdin")
+				assert.Equalf(t, test.stdout, streamOpts.Stdout, "stdout")
+				assert.Equalf(t, test.tty, streamOpts.TTY, "tty")
+				assert.Equalf(t, !test.tty && test.stderr, streamOpts.Stderr, "stderr")
 			}
 
 			fw.fakeKubelet.getExecCheck = func(podFullName string, uid types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) {
 				execInvoked = true
-				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+				assert.Equalf(t, expectedCommand, strings.Join(cmd, " "), "cmd")
 				checkStream(podFullName, uid, containerName, streamOpts)
 			}
 
@@ -1063,29 +1063,29 @@ func testExecAttach(t *testing.T, verb string) {
 
 			testStream := func(containerID string, in io.Reader, out, stderr io.WriteCloser, tty bool, done chan struct{}) error {
 				close(done)
-				assert.Equal(t, testContainerID, containerID, "containerID")
-				assert.Equal(t, test.tty, tty, "tty")
-				require.Equal(t, test.stdin, in != nil, "in")
-				require.Equal(t, test.stdout, out != nil, "out")
-				require.Equal(t, !test.tty && test.stderr, stderr != nil, "err")
+				assert.Equalf(t, testContainerID, containerID, "containerID")
+				assert.Equalf(t, test.tty, tty, "tty")
+				require.Equalf(t, test.stdin, in != nil, "in")
+				require.Equalf(t, test.stdout, out != nil, "out")
+				require.Equalf(t, !test.tty && test.stderr, stderr != nil, "err")
 
 				if test.stdin {
 					b := make([]byte, 10)
 					n, err := in.Read(b)
-					assert.NoError(t, err, "reading from stdin")
-					assert.Equal(t, expectedStdin, string(b[0:n]), "content from stdin")
+					assert.NoErrorf(t, err, "reading from stdin")
+					assert.Equalf(t, expectedStdin, string(b[0:n]), "content from stdin")
 				}
 
 				if test.stdout {
 					_, err := out.Write([]byte(expectedStdout))
-					assert.NoError(t, err, "writing to stdout")
+					assert.NoErrorf(t, err, "writing to stdout")
 					out.Close()
 					<-clientStdoutReadDone
 				}
 
 				if !test.tty && test.stderr {
 					_, err := stderr.Write([]byte(expectedStderr))
-					assert.NoError(t, err, "writing to stderr")
+					assert.NoErrorf(t, err, "writing to stderr")
 					stderr.Close()
 					<-clientStderrReadDone
 				}
@@ -1093,7 +1093,7 @@ func testExecAttach(t *testing.T, verb string) {
 			}
 
 			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+				assert.Equalf(t, expectedCommand, strings.Join(cmd, " "), "cmd")
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}
 
@@ -1135,73 +1135,73 @@ func testExecAttach(t *testing.T, verb string) {
 			c = &http.Client{Transport: upgradeRoundTripper}
 
 			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
-			require.NoError(t, err, "POSTing")
+			require.NoErrorf(t, err, "POSTing")
 			defer resp.Body.Close()
 
 			_, err = io.ReadAll(resp.Body)
-			assert.NoError(t, err, "reading response body")
+			assert.NoErrorf(t, err, "reading response body")
 
-			require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
+			require.Equalf(t, test.responseStatusCode, resp.StatusCode, "response status")
 			if test.responseStatusCode != http.StatusSwitchingProtocols {
 				return
 			}
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
-			require.NoError(t, err, "creating streaming connection")
+			require.NoErrorf(t, err, "creating streaming connection")
 			defer conn.Close()
 
 			h := http.Header{}
 			h.Set(api.StreamType, api.StreamTypeError)
 			_, err = conn.CreateStream(h)
-			require.NoError(t, err, "creating error stream")
+			require.NoErrorf(t, err, "creating error stream")
 
 			if test.stdin {
 				h.Set(api.StreamType, api.StreamTypeStdin)
 				stream, err := conn.CreateStream(h)
-				require.NoError(t, err, "creating stdin stream")
+				require.NoErrorf(t, err, "creating stdin stream")
 				_, err = stream.Write([]byte(expectedStdin))
-				require.NoError(t, err, "writing to stdin stream")
+				require.NoErrorf(t, err, "writing to stdin stream")
 			}
 
 			var stdoutStream httpstream.Stream
 			if test.stdout {
 				h.Set(api.StreamType, api.StreamTypeStdout)
 				stdoutStream, err = conn.CreateStream(h)
-				require.NoError(t, err, "creating stdout stream")
+				require.NoErrorf(t, err, "creating stdout stream")
 			}
 
 			var stderrStream httpstream.Stream
 			if test.stderr && !test.tty {
 				h.Set(api.StreamType, api.StreamTypeStderr)
 				stderrStream, err = conn.CreateStream(h)
-				require.NoError(t, err, "creating stderr stream")
+				require.NoErrorf(t, err, "creating stderr stream")
 			}
 
 			if test.stdout {
 				output := make([]byte, 10)
 				n, err := stdoutStream.Read(output)
 				close(clientStdoutReadDone)
-				assert.NoError(t, err, "reading from stdout stream")
-				assert.Equal(t, expectedStdout, string(output[0:n]), "stdout")
+				assert.NoErrorf(t, err, "reading from stdout stream")
+				assert.Equalf(t, expectedStdout, string(output[0:n]), "stdout")
 			}
 
 			if test.stderr && !test.tty {
 				output := make([]byte, 10)
 				n, err := stderrStream.Read(output)
 				close(clientStderrReadDone)
-				assert.NoError(t, err, "reading from stderr stream")
-				assert.Equal(t, expectedStderr, string(output[0:n]), "stderr")
+				assert.NoErrorf(t, err, "reading from stderr stream")
+				assert.Equalf(t, expectedStderr, string(output[0:n]), "stderr")
 			}
 
 			// wait for the server to finish before checking if the attach/exec funcs were invoked
 			<-done
 
 			if verb == "exec" {
-				assert.True(t, execInvoked, "exec should be invoked")
-				assert.False(t, attachInvoked, "attach should not be invoked")
+				assert.Truef(t, execInvoked, "exec should be invoked")
+				assert.Falsef(t, attachInvoked, "attach should not be invoked")
 			} else {
-				assert.True(t, attachInvoked, "attach should be invoked")
-				assert.False(t, execInvoked, "exec should not be invoked")
+				assert.Truef(t, attachInvoked, "attach should be invoked")
+				assert.Falsef(t, execInvoked, "exec should not be invoked")
 			}
 		})
 	}
@@ -1287,31 +1287,31 @@ func TestServePortForward(t *testing.T) {
 			portForwardFuncDone := make(chan struct{})
 
 			fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
-				assert.Equal(t, podName, name, "pod name")
-				assert.Equal(t, podNamespace, namespace, "pod namespace")
+				assert.Equalf(t, podName, name, "pod name")
+				assert.Equalf(t, podNamespace, namespace, "pod namespace")
 				if test.uid {
-					assert.Equal(t, testUID, string(uid), "uid")
+					assert.Equalf(t, testUID, string(uid), "uid")
 				}
 			}
 
 			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 				defer close(portForwardFuncDone)
-				assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
+				assert.Equalf(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 				// The port should be valid if it reaches here.
 				testPort, err := strconv.ParseInt(test.port, 10, 32)
-				require.NoError(t, err, "parse port")
-				assert.Equal(t, int32(testPort), port, "port")
+				require.NoErrorf(t, err, "parse port")
+				assert.Equalf(t, int32(testPort), port, "port")
 
 				if test.clientData != "" {
 					fromClient := make([]byte, 32)
 					n, err := stream.Read(fromClient)
-					assert.NoError(t, err, "reading client data")
-					assert.Equal(t, test.clientData, string(fromClient[0:n]), "client data")
+					assert.NoErrorf(t, err, "reading client data")
+					assert.Equalf(t, test.clientData, string(fromClient[0:n]), "client data")
 				}
 
 				if test.containerData != "" {
 					_, err := stream.Write([]byte(test.containerData))
-					assert.NoError(t, err, "writing container data")
+					assert.NoErrorf(t, err, "writing container data")
 				}
 
 				return nil
@@ -1337,20 +1337,20 @@ func TestServePortForward(t *testing.T) {
 
 			req := makeReq(t, "POST", url, "portforward.k8s.io")
 			resp, err := c.Do(req)
-			require.NoError(t, err, "POSTing")
+			require.NoErrorf(t, err, "POSTing")
 			defer resp.Body.Close()
 
-			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
+			assert.Equalf(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
-			require.NoError(t, err, "creating streaming connection")
+			require.NoErrorf(t, err, "creating streaming connection")
 			defer conn.Close()
 
 			headers := http.Header{}
 			headers.Set("streamType", "error")
 			headers.Set("port", test.port)
 			_, err = conn.CreateStream(headers)
-			assert.Equal(t, test.shouldError, err != nil, "expect error")
+			assert.Equalf(t, test.shouldError, err != nil, "expect error")
 
 			if test.shouldError {
 				return
@@ -1359,18 +1359,18 @@ func TestServePortForward(t *testing.T) {
 			headers.Set("streamType", "data")
 			headers.Set("port", test.port)
 			dataStream, err := conn.CreateStream(headers)
-			require.NoError(t, err, "create stream")
+			require.NoErrorf(t, err, "create stream")
 
 			if test.clientData != "" {
 				_, err := dataStream.Write([]byte(test.clientData))
-				assert.NoError(t, err, "writing client data")
+				assert.NoErrorf(t, err, "writing client data")
 			}
 
 			if test.containerData != "" {
 				fromContainer := make([]byte, 32)
 				n, err := dataStream.Read(fromContainer)
-				assert.NoError(t, err, "reading container data")
-				assert.Equal(t, test.containerData, string(fromContainer[0:n]), "container data")
+				assert.NoErrorf(t, err, "reading container data")
+				assert.Equalf(t, test.containerData, string(fromContainer[0:n]), "container data")
 			}
 
 			<-portForwardFuncDone
