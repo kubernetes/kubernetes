@@ -382,13 +382,11 @@ func makeQuantifier(kind quantifierKind, eh ExprHelper, target ast.Expr, args []
 		step = eh.NewCall(operators.LogicalOr, eh.NewAccuIdent(), args[1])
 		result = eh.NewAccuIdent()
 	case quantifierExistsOne:
-		zeroExpr := eh.NewLiteral(types.Int(0))
-		oneExpr := eh.NewLiteral(types.Int(1))
-		init = zeroExpr
+		init = eh.NewLiteral(types.Int(0))
 		condition = eh.NewLiteral(types.True)
 		step = eh.NewCall(operators.Conditional, args[1],
-			eh.NewCall(operators.Add, eh.NewAccuIdent(), oneExpr), eh.NewAccuIdent())
-		result = eh.NewCall(operators.Equals, eh.NewAccuIdent(), oneExpr)
+			eh.NewCall(operators.Add, eh.NewAccuIdent(), eh.NewLiteral(types.Int(1))), eh.NewAccuIdent())
+		result = eh.NewCall(operators.Equals, eh.NewAccuIdent(), eh.NewLiteral(types.Int(1)))
 	default:
 		return nil, eh.NewError(args[0].ID(), fmt.Sprintf("unrecognized quantifier '%v'", kind))
 	}

@@ -158,7 +158,7 @@ type EntryExpr interface {
 // IDGenerator produces unique ids suitable for tagging expression nodes
 type IDGenerator func(originalID int64) int64
 
-// CallExpr defines an interface for inspecting a function call and its arugments.
+// CallExpr defines an interface for inspecting a function call and its arguments.
 type CallExpr interface {
 	// FunctionName returns the name of the function.
 	FunctionName() string

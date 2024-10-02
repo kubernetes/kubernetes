@@ -100,7 +100,8 @@ argument. Simple numeric and list literals are supported as valid argument
 types; however, other literals will be flagged as errors during macro
 expansion. If the argument expression does not resolve to a numeric or
 list(numeric) type during type-checking, or during runtime then an error
-will be produced. If a list argument is empty, this too will produce an error.
+will be produced. If a list argument is empty, this too will produce an
+error.
 
     math.least(<arg>, ...) -> <double|int|uint>
 
@@ -116,6 +117,244 @@ Examples:
     math.least('string') // parse error
     math.least(a, b)     // check-time error if a or b is non-numeric
     math.least(dyn('string')) // runtime error
+
+### Math.BitOr
+
+Introduced at version: 1
+
+Performs a bitwise-OR operation over two int or uint values.
+
+    math.bitOr(<int>, <int>) -> <int>
+    math.bitOr(<uint>, <uint>) -> <uint>
+
+Examples:
+
+    math.bitOr(1u, 2u)    // returns 3u
+    math.bitOr(-2, -4)    // returns -2
+
+### Math.BitAnd
+
+Introduced at version: 1
+
+Performs a bitwise-AND operation over two int or uint values.
+
+    math.bitAnd(<int>, <int>) -> <int>
+    math.bitAnd(<uint>, <uint>) -> <uint>
+
+Examples:
+
+    math.bitAnd(3u, 2u)   // return 2u
+    math.bitAnd(3, 5)     // returns 3
+    math.bitAnd(-3, -5)   // returns -7
+
+### Math.BitXor
+
+Introduced at version: 1
+
+    math.bitXor(<int>, <int>) -> <int>
+    math.bitXor(<uint>, <uint>) -> <uint>
+
+Performs a bitwise-XOR operation over two int or uint values.
+
+Examples:
+
+    math.bitXor(3u, 5u) // returns 6u
+    math.bitXor(1, 3)   // returns 2
+
+### Math.BitNot
+
+Introduced at version: 1
+
+Function which accepts a single int or uint and performs a bitwise-NOT
+ones-complement of the given binary value.
+
+    math.bitNot(<int>) -> <int>
+    math.bitNot(<uint>) -> <uint>
+
+Examples
+
+    math.bitNot(1)  // returns -1
+    math.bitNot(-1) // return 0
+    math.bitNot(0u) // returns 18446744073709551615u
+
+### Math.BitShiftLeft
+
+Introduced at version: 1
+
+Perform a left shift of bits on the first parameter, by the amount of bits
+specified in the second parameter. The first parameter is either a uint or
+an int. The second parameter must be an int.
+
+When the second parameter is 64 or greater, 0 will be always be returned
+since the number of bits shifted is greater than or equal to the total bit
+length of the number being shifted. Negative valued bit shifts will result
+in a runtime error.
+
+    math.bitShiftLeft(<int>, <int>) -> <int>
+    math.bitShiftLeft(<uint>, <int>) -> <uint>
+
+Examples
+
+    math.bitShiftLeft(1, 2)    // returns 4
+    math.bitShiftLeft(-1, 2)   // returns -4
+    math.bitShiftLeft(1u, 2)   // return 4u
+    math.bitShiftLeft(1u, 200) // returns 0u
+
+### Math.BitShiftRight
+
+Introduced at version: 1
+
+Perform a right shift of bits on the first parameter, by the amount of bits
+specified in the second parameter. The first parameter is either a uint or
+an int. The second parameter must be an int.
+
+When the second parameter is 64 or greater, 0 will always be returned since
+the number of bits shifted is greater than or equal to the total bit length
+of the number being shifted. Negative valued bit shifts will result in a
+runtime error.
+
+The sign bit extension will not be preserved for this operation: vacant bits
+on the left are filled with 0.
+
+    math.bitShiftRight(<int>, <int>) -> <int>
+    math.bitShiftRight(<uint>, <int>) -> <uint>
+
+Examples
+
+    math.bitShiftRight(1024, 2)    // returns 256
+    math.bitShiftRight(1024u, 2)   // returns 256u
+    math.bitShiftRight(1024u, 64)  // returns 0u
+
+### Math.Ceil
+
+Introduced at version: 1
+
+Compute the ceiling of a double value.
+
+    math.ceil(<double>) -> <double>
+
+Examples:
+
+    math.ceil(1.2)   // returns 2.0
+    math.ceil(-1.2)  // returns -1.0
+
+### Math.Floor
+
+Introduced at version: 1
+
+Compute the floor of a double value.
+
+    math.floor(<double>) -> <double>
+
+Examples:
+
+    math.floor(1.2)   // returns 1.0
+    math.floor(-1.2)  // returns -2.0
+
+### Math.Round
+
+Introduced at version: 1
+
+Rounds the double value to the nearest whole number with ties rounding away
+from zero, e.g. 1.5 -> 2.0, -1.5 -> -2.0.
+
+    math.round(<double>) -> <double>
+
+Examples:
+
+    math.round(1.2)  // returns 1.0
+    math.round(1.5)  // returns 2.0
+    math.round(-1.5) // returns -2.0
+
+### Math.Trunc
+
+Introduced at version: 1
+
+Truncates the fractional portion of the double value.
+
+    math.trunc(<double>) -> <double>
+
+Examples:
+
+    math.trunc(-1.3)  // returns -1.0
+    math.trunc(1.3)   // returns 1.0
+
+### Math.Abs
+
+Introduced at version: 1
+
+Returns the absolute value of the numeric type provided as input. If the
+value is NaN, the output is NaN. If the input is int64 min, the function
+will result in an overflow error.
+
+    math.abs(<double>) -> <double>
+    math.abs(<int>) -> <int>
+    math.abs(<uint>) -> <uint>
+
+Examples:
+
+    math.abs(-1)  // returns 1
+    math.abs(1)   // returns 1
+    math.abs(-9223372036854775808) // overlflow error
+
+### Math.Sign
+
+Introduced at version: 1
+
+Returns the sign of the numeric type, either -1, 0, 1 as an int, double, or
+uint depending on the overload. For floating point values, if NaN is
+provided as input, the output is also NaN. The implementation does not
+differentiate between positive and negative zero.
+
+    math.sign(<double>) -> <double>
+    math.sign(<int>) -> <int>
+    math.sign(<uint>) -> <uint>
+
+Examples:
+
+    math.sign(-42) // returns -1
+    math.sign(0)   // returns 0
+    math.sign(42)  // returns 1
+
+### Math.IsInf
+
+Introduced at version: 1
+
+Returns true if the input double value is -Inf or +Inf.
+
+    math.isInf(<double>) -> <bool>
+
+Examples:
+
+    math.isInf(1.0/0.0)  // returns true
+    math.isInf(1.2)      // returns false
+
+### Math.IsNaN
+
+Introduced at version: 1
+
+Returns true if the input double value is NaN, false otherwise.
+
+    math.isNaN(<double>) -> <bool>
+
+Examples:
+
+    math.isNaN(0.0/0.0)  // returns true
+    math.isNaN(1.2)      // returns false
+
+### Math.IsFinite
+
+Introduced at version: 1
+
+Returns true if the value is a finite number. Equivalent in behavior to:
+!math.isNaN(double) && !math.isInf(double)
+
+    math.isFinite(<double>) -> <bool>
+
+Examples:
+
+    math.isFinite(0.0/0.0)  // returns false
+    math.isFinite(1.2)      // returns true
 
 ## Protos
 
@@ -273,10 +512,10 @@ elements in the resulting string.
 
 Examples:
 
-	['hello', 'mellow'].join() // returns 'hellomellow'
-	['hello', 'mellow'].join(' ') // returns 'hello mellow'
-	[].join() // returns ''
-	[].join('/') // returns ''
+    ['hello', 'mellow'].join() // returns 'hellomellow'
+    ['hello', 'mellow'].join(' ') // returns 'hello mellow'
+    [].join() // returns ''
+    [].join('/') // returns ''
 
 ### LastIndexOf
 
